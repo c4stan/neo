@@ -1,0 +1,12 @@
+*
+!.gitignore
+!makedef
+!*.def
+!private/
+!private/**
+!public/
+!public/**
+!shader/
+!shader/**
+!assets/
+!assets/**

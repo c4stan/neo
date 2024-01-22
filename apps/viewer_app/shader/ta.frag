@@ -1,0 +1,207 @@
+#version 450
+
+#include "xs.glsl"
+
+#include "common.glsl"
+
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_color;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture2D tex_history;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_depth;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_prev_depth;
+
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 4 ) uniform sampler sampler_point;
+
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 5 ) uniform shader_cbuffer_t {
+    vec2 resolution_f32;
+} draw_cbuffer;
+
+layout ( location = 0 ) out vec4 out_color;
+
+vec4 clip_aabb ( vec4 color, float p, vec3 minimum, vec3 maximum ) {
+    // note: only clips towards aabb center (but fast!)
+    vec3 center  = 0.5 * ( maximum + minimum );
+    vec3 extents = 0.5 * ( maximum - minimum );
+
+    // This is actually `distance`, however the keyword is reserved
+    vec4 offset = color - vec4 ( center, p );
+    vec3 repeat = abs ( offset.xyz / extents );
+
+    repeat.x = max ( repeat.x, max ( repeat.y, repeat.z ) );
+
+    if ( repeat.x > 1.0 ) {
+        // `color` is not intersecting (nor inside) the AABB; it's clipped to the closest extent
+        return vec4 ( center, p ) + offset / repeat.x;
+    } else {
+        // `color` is intersecting (or inside) the AABB.
+        return color;
+    }
+}
+
+void main ( void ) {
+    // Compute screen uv
+    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    vec2 texel_size = 1.0 / frame_cbuffer.resolution_f32;
+
+    // Sample
+    vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
+    float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
+
+    // closest uv
+#if 0
+    vec2 closest_uv;
+    float closest_depth = 1;
+
+    for ( int x = -1; x <= 1; ++x ) {
+        for ( int y = -1; y <= 1; ++y ) {
+            vec2 sample_offset = vec2 ( x, y );
+            vec2 sample_uv = screen_uv + sample_offset * texel_size;
+            float depth_sample = texture ( sampler2D ( tex_depth, sampler_point ), sample_uv ).x;
+            float d = abs ( depth - depth_sample );
+
+            if ( d < closest_depth ) {
+                closest_depth = d;
+                closest_uv = sample_uv;
+            }
+        }
+    }
+
+#endif
+
+    // reprojection
+    vec3 view = view_from_depth ( screen_uv, depth );
+    vec3 world = ( view_cbuffer.world_from_view * vec4 ( view, 1 ) ).xyz;
+    vec3 prev_screen = prev_screen_from_world ( world );
+    vec2 screen_offset = prev_screen.xy - screen_uv;
+    vec2 reprojected_uv = screen_uv + screen_offset;
+
+    // history sample
+    vec3 history = texture ( sampler2D ( tex_history, sampler_point ), prev_screen.xy ).xyz;
+    float prev_depth = texture ( sampler2D ( tex_prev_depth, sampler_point ), prev_screen.xy ).x;
+
+    //float d1 =  ( depth );
+    //float d2 =  ( prev_depth );
+    //out_color = vec4 ( abs ( d1 - d2 ) * 100000000, 0, 0, 1 );
+    //return;
+
+#if 0
+    // depth disocclusion
+    float depth_diff = 1 - depth / prev_depth;
+    float depth_factor = exp2 ( -20 * abs ( depth_diff ) );
+    if ( depth_factor < 0.9 ) {
+    //if ( abs ( linearize_depth ( depth ) - linearize_depth ( prev_depth ) ) > 0.1 ) {
+
+#if 0
+        vec3 color_min = color;
+        vec3 color_max = color;
+
+        for ( int y = -1; y < 1; ++y ) {
+            for ( int x = -1; x < 1; ++x ) {
+                vec2 sample_uv = vec2 ( ( gl_FragCoord.xy + ivec2 ( x, y ) ) / frame_cbuffer.resolution_f32 );
+                vec3 c = texture ( sampler2D ( tex_color, sampler_point ), sample_uv ).xyz;
+                color_min = min ( color_min, c );
+                color_max = max ( color_max, c );
+            }
+        }
+
+        // TODO does this make any sense?
+        //history = clip_aabb ( vec4 ( history, 0 ), 0, color_min, color_max ).xyz;
+        //color = mix ( history, color, 0 );
+#endif
+
+        out_color = vec4 ( color, 1 );
+        return;
+    }
+#endif
+
+#if 0
+
+#if 0
+    // Sample color for pixel and neighborhood
+    vec3 tile[3][3];
+    vec3 tile_min = vec3 ( 1, 1, 1 );
+    vec3 tile_max = vec3 ( 0, 0, 0 );
+
+    for ( int x = -1; x <= 1; ++x ) {
+        for ( int y = -1; y <= 1; ++y ) {
+            vec2 sample_offset = vec2 ( x, y );
+            vec2 sample_uv = screen_uv + sample_offset * texel_size;
+
+            vec3 color_sample = texture ( sampler2D ( tex_history, sampler_point ), sample_uv ).xyz;
+            tile[x + 1][y + 1] = color_sample;
+
+            tile_max = max ( tile_max, color_sample );
+            tile_min = min ( tile_min, color_sample );
+        }
+    }
+
+    // Neighborhood clamping
+    vec3 min_cross = min ( min ( tile[0][0], tile[2][2] ), min ( tile[0][2], tile[2][0] ) );
+    vec3 max_cross = max ( max ( tile[0][0], tile[2][2] ), max ( tile[0][2], tile[2][0] ) );
+    vec3 min_plus  = min ( min ( tile[0][1], tile[2][1] ), min ( tile[1][0], tile[1][2] ) );
+    vec3 max_plus  = max ( max ( tile[0][1], tile[2][1] ), max ( tile[1][0], tile[1][2] ) );
+
+    //tile_min = min_cross * 0.5 + min_plus * 0.5;
+    //tile_max = max_cross * 0.5 + max_plus * 0.5;
+    //history = clamp ( history, tile_min, tile_max );
+
+    tile_max = mix ( tile_max, max_plus, 0.5 );
+    tile_min = mix ( tile_min, min_plus, 0.5 );
+
+    //history = clip_aabb ( vec4 ( color, 0 ), 0, tile_min, tile_max ).xyz;
+
+    float luma_min = rgb_to_luma ( tile_min );
+    float luma_max = rgb_to_luma ( tile_max );
+    float luma_history = rgb_to_luma ( history );
+#endif
+
+    // Blend factor
+    vec2 pixel_offset = screen_offset * frame_cbuffer.resolution_f32;
+    float motion_factor = clamp ( dot ( 1.0.xx, 0.5 - abs ( 0.5 - fract ( pixel_offset ) ) ), 0.0, 1.0 );
+    //float contrast_factor = 0.125f * min ( luma_history, luma_min ) / ( 0.00005 + max ( abs ( luma_min - luma_history ), abs ( luma_max - luma_history ) ) );
+    float blend_factor = 0.05 * ( 1 + motion_factor * 4 );// * contrast_factor;
+
+#if 0
+    if ( dot ( 1.0.xxx, history ) == 0 ) {
+        //blend_factor = 1;
+    }
+#endif
+
+    ///
+#else
+    
+    vec3 vsum = 0.0.xxx;
+    vec3 vsum2 = 0.0.xxx;
+    float wsum = 0.0;
+
+    const int k = 2;
+    for ( int y = -k; y <= k; ++y ) {
+        for ( int x = -k; x <= k; ++x ) {
+            vec2 sample_uv = vec2 ( ( gl_FragCoord.xy + ivec2 ( x, y ) * 2 ) / frame_cbuffer.resolution_f32 );
+            vec3 neigh = texture ( sampler2D ( tex_color, sampler_point ), sample_uv ).xyz;
+            float w = exp ( -3.0 * float ( x * x + y * y ) / float ( ( k+1. ) * ( k+1. ) ) );
+            vsum += neigh * w;
+            vsum2 += neigh * neigh * w;
+            wsum += w;
+        }
+    }
+
+    vec3 ex = vsum / wsum;
+    vec3 ex2 = vsum2 / wsum;
+    vec3 dev = sqrt (max ( 0.0.xxx, ex2 - ex * ex ) );
+
+    float box_size = 0.5;
+
+    const float n_deviations = 5.0;
+    vec3 nmin = mix ( color, ex, box_size * box_size ) - dev * box_size * n_deviations;
+    vec3 nmax = mix ( color, ex, box_size * box_size ) + dev * box_size * n_deviations;
+    
+    history = clamp ( history, nmin, nmax );
+
+    vec2 pixel_offset = screen_offset * frame_cbuffer.resolution_f32;
+    float motion_factor = clamp ( dot ( 1.0.xx, 0.5 - abs ( 0.5 - fract ( pixel_offset ) ) ), 0.0, 1.0 );
+    float blend_factor = 0.05 * (1 + motion_factor * 4);// 1.0 / 8.0;
+#endif
+    color = mix ( history, color, blend_factor );
+
+    out_color = vec4 ( color, 1 );
+}

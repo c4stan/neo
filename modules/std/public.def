@@ -1,0 +1,38 @@
+# std_module
+std_module_injection_m                    std_on_m
+std_module_logging_m                      std_on_m
+std_module_max_modules_m                  256
+std_module_name_max_len_m                 128
+
+# std_log
+std_log_enabled_levels_m                  std_log_level_all_m
+std_log_colored_console_output_m          std_on_m
+
+# std_thread
+std_thread_max_threads_m                  128
+std_thread_name_max_len_m                 32
+#std_thread_main_thread_core_usage_m      std_thread_core_usage_default_m
+#std_thread_main_thread_core_pairing_m    std_thread_core_pairing_default_m
+#std_thread_main_thread_core_sharing_m    std_thread_core_sharing_default_m
+#std_thread_main_thread_wake_priority_m   std_thread_wake_priority_default_m
+std_thread_main_thread_core_mask_m        std_thread_core_mask_any_m
+std_thread_main_thread_name_m             "MAIN_THREAD"
+std_thread_stack_size_m                   1024 * 1024 * 8
+
+# std_process
+std_process_name_max_len_m                64
+std_process_path_max_len_m                1024
+std_process_max_args_m                    128
+std_process_args_max_len_m                1024
+std_process_cmdline_max_len_m             4096
+std_process_max_processes_m               16
+std_process_max_pipes_m                   32
+std_process_pipe_name_max_len_m           128
+
+#std_allocator
+#std_segment_pool_max_bins_m               8
+std_tagged_allocator_max_bins_m           128
+
+#std_platform
+std_l1d_size_m                            64
+std_vmem_page_size_m                      1024 * 4

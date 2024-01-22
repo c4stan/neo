@@ -1,0 +1,8 @@
+# wm
+wm_input_events_m std_on_m
+wm_input_state_m  std_on_m
+
+# wm_window
+wm_max_input_event_handlers_m 256
+wm_max_windows_m 256
+wm_window_name_size 32

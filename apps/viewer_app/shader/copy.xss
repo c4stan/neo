@@ -1,0 +1,18 @@
+vertex_shader screen_space.vert
+fragment_shader copy.frag
+
+include common_graphics.xsi
+
+begin render_target 0
+    format R32_FLOAT
+end
+
+begin texture
+    stage fragment
+    register 0
+end
+
+begin sampler
+    stage fragment
+    register 1
+end

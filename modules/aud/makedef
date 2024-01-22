@@ -1,0 +1,13 @@
+name = aud
+code = public, private
+defs = public.def
+configs = debug, release
+if win32
+    libs = Winmm.lib, ksuser.lib
+endif
+if linux
+    libs = asound
+endif
+output = dll
+deps = std
+ignores = aud_mixer.c

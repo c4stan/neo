@@ -1,0 +1,31 @@
+vertex_shader xui_render.vert
+fragment_shader xui_render.frag
+
+begin render_target 0
+    blend on
+    blend_color_op add
+    blend_alpha_op add
+    blend_color_src src_alpha
+    blend_color_dst one_minus_src_alpha
+    blend_alpha_src one
+    blend_alpha_dst one
+end
+
+begin input 0
+    pos R32G32_FLOAT
+    uv R32G32_FLOAT
+    color R32G32B32A32_FLOAT
+end
+
+begin texture
+    update per_draw
+    register 0
+    access read
+    stage fragment
+end
+
+begin sampler
+    update per_draw
+    register 1
+    stage fragment
+end

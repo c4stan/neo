@@ -1,0 +1,77 @@
+#version 450
+
+#include "xs.glsl"
+
+#include "common.glsl"
+
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_normal;
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
+layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_hiz;
+
+layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
+
+layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+    vec2 resolution_f32;
+    uint hiz_mip_count;
+} draw_cbuffer;
+
+layout ( location = 0 ) out vec4 out_color;
+
+// ---
+// TODO: try: downsample depth & normals -> raytrace in half-resolution -> upsample result back using a bi-filter (read half res depth and normals)
+void main ( void ) {
+    // Compute screen uv
+    vec2 screen_uv = vec2 ( gl_FragCoord.xy / draw_cbuffer.resolution_f32 );
+
+    // Sample
+    // TODO pass prev frame camera data and account for movement when sampling prev frame textures
+    //vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
+    vec4 norm_rough_sample = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv );
+    vec3 view_normal = norm_rough_sample.xyz * 2 - 1;
+    float roughness = 0;//norm_rough_sample.w;
+    float depth = textureLod ( sampler2D ( tex_hiz, sampler_point ), screen_uv, 0 ).x;
+    vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
+    vec3 view_pos = view_from_depth ( screen_uv, depth );
+
+    // Trace
+    vec3 view_ray_dir = reflect ( normalize ( view_pos ), view_normal );
+
+    uint rng_state = rng_wang_init ( gl_FragCoord.xy );
+    float ex = rng_wang ( rng_state );
+    float ey = rng_wang ( rng_state );
+    vec2 e2 = vec2 ( ex, ey );
+    vec3 wo = normalize ( -view_pos );
+    vec3 wi = ggx_sample ( e2, wo, view_normal, roughness );
+    //float p = ggx_pdf ( wi, wo, view_normal, roughness );
+    //view_ray_dir = wi;
+
+    //view_ray_dir = normalize ( view_ray_dir * 0 + wi );
+
+    vec3 sample_color = vec3 ( 0, 0, 0 );
+    float sample_distance = 1;
+
+    /*
+        depth thickness:
+            render objects to the usual depth prepass and gbuffer passes
+            render objects to a new depth buffer using frontface culling and closest depth test
+            render objects to the thickness buffer, depth equal with the first depth prepass (same way as a forward pass)
+                but in the shader compare depth with sampled frontface culled depth, store difference in the thickness buffer
+            sample thickness from the SSR shader to determine proper thickness value
+    */
+
+    if ( depth < 1 && roughness < 1 ) {
+        vec3 hit_screen_pos;
+        float hit_depth;
+
+        if ( trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_cbuffer.hiz_mip_count, sampler_point, 300 ) ) {
+            vec3 hit_color = texture ( sampler2D ( tex_color, sampler_point ), hit_screen_pos.xy ).xyz;
+            float depth_delta = -(linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ));
+            float depth_threshold = 0.4;
+            sample_color = mix ( hit_color, vec3 ( 0, 0, 0 ), clamp ( depth_delta, 0, depth_threshold ) * 1.f / depth_threshold );
+            //sample_color = hit_color;
+        }
+    }
+
+    // TODO should the attenuation depend on the specular of the reflecting surface?
+    out_color = vec4 ( sample_color, 1 );
+}

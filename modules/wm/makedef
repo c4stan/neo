@@ -1,0 +1,13 @@
+name = wm
+output = dll
+configs = debug, release
+defs = public.def
+code = public, private
+deps = std
+ignorelist = wm_manager
+if win32
+    libs = user32.lib
+endif
+if linux
+    libs = X11
+endif

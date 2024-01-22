@@ -1,0 +1,18 @@
+vertex_shader main.vert
+fragment_shader main.frag
+
+begin rasterizer
+    cull back
+    front clockwise
+end
+
+begin render_target 0
+    format B8G8R8A8_UNORM
+end
+
+begin buffer
+    register 0
+    stage vertex
+    access read
+    update per_draw
+end

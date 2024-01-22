@@ -1,0 +1,4 @@
+se_component_flags_block_count_m  1
+# TODO increase to 1M+
+se_max_entities_m                 65536
+se_max_pending_queries_m          128

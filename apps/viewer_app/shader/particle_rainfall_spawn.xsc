@@ -1,0 +1,8 @@
+include common.xsi
+
+compute_shader particle_rainfall_spawn.comp
+
+begin buffer
+    stage fragment
+    register 0
+end

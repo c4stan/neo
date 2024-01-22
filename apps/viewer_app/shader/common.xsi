@@ -1,0 +1,13 @@
+begin buffer
+    stage vertex
+    stage fragment
+    set frame
+    register 0
+end
+
+begin buffer
+    stage vertex
+    stage fragment
+    set view
+    register 0
+end

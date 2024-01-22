@@ -1,0 +1,10 @@
+vertex_shader vert_kernel.vert
+fragment_shader frag_kernel.frag
+
+begin render_target 0
+    format R8G8B8A8_UNORM
+end
+
+begin viewport
+    dynamic on
+end

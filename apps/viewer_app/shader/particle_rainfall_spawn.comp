@@ -1,0 +1,34 @@
+#version 450
+
+#include "xs.glsl"
+#include "common.glsl"
+
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+    uint particle_count;
+    uint spawn_count;
+} draw_cbuffer;
+
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer particle_buffer_t {
+    vec4 data[];
+} particle_buffer;
+
+//layout ( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
+
+void main() {
+    return;
+    uint spawn_idx = gl_GlobalInvocationID.x;
+
+    if ( spawn_idx >= draw_cbuffer.spawn_count ) {
+        return;
+    }
+
+    uint rng_state = rng_wang_init ( vec2 ( spawn_idx, spawn_idx ) );
+    float u = rng_wang ( rng_state );
+    float v = rng_wang ( rng_state );
+
+    uint data_idx = ( draw_cbuffer.particle_count + spawn_idx );
+    particle_buffer.data[data_idx][0] = u;
+    particle_buffer.data[data_idx][1] = v;
+    particle_buffer.data[data_idx][2] = 0;
+    particle_buffer.data[data_idx][3] = 0;
+}

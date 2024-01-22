@@ -1,0 +1,6 @@
+name = se
+code = public, private
+defs = public.def
+configs = debug, release
+output = dll
+deps = std

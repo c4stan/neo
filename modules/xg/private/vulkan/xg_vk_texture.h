@@ -1,0 +1,91 @@
+#pragma once
+
+#include <xg.h>
+
+#include "xg_vk.h"
+
+#include <std_allocator.h>
+#include <std_mutex.h>
+
+typedef struct {
+    xg_texture_view_t desc;
+    xg_format_e format;
+    uint32_t mip_count;
+    uint32_t array_count;
+    VkImageAspectFlags aspect;
+} xg_vk_texture_view_params_t;
+
+typedef struct {
+    VkImageView vk_handle;
+    xg_vk_texture_view_params_t params;
+} xg_vk_texture_view_t;
+
+// TODO rename enum to something more meaningful/specific?
+typedef enum {
+    xg_vk_texture_state_reserved_m,
+    xg_vk_texture_state_created_m
+} xg_vk_texture_state_e;
+
+typedef struct {
+    VkImage                 vk_handle;
+    xg_alloc_t              allocation;
+    xg_texture_params_t     params;
+    xg_texture_flags_b      flags;
+    //VkImageView             vk_view; // default view
+
+    //xg_texture_view_h       default_view;
+    xg_vk_texture_view_t    default_view;
+
+    union {
+        struct {
+            std_memory_h handle;
+            xg_vk_texture_view_t* array;
+        } mips;
+        // TODO use std_map_t? and store <xg_vk_texture_view_t, xg_texture_view_t> in payload
+        struct {
+            // TODO not implemented yet
+            std_memory_h keys_handle;
+            std_memory_h payloads_handle;
+            std_memory_h map_handle;
+            std_hash_map_t* map; // xg_texture_view_t -> xg_vk_texture_view_t
+        } table;
+    } external_views;
+
+    xg_vk_texture_state_e   state;
+    xg_texture_aspect_e     default_aspect;
+} xg_vk_texture_t;
+
+typedef struct {
+    std_memory_h textures_memory_handle;
+    xg_vk_texture_t* textures_array;
+    xg_vk_texture_t* textures_freelist;
+    std_mutex_t textures_mutex;
+
+#if 0
+    std_memory_h texture_views_memory_handle;
+    xg_vk_texture_view_t* texture_views_array;
+    xg_vk_texture_view_t* texture_views_freelist;
+    std_mutex_t texture_views_mutex;
+#endif
+} xg_vk_texture_state_t;
+
+void xg_vk_texture_load ( xg_vk_texture_state_t* state );
+void xg_vk_texture_reload ( xg_vk_texture_state_t* state );
+void xg_vk_texture_unload ( void );
+
+xg_texture_h xg_texture_create ( const xg_texture_params_t* params );
+
+xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params );
+bool xg_texture_alloc ( xg_texture_h texture );
+
+bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture );
+bool xg_texture_destroy ( xg_texture_h texture );
+
+bool xg_texture_resize ( xg_texture_h texture, size_t width, size_t height );
+
+xg_texture_h xg_vk_texture_register_swapchain_texture ( const xg_texture_params_t* params, VkImage image );
+void xg_vk_texture_update_swapchain_texture ( xg_texture_h texture, const xg_texture_params_t* params, VkImage image );
+void xg_vk_texture_unregister_swapchain_texture ( xg_texture_h texture );
+
+const xg_vk_texture_t* xg_vk_texture_get ( xg_texture_h handle );
+const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture, xg_texture_view_t view );

@@ -1,0 +1,7 @@
+# fs
+fs_volume_guid_size_m     256
+fs_volume_name_size_m     64
+fs_volume_fs_size_m       16
+
+# fs_path
+fs_path_size_m            32767

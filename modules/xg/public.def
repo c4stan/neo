@@ -1,0 +1,123 @@
+
+########## xg ##########
+
+xg_device_name_size_m                         256
+xg_display_name_size_m                        256
+xg_display_max_modes_m                        128
+
+xg_vertex_stream_max_bindings_m               32
+xg_input_layout_max_streams_m                 8
+xg_input_layout_stream_max_attributes_m       8
+
+xg_pipeline_resource_max_bindings_m           64
+xg_pipeline_constant_max_bindings_m           4
+xg_pipeline_resource_max_buffers_per_set_m    16
+xg_pipeline_resource_max_textures_per_set_m   16
+xg_pipeline_resource_max_samplers_per_set_m   4
+xg_pipeline_resource_max_bindings_per_set_m   (xg_pipeline_resource_max_buffers_per_set_m + xg_pipeline_resource_max_textures_per_set_m + xg_pipeline_resource_max_samplers_per_set_m)
+
+xg_pipeline_output_max_color_targets_m        8
+
+xg_swapchain_max_textures_m                   8
+
+xg_workload_max_queued_workloads_m            4
+xg_workload_max_allocated_workloads_m         8
+xg_vk_workload_uniform_buffer_size_m          2 * 1024 * 1024
+xg_workload_max_timestamp_query_pools_per_workload_m    8
+xg_workload_timing_name_size_m                32
+
+xg_cmd_buffer_max_cmd_buffers_per_workload_m  4
+xg_cmd_buffer_max_resource_cmd_buffers_per_workload_m     4
+
+xg_cmd_buffer_cmd_buffer_size_m               1024 * 1024
+xg_cmd_buffer_max_cmd_buffers_m               32
+xg_cmd_buffer_preallocated_cmd_buffers_m      16
+
+xg_cmd_buffer_resource_cmd_buffer_size_m      1024 * 1024
+xg_cmd_buffer_max_resource_cmd_buffers_m      16
+xg_cmd_buffer_preallocated_resource_cmd_buffers_m     8
+
+xg_alloc_enable_default_allocators_m          std_on_m
+
+xg_crash_on_validation_error_m                false
+
+########## debug ##########
+
+xg_debug_events_log_m                         std_off_m
+xg_debug_flush_gpu_submissions_m              std_off_m
+# TODO move this to Vulkan backend?
+xg_debug_disable_semaphore_frame_sync_m       std_off_m
+xg_debug_simple_frame_test_m                  std_off_m
+
+xg_debug_name_size_m                          32
+
+xg_debug_measure_present_time_m               std_off_m
+xg_debug_measure_acquire_time_m               std_off_m
+xg_debug_measure_workload_wait_time_m         std_off_m
+
+########## Backends ##########
+
+xg_backend_vulkan_m                             std_on_m
+
+########## Vulkan Backend ##########
+
+# Resources containers
+xg_vk_max_devices_m                             4
+xg_vk_max_active_devices_m                      1
+xg_vk_max_swapchains_m                          128
+xg_vk_max_graphics_pipelines_m                  1024
+xg_vk_max_compute_pipelines_m                   128
+xg_vk_max_renderpasses_m                        1024
+xg_vk_max_framebuffers_m                        1024
+xg_vk_max_buffers_m                             1024 * 2
+xg_vk_max_textures_m                            1024 * 2
+xg_vk_max_texture_views_m                       1024 * 10
+xg_vk_max_samplers_m                            512
+xg_vk_max_gpu_events_m                          1024
+# one per workload + one per swapchain image (x number of swapchains? in theory)
+xg_vk_max_gpu_queue_events_m                    (xg_workload_max_allocated_workloads_m + xg_swapchain_max_textures_m)
+# one per workload
+xg_vk_max_cpu_queue_events_m                    xg_workload_max_allocated_workloads_m
+xg_vk_max_descriptor_sets_layouts_m             1024 * 2
+xg_vk_max_pipeline_resource_groups_m            1024
+xg_vk_max_query_pools_m                         32
+
+xg_vk_max_allocations_m                         1024 * 4
+xg_vk_max_linear_allocators_m                   32
+
+# cmd buffer management
+xg_vk_cmd_buffer_max_cmd_allocators_m           16
+xg_vk_cmd_buffer_cmd_buffers_per_allocator_m    4
+xg_vk_cmd_buffer_max_desc_allocators_m          16
+
+xg_vk_cmd_buffer_max_framebuffers_per_workload_m    4
+xg_vk_cmd_buffer_max_fences_m                       16
+xg_vk_cmd_buffer_max_translates_per_submit_m        2
+
+xg_vk_cmd_buffer_max_execution_barriers_per_cmd_m   8
+xg_vk_cmd_buffer_max_memory_barriers_per_cmd_m      8
+xg_vk_cmd_buffer_max_buffer_barriers_per_cmd_m      16
+xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m     16
+
+# descriptor management
+xg_vk_max_samplers_per_descriptor_pool_m                16
+xg_vk_max_sampled_texture_per_descriptor_pool_m         128
+xg_vk_max_storage_texture_per_descriptor_pool_m         8
+xg_vk_max_uniform_buffer_per_descriptor_pool_m          128
+xg_vk_max_storage_buffer_per_descriptor_pool_m          8
+xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m    8
+xg_vk_max_storage_texel_buffer_per_descriptor_pool_m    8
+
+# Size of static stack-allocated temporary buffers used to query the Vulkan API
+xg_vk_query_max_device_extensions_m             256
+xg_vk_query_max_layers_m                        128
+xg_vk_query_max_surface_formats_m               1024
+xg_vk_query_max_present_modes_m                 32
+xg_vk_query_max_instance_extensions_m           128
+xg_vk_query_instance_layers_buffer_size_m       1024 * 4
+xg_vk_query_instance_extensions_buffer_size_m   1024 * 4
+xg_vk_query_max_device_displays_m               16
+
+xg_vk_enable_sync2_m                            std_on_m
+
+xg_vk_enable_raytracing                         std_off_m

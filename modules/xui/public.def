@@ -1,0 +1,15 @@
+xui_element_max_layers_m 32
+
+xui_window_title_size 32
+xui_button_text_size 32
+xui_label_text_size 32
+xui_section_title_size 32
+
+xui_workload_max_rects_m 1024
+xui_workload_max_tris_m 1024
+xui_workload_max_workloads_m 8
+xui_workload_max_submitted_workloads_m 4
+
+xui_font_max_fonts_m 32
+xui_font_texture_atlas_width_m 512
+xui_font_texture_atlas_height_m 512

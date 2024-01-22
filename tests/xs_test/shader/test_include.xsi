@@ -1,0 +1,10 @@
+begin render_target 0
+    format B8G8R8A8_UNORM
+    blend off
+    blend_color_src one
+    blend_color_dst zero
+    blend_color_op add
+    blend_alpha_src one
+    blend_alpha_dst zero
+    blend_alpha_op add
+end

@@ -1,0 +1,7 @@
+aud_device_name_size_m            256
+aud_device_max_devices_m          32
+aud_device_max_submit_contexts_m  32
+aud_device_submit_block_max_ms_m  200
+
+aud_source_max_sources_m          128
+aud_source_max_playing_sources_m  32

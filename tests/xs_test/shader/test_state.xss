@@ -1,0 +1,53 @@
+vertex_shader vert_kernel.vert
+
+fragment_shader frag_kernel.frag
+
+// missing input layout and multisampling (part of rasterizer?) related state
+
+include test_include.xsi
+
+begin viewport
+    dynamic on
+    min_depth 0
+    max_depth 1
+end
+
+begin rasterizer
+    depth_clamp off
+    discard off
+    polygon fill // line point
+    line_width 1.0
+    cull back
+    front clockwise
+    depth_bias off
+    depth_bias_const 0.0
+    depth_bias_clamp 0.0
+    depth_bias_slope 0.0
+end
+
+begin depth_stencil
+    min_depth_bound 0
+    max_depth_bound 1
+    depth_bound_test off
+    depth_test off
+    depth_write off
+    depth_test_op less
+    stencil_test off
+end
+
+begin buffer
+    register 0
+    stage pixel
+    access read
+    update per_draw
+    texel off
+end
+
+/*
+begin texture 0
+    stage pixel // vertex
+    access read
+    update per_object
+    // sampler linear -- is there a reason to support embedding samplers in textures?
+end
+*/

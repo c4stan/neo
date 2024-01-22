@@ -1,0 +1,5 @@
+# tk
+
+tk_max_threads_m              64
+tk_max_fibers_m               1024
+tk_max_parallel_tasks_m       1024 * 128

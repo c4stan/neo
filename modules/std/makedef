@@ -1,0 +1,8 @@
+name = std
+output = lib
+configs = debug, release
+defs = public.def
+code = public, private
+if linux
+    libs = m, dl, pthread
+endif

@@ -1,0 +1,7 @@
+include downsample_common.xsi
+
+fragment_shader downsample_depth.frag
+
+begin render_target 0
+    format R16_UNORM
+end

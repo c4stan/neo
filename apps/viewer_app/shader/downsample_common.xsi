@@ -1,0 +1,19 @@
+vertex_shader screen_space.vert
+fragment_shader downsample.frag
+
+include common_graphics.xsi
+
+begin texture
+    stage fragment
+    register 0
+end
+
+begin sampler
+    stage fragment
+    register 1
+end
+
+begin buffer
+    stage fragment
+    register 2
+end

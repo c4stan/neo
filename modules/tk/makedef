@@ -1,0 +1,7 @@
+name = tk
+output = dll
+configs = debug, release
+code = public, private
+deps = std
+defs = public.def
+ignores = tk_worker.c

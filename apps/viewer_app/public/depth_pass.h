@@ -1,0 +1,6 @@
+#pragma once
+
+#include <xf.h>
+
+xf_node_h add_depth_clear_pass ( xf_graph_h graph, xf_texture_h depth, const char* name );
+xf_node_h add_depth_pass ( xf_graph_h graph, xf_texture_h depth );

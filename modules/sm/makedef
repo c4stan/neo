@@ -1,0 +1,6 @@
+name = sm
+code = public, private
+defs = public.def
+configs = debug, release
+output = inl
+deps = std

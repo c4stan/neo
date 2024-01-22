@@ -1,0 +1,10 @@
+*
+!.gitignore
+!makedef
+!*.def
+!private/
+!private/**
+!public/
+!public/**
+!assets/
+!assets/**

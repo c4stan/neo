@@ -1,0 +1,69 @@
+#version 450
+
+#include "xs.glsl"
+
+#include "common.glsl"
+
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_color;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture2D tex_normal;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_depth;
+
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform sampler sampler_point;
+
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 4 ) uniform shader_cbuffer_t {
+    // separate from frame resolution to allow for downsampling while blurring? not sure if this is useful
+    vec2 src_resolution_f32;
+    vec2 dst_resolution_f32;
+
+    // (1,0) for horizontal, (0,1) for vertical
+    vec2 direction;
+
+    // one tap per kernel value
+    uint kernel_size; // == kernel_radius * 2 + 1
+    uint _pad0;
+    vec4 kernel[32]; // only .x is used...
+} draw_cbuffer;
+
+layout ( location = 0 ) out vec4 out_color;
+
+void main ( void ) {
+    // Compute screen uv
+    vec2 screen_uv = vec2 ( gl_FragCoord.xy / draw_cbuffer.dst_resolution_f32 );
+
+    // Sample
+    vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
+    float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
+
+    vec3 view_pos = view_from_depth ( screen_uv, depth );
+
+    vec2 color_texel_size = 1.0 / draw_cbuffer.src_resolution_f32;
+    vec2 frame_texel_size = 1.0 / frame_cbuffer.resolution_f32;
+    vec3 color_sum = vec3 ( 0, 0, 0 );
+    float weight_sum = 0;
+
+    for ( int i = 0; i < draw_cbuffer.kernel_size; ++i ) {
+        int j = i - int ( draw_cbuffer.kernel_size ) / 2;
+        vec2 sample_offset = vec2 ( float ( j ), float ( j ) ) * draw_cbuffer.direction;
+
+        vec2 color_sample_uv = screen_uv + sample_offset * color_texel_size;
+        vec2 frame_sample_uv = screen_uv + sample_offset * frame_texel_size;
+
+        vec3 view_sample_normal = texture ( sampler2D ( tex_normal, sampler_point ), frame_sample_uv ).xyz * 2 - 1;
+        float sample_depth = texture ( sampler2D ( tex_depth, sampler_point ), frame_sample_uv ).x;
+        vec3 view_sample_pos = view_from_depth ( frame_sample_uv, sample_depth );
+
+        float k = draw_cbuffer.kernel[i].x;
+        float depth_diff = 1 - depth / sample_depth;
+        float depth_factor = exp2 ( -2000 * abs ( depth_diff ) );
+        float normal_factor = dot ( view_normal, view_sample_normal );
+        normal_factor *= normal_factor;
+        normal_factor *= normal_factor;
+        float w = depth_factor * normal_factor;
+        //w = 1;
+
+        color_sum += w * texture ( sampler2D ( tex_color, sampler_point ), color_sample_uv ).xyz;
+        weight_sum += w;
+    }
+
+    out_color = vec4 ( color_sum / weight_sum, 1 );
+}

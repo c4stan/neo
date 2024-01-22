@@ -1,0 +1,6 @@
+name = xf_test
+code = public, private
+defs = public.def
+configs = debug, release
+output = exe
+deps = std, xf, xs

@@ -1,0 +1,5 @@
+net_socket_max_sockets_m      1024
+
+########## WinSock ##########
+net_winsock_version_major_m 2
+net_winsock_version_minor_m 2

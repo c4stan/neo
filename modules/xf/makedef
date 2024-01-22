@@ -1,0 +1,6 @@
+name = xf
+code = public, private
+defs = public.def
+configs = debug, release
+output = dll
+deps = std, xg, xui

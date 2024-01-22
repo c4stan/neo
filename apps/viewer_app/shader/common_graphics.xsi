@@ -1,0 +1,10 @@
+include common.xsi
+
+begin viewport
+    dynamic on
+end
+
+begin rasterizer
+    cull back
+    front clockwise
+end
