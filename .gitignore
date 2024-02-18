@@ -1,0 +1,10 @@
+*
+!.gitignore
+!app/
+!app/**
+!module/
+!module/**
+!test/
+!test/**
+!tool/
+!tool/**

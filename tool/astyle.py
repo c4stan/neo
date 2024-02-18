@@ -4,11 +4,11 @@ import subprocess
 import os.path
 import platform
 
-import bindings
+import bindings_reader
 
 def run(self):
 
-    # Remap these to whatever they needs to map to
+    # TODO read and use bindings
     if platform.system() == 'Windows':
         astyle_path = "astyle.exe"
         options_path = "AStyleOptions"

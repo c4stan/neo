@@ -274,6 +274,12 @@ def parse_makedef_bindings(path):
                 exp = line.split('=')
                 name = exp[0].strip()
                 value = exp[1].strip()
+                if os.path.exists(value):
+                    value = normpath(value)
+                    if value[0] != '"':
+                        value = '"' + value
+                    if value[-1] != '"':
+                        value = value + '"'
                 entries[name] = value
 
                 log.verbose(name + ': ' + str(value))
@@ -325,10 +331,11 @@ def parse_makedef(path, bindings):
             values = exp[1].strip().split(',')
             values = [x.strip() for x in values]
 
-            for x in values:
-                if x.startswith('$'):
-                    if not x[1:] in bindings:
-                        log.error("Missing makedef binding for key " + x + ' while parsing makedef ' + path)
+            if bindings is not None:
+                for x in values:
+                    if x.startswith('$'):
+                        if not x[1:] in bindings:
+                            log.error("Missing makedef binding for key " + x + ' while parsing makedef ' + path)
 
             if bindings is not None:
                 values = [x if not x.startswith('$') else bindings[x[1:]] for x in values]
@@ -635,6 +642,7 @@ class Project:
         def_cmd = '-Dstd_module_name_m=' + self.name
         def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
         def_cmd += ' -Dstd_solution_module_name_m=' + solution_name
+        def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/builder.py\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_debug_m=std_on_m'
             def_cmd += ' -Dstd_modules_path_m=\\"modules/debug/\\"'
