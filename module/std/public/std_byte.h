@@ -3,19 +3,16 @@
 #include <std_platform.h>
 #include <std_compiler.h>
 
-typedef unsigned char           byte_t; // TODO rename to std_byte_t?
-#define                         std_byte_max_m UINT8_MAX
-
-// TODO make sure these get all aligned, or use macros
+// TODO make sure these all get inlined, or use macros
 
 void        std_mem_copy ( void* dest, const void* source, size_t size );
 bool        std_mem_cmp  ( const void* a, const void* b, size_t size );
-void        std_mem_set  ( void* dest, size_t size, byte_t value );
+void        std_mem_set  ( void* dest, size_t size, char value );
 void        std_mem_zero ( void* dest, size_t size );
-bool        std_mem_test ( const void* base, size_t size, byte_t value );
+bool        std_mem_test ( const void* base, size_t size, char value );
 void        std_mem_move ( void* dest, void* source, size_t size );
 
-// note: sizeof(byte_t[32]) == 32, use _T for static arrays (need to pass pointer to it)
+// note: sizeof(char[32]) == 32, use _T for static arrays (need to pass pointer to it)
 #define     std_mem_zero_m( item ) std_mem_zero( (item), sizeof ( *(item) ) )
 #define     std_mem_zero_array_m( item, count ) std_mem_zero( (item), sizeof ( *(item) ) * (count) )
 #define     std_mem_copy_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) )
@@ -117,7 +114,7 @@ size_t      std_bit_count_32 ( uint32_t value );
 size_t      std_bit_count_64 ( uint64_t value );
 
 size_t      std_align     ( size_t value, size_t align );
-byte_t*     std_align_ptr ( void* value, size_t align );
+char*     std_align_ptr ( void* value, size_t align );
 uint32_t    std_align_u32 ( uint32_t value, uint32_t align );
 uint64_t    std_align_u64 ( uint64_t value, uint64_t align );
 
@@ -189,9 +186,9 @@ uint64_t    std_2_u32_to_u64 ( uint32_t high, uint32_t low );
 
 uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_size );
 
-//#define std_ptr_offset_m(from, to)        ( size_t ) ( ( byte_t* ) (to)  - ( byte_t* ) (from) )
-//#define std_ptr_offset_32_m(from, to)     ( uint32_t ) ( ( byte_t* ) (to)  - ( byte_t* ) (from) )
-//#define std_ptr_offset_64_m(from, to)     ( uint64_t ) ( ( byte_t* ) (to)  - ( byte_t* ) (from) )
+//#define std_ptr_offset_m(from, to)        ( size_t ) ( ( char* ) (to)  - ( char* ) (from) )
+//#define std_ptr_offset_32_m(from, to)     ( uint32_t ) ( ( char* ) (to)  - ( char* ) (from) )
+//#define std_ptr_offset_64_m(from, to)     ( uint64_t ) ( ( char* ) (to)  - ( char* ) (from) )
 
 #define std_ptr_value_m( ptr, type ) ( *( type* ) ( ptr ) )
 

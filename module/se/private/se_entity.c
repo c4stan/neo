@@ -8,12 +8,18 @@
 typedef struct {
     std_mutex_t mutex;
 
+    // one bit per entity, marks whether the entity is in use (created) or not
     uint64_t* entity_bitset;
 
+    // one slot per entity
+    // each slot is a bitset with one bit per component type
     se_component_flags_t* component_flags_array;
     se_component_flags_t* component_flags_freelist;
 
+    // one slot per entity
+    // each table maps component type with component handle for the components owned by the entity
     se_entity_component_table_t* component_tables;
+    // TODO better memory management for component tables
     // component_tables_heap;
 } se_entity_state_t;
 
@@ -49,7 +55,7 @@ se_entity_h se_entity_create ( const se_entity_params_t* params ) {
     se_entity_component_table_t* component_table = &se_entity_state.component_tables[entity_idx];
     std_mem_zero_m ( component_flags );
     std_mem_zero_m ( component_table );
-    std_mem_set ( component_table->keys, sizeof ( component_table->keys ), std_byte_max_m );
+    std_mem_set ( component_table->keys, sizeof ( component_table->keys ), 0xff );
     component_table->mask = 32 - 1;
 
     return ( se_entity_h ) entity_idx;

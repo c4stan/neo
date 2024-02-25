@@ -190,14 +190,15 @@ static void run_se_test_2 ( void ) {
         xg->get_device_info ( &device_info, device );
         std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
 
-        xg_swapchain_window_params_t swapchain_params;
-        swapchain_params.window = window;
-        swapchain_params.device = device;
-        swapchain_params.texture_count = 3;
-        swapchain_params.format = xg_format_b8g8r8a8_unorm_m;//xg_format_b8g8r8a8_srgb_m;
-        swapchain_params.color_space = xg_colorspace_srgb_m;
-        swapchain_params.present_mode = xg_present_mode_mailbox_m;
-        swapchain_params.debug_name = "swapchain";
+        xg_swapchain_window_params_t swapchain_params = xg_swapchain_window_params_m (
+            .window = window,
+            .device = device,
+            .texture_count = 3,
+            .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
+            .color_space = xg_colorspace_srgb_m,
+            .present_mode = xg_present_mode_mailbox_m,
+            .debug_name = "swapchain",
+        );
         swapchain = xg->create_window_swapchain ( &swapchain_params );
         std_assert_m ( swapchain != xg_null_handle_m );
     }
@@ -268,12 +269,13 @@ static void run_se_test_2 ( void ) {
 
             xg_workload_h workload = xg->create_workload ( device );
             xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-            xg_buffer_params_t buffer_params;
-            buffer_params.allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_mappable_m );
-            buffer_params.device = device;
-            buffer_params.size = sizeof ( vertex_cbuffer_t );
-            buffer_params.allowed_usage = xg_buffer_usage_uniform_m;
-            buffer_params.debug_name = "component_cbuffer";
+            xg_buffer_params_t buffer_params = xg_buffer_params_m (
+                .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_mappable_m ),
+                .device = device,
+                .size = sizeof ( vertex_cbuffer_t ),
+                .allowed_usage = xg_buffer_usage_uniform_m,
+                .debug_name = "component_cbuffer",
+            );
             vertex_cbuffer = xg->cmd_create_buffer ( resource_cmd_buffer, &buffer_params );
             xg->submit_workload ( workload );
 

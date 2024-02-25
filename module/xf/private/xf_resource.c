@@ -404,11 +404,11 @@ xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t
         char id[8];
         std_u32_to_str ( i, id, 8 );
         xf_texture_params_t texture_params = params->texture;
-        std_array_t array = std_array ( xf_debug_name_size_m );
-        std_array_push ( &array, std_str_len ( texture_params.debug_name ) );
-        std_str_append ( texture_params.debug_name, &array, "(" );
-        std_str_append ( texture_params.debug_name, &array, id );
-        std_str_append ( texture_params.debug_name, &array, ")" );
+        std_stack_t stack = std_static_stack_m ( texture_params.debug_name );
+        stack.top = std_str_len ( texture_params.debug_name );
+        std_stack_push_append_string ( &stack, "(" );
+        std_stack_push_append_string ( &stack, id );
+        std_stack_push_append_string ( &stack, ")" );
         xf_texture_h handle = xf_resource_texture_declare ( &texture_params );
         // TODO tag handle here
         multi_texture->textures[i] = handle;
@@ -446,10 +446,7 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     params.texture.allow_aliasing = false;
     params.texture.view_access = xg_texture_view_access_default_only_m;
     params.multi_texture_count = ( uint32_t ) info.texture_count;
-
-    if ( info.debug_name ) {
-        std_str_copy_m ( params.texture.debug_name, info.debug_name );
-    }
+    std_str_copy_m ( params.texture.debug_name, info.debug_name );
 
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
     multi_texture->params = params;

@@ -132,8 +132,8 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
             double decimal = source_sample - source_sample_idx_a;
             uint64_t source_sample_idx_b = ( uint64_t ) ( source_sample + 1 );
 
-            byte_t* source_sample_a = source->buffer.base + source_sample_idx_a * source_sample_stride;
-            byte_t* source_sample_b = source->buffer.base + source_sample_idx_b * source_sample_stride;
+            char* source_sample_a = source->buffer.base + source_sample_idx_a * source_sample_stride;
+            char* source_sample_b = source->buffer.base + source_sample_idx_b * source_sample_stride;
             double sample_a = 0;
             double sample_b = 0;
 
@@ -172,7 +172,7 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
 
     std_mutex_unlock ( &aud_source_state.sources_mutex );
 
-    byte_t* device_buffer = aud_device_get_buffer ( device_handle );
+    char* device_buffer = aud_device_get_buffer ( device_handle );
 
     for ( uint64_t i = 0; i < sample_count; ++i ) {
         switch ( device_info.bits_per_sample ) {

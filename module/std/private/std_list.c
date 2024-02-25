@@ -153,15 +153,15 @@ void std_dlist_remove ( void* _item ) {
 }
 
 void std_dlist_push_offset ( void* _list, void* _item, uint64_t offset ) {
-    std_auto_m list = ( std_dlist_item_i* ) ( ( byte_t* ) _list + offset );
-    std_auto_m item = ( std_dlist_item_i* ) ( ( byte_t* ) _item + offset );
+    std_auto_m list = ( std_dlist_item_i* ) ( ( char* ) _list + offset );
+    std_auto_m item = ( std_dlist_item_i* ) ( ( char* ) _item + offset );
     std_assert_m ( list != NULL );
     std_assert_m ( item != NULL );
     //std_assert_m ( list->prev == NULL );
     item->next = list->next;
 
     if ( list->next ) {
-        std_auto_m list_next = ( std_dlist_item_i* ) ( ( byte_t* ) list->next + offset );
+        std_auto_m list_next = ( std_dlist_item_i* ) ( ( char* ) list->next + offset );
         list_next->prev = item;
     }
 
@@ -170,10 +170,10 @@ void std_dlist_push_offset ( void* _list, void* _item, uint64_t offset ) {
 }
 
 void* std_dlist_pop_offset ( void* _list, uint64_t offset ) {
-    std_auto_m list = ( std_dlist_item_i* ) ( ( byte_t*) _list + offset );
+    std_auto_m list = ( std_dlist_item_i* ) ( ( char*) _list + offset );
     std_assert_m ( list != NULL );
     //std_assert_m ( list->prev == NULL );
-    std_auto_m item = ( std_dlist_item_i* ) ( ( byte_t* ) list->next + offset );
+    std_auto_m item = ( std_dlist_item_i* ) ( ( char* ) list->next + offset );
 
     if ( item == NULL ) {
         return NULL;
@@ -182,7 +182,7 @@ void* std_dlist_pop_offset ( void* _list, uint64_t offset ) {
     list->next = item->next;
 
     if ( item->next ) {
-        std_auto_m item_next = ( std_dlist_item_i* ) ( ( byte_t* ) item->next + offset );
+        std_auto_m item_next = ( std_dlist_item_i* ) ( ( char* ) item->next + offset );
         item_next->prev = list;
     }
 
@@ -193,10 +193,10 @@ void* std_dlist_pop_offset ( void* _list, uint64_t offset ) {
 }
 
 void std_dlist_remove_offset ( void* _item, uint64_t offset ) {
-    std_auto_m item = ( std_dlist_item_i* ) ( ( byte_t*) _item + offset );
+    std_auto_m item = ( std_dlist_item_i* ) ( ( char*) _item + offset );
     std_assert_m ( item != NULL );
-    std_auto_m next = ( std_dlist_item_i* ) ( ( byte_t*) item->next + offset );
-    std_auto_m prev = ( std_dlist_item_i* ) ( ( byte_t*) item->prev + offset );
+    std_auto_m next = ( std_dlist_item_i* ) ( ( char*) item->next + offset );
+    std_auto_m prev = ( std_dlist_item_i* ) ( ( char*) item->prev + offset );
 
     if ( next ) {
         next->prev = prev;
@@ -254,7 +254,7 @@ void* std_pool_pop ( std_pool_t* pool ) {
 
 void std_pool_push ( std_pool_t* pool, void* item ) {
     std_assert_m ( pool->pop < pool->cap );
-    std_assert_m ( ( byte_t* ) item >= pool->buffer.base && ( byte_t* ) item < pool->buffer.base + pool->buffer.size );
+    std_assert_m ( ( char* ) item >= pool->buffer.base && ( char* ) item < pool->buffer.base + pool->buffer.size );
 
     ++pool->pop;
     std_list_push ( &pool->freelist, item );
@@ -272,7 +272,7 @@ void* std_pool_at ( const std_pool_t* pool, size_t idx ) {
 }
 
 size_t std_pool_index ( const std_pool_t* pool, void* item ) {
-    return ( size_t ) ( ( byte_t* ) item - pool->buffer.base ) / pool->stride;
+    return ( size_t ) ( ( char* ) item - pool->buffer.base ) / pool->stride;
 }
 #endif
 

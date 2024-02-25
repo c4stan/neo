@@ -16,6 +16,7 @@ typedef struct {
 } xs_database_build_t;
 
 typedef struct {
+    // These both point to xs_database_memory_page_t allocated memory
     const char* path;
     const char* name;
     uint64_t name_hash;

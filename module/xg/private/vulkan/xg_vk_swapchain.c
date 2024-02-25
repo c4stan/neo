@@ -210,7 +210,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain->device = params->device;
     swapchain->window = params->window;
     swapchain->display = xg_null_handle_m;
-    swapchain->debug_name = params->debug_name;
+    std_str_copy_m ( swapchain->debug_name, params->debug_name );
 
     //swapchain->texture_acquire_event = xg_gpu_queue_event_create ( params->device );
     for ( size_t i = 0; i < texture_count; ++i ) {
@@ -347,7 +347,7 @@ bool xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapchain_h swapch
     info->device = swapchain->device;
     info->window = swapchain->window;
     info->display = swapchain->display;
-    info->debug_name = swapchain->debug_name;
+    std_str_copy_m ( info->debug_name, swapchain->debug_name );
 
     for ( uint64_t i = 0; i < swapchain->texture_count; ++i ) {
         info->textures[i] = swapchain->textures[i];

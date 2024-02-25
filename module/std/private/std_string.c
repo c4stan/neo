@@ -2,6 +2,7 @@
 
 #include <std_byte.h>
 #include <std_log.h>
+#include <std_allocator.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,15 +110,15 @@ size_t std_str_copy ( char* dest, size_t cap, const char* src ) {
 }
 
 //size_t std_str_append ( char* dest, size_t dest_cap, const char* source ) {
-void std_str_append ( char* dest, std_array_t* array, const char* source ) {
-    //size_t len = std_str_len ( dest );
-    //std_assert_m ( len < dest_cap );
-    //return std_str_copy ( dest + len, dest_cap - len, source );
-    uint64_t capacity = array->capacity - array->count;
-    uint64_t source_len = std_str_copy ( dest + array->count, capacity, source );
-    std_assert_m ( capacity > source_len );
-    std_array_push ( array, source_len );
-}
+//void std_str_append ( char* dest, std_array_t* array, const char* source ) {
+//    //size_t len = std_str_len ( dest );
+//    //std_assert_m ( len < dest_cap );
+//    //return std_str_copy ( dest + len, dest_cap - len, source );
+//    uint64_t capacity = array->capacity - array->count;
+//    uint64_t source_len = std_str_copy ( dest + array->count, capacity, source );
+//    std_assert_m ( capacity > source_len );
+//    std_array_push ( array, source_len );
+//}
 
 int std_str_cmp ( const char* a, const char* b ) {
     return strcmp ( a, b );
@@ -456,3 +457,24 @@ uint64_t std_str_hash_64 ( const char* str ) {
 
     return hash;
 }
+
+bool std_str_validate ( const char* str, size_t cap ) {
+    bool terminated = false;
+
+    for ( size_t i = 0; i < cap; ++i ) {
+        if ( str[i] == '\0' ) {
+            terminated = true;
+            break;
+        }
+    }
+
+    return terminated;
+}
+
+//const char* std_str_static ( const char* text, size_t size ) {
+//    // TODO avoid leaking this memory
+//    std_alloc_t alloc = std_virtual_heap_alloc ( size, 16 );
+//    std_auto_m str = ( const char* ) alloc.buffer.base;
+//    std_str_copy ( str, size, text );
+//    return str;
+//}

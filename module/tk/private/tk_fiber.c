@@ -73,10 +73,10 @@ void tk_fiber_init ( void ) {
     static tk_fiber_workload_t          workloads_array[tk_max_parallel_tasks_m];
     static tk_acquired_thread_t         acquired_threads_array[tk_max_threads_m];
 
-    static byte_t dispatch_queue_array[std_pow2_round_up_32_m ( tk_max_parallel_tasks_m * sizeof ( tk_fiber_dispatched_task_t ) )];
-    static byte_t ready_fiber_contexts_queue_array[std_pow2_round_up_32_m ( tk_max_fibers_m * sizeof ( uint32_t ) )];
-    static byte_t free_fiber_contexts_queue_array[std_pow2_round_up_32_m ( tk_max_fibers_m * sizeof ( uint32_t ) ) ];
-    static byte_t free_workloads_queue_array[std_pow2_round_up_32_m ( tk_max_parallel_tasks_m * sizeof ( uint32_t ) )];
+    static char dispatch_queue_array[std_pow2_round_up_32_m ( tk_max_parallel_tasks_m * sizeof ( tk_fiber_dispatched_task_t ) )];
+    static char ready_fiber_contexts_queue_array[std_pow2_round_up_32_m ( tk_max_fibers_m * sizeof ( uint32_t ) )];
+    static char free_fiber_contexts_queue_array[std_pow2_round_up_32_m ( tk_max_fibers_m * sizeof ( uint32_t ) ) ];
+    static char free_workloads_queue_array[std_pow2_round_up_32_m ( tk_max_parallel_tasks_m * sizeof ( uint32_t ) )];
 
     tk_fiber_state.threads = threads_array;
     tk_fiber_state.thread_contexts = thread_contexts_array;

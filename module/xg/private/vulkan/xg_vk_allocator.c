@@ -189,7 +189,7 @@ void xg_vk_allocator_tlsf_remove_from_freelist ( xg_vk_allocator_tlsf_heap_t* he
     }    
 }
 
-#define xg_vk_allocator_tlsf_get_segment_m( _ptr, _field ) ( xg_vk_allocator_tlsf_segment_t* ) ( ( byte_t* ) (_ptr) - std_field_offset_m ( xg_vk_allocator_tlsf_segment_t, _field ) )
+#define xg_vk_allocator_tlsf_get_segment_m( _ptr, _field ) ( xg_vk_allocator_tlsf_segment_t* ) ( ( char* ) (_ptr) - std_field_offset_m ( xg_vk_allocator_tlsf_segment_t, _field ) )
 
 xg_vk_allocator_tlsf_segment_t* xg_vk_allocator_tlsf_pop_from_freelist ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t size ) {
     xg_vk_allocator_tlsf_freelist_idx_t start_idx = xg_vk_allocator_tlsf_freelist_idx ( size );

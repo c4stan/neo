@@ -153,7 +153,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     uint32_t host_uncached_memory_type = UINT32_MAX;
     uint32_t host_cached_memory_type = UINT32_MAX;
 
-    byte_t used_memory_types[VK_MAX_MEMORY_TYPES];
+    char used_memory_types[VK_MAX_MEMORY_TYPES];
     std_mem_zero_m ( &used_memory_types );
 
     // Pass 1. try to look for a good match
@@ -938,14 +938,14 @@ size_t xg_vk_device_get_displays_info ( xg_display_info_t* displays, size_t cap,
     return device_displays_count;
 }
 
-byte_t* xg_vk_device_map_alloc ( const xg_alloc_t* alloc ) {
+char* xg_vk_device_map_alloc ( const xg_alloc_t* alloc ) {
     const xg_vk_device_t* device = xg_vk_device_get ( alloc->device );
     std_assert_m ( device );
     void* data = NULL;
     VkResult result = vkMapMemory ( device->vk_handle, ( VkDeviceMemory ) alloc->base, ( VkDeviceSize ) alloc->offset, ( VkDeviceSize ) alloc->handle.size, 0, &data );
     std_assert_m ( result == VK_SUCCESS );
     std_assert_m ( data != NULL );
-    return ( byte_t* ) data;
+    return ( char* ) data;
 }
 
 void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc ) {
@@ -958,7 +958,7 @@ void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc ) {
 
 #if 0
 void xg_vk_device_map_host_buffer ( xg_host_buffer_t* buffer ) {
-    buffer->mapped_base = ( byte_t* ) xg_vk_device_map_alloc ( &buffer->alloc );
+    buffer->mapped_base = ( char* ) xg_vk_device_map_alloc ( &buffer->alloc );
 }
 
 void xg_vk_device_unmap_host_buffer ( xg_host_buffer_t* buffer ) {

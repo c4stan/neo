@@ -6,7 +6,7 @@
 
 // https://rosettacode.org/wiki/Sorting_algorithms/Insertion_sort#C
 void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_comp_f* compare, void* tmp ) {
-    byte_t* base = ( byte_t* ) _base;
+    char* base = ( char* ) _base;
 
     for ( size_t i = 1; i < count; ++i ) {
 
@@ -29,8 +29,8 @@ void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_com
 }
 
 void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, size_t count, std_sort_comp_f* compare ) {
-    byte_t* base = ( byte_t* ) _base;
-    byte_t* dest = ( byte_t* ) _dest;
+    char* base = ( char* ) _base;
+    char* dest = ( char* ) _dest;
 
     std_mem_copy ( dest, base, stride );
 

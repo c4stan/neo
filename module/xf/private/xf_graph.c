@@ -250,7 +250,7 @@ typedef struct {
     size_t node_indices_count;
     //size_t stack[xf_graph_max_nodes_m];
     //size_t stack_size;
-    byte_t node_flags[xf_graph_max_nodes_m];
+    char node_flags[xf_graph_max_nodes_m];
     xf_node_h nodes_map_keys[xf_graph_max_nodes_m * 2];
     uint64_t nodes_map_payloads[xf_graph_max_nodes_m * 2];
     std_map_t nodes_map;

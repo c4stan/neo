@@ -33,8 +33,8 @@ void aud_mixer_mix_sources ( aud_source_t* sources, uint64_t count, aud_device_h
             double decimal = source_sample - source_sample_idx_a;
             uint64_t source_sample_idx_b = ( uint64_t ) ( source_sample + 1 );
 
-            byte_t* source_sample_a = source->buffer.base + source_sample_idx_a * source_sample_stride;
-            byte_t* source_sample_b = source->buffer.base + source_sample_idx_b * source_sample_stride;
+            char* source_sample_a = source->buffer.base + source_sample_idx_a * source_sample_stride;
+            char* source_sample_b = source->buffer.base + source_sample_idx_b * source_sample_stride;
 
             float sample_a, sample_b;
 

@@ -369,7 +369,7 @@ static void  test_allocator ( void ) {
         std_alloc_t stack_alloc = std_alloc_m ( &malloc_allocator, 1024 * 32, 16 );
         std_stack_t stack = std_stack ( stack_alloc.buffer );
         std_alloc_t a = std_stack_alloc ( &stack, 1024 * 16, 16 );
-        byte_t* b = std_stack_push ( &stack, 1024 * 8, 16 );
+        char* b = std_stack_push ( &stack, 1024 * 8, 16 );
         std_alloc_t c = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
         uint32_t* d = std_stack_push_array_m ( &stack, uint32_t, 1024 );
         std_assert_m ( stack.top == stack.buffer.size );
@@ -1407,7 +1407,7 @@ void std_main ( void ) {
 
     const char* separator = "------------------------------------------";
 
-#if 0
+#if 1
     test_platform();
     std_log_info_m ( separator );
     test_allocator();

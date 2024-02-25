@@ -78,9 +78,9 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     stbtt_pack_context pack_context;
     std_alloc_t char_info_alloc = std_virtual_heap_alloc ( sizeof ( stbtt_packedchar ) * params->char_count, 16 );
 
-    stbtt_PackBegin ( &pack_context, atlas_alloc.buffer.base, xui_font_texture_atlas_width_m, xui_font_texture_atlas_height_m, 0, 4, NULL );
+    stbtt_PackBegin ( &pack_context, ( unsigned char* ) atlas_alloc.buffer.base, xui_font_texture_atlas_width_m, xui_font_texture_atlas_height_m, 0, 4, NULL );
     stbtt_PackSetOversampling ( &pack_context, 2, 2 );
-    stbtt_PackFontRange ( &pack_context, ttf_data.base, 0, ( float ) params->pixel_height, ( int ) params->first_char_code, ( int ) params->char_count, ( stbtt_packedchar* ) char_info_alloc.buffer.base );
+    stbtt_PackFontRange ( &pack_context, ( unsigned char* ) ttf_data.base, 0, ( float ) params->pixel_height, ( int ) params->first_char_code, ( int ) params->char_count, ( stbtt_packedchar* ) char_info_alloc.buffer.base );
     stbtt_PackEnd ( &pack_context );
 #endif
 
@@ -107,12 +107,13 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
 
     xg_buffer_h staging_buffer;
     {
-        xg_buffer_params_t buffer_params = xg_default_buffer_params_m;
-        buffer_params.allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_upload_m );
-        buffer_params.device = params->xg_device;
-        buffer_params.size = xui_font_texture_atlas_width_m * xui_font_texture_atlas_height_m;
-        buffer_params.allowed_usage = xg_buffer_usage_copy_source_m;
-        buffer_params.debug_name = "font atlas staging buffer";
+        xg_buffer_params_t buffer_params = xg_buffer_params_m (
+            .allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_upload_m ),
+            .device = params->xg_device,
+            .size = xui_font_texture_atlas_width_m * xui_font_texture_atlas_height_m,
+            .allowed_usage = xg_buffer_usage_copy_source_m,
+            .debug_name = "font atlas staging buffer",
+        );
         staging_buffer = xg->create_buffer ( &buffer_params );
     }
 
@@ -200,12 +201,13 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     {
         xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-        xg_buffer_params_t cbuffer_params;
-        cbuffer_params.allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_mappable_m );
-        cbuffer_params.device = params->xg_device;
-        cbuffer_params.size = sizeof ( xui_font_atlas_uniform_data_t );
-        cbuffer_params.allowed_usage = xg_buffer_usage_uniform_m;
-        cbuffer_params.debug_name = "xui font cbuffer";
+        xg_buffer_params_t cbuffer_params = xg_buffer_params_m (
+            .allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_mappable_m ),
+            .device = params->xg_device,
+            .size = sizeof ( xui_font_atlas_uniform_data_t ),
+            .allowed_usage = xg_buffer_usage_uniform_m,
+            .debug_name = "xui font cbuffer",
+        );
         uniform_buffer = xg->create_buffer ( &cbuffer_params );
 
         xg->cmd_destroy_buffer ( resource_cmd_buffer, uniform_buffer, xg_resource_cmd_buffer_time_workload_complete_m );

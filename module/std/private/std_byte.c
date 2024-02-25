@@ -16,7 +16,7 @@
 void std_mem_copy ( void* dest, const void* source, size_t size ) {
     memcpy ( dest, source, size );
 }
-void std_mem_set ( void* dest, size_t size, byte_t value ) {
+void std_mem_set ( void* dest, size_t size, char value ) {
     memset ( dest, value, size );
 }
 bool std_mem_cmp ( const void* a, const void* b, size_t size ) {
@@ -26,9 +26,9 @@ void std_mem_zero ( void* dest, size_t size ) {
     memset ( dest, 0, size );
 }
 
-bool std_mem_test ( const void* base, size_t size, byte_t value ) {
+bool std_mem_test ( const void* base, size_t size, char value ) {
     // TODO faster implementation
-    byte_t* b = ( byte_t* ) base;
+    char* b = ( char* ) base;
 
     for ( size_t i = 0; i < size; ++i ) {
         if ( b[i] != value ) {
@@ -305,11 +305,11 @@ bool std_align_test_u64 ( uint64_t value, uint64_t align ) {
     return ( value & ( align - 1 ) ) == 0;
 }
 
-byte_t* std_align_ptr ( void* value, size_t align ) {
+char* std_align_ptr ( void* value, size_t align ) {
     std_assert_m ( align != 0 );
     std_assert_m ( std_pow2_test ( align ) );
     size_t mask = align - 1;
-    return ( byte_t* ) ( ( ( size_t ) value + mask ) & ~mask );
+    return ( char* ) ( ( ( size_t ) value + mask ) & ~mask );
 }
 
 size_t std_align ( size_t value, size_t align ) {

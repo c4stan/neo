@@ -741,7 +741,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
             VkResult result = vkCreateComputePipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
             std_assert_m ( result == VK_SUCCESS );
 
-            if ( params->debug_name != NULL ) {
+            if ( params->debug_name[0] ) {
                 VkDebugUtilsObjectNameInfoEXT debug_name_info;
                 debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
                 debug_name_info.pNext = NULL;
@@ -767,8 +767,8 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
 
         xg_vk_pipeline->common.push_constants_hash = pipeline_layout_results.constant_bindings_hash;
 
-        if ( params->debug_name != NULL ) {
-            std_str_copy ( xg_vk_pipeline->common.debug_name, xg_debug_name_size_m, params->debug_name );
+        if ( params->debug_name[0] ) {
+            std_str_copy_m ( xg_vk_pipeline->common.debug_name, params->debug_name );
         }
 
         xg_vk_pipeline->common.vk_handle = pipeline;
@@ -1417,7 +1417,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             VkResult result = vkCreateGraphicsPipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
             std_assert_m ( result == VK_SUCCESS );
 
-            if ( params->debug_name != NULL ) {
+            if ( params->debug_name[0] ) {
                 VkDebugUtilsObjectNameInfoEXT debug_name_info;
                 debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
                 debug_name_info.pNext = NULL;
@@ -1445,7 +1445,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
         xg_vk_pipeline->common.push_constants_hash = pipeline_layout_results.constant_bindings_hash;
 
-        if ( params->debug_name != NULL ) {
+        if ( params->debug_name[0] ) {
             std_str_copy ( xg_vk_pipeline->common.debug_name, xg_debug_name_size_m, params->debug_name );
         }
 

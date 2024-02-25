@@ -29,7 +29,7 @@ typedef struct {
     union {
         uint32_t u32[4]; // ipv4 -> u32[0]
         uint64_t u64[2]; // ipv6 -> u64[]
-        byte_t bytes[16];
+        char bytes[16];
     };
 } net_address_bytes_t; // network byte order
 

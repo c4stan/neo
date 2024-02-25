@@ -155,8 +155,8 @@ std_alloc_t std_allocator_virtual_heap_alloc ( size_t size, size_t align ) {
 
         // Traverse the freelist
         // Make sure that the segment is still big enough after taking alignment into consideration
-        byte_t* prev = ( byte_t* ) &node->freelist;
-        byte_t* curr = ( byte_t* ) node->freelist;
+        char* prev = ( char* ) &node->freelist;
+        char* curr = ( char* ) node->freelist;
 
         while ( curr != NULL ) {
             /*
@@ -171,7 +171,7 @@ std_alloc_t std_allocator_virtual_heap_alloc ( size_t size, size_t align ) {
                 from enforced padding and virtual pages alignment satisfies that. No additional alignment
                 or checks are necessary.
             */
-            byte_t* base = std_align_ptr ( curr, align );
+            char* base = std_align_ptr ( curr, align );
             size_t align_cost = ( size_t ) ( base - curr );
 
             std_allocator_virtual_heap_segment_t* segment = ( std_allocator_virtual_heap_segment_t* ) curr;
@@ -235,7 +235,7 @@ std_alloc_t std_allocator_virtual_heap_alloc ( size_t size, size_t align ) {
     std_allocator_state->virtual_heap.total_size += std_allocator_state->virtual_page_size;
 
     // Reserve requested space and set up the node
-    byte_t* base = new_node->alloc.buffer.base;
+    char* base = new_node->alloc.buffer.base;
     size_t segment_size = node_size - aligned_size;
     void* segment_base = base + aligned_size;
     std_auto_m segment = ( std_allocator_virtual_heap_segment_t* ) segment_base;
@@ -273,13 +273,13 @@ bool std_allocator_virtual_heap_free ( std_memory_h handle ) {
         std_allocator_virtual_heap_node_t* node;
         std_buffer_ptr_m ( &node, std_allocator_state->virtual_heap.nodes_alloc.buffer, i );
 
-        if ( node->alloc.buffer.base <= ( byte_t* ) handle.id && node->alloc.buffer.base + node->alloc.buffer.size >= ( byte_t* ) handle.id + handle.size ) {
-            byte_t* left = ( byte_t* ) &node->freelist;
-            byte_t* right = ( byte_t* ) node->freelist;
+        if ( node->alloc.buffer.base <= ( char* ) handle.id && node->alloc.buffer.base + node->alloc.buffer.size >= ( char* ) handle.id + handle.size ) {
+            char* left = ( char* ) &node->freelist;
+            char* right = ( char* ) node->freelist;
 
             // Go through the freelist and find the two list elements that surround the memory address
             while ( right != NULL ) {
-                if ( right > ( byte_t* ) handle.id ) {
+                if ( right > ( char* ) handle.id ) {
                     break;
                 }
 
@@ -290,8 +290,8 @@ bool std_allocator_virtual_heap_free ( std_memory_h handle ) {
             std_auto_m left_segment = ( std_allocator_virtual_heap_segment_t* ) left;
             std_auto_m right_segment = ( std_allocator_virtual_heap_segment_t* ) right;
 
-            bool left_adjacent = left != ( byte_t* ) &node->freelist && left + left_segment->size == ( byte_t* ) handle.id;
-            bool right_adjacent = ( byte_t* ) handle.id + handle.size == right;
+            bool left_adjacent = left != ( char* ) &node->freelist && left + left_segment->size == ( char* ) handle.id;
+            bool right_adjacent = ( char* ) handle.id + handle.size == right;
 
             if ( left_adjacent ) {
                 size_t size_increase = handle.size;
@@ -426,7 +426,7 @@ std_virtual_buffer_t std_virtual_buffer_reserve ( size_t size ) {
     return buffer;
 }
 
-byte_t* std_virtual_buffer_push ( std_virtual_buffer_t* buffer, size_t size ) {
+char* std_virtual_buffer_push ( std_virtual_buffer_t* buffer, size_t size ) {
     size_t page_size = std_virtual_page_size();
 
     size_t old_top = buffer->top;
@@ -467,11 +467,11 @@ std_alloc_t std_virtual_alloc ( size_t size ) {
 std_alloc_t std_virtual_reserve ( size_t size ) {
     std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
 
-    byte_t* base;
+    char* base;
 #ifdef std_platform_win32_m
-    base = ( byte_t* ) VirtualAlloc ( NULL, size, MEM_RESERVE, PAGE_NOACCESS );
+    base = ( char* ) VirtualAlloc ( NULL, size, MEM_RESERVE, PAGE_NOACCESS );
 #elif defined(std_platform_linux_m)
-    base = ( byte_t* ) mmap ( NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
+    base = ( char* ) mmap ( NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
 #endif
     std_assert_m ( base != NULL );
     std_alloc_t alloc;
@@ -487,7 +487,7 @@ bool std_virtual_map ( std_memory_h reserve_handle, size_t offset, size_t size )
     std_assert_m ( std_align_test ( offset, std_allocator_state->virtual_page_size ) );
 
     // TODO do some validation/state tracking on the handle?
-    byte_t* base = ( byte_t* ) reserve_handle.id + offset;
+    char* base = ( char* ) reserve_handle.id + offset;
     std_assert_m ( base != NULL );
     std_assert_m ( std_align_test_ptr ( base, std_allocator_state->virtual_page_size ) );
 
@@ -504,7 +504,7 @@ bool std_virtual_unmap ( std_memory_h handle, size_t offset, size_t size ) {
     std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
     std_assert_m ( std_align_test ( offset, std_allocator_state->virtual_page_size ) );
 
-    byte_t* base = ( byte_t* ) handle.id + offset;
+    char* base = ( char* ) handle.id + offset;
     std_assert_m ( base != NULL );
     std_assert_m ( std_align_test_ptr ( base, std_allocator_state->virtual_page_size ) );
 
@@ -518,7 +518,7 @@ bool std_virtual_unmap ( std_memory_h handle, size_t offset, size_t size ) {
 }
 
 bool std_virtual_free ( std_memory_h handle ) {
-    byte_t* base = ( byte_t* ) handle.id;
+    char* base = ( char* ) handle.id;
     std_assert_m ( base != NULL );
     std_assert_m ( std_align_test_ptr ( base, std_allocator_state->virtual_page_size ) );
 
@@ -559,9 +559,9 @@ std_stack_t std_stack ( std_buffer_t buffer ) {
 }
 
 std_alloc_t std_stack_alloc ( std_stack_t* allocator, size_t size, size_t align ) {
-    byte_t* base = allocator->buffer.base;
+    char* base = allocator->buffer.base;
     size_t old_top = allocator->top;
-    byte_t* user_ptr = ( byte_t* ) std_align_ptr ( base + old_top, align );
+    char* user_ptr = ( char* ) std_align_ptr ( base + old_top, align );
     size_t new_top = ( size_t ) ( user_ptr - base ) + size;
     allocator->top = new_top;
     std_assert_m ( allocator->top <= allocator->buffer.size );
@@ -573,17 +573,17 @@ std_alloc_t std_stack_alloc ( std_stack_t* allocator, size_t size, size_t align 
     return alloc;
 }
 
-byte_t* std_stack_push ( std_stack_t* allocator, size_t size, size_t align ) {
-    byte_t* base = allocator->buffer.base;
+char* std_stack_push ( std_stack_t* allocator, size_t size, size_t align ) {
+    char* base = allocator->buffer.base;
     size_t old_top = allocator->top;
-    byte_t* user_ptr = ( byte_t* ) std_align_ptr ( base + old_top, align );
+    char* user_ptr = ( char* ) std_align_ptr ( base + old_top, align );
     size_t new_top = ( size_t ) ( user_ptr - base ) + size;
     allocator->top = new_top;
     std_assert_m ( allocator->top <= allocator->buffer.size );
     return user_ptr;
 }
 
-byte_t* std_stack_push_noalign ( std_stack_t* allocator, size_t size ) {
+char* std_stack_push_noalign ( std_stack_t* allocator, size_t size ) {
     size_t old_top = allocator->top;
     allocator->top = old_top + size;
     std_assert_m ( old_top + size < allocator->buffer.size );
@@ -591,12 +591,12 @@ byte_t* std_stack_push_noalign ( std_stack_t* allocator, size_t size ) {
 }
 
 void std_stack_push_copy ( std_stack_t* allocator, const void* data, size_t size, size_t align ) {
-    byte_t* dest = std_stack_push ( allocator, size, align );
+    char* dest = std_stack_push ( allocator, size, align );
     std_mem_copy ( dest, data, size );
 }
 
 void std_stack_push_copy_noalign ( std_stack_t* allocator, const void* data, size_t size ) {
-    byte_t* dest = std_stack_push_noalign ( allocator, size );
+    char* dest = std_stack_push_noalign ( allocator, size );
     std_mem_copy ( dest, data, size );
 }
 
@@ -635,6 +635,27 @@ void std_stack_pop ( std_stack_t* allocator, size_t size ) {
 
 void std_stack_clear ( std_stack_t* allocator ) {
     allocator->top = 0;
+}
+
+void std_stack_push_copy_string ( std_stack_t* stack, const char* str ) {
+    char* base = stack->buffer.base;
+    size_t cap = stack->buffer.size;
+    size_t old_top = stack->top;
+    size_t str_len = std_str_copy ( base + old_top, cap - old_top, str );
+    size_t new_top = old_top + str_len + 1;
+    std_assert_m ( new_top <= cap );
+    stack->top = new_top;
+}
+
+void std_stack_push_append_string ( std_stack_t* stack, const char* str ) {
+    size_t top = stack->top;
+    char* base = stack->buffer.base;
+
+    if ( top > 0 && base[top - 1] == '\0') {
+        stack->top = top - 1;
+    }
+
+    std_stack_push_copy_string ( stack, str );
 }
 
 static std_alloc_t std_stack_allocator_alloc ( void* allocator, size_t size, size_t align ) {
@@ -815,7 +836,7 @@ void std_allocator_tlsf_remove_from_freelist ( std_allocator_tlsf_heap_t* heap, 
     }
 }
 
-byte_t* std_allocator_tlsf_pop_from_freelist ( std_allocator_tlsf_heap_t* heap, uint64_t size ) {
+char* std_allocator_tlsf_pop_from_freelist ( std_allocator_tlsf_heap_t* heap, uint64_t size ) {
     std_allocator_tlsf_freelist_idx_t start_idx = std_allocator_tlsf_freelist_idx ( size );
     std_allocator_tlsf_freelist_idx_t idx = std_allocator_tlsf_freelist_idx_first_available ( heap, size, start_idx );
     std_auto_m segment = std_dlist_pop ( &heap->freelists[idx.x][idx.y] ) - std_allocator_tlsf_header_size_m;
@@ -837,17 +858,17 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
     uint64_t prev_top = heap->buffer.top;
     bool empty = prev_top == 0;
-    byte_t* new_segment = std_virtual_buffer_push ( &heap->buffer, size );
+    char* new_segment = std_virtual_buffer_push ( &heap->buffer, size );
 
     if ( !empty ) {
         // not the first grow
-        byte_t* base = heap->buffer.base;
+        char* base = heap->buffer.base;
 
-        byte_t* top_segment_end = base + prev_top;
+        char* top_segment_end = base + prev_top;
         std_auto_m top_segment_footer = ( std_allocator_tlsf_footer_t* ) ( top_segment_end - std_allocator_tlsf_footer_size_m );
         uint64_t top_segment_size = top_segment_footer->size;
 
-        byte_t* top_segment_start = top_segment_end - top_segment_size;
+        char* top_segment_start = top_segment_end - top_segment_size;
         std_auto_m top_segment_header = ( std_allocator_tlsf_header_t* ) top_segment_start;
         uint64_t top_size_flags = top_segment_header->size_flags;
         std_assert_m ( ( top_size_flags & std_allocator_tlsf_size_mask_m ) == top_segment_size );
@@ -918,7 +939,7 @@ std_alloc_t std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size
     std_mutex_lock ( &heap->mutex );
 
     // grab from freelist
-    byte_t* segment = std_allocator_tlsf_pop_from_freelist ( heap, size_roundup );
+    char* segment = std_allocator_tlsf_pop_from_freelist ( heap, size_roundup );
 
     // load segment
     std_auto_m segment_header = ( std_allocator_tlsf_header_t* ) segment;
@@ -935,7 +956,7 @@ std_alloc_t std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size
     if ( needs_split ) {
         uint64_t extra_size = segment_size - size;
 
-        std_auto_m extra_segment = ( byte_t* ) segment + size;
+        std_auto_m extra_segment = ( char* ) segment + size;
         std_auto_m extra_segment_header = ( std_allocator_tlsf_header_t* ) extra_segment;
         std_auto_m extra_segment_footer = ( std_allocator_tlsf_footer_t* ) ( extra_segment + extra_size - std_allocator_tlsf_footer_size_m );
         std_assert_m ( extra_segment_footer == segment_footer );
@@ -970,7 +991,7 @@ std_alloc_t std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size
 
     std_mutex_unlock ( &heap->mutex );
 
-    byte_t* user_data = std_align_ptr ( segment + std_allocator_tlsf_header_size_m, align );
+    char* user_data = std_align_ptr ( segment + std_allocator_tlsf_header_size_m, align );
     uint64_t user_size = segment + segment_size - user_data;
     std_alloc_t alloc;
     alloc.handle.id = ( uint64_t ) segment;
@@ -986,7 +1007,7 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, std_memory_h handle )
         return;
     }
 
-    std_auto_m segment = ( byte_t* ) handle.id;
+    std_auto_m segment = ( char* ) handle.id;
     uint64_t segment_size = handle.size;
 
     std_mutex_lock ( &heap->mutex );
@@ -997,7 +1018,7 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, std_memory_h handle )
     std_auto_m segment_header = ( std_allocator_tlsf_header_t* ) segment;
     //std_auto_m segment_footer = ( std_allocator_tlsf_footer_t* ) ( segment + segment_size - std_allocator_tlsf_footer_size_m );
 
-    byte_t* new_segment = segment;
+    char* new_segment = segment;
     std_allocator_tlsf_header_t new_header = *segment_header;
     //std_allocator_tlsf_footer_t new_footer = *segment_footer;
     std_allocator_tlsf_footer_t new_footer;
@@ -1025,14 +1046,14 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, std_memory_h handle )
             uint64_t new_flags = prev_flags & std_allocator_tlsf_free_prev_segment_bit_m;
             new_header.size_flags = new_size | new_flags;
             new_footer.size = new_size;
-            new_segment = ( byte_t* ) prev_header_ptr;
+            new_segment = ( char* ) prev_header_ptr;
         }
     }
 
     // check next
     if ( segment + segment_size != heap->buffer.base + heap->buffer.top ) {
 
-        byte_t* next_segment = segment + segment_size;
+        char* next_segment = segment + segment_size;
         std_auto_m next_header_ptr = ( std_allocator_tlsf_header_t* ) next_segment;
         std_allocator_tlsf_header_t next_header = *next_header_ptr;
         uint64_t next_size = next_header.size_flags & std_allocator_tlsf_size_mask_m;

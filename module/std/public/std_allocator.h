@@ -216,14 +216,14 @@ std_allocator_i std_virtual_heap_allocator ( void );
 */
 typedef struct {
     std_memory_h handle;
-    byte_t* base;
+    char* base;
     size_t reserved_size;
     size_t mapped_size;
     size_t top;
 } std_virtual_buffer_t;
 
 std_virtual_buffer_t    std_virtual_buffer_reserve ( size_t size );
-byte_t*                 std_virtual_buffer_push ( std_virtual_buffer_t* buffer, size_t size );
+char*                   std_virtual_buffer_push ( std_virtual_buffer_t* buffer, size_t size );
 void                    std_virtual_buffer_free ( std_virtual_buffer_t* buffer );
 
 /*
@@ -235,27 +235,31 @@ typedef struct {
     size_t top;
 } std_stack_t;
 
-std_stack_t             std_stack                   ( std_buffer_t buffer );
-byte_t*                 std_stack_push              ( std_stack_t* stack, size_t size, size_t align );
-byte_t*                 std_stack_push_noalign      ( std_stack_t* stack, size_t size );
-void                    std_stack_push_copy         ( std_stack_t* stack, const void* data, size_t size, size_t align );
-void                    std_stack_push_copy_noalign ( std_stack_t* stack, const void* data, size_t size );
-void                    std_stack_align             ( std_stack_t* stack, size_t align );
-void                    std_stack_align_zero        ( std_stack_t* stack, size_t align );
-void                    std_stack_pop               ( std_stack_t* stack, size_t size );
-void                    std_stack_clear             ( std_stack_t* stack );
+std_stack_t         std_stack                   ( std_buffer_t buffer );
+char*               std_stack_push              ( std_stack_t* stack, size_t size, size_t align );
+char*               std_stack_push_noalign      ( std_stack_t* stack, size_t size );
+void                std_stack_push_copy         ( std_stack_t* stack, const void* data, size_t size, size_t align );
+void                std_stack_push_copy_noalign ( std_stack_t* stack, const void* data, size_t size );
+void                std_stack_align             ( std_stack_t* stack, size_t align );
+void                std_stack_align_zero        ( std_stack_t* stack, size_t align );
+void                std_stack_pop               ( std_stack_t* stack, size_t size );
+void                std_stack_clear             ( std_stack_t* stack );
+void                std_stack_push_copy_string  ( std_stack_t* stack, const char* str );
+void                std_stack_push_append_string ( std_stack_t* stack, const char* str );
 
-std_alloc_t             std_stack_alloc             ( std_stack_t* stack, size_t size, size_t align );
-bool                    std_stack_free              ( std_stack_t* stack, std_memory_h memory );
-std_allocator_i         std_stack_allocator         ( std_stack_t* stack );
+std_alloc_t         std_stack_alloc             ( std_stack_t* stack, size_t size, size_t align );
+bool                std_stack_free              ( std_stack_t* stack, std_memory_h memory );
+std_allocator_i     std_stack_allocator         ( std_stack_t* stack );
 
-#define                 std_stack_push_m( stack, type )                 ( type* ) std_stack_push ( (stack), sizeof ( type ) , std_alignof_m ( type ) )
-#define                 std_stack_push_array_m( stack, type, count )    ( type* ) std_stack_push ( (stack), sizeof ( type ) * (count), std_alignof_m ( type ) )
-#define                 std_stack_push_noalign_m( stack, type )         ( type* ) std_stack_push_noalign ( (stack), (data), sizeof ( type ) )
-#define                 std_stack_push_noalign_array_m( stack, type, count )  ( type* ) std_stack_push_noalign ( (stack), sizeof ( type ) * (count) )
-#define                 std_stack_push_copy_noalign_m( stack, data )    std_stack_push_copy_noalign ( (stack), (data), sizeof ( *(data) ) )
-#define                 std_stack_push_copy_noalign_array_m( stack, data, count ) std_stack_push_copy_noalign ( (stack), (data), sizeof ( *(data) ) * (count) )
-#define                 std_stack_alloc_array_m( stack, type, count )   std_stack_alloc ( (stack), sizeof ( type ) * (count), std_alignof_m ( type ) )
+#define             std_stack_push_m( stack, type )                 ( type* ) std_stack_push ( (stack), sizeof ( type ) , std_alignof_m ( type ) )
+#define             std_stack_push_array_m( stack, type, count )    ( type* ) std_stack_push ( (stack), sizeof ( type ) * (count), std_alignof_m ( type ) )
+#define             std_stack_push_noalign_m( stack, type )         ( type* ) std_stack_push_noalign ( (stack), (data), sizeof ( type ) )
+#define             std_stack_push_noalign_array_m( stack, type, count )  ( type* ) std_stack_push_noalign ( (stack), sizeof ( type ) * (count) )
+#define             std_stack_push_copy_noalign_m( stack, data )    std_stack_push_copy_noalign ( (stack), (data), sizeof ( *(data) ) )
+#define             std_stack_push_copy_noalign_array_m( stack, data, count ) std_stack_push_copy_noalign ( (stack), (data), sizeof ( *(data) ) * (count) )
+#define             std_stack_alloc_array_m( stack, type, count )   std_stack_alloc ( (stack), sizeof ( type ) * (count), std_alignof_m ( type ) )
+#define             std_stack_count_m( stack, type )                ( (stack)->top / sizeof ( type ) )
+#define             std_static_stack_m( buffer ) std_stack ( std_static_buffer_m ( buffer ) )
 
 /*
     Tagged allocator

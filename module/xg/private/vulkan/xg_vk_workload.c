@@ -166,7 +166,7 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, voi
     const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
     uint64_t alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
 
-    byte_t* base = uniform_buffer->alloc.mapped_address;//uniform_buffer->base;
+    char* base = uniform_buffer->alloc.mapped_address;//uniform_buffer->base;
     std_assert_m ( base != NULL );
     uint64_t offset = 0; // this is relative to the start of the VkBuffer object, not to the underlying Vk memory allocation
 

@@ -21,12 +21,6 @@
             doesn't let the client know how much size is required to complete successfully
 */
 
-// TODO
-//typedef struct {
-//    char* text;
-//    size_t size;
-//} str_string_t;
-
 bool std_utf8_is_single_byte    ( char c );
 bool std_utf8_is_double_byte    ( char c );
 bool std_utf8_is_triple_byte    ( char c );
@@ -48,8 +42,8 @@ size_t std_str_format_valist ( char* dest, size_t dest_cap, const char* source, 
 bool std_str_starts_with ( const char* str, const char* token );
 
 // TODO rename this to make it clear that it expects dst to be a static char array
-#define std_str_copy_m( _dst, _src ) std_str_copy ( _dst, sizeof ( _dst ), _src );
-#define std_str_format_m( _dst, _src, ... ) std_str_format ( _dst, sizeof ( _dst ), _src, __VA_ARGS__ );
+#define std_str_copy_m( _dst, _src ) std_str_copy ( _dst, sizeof ( _dst ), _src )
+#define std_str_format_m( _dst, _src, ... ) std_str_format ( _dst, sizeof ( _dst ), _src, __VA_ARGS__ )
 
 size_t std_u32_to_str ( uint32_t u32, char* str, size_t cap );
 size_t std_u64_to_str ( uint64_t u64, char* str, size_t cap );
@@ -72,8 +66,8 @@ size_t std_str_find_reverse ( const char* str, size_t len, const char* token ); 
 
 size_t std_str_count ( const char* str, const char* token );
 
-//size_t                          std_str_replace ( const char* str, const char* token, const char* new_str );
-//size_t                          std_str_replace_inplace ( char* str, size_t cap, const char* token );
+//size_t std_str_replace ( const char* str, const char* token, const char* new_str );
+//size_t std_str_replace_inplace ( char* str, size_t cap, const char* token );
 
 size_t std_size_to_str_approx ( char* dest, size_t cap, size_t size_value );
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value );
@@ -83,4 +77,5 @@ void std_str_append ( char* dest, std_array_t* array, const char* source );
 uint32_t std_str_hash_32 ( const char* str );
 uint64_t std_str_hash_64 ( const char* str );
 
-const char* std_str_static ( const char* str );
+bool std_str_validate ( const char* str, size_t cap );
+#define std_str_validate_m( _str ) ( std_str_validate ( _str, sizeof ( _str ) ) )

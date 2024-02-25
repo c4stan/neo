@@ -15,7 +15,7 @@ void        aud_device_play ( aud_device_h device, std_buffer_t buffer );
 void        aud_device_init ( void );
 void        aud_device_shutdown ( void );
 
-byte_t*     aud_device_get_buffer ( aud_device_h device );
+char*     aud_device_get_buffer ( aud_device_h device );
 void        aud_device_push_buffer ( aud_device_h device, uint64_t buffer_size );
 
 const std_ring_t*   aud_device_get_ring ( aud_device_h device );

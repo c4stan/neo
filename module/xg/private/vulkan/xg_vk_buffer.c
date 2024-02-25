@@ -117,7 +117,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     VkResult result = vkCreateBuffer ( device->vk_handle, &vk_buffer_info, NULL, &vk_buffer );
     std_assert_m ( result == VK_SUCCESS );
 
-    if ( params->debug_name ) {
+    if ( params->debug_name[0] != '\0' ) {
         VkDebugUtilsObjectNameInfoEXT debug_name;
         debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
         debug_name.pNext = NULL;
@@ -172,7 +172,7 @@ bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
     info->device = buffer->params.device;
     info->size = buffer->params.size;
     info->allowed_usage = buffer->params.allowed_usage;
-    info->debug_name = buffer->params.debug_name;
+    std_str_copy_m ( info->debug_name, buffer->params.debug_name );
 
     return true;
 }

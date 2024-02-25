@@ -1181,7 +1181,7 @@ static std_app_state_e viewapp_update ( void ) {
             xg->get_default_allocator_info ( &info, m_state->render.device, i );
             {
                 xui_label_state_t type_label = xui_label_state_m( .height = 14 );
-                std_array_t array = std_static_array_m ( type_label.text );
+                std_stack_t stack = std_static_stack_m ( type_label.text );
                 const char* memory_type_name;
                 switch ( i ) {
                     case xg_memory_type_gpu_only_m:     memory_type_name = "gpu"; break;
@@ -1189,7 +1189,7 @@ static std_app_state_e viewapp_update ( void ) {
                     case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
                     case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
                 }
-                std_str_append ( type_label.text, &array, memory_type_name );
+                std_stack_push_append_string ( &stack, memory_type_name );
                 xui->add_label ( xui_workload, &type_label );
             }
             {
@@ -1197,16 +1197,16 @@ static std_app_state_e viewapp_update ( void ) {
                     .height = 14,
                     .style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m,
                 );
-                std_array_t array = std_static_array_m ( size_label.text );
+                std_stack_t stack = std_static_stack_m ( size_label.text );
                 char buffer[32];
                 std_size_to_str_approx ( buffer, 32, info.allocated_size );
-                std_str_append ( size_label.text, &array, buffer );
-                std_str_append ( size_label.text, &array, "/" );
+                std_stack_push_append_string ( &stack, buffer );
+                std_stack_push_append_string ( &stack, "/" );
                 std_size_to_str_approx ( buffer, 32, info.reserved_size );
-                std_str_append ( size_label.text, &array, buffer );
-                std_str_append ( size_label.text, &array, "/" );
+                std_stack_push_append_string ( &stack, buffer );
+                std_stack_push_append_string ( &stack, "/" );
                 std_size_to_str_approx ( buffer, 32, info.system_size );
-                std_str_append ( size_label.text, &array, buffer );
+                std_stack_push_append_string ( &stack, buffer );
                 xui->add_label ( xui_workload, &size_label );
             }
             xui->newline();

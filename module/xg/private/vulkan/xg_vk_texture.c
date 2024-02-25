@@ -102,9 +102,12 @@ void xg_texture_create_view ( xg_vk_texture_view_t* view, xg_texture_h texture_h
 
         if ( texture->params.debug_name[0] ) {
             char buffer[xg_debug_name_size_m + 16] = {0};
-            std_array_t array = std_static_array_m ( buffer );
-            std_str_append ( buffer, &array, texture->params.debug_name );
-            std_str_append ( buffer, &array, " view" ); // TODO add more info
+            std_stack_t stack = std_static_stack_m ( buffer );
+            std_stack_push_append_string ( &stack, texture->params.debug_name );
+            std_stack_push_append_string ( &stack, "view" );
+            //std_array_t array = std_static_array_m ( buffer );
+            //std_str_append ( buffer, &array, texture->params.debug_name );
+            //std_str_append ( buffer, &array, " view" ); // TODO add more info
 
             VkDebugUtilsObjectNameInfoEXT debug_name;
             debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -311,7 +314,7 @@ bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle 
     info->flags = texture->flags;
     info->default_aspect = texture->default_aspect;
     info->os_handle = ( uint64_t ) texture->vk_handle;
-    info->debug_name = texture->params.debug_name;
+    std_str_copy_m ( info->debug_name, texture->params.debug_name );
 
     return true;
 }

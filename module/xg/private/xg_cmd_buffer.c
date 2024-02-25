@@ -245,7 +245,7 @@ void xg_cmd_buffer_pipeline_constant_write ( xg_cmd_buffer_h cmd_buffer_handle, 
     cmd_args->offset = constant_data->write_offset;
     cmd_args->size = constant_data->size;
 
-    byte_t* data = std_queue_local_emplace ( &cmd_buffer->cmd_args_allocator, constant_data->size );
+    char* data = std_queue_local_emplace ( &cmd_buffer->cmd_args_allocator, constant_data->size );
     std_mem_copy ( data, constant_data->base, constant_data->size );
 }
 

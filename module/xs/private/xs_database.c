@@ -260,7 +260,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         switch ( pipeline_state->type ) {
             case xg_pipeline_graphics_m:
                 parsed_pipeline_state.graphics.params = xg_default_graphics_pipeline_params_m;
-                parsed_pipeline_state.graphics.params.debug_name = pipeline_state->name;
+                std_str_copy_m ( parsed_pipeline_state.graphics.params.debug_name, pipeline_state->name );
 
                 // Initialize viewport size with param values, the xss can override it if desired
                 parsed_pipeline_state.graphics.params.state.viewport_state.width = ( uint32_t ) build_params->viewport_width;
@@ -275,7 +275,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
 
             case xg_pipeline_compute_m:
                 parsed_pipeline_state.compute.params = xg_default_compute_pipeline_params_m;
-                parsed_pipeline_state.compute.params.debug_name = pipeline_state->name;
+                std_str_copy_m ( parsed_pipeline_state.compute.params.debug_name, pipeline_state->name );
 
                 state_parse_result = xs_parser_parse_compute_pipeline_state_from_path ( &parsed_pipeline_state.compute, pipeline_state->path );
 
@@ -417,8 +417,11 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                         len = len2;
                     }
 
-                    std_array_t array = std_static_array_m ( binary_path );
-                    array.count = len;
+                    //std_array_t array = std_static_array_m ( binary_path );
+                    //array.count = len;
+
+                    std_stack_t stack = std_static_stack_m ( binary_path );
+                    stack.top = len + 1;
 
                     const char* stage_tag = "";
 
@@ -430,9 +433,13 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                         stage_tag = "cs";
                     }
 
-                    std_str_append ( binary_path, &array, "-" );
-                    std_str_append ( binary_path, &array, stage_tag );
-                    std_str_append ( binary_path, &array, ".spv" );
+                    //std_str_append ( binary_path, &array, "-" );
+                    //std_str_append ( binary_path, &array, stage_tag );
+                    //std_str_append ( binary_path, &array, ".spv" );
+
+                    std_stack_push_append_string ( &stack, "-" );
+                    std_stack_push_append_string ( &stack, stage_tag );
+                    std_stack_push_append_string ( &stack, ".spv" );
 
                     // check if shader needs to be (re)compiled
                     bool skip_compile = false;
@@ -551,7 +558,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         }
     }
 
-    std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders built, " std_fmt_size_m " shaders skipped", 
+    std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders built, " std_fmt_size_m " shaders cached", 
         result.successful_pipeline_states, result.successful_shaders, result.skipped_shaders );
 
     if ( result.failed_shaders || result.failed_pipeline_states ) {

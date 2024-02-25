@@ -563,8 +563,8 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
 #if std_enabled_m(wm_input_state_m)
 void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_console ) {
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
-    byte_t* kb = window->input_state.keyboard;
-    byte_t* mouse = window->input_state.mouse;
+    char* kb = window->input_state.keyboard;
+    char* mouse = window->input_state.mouse;
     char line1[1024];
     std_str_format ( line1, sizeof ( line1 ),
         "ESC:" std_fmt_u8_m " F1:" std_fmt_u8_m " F2:" std_fmt_u8_m " F3:" std_fmt_u8_m " F4:" std_fmt_u8_m " F5:" std_fmt_u8_m " F6:" std_fmt_u8_m
@@ -639,7 +639,7 @@ static void wm_update_input_state ( wm_window_h handle ) {
 
     GetCursorPos ( &cursor );
 
-    byte_t keyboard[256];
+    uint8_t keyboard[256];
     GetKeyState ( 0 );
     result = GetKeyboardState ( keyboard );
     std_assert_m ( result );

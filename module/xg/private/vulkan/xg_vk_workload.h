@@ -14,7 +14,7 @@ typedef uint64_t xg_cpu_queue_event_h;
 typedef struct {
     xg_buffer_h handle;
     xg_alloc_t alloc;
-    //byte_t* base;
+    //char* base;
     uint64_t used_size;
     uint64_t total_size;
 } xg_vk_workload_uniform_buffer_t;

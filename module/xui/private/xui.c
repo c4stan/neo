@@ -10,9 +10,9 @@
 
 static void xui_register_shaders ( xs_i* xs ) {
     char path[std_process_path_max_len_m];
-    std_array_t array = std_static_array_m ( path );
-    std_str_append ( path, &array, std_module_path_m );
-    std_str_append ( path, &array, "shader/");
+    std_stack_t stack = std_static_stack_m ( path );
+    std_stack_push_append_string ( &stack, std_module_path_m );
+    std_stack_push_append_string ( &stack, "shader/");
     xs->add_database_folder ( path );
     xui_workload_load_shaders ( xs );
     xui_font_load_shaders ( xs );

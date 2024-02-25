@@ -84,7 +84,7 @@
     #define std_array_typecast_m( a )                             ( std_typeof_m ( &( (a)[0] ) ) )
     #define std_no_return_m                                       __attribute__((noreturn)) void
     #define std_static_assert_m( exp )                            _Static_assert ( exp, "FAILED STATIC ASSERT: " #exp )
-    #define std_pad_m( size )                                     std_pp_eval_concat_m ( byte_t __pad, std_line_num_m ) [size]
+    #define std_pad_m( size )                                     std_pp_eval_concat_m ( char __pad, std_line_num_m ) [size]
     #define std_auto_m                                            __auto_type
 
 #else

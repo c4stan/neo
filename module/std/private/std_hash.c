@@ -421,7 +421,7 @@ std_map_t std_map ( std_buffer_t keys, std_buffer_t payloads, size_t key_stride,
     map.mask = cap - 1;
 
     // Use u64_max as invalid key/hash.
-    std_mem_set ( keys.base, keys.size, std_byte_max_m );
+    std_mem_set ( keys.base, keys.size, 0xff );
     return map;
 }
 
@@ -446,9 +446,9 @@ std_map_t std_map_u64 ( std_buffer_t keys, std_buffer_t payloads ) {
 void* std_map_insert ( std_map_t* map, const void* key, const void* payload ) {
     // Load
     size_t      mask = map->mask;
-    byte_t*     keys = map->keys;
+    char*     keys = map->keys;
     size_t      key_stride = map->key_stride;
-    byte_t*     payloads = map->payloads;
+    char*     payloads = map->payloads;
     size_t      payload_stride = map->payload_stride;
 
     // Compute hash and offset
@@ -477,9 +477,9 @@ void* std_map_insert ( std_map_t* map, const void* key, const void* payload ) {
 void* std_map_lookup ( const std_map_t* map, const void* key ) {
     // Load
     size_t          mask = map->mask;
-    const byte_t*   keys = map->keys;
+    const char*   keys = map->keys;
     size_t          key_stride = map->key_stride;
-    byte_t*         payloads = map->payloads;
+    char*         payloads = map->payloads;
     size_t          payload_stride = map->payload_stride;
 
     // Compute hash and offset
@@ -509,20 +509,20 @@ void* std_map_lookup ( const std_map_t* map, const void* key ) {
 void std_map_remove ( std_map_t* map, const void* payload ) {
     // Load
     size_t      mask = map->mask;
-    byte_t*     keys = map->keys;
+    char*     keys = map->keys;
     size_t      key_stride = map->key_stride;
-    byte_t*     payloads = map->payloads;
+    char*     payloads = map->payloads;
     size_t      payload_stride = map->payload_stride;
 
     // Validate payload ptr
-    std_assert_m ( ( byte_t* ) payload >= payloads );
-    std_assert_m ( ( byte_t* ) payload < payloads + ( mask + 1 ) * payload_stride );
+    std_assert_m ( ( char* ) payload >= payloads );
+    std_assert_m ( ( char* ) payload < payloads + ( mask + 1 ) * payload_stride );
 
     // Compute key ptr
-    size_t      offset = ( size_t ) ( ( byte_t* ) payload - payloads );
+    size_t      offset = ( size_t ) ( ( char* ) payload - payloads );
     size_t      idx = offset / payload_stride;
     void*       map_key = keys + idx * key_stride;
-    std_assert_m ( !std_mem_test ( map_key, key_stride, std_byte_max_m ) );
+    std_assert_m ( !std_mem_test ( map_key, key_stride, 0xff ) );
 
     // All elements that linearly follow the removed item need to be checked for
     // possible necessary reorder. The rule that all elements can be accessed by
@@ -536,8 +536,8 @@ void std_map_remove ( std_map_t* map, const void* payload ) {
 
         // If element after is invalid, no more moving necessary. Can return.
         // If not ivalid, it might be victim of over crowding. Check and fix.
-        if ( std_mem_test ( next_key, key_stride, std_byte_max_m ) ) {
-            std_mem_set ( map_key, key_stride, std_byte_max_m );
+        if ( std_mem_test ( next_key, key_stride, 0xff ) ) {
+            std_mem_set ( map_key, key_stride, 0xff );
             --map->pop;
             return;
         }
@@ -563,25 +563,25 @@ const void* std_map_get_key ( const std_map_t* map, const void* payload ) {
     size_t      key_stride = map->key_stride;
     size_t      payload_stride = map->payload_stride;
     size_t      mask = map->mask;
-    byte_t*     keys = map->keys;
-    byte_t*     payloads = map->payloads;
+    char*     keys = map->keys;
+    char*     payloads = map->payloads;
 
     // Validate payload pointer
-    std_assert_m ( ( const byte_t* ) payload >= payloads );
-    std_assert_m ( ( const byte_t* ) payload <= payloads + ( mask + 1 ) * payload_stride );
+    std_assert_m ( ( const char* ) payload >= payloads );
+    std_assert_m ( ( const char* ) payload <= payloads + ( mask + 1 ) * payload_stride );
 
     // Compute key ptr
-    size_t      offset = ( size_t ) ( ( const byte_t* ) payload - payloads );
+    size_t      offset = ( size_t ) ( ( const char* ) payload - payloads );
     size_t      idx = offset / payload_stride;
     const void* key = keys + idx * key_stride;
-    std_assert_m ( !std_mem_test ( key, key_stride, std_byte_max_m ) );
+    std_assert_m ( !std_mem_test ( key, key_stride, 0xff ) );
 
     return key;
 }
 
 void std_map_clear ( std_map_t* map ) {
     map->pop = 0;
-    std_mem_set ( map->keys, ( map->mask + 1 ) * map->key_stride, std_byte_max_m );
+    std_mem_set ( map->keys, ( map->mask + 1 ) * map->key_stride, 0xff );
 }
 
 // ======================================================================================= //

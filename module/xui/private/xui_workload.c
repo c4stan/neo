@@ -157,21 +157,23 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
 
         xg_sampler_h point_sampler;
         {
-            xg_sampler_params_t params = xg_default_sampler_params_m;
-            params.debug_name = "xui point sampler";
-            params.min_filter = xg_sampler_filter_point_m;
-            params.mag_filter = xg_sampler_filter_point_m;
-            params.mipmap_filter = xg_sampler_filter_point_m;
+            xg_sampler_params_t params = xg_sampler_params_m (
+                .debug_name = "xui point sampler",
+                .min_filter = xg_sampler_filter_point_m,
+                .mag_filter = xg_sampler_filter_point_m,
+                .mipmap_filter = xg_sampler_filter_point_m,
+            );
             point_sampler = xg->create_sampler ( &params );
         }
 
         xg_sampler_h linear_sampler;
         {
-            xg_sampler_params_t params = xg_default_sampler_params_m;
-            params.debug_name = "xui linear sampler";
-            params.min_filter = xg_sampler_filter_linear_m;
-            params.mag_filter = xg_sampler_filter_linear_m;
-            params.mipmap_filter = xg_sampler_filter_linear_m;
+            xg_sampler_params_t params = xg_sampler_params_m (
+                .debug_name = "xui linear sampler",
+                .min_filter = xg_sampler_filter_linear_m,
+                .mag_filter = xg_sampler_filter_linear_m,
+                .mipmap_filter = xg_sampler_filter_linear_m,
+            );
             linear_sampler = xg->create_sampler ( &params );
         }
 
@@ -281,12 +283,13 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     }
 
     // create vertex buffer
-    xg_buffer_params_t vertex_buffer_params;
-    vertex_buffer_params.allocator = xg->get_default_allocator ( flush_params->device, xg_memory_type_gpu_mappable_m );
-    vertex_buffer_params.device = flush_params->device;
-    vertex_buffer_params.size = sizeof ( xui_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 );
-    vertex_buffer_params.allowed_usage = xg_buffer_usage_vertex_buffer_m;
-    vertex_buffer_params.debug_name = "xui_vertex_buffer";
+    xg_buffer_params_t vertex_buffer_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( flush_params->device, xg_memory_type_gpu_mappable_m ),
+        .device = flush_params->device,
+        .size = sizeof ( xui_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
+        .allowed_usage = xg_buffer_usage_vertex_buffer_m,
+        .debug_name = "xui_vertex_buffer",
+    );
     xg_buffer_h vertex_buffer_handle = xg->create_buffer ( &vertex_buffer_params );
     std_assert_m ( vertex_buffer_handle != xg_null_handle_m );
     workload->vertex_buffer = vertex_buffer_handle;
@@ -294,7 +297,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     // fill vertex buffer
     xg_buffer_info_t vertex_buffer_info;
     xg->get_buffer_info ( &vertex_buffer_info, vertex_buffer_handle );
-    byte_t* vertex_buffer_data = ( byte_t* ) vertex_buffer_info.allocation.mapped_address;
+    char* vertex_buffer_data = ( char* ) vertex_buffer_info.allocation.mapped_address;
     std_mem_copy ( vertex_buffer_data, workload->vertex_buffer_data, vertex_buffer_params.size );
 
     // bind pipeline

@@ -390,7 +390,7 @@ typedef struct {
     xg_device_h device;
     wm_window_h window;
     xg_display_h display;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_swapchain_info_t;
 
 typedef struct {
@@ -400,7 +400,7 @@ typedef struct {
     xg_present_mode_e present_mode;
     xg_device_h device;
     wm_window_h window;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_swapchain_window_params_t;
 
 #define xg_swapchain_window_params_m( ... ) ( xg_swapchain_window_params_t ) { \
@@ -421,7 +421,7 @@ typedef struct {
     xg_present_mode_e present_mode;
     xg_device_h device;
     xg_display_h display;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_swapchain_display_params_t;
 
 typedef struct {
@@ -431,7 +431,7 @@ typedef struct {
     size_t width;
     size_t height;
     xg_device_h device;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_swapchain_virtual_params_t;
 
 // -- Device Memory --
@@ -1095,7 +1095,7 @@ typedef struct {
     xg_render_textures_layout_t     render_textures; // TOOD rename in render_textures_layout?
     xg_resource_bindings_layout_t   resource_bindings; // TODO rename in resource_layout. etc.. below
     xg_constant_bindings_layout_t   constant_bindings;
-    const char*                     debug_name;
+    char                            debug_name[xg_debug_name_size_m];
 } xg_graphics_pipeline_params_t;
 
 #define xg_default_graphics_pipeline_params_m ( xg_graphics_pipeline_params_t ) { \
@@ -1103,7 +1103,7 @@ typedef struct {
     .render_textures = xg_default_render_textures_layout_m, \
     .resource_bindings = xg_default_resource_bindings_layout_m, \
     .constant_bindings = xg_default_constant_bindings_layout_m, \
-    .debug_name = NULL, \
+    .debug_name = {0}, \
 }
 
 typedef struct {
@@ -1118,14 +1118,14 @@ typedef struct {
     xg_compute_pipeline_state_t     state;
     xg_resource_bindings_layout_t   resource_bindings;
     xg_constant_bindings_layout_t   constant_bindings;
-    const char*                     debug_name;
+    char                            debug_name[xg_debug_name_size_m];
 } xg_compute_pipeline_params_t;
 
 #define xg_default_compute_pipeline_params_m ( xg_compute_pipeline_params_t ) { \
     .state = xg_default_compute_pipeline_state_m, \
     .resource_bindings = xg_default_resource_bindings_layout_m, \
     .constant_bindings = xg_default_constant_bindings_layout_m, \
-    .debug_name = NULL, \
+    .debug_name = {0}, \
 }
 
 typedef struct {
@@ -1140,7 +1140,7 @@ typedef struct {
     xg_raytrace_pipeline_state_t    state;
     xg_resource_bindings_layout_t   resource_bindings;
     xg_constant_bindings_layout_t   constant_bindings;
-    const char*                     debug_name;
+    char                            debug_name[xg_debug_name_size_m];
 } xg_raytrace_pipeline_params_t;
 
 typedef enum {
@@ -1553,7 +1553,7 @@ typedef struct {
     size_t size;
     // TODO rename to allowed_gpu_usage?
     xg_buffer_usage_f allowed_usage;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_buffer_params_t;
 
 #define xg_buffer_params_m( ... ) ( xg_buffer_params_t ) { \
@@ -1561,7 +1561,7 @@ typedef struct {
     .device = xg_null_handle_m, \
     .size = 0, \
     .allowed_usage = 0, \
-    .debug_name = NULL, \
+    .debug_name = {0}, \
     ##__VA_ARGS__ \
 }
 
@@ -1636,10 +1636,10 @@ typedef struct {
     uint32_t max_mip;
     uint32_t mip_bias;
     xg_sampler_address_mode_e address_mode; // TODO separate value for u/v/w axes?
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_sampler_params_t;
 
-#define xg_default_sampler_params_m ( xg_sampler_params_t ) { \
+#define xg_sampler_params_m(...) ( xg_sampler_params_t ) { \
     .min_filter = xg_sampler_filter_point_m, \
     .mag_filter = xg_sampler_filter_point_m, \
     .mipmap_filter = xg_sampler_filter_point_m, \
@@ -1648,8 +1648,11 @@ typedef struct {
     .max_mip = xg_texture_all_mips_m, \
     .mip_bias = 0, \
     .address_mode = xg_sampler_address_mode_clamp_m, \
-    .debug_name = NULL, \
+    .debug_name = {0}, \
+    ##__VA_ARGS__ \
 }
+
+#define xg_default_sampler_params_m xg_sampler_params_m()
 
 typedef enum {
     xg_texture_flag_bit_swapchain_texture_m = 1 << 0,
@@ -1675,7 +1678,7 @@ typedef struct {
     xg_texture_flags_b flags;
     xg_texture_aspect_e default_aspect;
     uint64_t os_handle; // TODO replace with monotonically increasing resource uid
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_texture_info_t;
 
 typedef struct {
@@ -1684,7 +1687,7 @@ typedef struct {
     xg_device_h device;
     size_t size;
     xg_buffer_usage_f allowed_usage;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_buffer_info_t;
 
 typedef struct {
@@ -1697,7 +1700,7 @@ typedef struct {
     uint32_t max_mip;
     uint32_t mip_bias;
     xg_sampler_address_mode_e address_mode;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 } xg_sampler_info_t;
 
 typedef enum {
@@ -1946,7 +1949,7 @@ typedef struct {
     xg_allocator_i          ( *get_default_allocator )              ( xg_device_h device, xg_memory_type_e type );
     void                    ( *get_default_allocator_info )         ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
     // TODO add map_buffer/texture for convenience?
-    //byte_t*                 ( *map_alloc )                          ( const xg_alloc_t* alloc );
+    //char*                 ( *map_alloc )                          ( const xg_alloc_t* alloc );
     //void                    ( *unmap_alloc )                        ( const xg_alloc_t* alloc );
 
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion

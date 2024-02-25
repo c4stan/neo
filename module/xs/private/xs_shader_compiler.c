@@ -34,26 +34,23 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
     char args_buffer[std_process_args_max_len_m] = {0};
     //char cmdline[std_process_cmdline_max_len_m];
     {
-        std_array_t array = std_static_array_m ( args_buffer );
+        std_stack_t stack = std_static_stack_m ( args_buffer );
 
-        args[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, params->shader_path );
+        args[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, params->shader_path );
 
-        std_array_push ( &array, 1 );
-        args[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, "-g" );
+        args[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, "-g" );
 
-        std_array_push ( &array, 1 );
-        args[argc++] = &args_buffer[array.count];
+        args[argc++] = &args_buffer[stack.top];
 #if std_enabled_m(std_debug_m)
-        std_str_append ( args_buffer, &array, "-O0" );
+        std_stack_push_copy_string ( &stack, "-O0" );
 #else
-        std_str_append ( args_buffer, &array, "-O" );
+        std_stack_push_copy_string ( &stack, "-O" );
 #endif
 
-        std_array_push ( &array, 1 );
-        args[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, "-o" );
+        args[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, "-o" );
 
         /*char binary_name[xs_shader_name_max_len_m];
         {
@@ -68,9 +65,8 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             cap2 = xs_shader_name_max_len_m - len;
             std_str_append_m ( dest2, cap2, ".spv" );
         }*/
-        std_array_push ( &array, 1 );
-        args[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, params->binary_path );
+        args[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, params->binary_path );
 
 #if 0
         args[argc++] = ++dest;
@@ -83,16 +79,21 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
         std_str_append_m ( dest, cap, "=main" );
 #endif
 
-        std_array_push ( &array, 1 );
-        args[argc++] = &args_buffer[array.count];
+        args[argc++] = &args_buffer[stack.top];
         // TODO find a better way to do this... this depends on the working dir (the app workspace root when running from neo)
         {
             char include_path[256];
-            std_array_t include_path_array = std_static_array_m ( include_path );
-            std_str_append ( include_path, &include_path_array, "-I" );
-            std_str_append ( include_path, &include_path_array, std_module_path_m );
-            std_str_append ( include_path, &include_path_array, "public/shader/" );
-            std_str_append ( args_buffer, &array, include_path );
+            //std_array_t include_path_array = std_static_array_m ( include_path );
+            //std_str_append ( include_path, &include_path_array, "-I" );
+            //std_str_append ( include_path, &include_path_array, std_module_path_m );
+            //std_str_append ( include_path, &include_path_array, "public/shader/" );
+            //std_str_append ( args_buffer, &array, include_path );
+        
+            std_stack_t include_path_string = std_static_stack_m ( include_path );
+            std_stack_push_append_string ( &include_path_string, "-I" );
+            std_stack_push_append_string ( &include_path_string, std_module_path_m );
+            std_stack_push_append_string ( &include_path_string, "public/shader/" );
+            std_stack_push_copy_string ( &stack, include_path );
         }
 
         //if ( binary_name_out ) {
@@ -103,25 +104,24 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             char u32_buffer[32];
 
             for ( size_t i = 0; i < params->global_definition_count; ++i ) {
-                std_array_push ( &array, 1 );
-                args[argc++] = &args_buffer[array.count];
-                std_str_append ( args_buffer, &array, "-D" );
-                std_str_append ( args_buffer, &array, params->global_definitions[i].name );
-                std_str_append ( args_buffer, &array, "=" );
+                //std_array_push ( &array, 1 );
+                args[argc++] = &args_buffer[stack.top];
+                std_stack_push_copy_string ( &stack, "-D" );
+                std_stack_push_append_string ( &stack, params->global_definitions[i].name );
+                std_stack_push_append_string ( &stack, "=" );
                 size_t len = std_u32_to_str ( params->global_definitions[i].value, u32_buffer, 32 );
                 std_assert_m ( len > 0 && len < 32 );
-                std_str_append ( args_buffer, &array, u32_buffer );
+                std_stack_push_append_string ( &stack, u32_buffer );
             }
 
             for ( size_t i = 0; i < params->shader_definition_count; ++i ) {
-                std_array_push ( &array, 1 );
-                args[argc++] = &args_buffer[array.count];
-                std_str_append ( args_buffer, &array, "-D" );
-                std_str_append ( args_buffer, &array, params->global_definitions[i].name );
-                std_str_append ( args_buffer, &array, "=" );
+                args[argc++] = &args_buffer[stack.top];
+                std_stack_push_copy_string ( &stack, "-D" );
+                std_stack_push_append_string ( &stack, params->global_definitions[i].name );
+                std_stack_push_append_string ( &stack, "=" );
                 size_t len = std_u32_to_str ( params->global_definitions[i].value, u32_buffer, 32 );
                 std_assert_m ( len > 0 && len < 32 );
-                std_str_append ( args_buffer, &array, u32_buffer );
+                std_stack_push_append_string ( &stack, u32_buffer );
             }
         }
     }

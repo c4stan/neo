@@ -1909,7 +1909,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
             case xg_cmd_barrier_set_m: {
                 std_auto_m args = ( xg_cmd_barrier_set_t* ) header->args;
 
-                byte_t* base = ( byte_t* ) ( args + 1 );
+                char* base = ( char* ) ( args + 1 );
 
 #if std_enabled_m(xg_vk_enable_sync2_m)
                 VkImageMemoryBarrier2KHR vk_texture_barriers[xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m];
@@ -1920,7 +1920,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 }
 
                 if ( args->buffer_memory_barriers > 0 ) {
-                    base = ( byte_t* ) std_align_ptr ( base, std_alignof_m ( xg_buffer_memory_barrier_t ) );
+                    base = ( char* ) std_align_ptr ( base, std_alignof_m ( xg_buffer_memory_barrier_t ) );
 
                     for ( uint32_t i = 0; i < args->buffer_memory_barriers; ++i ) {
                         VkBufferMemoryBarrier2KHR* vk_barrier = &vk_buffer_barriers[i];
@@ -1945,7 +1945,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 }
 
                 if ( args->texture_memory_barriers > 0 ) {
-                    base = ( byte_t* ) std_align_ptr ( base, std_alignof_m ( xg_texture_memory_barrier_t ) );
+                    base = ( char* ) std_align_ptr ( base, std_alignof_m ( xg_texture_memory_barrier_t ) );
 
                     for ( uint32_t i = 0; i < args->texture_memory_barriers; ++i ) {
                         VkImageMemoryBarrier2KHR* vk_barrier = &vk_texture_barriers[i];
@@ -2038,7 +2038,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 VkPipelineStageFlags dstStage = 0;
 
                 if ( args->texture_memory_barriers > 0 ) {
-                    base = ( byte_t* ) std_align_ptr ( base, std_alignof_m ( xg_texture_memory_barrier_t ) );
+                    base = ( char* ) std_align_ptr ( base, std_alignof_m ( xg_texture_memory_barrier_t ) );
 
                     for ( uint32_t i = 0; i < args->texture_memory_barriers; ++i ) {
                         VkImageMemoryBarrier* vk_barrier = &vk_texture_barriers[i];

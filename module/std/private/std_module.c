@@ -362,6 +362,7 @@ size_t std_module_build ( const char* solution_name, std_buffer_t output ) {
     const char* argv[std_process_max_args_m];
     size_t argc = 0;
     char args_buffer[std_process_args_max_len_m];
+#if 0
     {
         std_assert_m ( std_process_max_args_m > 4 );
         std_array_t array = std_static_array_m ( args_buffer );
@@ -380,6 +381,22 @@ size_t std_module_build ( const char* solution_name, std_buffer_t output ) {
 
         argv[argc++] = &args_buffer[array.count];
         std_str_append ( args_buffer, &array, "-r" ); // reload flag
+    }
+#endif
+    {
+        std_stack_t stack = std_static_stack_m ( args_buffer );
+        
+        argv[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, std_builder_path_m );
+
+        argv[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, "build" );
+
+        argv[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, solution_name );
+
+        argv[argc++] = &args_buffer[stack.top];
+        std_stack_push_copy_string ( &stack, "-r" ); // reload flag
     }
 
     // The builder will send back the build results to this process through this pipe

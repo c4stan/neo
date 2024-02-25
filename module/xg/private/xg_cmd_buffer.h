@@ -122,7 +122,7 @@ typedef struct {
     xg_shading_stage_b stages;
     uint32_t offset;
     uint32_t size;
-    byte_t data[];
+    char data[];
 } xg_cmd_pipeline_constant_data_write_t;
 
 typedef struct {

@@ -45,7 +45,7 @@ typedef struct {
 
     /*std_memory_h submit_blocks_handle;
     std_ring_t submit_blocks_ring;
-    byte_t** submit_blocks;
+    char** submit_blocks;
     uint64_t submit_block_size;
     aud_device_submit_context_t* submit_contexts;*/
 } aud_device_t;
@@ -374,7 +374,7 @@ void aud_device_play ( aud_device_h device_handle, std_buffer_t buffer ) {
 #endif
 }
 
-byte_t* aud_device_get_buffer ( aud_device_h device_handle ) {
+char* aud_device_get_buffer ( aud_device_h device_handle ) {
     aud_device_t* device = &aud_device_state.devices_array[device_handle];
     std_assert_m ( ( device->flags & aud_devuce_existing_m ) );
 

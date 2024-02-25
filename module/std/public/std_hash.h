@@ -39,8 +39,8 @@ uint64_t    std_hash_metro_end ( std_hash_metro_state_t* state );
 typedef bool        ( std_map_cmp_f )  ( uint64_t hash1, const void* key1, const void* key2, void* usr_arg );
 typedef uint64_t    ( std_map_hash_f ) ( const void* key, void* usr_arg );
 typedef struct {
-    byte_t* keys;
-    byte_t* payloads;
+    char* keys;
+    char* payloads;
     size_t pop;
     size_t mask;
     std_map_hash_f* hasher;

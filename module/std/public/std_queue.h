@@ -12,7 +12,7 @@
 */
 
 typedef struct {
-    byte_t* base;
+    char* base;
     size_t top;
     size_t bot;
     size_t mask;        // Equals to (size - 1). Size must be pow2.
@@ -59,14 +59,14 @@ void std_ring_pop ( std_ring_t* ring, uint64_t count );
 // ----------
 
 std_static_align_m ( std_l1d_size_m ) typedef struct {
-    byte_t* base;
-    byte_t  _p0[std_l1d_size_m - sizeof ( byte_t* )];
+    char* base;
+    char  _p0[std_l1d_size_m - sizeof ( char* )];
     size_t  top;
-    byte_t  _p1[std_l1d_size_m - sizeof ( size_t )];
+    char  _p1[std_l1d_size_m - sizeof ( size_t )];
     size_t  bot;
-    byte_t  _p2[std_l1d_size_m - sizeof ( size_t )];
+    char  _p2[std_l1d_size_m - sizeof ( size_t )];
     size_t  mask;       // Equals to (size - 1). Size must be pow2.
-    byte_t  _p3[std_l1d_size_m - sizeof ( size_t )];
+    char  _p3[std_l1d_size_m - sizeof ( size_t )];
 } std_queue_shared_t;
 
 /*

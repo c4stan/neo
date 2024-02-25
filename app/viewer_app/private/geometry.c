@@ -132,28 +132,31 @@ geometry_data_t generate_plane ( float side ) {
 geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_data_t* geo ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-    xg_buffer_params_t pos_staging_params;
-    pos_staging_params.allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m );
-    pos_staging_params.device = device;
-    pos_staging_params.size = geo->vertex_count * sizeof ( float ) * 3;
-    pos_staging_params.allowed_usage = xg_buffer_usage_copy_source_m;
-    pos_staging_params.debug_name = "staging temp buffer";
+    xg_buffer_params_t pos_staging_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m ),
+        .device = device,
+        .size = geo->vertex_count * sizeof ( float ) * 3,
+        .allowed_usage = xg_buffer_usage_copy_source_m,
+        .debug_name = "staging temp buffer",
+    );
     xg_buffer_h pos_staging = xg->create_buffer ( &pos_staging_params );
 
-    xg_buffer_params_t nor_staging_params;
-    nor_staging_params.allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m );
-    nor_staging_params.device = device;
-    nor_staging_params.size = geo->vertex_count * sizeof ( float ) * 3;
-    nor_staging_params.allowed_usage = xg_buffer_usage_copy_source_m;
-    nor_staging_params.debug_name = "staging temp buffer";
+    xg_buffer_params_t nor_staging_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m ),
+        .device = device,
+        .size = geo->vertex_count * sizeof ( float ) * 3,
+        .allowed_usage = xg_buffer_usage_copy_source_m,
+        .debug_name = "staging temp buffer",
+    );
     xg_buffer_h nor_staging = xg->create_buffer ( &nor_staging_params );
 
-    xg_buffer_params_t idx_staging_params;
-    idx_staging_params.allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m );
-    idx_staging_params.device = device;
-    idx_staging_params.size = geo->index_count * sizeof ( uint32_t );
-    idx_staging_params.allowed_usage = xg_buffer_usage_copy_source_m;
-    idx_staging_params.debug_name = "staging temp buffer";
+    xg_buffer_params_t idx_staging_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m ),
+        .device = device,
+        .size = geo->index_count * sizeof ( uint32_t ),
+        .allowed_usage = xg_buffer_usage_copy_source_m,
+        .debug_name = "staging temp buffer",
+    );
     xg_buffer_h idx_staging = xg->create_buffer ( &idx_staging_params );
 
     xg_buffer_info_t pos_staging_info;
@@ -186,28 +189,31 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
-    xg_buffer_params_t pos_buffer_params;
-    pos_buffer_params.allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m );
-    pos_buffer_params.device = device;
-    pos_buffer_params.size = geo->vertex_count * sizeof ( float ) * 3;
-    pos_buffer_params.allowed_usage = xg_buffer_usage_copy_dest_m | xg_buffer_usage_vertex_buffer_m;
-    pos_buffer_params.debug_name = "vbuffer pos stream";
+    xg_buffer_params_t pos_buffer_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .device = device,
+        .size = geo->vertex_count * sizeof ( float ) * 3,
+        .allowed_usage = xg_buffer_usage_copy_dest_m | xg_buffer_usage_vertex_buffer_m,
+        .debug_name = "vbuffer pos stream",
+    );
     xg_buffer_h pos_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &pos_buffer_params );
 
-    xg_buffer_params_t nor_buffer_params;
-    nor_buffer_params.allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m );
-    nor_buffer_params.device = device;
-    nor_buffer_params.size = geo->vertex_count * sizeof ( float ) * 3;
-    nor_buffer_params.allowed_usage = xg_buffer_usage_copy_dest_m | xg_buffer_usage_vertex_buffer_m;
-    nor_buffer_params.debug_name = "vbuffer nor stream";
+    xg_buffer_params_t nor_buffer_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .device = device,
+        .size = geo->vertex_count * sizeof ( float ) * 3,
+        .allowed_usage = xg_buffer_usage_copy_dest_m | xg_buffer_usage_vertex_buffer_m,
+        .debug_name = "vbuffer nor stream",
+    );
     xg_buffer_h nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &nor_buffer_params );
 
-    xg_buffer_params_t idx_buffer_params;
-    idx_buffer_params.allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m );
-    idx_buffer_params.device = device;
-    idx_buffer_params.size = geo->index_count * sizeof ( uint32_t );
-    idx_buffer_params.allowed_usage = xg_buffer_usage_copy_dest_m | xg_buffer_usage_index_buffer_m;
-    idx_buffer_params.debug_name = "ibuffer";
+    xg_buffer_params_t idx_buffer_params = xg_buffer_params_m (
+        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .device = device,
+        .size = geo->index_count * sizeof ( uint32_t ),
+        .allowed_usage = xg_buffer_usage_copy_dest_m | xg_buffer_usage_index_buffer_m,
+        .debug_name = "ibuffer",
+    );
     xg_buffer_h idx_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &idx_buffer_params );
 
     xg->cmd_copy_buffer ( cmd_buffer, nor_staging, nor_buffer, 0 );

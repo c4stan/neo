@@ -193,8 +193,8 @@ typedef struct {
     uint32_t global_cursor_y;
     uint32_t cursor_x;
     uint32_t cursor_y;
-    byte_t mouse[wm_mouse_state_size_m]; // access with [] by wm_mouse_state_e values
-    byte_t keyboard[wm_keyboard_state_size_m]; // access with [] by wm_keyboard_state_e values
+    char mouse[wm_mouse_state_size_m]; // access with [] by wm_mouse_state_e values
+    char keyboard[wm_keyboard_state_size_m]; // access with [] by wm_keyboard_state_e values
 #if std_enabled_m ( wm_input_buffer_m )
     char buffer[wm_input_buffer_size_m];
     uint32_t buffer_used_size;

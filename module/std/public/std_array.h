@@ -2,6 +2,8 @@
 
 #include <std_platform.h>
 
+// TODO rename to array_size or array_meta
+// TODO move somewhere else... and delete this .h/.c
 typedef struct {
     uint64_t count;
     uint64_t capacity;

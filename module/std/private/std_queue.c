@@ -36,7 +36,7 @@ size_t std_queue_local_used_size ( const std_queue_local_t* queue ) {
 void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t size ) {
     std_assert_m ( item != NULL );
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
     size_t  bot = queue->bot;
@@ -53,7 +53,7 @@ void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t s
     size_t pre = cap > offset + size ? size : offset + size - cap;
     size_t post = size - pre;
     std_mem_copy ( base + offset, item, pre );
-    std_mem_copy ( base, ( byte_t* ) item + pre, post );
+    std_mem_copy ( base, ( char* ) item + pre, post );
 
     queue->top = top + size;
 }
@@ -74,7 +74,7 @@ void std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size ) {
 
 void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t size ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
     size_t  bot = queue->bot;
@@ -91,14 +91,14 @@ void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t siz
     size_t pre = cap > offset + size ? size : offset + size - cap;
     size_t post = size - pre;
     std_mem_copy ( dest, base + offset, pre );
-    std_mem_copy ( ( byte_t* ) dest + pre, base, post );
+    std_mem_copy ( ( char* ) dest + pre, base, post );
 
     queue->bot = bot + size;
 }
 
 void* std_queue_local_emplace ( std_queue_local_t* queue, size_t size ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
 
@@ -242,7 +242,7 @@ size_t std_circular_pool_capacity ( const std_circular_pool_t* pool ) {
 }
 
 void* std_circular_pool_push ( std_circular_pool_t* pool ) {
-    byte_t* base = pool->base;
+    char* base = pool->base;
     size_t top = pool->top;
     size_t mask = pool->mask;
     size_t stride = pool->stride;
@@ -256,7 +256,7 @@ void* std_circular_pool_push ( std_circular_pool_t* pool ) {
 #endif
 
     size_t offset = top & mask;
-    byte_t* item = base + offset * stride;
+    char* item = base + offset * stride;
 
     pool->top = top + 1;
 
@@ -277,7 +277,7 @@ void std_circular_pool_pop ( std_circular_pool_t* pool ) {
 }
 
 void* std_circular_pool_peek ( std_circular_pool_t* pool ) {
-    byte_t* base = pool->base;
+    char* base = pool->base;
     size_t stride = pool->stride;
     size_t mask = pool->mask;
     size_t bot = pool->bot;
@@ -286,7 +286,7 @@ void* std_circular_pool_peek ( std_circular_pool_t* pool ) {
 }
 
 void* std_circular_pool_at ( const std_circular_pool_t* pool, size_t idx ) {
-    byte_t* base = pool->base;
+    char* base = pool->base;
     size_t mask = pool->mask;
     size_t stride = pool->stride;
 
@@ -294,7 +294,7 @@ void* std_circular_pool_at ( const std_circular_pool_t* pool, size_t idx ) {
 }
 
 void* std_circular_pool_at_buffer ( const std_circular_pool_t* pool, size_t idx ) {
-    byte_t* base = pool->base;
+    char* base = pool->base;
     size_t stride = pool->stride;
 
 #if std_assert_enabled_m
@@ -307,7 +307,7 @@ void* std_circular_pool_at_buffer ( const std_circular_pool_t* pool, size_t idx 
 }
 
 void* std_circular_pool_at_pool ( const std_circular_pool_t* pool, size_t idx ) {
-    byte_t* base = pool->base;
+    char* base = pool->base;
     size_t bot = pool->bot;
     size_t mask = pool->mask;
     size_t stride = pool->stride;
@@ -363,7 +363,7 @@ const void* std_queue_shared_sc_peek ( std_queue_shared_t* queue ) {
 
 void std_queue_spsc_push ( std_queue_shared_t* queue, const void* item, size_t size ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
     size_t  bot = queue->bot;
@@ -381,7 +381,7 @@ void std_queue_spsc_push ( std_queue_shared_t* queue, const void* item, size_t s
     size_t pre = cap > offset + size ? size : offset + size - cap;
     size_t post = size - pre;
     std_mem_copy ( base + offset, item, pre );
-    std_mem_copy ( base, ( byte_t* ) item + pre, post );
+    std_mem_copy ( base, ( char* ) item + pre, post );
 
     std_compiler_fence();
     queue->top = top + size;
@@ -403,7 +403,7 @@ void std_queue_spsc_pop_discard ( std_queue_shared_t* queue, size_t size ) {
 
 void std_queue_spsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t size ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
     size_t  bot = queue->bot;
@@ -419,7 +419,7 @@ void std_queue_spsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t siz
     size_t pre = cap > offset + size ? size : offset + size - cap;
     size_t post = size - pre;
     std_mem_copy ( dest, base + offset, pre );
-    std_mem_copy ( ( byte_t* ) dest + pre, base, post );
+    std_mem_copy ( ( char* ) dest + pre, base, post );
 
     std_compiler_fence();
     queue->bot = bot + size;
@@ -444,7 +444,7 @@ bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t s
     std_assert_m ( size < UINT32_MAX );
 
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  bot = queue->bot;
     size_t  top = queue->top;
@@ -476,7 +476,7 @@ bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t s
         size_t pre = cap > offset + size ? size : offset + size - cap;
         size_t post = size - pre;
         std_mem_copy ( base + offset, item, pre );
-        std_mem_copy ( base, ( byte_t* ) item + pre, post );
+        std_mem_copy ( base, ( char* ) item + pre, post );
         std_compiler_fence();
         *tag = ( uint32_t ) size;
         return true;
@@ -488,7 +488,7 @@ bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t s
 size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
     // Load
     size_t  mask = queue->mask;
-    byte_t* base = queue->base;
+    char* base = queue->base;
 #if std_assert_enabled_m
     size_t top = queue->top;
 #endif
@@ -523,7 +523,7 @@ size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
 
 size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t dest_cap ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
     size_t  bot = queue->bot;
@@ -557,7 +557,7 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
         size_t pre = cap > offset + size ? size : offset + size - cap;
         size_t post = size - pre;
         std_mem_copy ( dest, base + offset, pre );
-        std_mem_copy ( ( byte_t* ) dest + pre, base, post );
+        std_mem_copy ( ( char* ) dest + pre, base, post );
         // TODO this mem_zero call is bad. Is there a way to avoid this?
         // The issue is that if there's no guarantee on data alignment, after a wrap around on the buffer
         // the tag bytes might end up located where before was stored some user data, which is likely not to be 0
@@ -581,7 +581,7 @@ std_queue_shared_t std_queue_mpmc_32 ( std_buffer_t buffer ) {
 
 bool std_queue_mpmc_push_32 ( std_queue_shared_t* queue, const void* item ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
 
@@ -607,7 +607,7 @@ bool std_queue_mpmc_push_32 ( std_queue_shared_t* queue, const void* item ) {
 bool std_queue_mpmc_pop_discard_32 ( std_queue_shared_t* queue ) {
     // Load
     size_t  mask = queue->mask;
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t top = queue->top;
     size_t bot = queue->bot;
 
@@ -637,7 +637,7 @@ bool std_queue_mpmc_pop_discard_32 ( std_queue_shared_t* queue ) {
 bool std_queue_mpmc_pop_move_32 ( std_queue_shared_t* queue, void* dest ) {
     // Load
     size_t  mask = queue->mask;
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t top = queue->top;
     size_t bot = queue->bot;
 
@@ -676,7 +676,7 @@ std_queue_shared_t std_queue_mpmc_64 ( std_buffer_t buffer ) {
 bool std_queue_mpmc_push_64 ( std_queue_shared_t* queue, const void* item ) {
     // Load
     size_t  mask = queue->mask;
-    byte_t* base = queue->base;
+    char* base = queue->base;
 #if std_assert_enabled_m
     //size_t bot = queue->bot;
 #endif
@@ -704,7 +704,7 @@ bool std_queue_mpmc_push_64 ( std_queue_shared_t* queue, const void* item ) {
 bool std_queue_mpmc_pop_discard_64 ( std_queue_shared_t* queue ) {
     // Load
     size_t  mask = queue->mask;
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t top = queue->top;
     size_t bot = queue->bot;
 
@@ -734,7 +734,7 @@ bool std_queue_mpmc_pop_discard_64 ( std_queue_shared_t* queue ) {
 bool std_queue_mpmc_pop_move_64 ( std_queue_shared_t* queue, void* dest ) {
     // Load
     size_t  mask = queue->mask;
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t top = queue->top;
     size_t bot = queue->bot;
 
@@ -775,7 +775,7 @@ bool std_queue_mpsc_push ( std_queue_shared_t* queue, const void* item, size_t s
 
 size_t std_queue_mpsc_pop_discard ( std_queue_shared_t* queue ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t mask = queue->mask;
     size_t top = queue->top;
     size_t bot = queue->bot;
@@ -806,7 +806,7 @@ size_t std_queue_mpsc_pop_discard ( std_queue_shared_t* queue ) {
 
 size_t std_queue_mpsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t dest_cap ) {
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t mask = queue->mask;
     size_t top = queue->top;
     size_t bot = queue->bot;
@@ -840,7 +840,7 @@ size_t std_queue_mpsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
     size_t pre = cap > offset + size ? size : offset + size - cap;
     size_t post = size - pre;
     std_mem_copy ( dest, base + offset, pre );
-    std_mem_copy ( ( byte_t* ) dest + pre, base, post );
+    std_mem_copy ( ( char* ) dest + pre, base, post );
     std_compiler_fence();
     *tag = 0;
     return size;
@@ -857,7 +857,7 @@ void std_queue_spmc_push ( std_queue_shared_t* queue, const void* item, size_t s
     std_assert_m ( size < UINT32_MAX );
 
     // Load
-    byte_t* base = queue->base;
+    char* base = queue->base;
     size_t mask = queue->mask;
     size_t top = queue->top;
     size_t cap = mask + 1;
@@ -875,7 +875,7 @@ void std_queue_spmc_push ( std_queue_shared_t* queue, const void* item, size_t s
     size_t pre = cap > offset + size ? size : offset + size - cap;
     size_t post = size - pre;
     std_mem_copy ( base + offset, item, pre );
-    std_mem_copy ( base, ( byte_t* ) item + pre, post );
+    std_mem_copy ( base, ( char* ) item + pre, post );
 
     std_compiler_fence();
     // Push the size

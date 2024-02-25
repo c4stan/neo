@@ -23,7 +23,7 @@ typedef struct {
     xg_device_h device;
     wm_window_h window;
     xg_display_h display;
-    const char* debug_name;
+    char debug_name[xg_debug_name_size_m];
 
     xg_texture_h textures[xg_swapchain_max_textures_m];
     size_t current_texture_idx;
