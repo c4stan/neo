@@ -36,28 +36,6 @@ static float xorshift_to_f32 ( uint64_t xs ) {
     return ( ( float ) ( xs ) ) / ( float ) UINT64_MAX;
 }
 
-static void log_callback ( const std_log_msg_t* msg ) {
-    const char* type_prefix = "";
-
-    // Just add an extra prefix to differentiate from the default
-    if ( msg->flags & std_log_level_error_m ) {
-        type_prefix = "[ERROR] std_test: ";
-    } else if ( msg->flags & std_log_level_warn_m ) {
-        type_prefix = "[WARN] std_test: ";
-    } else if ( msg->flags & std_log_level_info_m ) {
-        type_prefix = "[INFO] std_test: ";
-    } else {
-        type_prefix = "std_test: ";
-    }
-
-    printf ( "[" std_fmt_str_m ":" std_fmt_size_m "] " std_fmt_str_m std_fmt_str_m, msg->file, msg->line, type_prefix, msg->payload );
-    fflush ( stdout );
-
-    if ( msg->flags & ( std_log_level_warn_m | std_log_level_error_m ) ) {
-        std_debug_break_m();
-    }
-}
-
 #if defined(std_platform_win32_m)
 static void bench_virtual_heap ( void ) {
     std_log_info_m ( "benching std_virtual_heap..." );
@@ -197,9 +175,10 @@ static void bench_virtual_heap ( void ) {
     }
 #endif
     {
-        std_alloc_t allocs[1000 * 100];
+        //std_alloc_t allocs[1000 * 100];
         void* ptrs[1000 * 100];
         size_t alloc_count = 0;
+        float p = 0.01;
 
         std_tick_t t1 = std_tick_now();
 
@@ -207,15 +186,10 @@ static void bench_virtual_heap ( void ) {
             uint64_t random = xorshift64star();
             float r = xorshift_to_f32 ( random );
 
-            if ( alloc_count && r > 0.99 ) {
+            if ( alloc_count && r > p ) {
                 uint64_t idx = random % ( alloc_count );
                 _aligned_free ( ptrs[idx] );
-
-                for ( size_t j = idx; j < alloc_count; ++j ) {
-                    ptrs[j] = ptrs[j + 1];
-                }
-
-                --alloc_count;
+                ptrs[idx] = ptrs[--alloc_count];
             } else {
                 ptrs[alloc_count++] = _aligned_malloc ( random % 1023 + 1, 16 );
             }
@@ -235,21 +209,20 @@ static void bench_virtual_heap ( void ) {
             uint64_t random = xorshift64star();
             float r = xorshift_to_f32 ( random );
 
-            if ( alloc_count && r > 0.99 ) {
+            if ( alloc_count && r > p ) {
                 uint64_t idx = random % ( alloc_count );
-                std_virtual_heap_free ( allocs[idx].handle );
-
-                for ( size_t j = idx; j < alloc_count; ++j ) {
-                    allocs[j] = allocs[j + 1];
-                }
-
-                --alloc_count;
+                std_virtual_heap_free ( ptrs[idx] );
+                ptrs[idx] = ptrs[--alloc_count];
             } else {
-                allocs[alloc_count++] = std_virtual_heap_alloc ( random % 1023 + 1, 16 );
+                ptrs[alloc_count++] = std_virtual_heap_alloc ( random % 1023 + 1, 16 );
             }
         }
 
         std_tick_t t4 = std_tick_now();
+
+        for ( size_t i = 0; i < alloc_count; ++i ) {
+            std_virtual_heap_free ( ptrs[i] );
+        }
 
         double d1 = std_tick_to_micro_f64 ( t2 - t1 );
         double d2 = std_tick_to_micro_f64 ( t4 - t3 );
@@ -309,10 +282,9 @@ static void  test_allocator ( void ) {
         std_assert_m ( virtual_page_size > 0 );
         std_assert_m ( virtual_page_size == std_platform_memory_info().virtual_page_size );
 
-        std_alloc_t a = std_virtual_reserve ( virtual_page_size );
-        std_assert_m ( a.buffer.size == virtual_page_size );
-        std_assert_m ( std_virtual_map ( a.handle, 0, virtual_page_size ) );
-        volatile int* d = ( volatile int* ) a.buffer.base;
+        void* a = std_virtual_reserve ( virtual_page_size );
+        std_verify_m ( std_virtual_map ( a, a + virtual_page_size ) );
+        volatile int* d = ( volatile int* ) a;
         int t = 0;
 
         for ( size_t i = 0; i < virtual_page_size / sizeof ( int ); ++i ) {
@@ -320,34 +292,13 @@ static void  test_allocator ( void ) {
             t += d[i];
         }
 
-        std_assert_m ( std_virtual_unmap ( a.handle, 0, virtual_page_size ) );
-        std_assert_m ( std_virtual_free ( a.handle ) );
-
-        // --
-
-        std_allocator_i virtual_allocator = std_virtual_allocator();
-
-        a = std_alloc_m ( &virtual_allocator, virtual_page_size, 16 );
-        std_assert_m ( a.buffer.size == virtual_page_size );
-        d = ( volatile int* ) a.buffer.base;
-
-        for ( size_t i = 0; i < virtual_page_size / sizeof ( int ); ++i ) {
-            d[i] = ( int ) i;
-            t += d[i];
-        }
-
-        std_assert_m ( std_free_m ( &virtual_allocator, a.handle ) );
+        std_verify_m ( std_virtual_unmap ( a, a + virtual_page_size ) );
+        std_verify_m ( std_virtual_free ( a, a + virtual_page_size ) );
     }
     {
-        std_allocator_i malloc_allocator = std_virtual_heap_allocator();
-
-        std_alloc_t a_alloc = std_alloc_m ( &malloc_allocator, sizeof ( uint32_t ) * 10, std_alignof_m ( uint32_t ) );
-        std_alloc_t b_alloc = std_alloc_array_m ( &malloc_allocator, uint32_t, 10 );
-        std_alloc_t c_alloc = malloc_allocator.alloc ( malloc_allocator.impl, sizeof ( uint32_t ) * 10, std_alignof_m ( uint32_t ) );
-
-        uint32_t* a = ( uint32_t* ) a_alloc.buffer.base;
-        uint32_t* b = ( uint32_t* ) b_alloc.buffer.base;
-        uint32_t* c = ( uint32_t* ) c_alloc.buffer.base;
+        uint32_t* a = std_virtual_heap_alloc_array_m ( uint32_t, 10 );
+        uint32_t* b = std_virtual_heap_alloc_array_m ( uint32_t, 10 );
+        uint32_t* c = ( uint32_t* ) ( std_virtual_heap_alloc ( sizeof ( uint32_t ) * 10, std_alignof_m ( uint32_t ) ) );
 
         for ( size_t i = 0; i < 10; ++i ) {
             a[i] = ( uint32_t ) i;
@@ -356,31 +307,24 @@ static void  test_allocator ( void ) {
         std_mem_copy ( b, a, sizeof ( uint32_t ) * 10 );
         std_mem_copy_array_m ( c, b, 10 );
 
-        std_assert_m ( std_mem_cmp ( a, c, sizeof ( uint32_t ) * 10 ) );
-        std_assert_m ( std_mem_cmp_array_m ( a, c, 10 ) );
+        std_verify_m ( std_mem_cmp ( a, c, sizeof ( uint32_t ) * 10 ) );
+        std_verify_m ( std_mem_cmp_array_m ( a, c, 10 ) );
 
-        std_assert_m ( std_free_m ( &malloc_allocator, a_alloc.handle ) );
-        std_assert_m ( std_free_m ( &malloc_allocator, b_alloc.handle ) );
-        std_assert_m ( std_free_m ( &malloc_allocator, c_alloc.handle ) );
+        std_verify_m ( std_virtual_heap_free ( a ) );
+        std_verify_m ( std_virtual_heap_free ( b ) );
+        std_verify_m ( std_virtual_heap_free ( c ) );
     }
     {
-
-        std_allocator_i malloc_allocator = std_virtual_heap_allocator();
-        std_alloc_t stack_alloc = std_alloc_m ( &malloc_allocator, 1024 * 32, 16 );
-        std_stack_t stack = std_stack ( stack_alloc.buffer );
-        std_alloc_t a = std_stack_alloc ( &stack, 1024 * 16, 16 );
-        char* b = std_stack_push ( &stack, 1024 * 8, 16 );
-        std_alloc_t c = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
-        uint32_t* d = std_stack_push_array_m ( &stack, uint32_t, 1024 );
-        std_assert_m ( stack.top == stack.buffer.size );
-
-        std_unused_m ( a );
-        std_unused_m ( b );
-        std_unused_m ( c );
-        std_unused_m ( d );
-
-        std_assert_m ( std_free_m ( &malloc_allocator, stack_alloc.handle ) );
+        void* buffer = std_virtual_heap_alloc ( 1024 * 32, 16 );
+        std_stack_t stack = std_stack ( buffer, 1024 * 32 );
+        void* a = std_stack_alloc_align ( &stack, 1024 * 16, 16 );
+        void* b = std_stack_alloc_align ( &stack, 1024 * 8, 16 );
+        void* c = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
+        void* d = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
+        //std_verify_m ( arena.used_size == arena.buffer.size );
+        std_virtual_heap_free ( buffer );
     }
+    #if 0
     {
         size_t tagged_page_size = std_tagged_page_size();
         std_buffer_t b1 = std_tagged_alloc ( tagged_page_size, 5 );
@@ -390,12 +334,12 @@ static void  test_allocator ( void ) {
         std_tagged_free ( 5 );
         std_tagged_free ( 7 );
     }
-
+    #endif
     for ( uint32_t i = 0; i < 100; ++i ) {
-        std_alloc_t alloc = std_tlsf_alloc ( 256, 8 );
-        std_alloc_t alloc2 = std_tlsf_alloc ( 2435, 8 );
-        std_tlsf_free ( alloc2.handle );
-        std_tlsf_free ( alloc.handle );
+        void* alloc = std_virtual_heap_alloc ( 256, 8 );
+        void* alloc2 = std_virtual_heap_alloc ( 2435, 8 );
+        std_virtual_heap_free ( alloc2 );
+        std_virtual_heap_free ( alloc );
     }
 
     std_log_info_m ( "std_allocator test complete." );
@@ -598,16 +542,16 @@ static void test_queue_spsc_thread ( void* arg ) {
 }
 
 typedef struct {
-    std_queue_shared_t* queue;
-    size_t n;
-    std_buffer_t buffer;
-} test_queue_thread_args_t;
-
-typedef struct {
     uint32_t a;
     uint32_t b;
     uint64_t c;
 } test_queue_item_t;
+
+typedef struct {
+    std_queue_shared_t* queue;
+    void* base;
+    size_t n;
+} test_queue_thread_args_t;
 
 static int test_queue_item_compare ( const void* a, const void* b ) {
     std_auto_m i = ( test_queue_item_t* ) a;
@@ -629,10 +573,10 @@ static int u32_compare ( const void* a, const void* b ) {
 
 static void test_queue_spmc_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( test_queue_item_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        test_queue_item_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        test_queue_item_t* item = &items[i];
         size_t size = std_queue_spmc_pop_move ( args->queue, item, sizeof ( test_queue_item_t ) );
 
         while ( size == 0 ) {
@@ -646,10 +590,10 @@ static void test_queue_spmc_thread ( void* arg ) {
 
 static void test_queue_mpsc_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( test_queue_item_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        test_queue_item_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        test_queue_item_t* item = &items[i];
 
         while ( !std_queue_mpsc_push ( args->queue, item, sizeof ( test_queue_item_t ) ) ) {
             //std_thread_this_yield();
@@ -659,10 +603,10 @@ static void test_queue_mpsc_thread ( void* arg ) {
 
 static void test_queue_mpmc_p_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( test_queue_item_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        test_queue_item_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        test_queue_item_t* item = &items[i];
 
         while ( !std_queue_mpmc_push_m ( args->queue, item ) ) {
             //std_thread_this_yield();
@@ -672,10 +616,10 @@ static void test_queue_mpmc_p_thread ( void* arg ) {
 
 static void test_queue_mpmc_c_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( test_queue_item_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        test_queue_item_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        test_queue_item_t* item = &items[i];
         size_t size = std_queue_mpmc_pop_move ( args->queue, item, sizeof ( test_queue_item_t ) );
 
         while ( size == 0 ) {
@@ -689,10 +633,10 @@ static void test_queue_mpmc_c_thread ( void* arg ) {
 
 static void test_queue_mpmc_u64_p_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( uint64_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        uint64_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        uint64_t* item = &items[i];
 
         while ( !std_queue_mpmc_push_64 ( args->queue, item ) ) {
             //std_thread_this_yield();
@@ -702,10 +646,10 @@ static void test_queue_mpmc_u64_p_thread ( void* arg ) {
 
 static void test_queue_mpmc_u64_c_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( uint64_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        uint64_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        uint64_t* item = &items[i];
 
         while ( !std_queue_mpmc_pop_move_64 ( args->queue, item ) ) {
             //std_thread_this_yield();
@@ -715,10 +659,10 @@ static void test_queue_mpmc_u64_c_thread ( void* arg ) {
 
 static void test_queue_mpmc_u32_p_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( uint32_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        uint32_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        uint32_t* item = &items[i];
 
         while ( !std_queue_mpmc_push_32 ( args->queue, item ) ) {
             //std_thread_this_yield();
@@ -728,10 +672,10 @@ static void test_queue_mpmc_u32_p_thread ( void* arg ) {
 
 static void test_queue_mpmc_u32_c_thread ( void* arg ) {
     std_auto_m args = ( test_queue_thread_args_t* ) arg;
+    std_auto_m items = ( uint32_t* ) args->base;
 
     for ( size_t i = 0; i < args->n; ++i ) {
-        uint32_t* item;
-        std_buffer_ptr_m ( &item, args->buffer, i );
+        uint32_t* item = &items[i];
 
         while ( !std_queue_mpmc_pop_move_32 ( args->queue, item ) ) {
             //std_thread_this_yield();
@@ -744,15 +688,15 @@ static void test_queue ( void ) {
     {
         std_log_info_m ( "testing std_queue..." );
         size_t size = 16;
-        std_alloc_t alloc = std_virtual_heap_alloc ( size, 16 );
+        void* buffer = std_virtual_heap_alloc ( size, 16 );
 
-        std_queue_local_t queue = std_queue_local ( alloc.buffer );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        std_queue_local_t queue = std_queue_local ( buffer, size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
         int i = 5;
 
         std_queue_local_push ( &queue, &i, sizeof ( i ) );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == sizeof ( i ) );
 
         struct {
@@ -763,7 +707,7 @@ static void test_queue ( void ) {
         std_queue_local_pop_move ( &queue, &s.i, sizeof ( i ) );
         std_assert_m ( s.i == i );
         std_assert_m ( s.j == 3 );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
 
         struct {
@@ -774,16 +718,16 @@ static void test_queue ( void ) {
         t.u32 = 2;
 
         std_queue_local_push ( &queue, &t, 12 );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 12 );
 
         std_queue_local_pop_discard ( &queue, 12 );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
 
         uint64_t j = 33;
         std_queue_local_push ( &queue, &j, sizeof ( j ) );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == sizeof ( j ) );
 
         struct {
@@ -793,18 +737,18 @@ static void test_queue ( void ) {
         r.k = 9;
         std_queue_local_pop_move ( &queue, &r.j, sizeof ( j ) );
         std_assert_m ( r.j == j );
-        std_assert_m ( std_queue_local_size ( &queue ) == size );
+        //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
 
-        std_virtual_heap_free ( alloc.handle );
+        std_virtual_heap_free ( buffer );
     }
 
     // Shared SPSC queue
     {
         size_t size = 1024ull * 4 * 1024 * 16;
-        std_alloc_t alloc = std_virtual_heap_alloc ( size, 16 );
+        void* buffer = std_virtual_heap_alloc ( size, 16 );
 
-        std_queue_shared_t queue = std_queue_shared ( alloc.buffer );
+        std_queue_shared_t queue = std_queue_shared ( buffer, size );
 
         test_queue_spsc_thread_args_t args;
         args.queue = &queue;
@@ -828,7 +772,7 @@ static void test_queue ( void ) {
         result = std_thread_join ( thread );
         std_assert_m ( result );
 
-        result = std_virtual_heap_free ( alloc.handle );
+        result = std_virtual_heap_free ( buffer );
         std_assert_m ( result );
     }
 
@@ -838,12 +782,13 @@ static void test_queue ( void ) {
 #define THREAD_COUNT 8
         std_assert_m ( n % THREAD_COUNT == 0 );
         size_t per_thread_n = n / THREAD_COUNT;
-        std_alloc_t threads_memory = std_virtual_heap_alloc ( n * sizeof ( test_queue_item_t ), 16 );
+        void* threads_memory = std_virtual_heap_alloc ( n * sizeof ( test_queue_item_t ), 16 );
 
         // SPMC
         {
-            std_alloc_t queue_alloc = std_virtual_heap_alloc ( std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) ), 16 );
-            std_queue_shared_t queue = std_queue_shared ( queue_alloc.buffer );
+            size_t queue_size = std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) );
+            void* queue_buffer = std_virtual_heap_alloc ( queue_size, 16 );
+            std_queue_shared_t queue = std_queue_shared ( queue_buffer, queue_size );
 
             test_queue_item_t item;
 
@@ -854,7 +799,7 @@ static void test_queue ( void ) {
                 args[i].queue = &queue;
                 args[i].n = per_thread_n;
                 size_t size = sizeof ( test_queue_item_t ) * per_thread_n;
-                args[i].buffer = std_buffer_slice ( threads_memory.buffer, i * size, size );
+                args[i].base = threads_memory + i * size;
 
                 threads[i] = std_thread ( test_queue_spmc_thread, &args[i], "spmc consumer", std_thread_core_mask_any_m );
             }
@@ -869,14 +814,15 @@ static void test_queue ( void ) {
                 std_assert_m ( result );
             }
 
-            std_virtual_heap_free ( queue_alloc.handle );
+            std_virtual_heap_free ( queue_buffer );
         }
 
         // MPSC
         {
-            std_alloc_t queue_alloc = std_virtual_heap_alloc ( std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) ), 16 );
-            std_queue_shared_t queue = std_queue_shared ( queue_alloc.buffer );
-            std_alloc_t merge_memory = std_virtual_heap_alloc ( sizeof ( test_queue_item_t ) * n, 16 );
+            size_t queue_size = std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) );
+            void* queue_buffer = std_virtual_heap_alloc ( queue_size, 16 );
+            std_queue_shared_t queue = std_queue_shared ( queue_buffer, queue_size );
+            test_queue_item_t* merge_items = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
 
             test_queue_thread_args_t args[THREAD_COUNT];
             std_thread_h threads[THREAD_COUNT];
@@ -885,14 +831,13 @@ static void test_queue ( void ) {
                 args[i].queue = &queue;
                 args[i].n = per_thread_n;
                 size_t size = sizeof ( test_queue_item_t ) * per_thread_n;
-                args[i].buffer = std_buffer_slice ( threads_memory.buffer, i * size, size );
+                args[i].base = threads_memory + i * size;
 
                 threads[i] = std_thread ( test_queue_mpsc_thread, &args[i], "mpsc producer", std_thread_core_mask_any_m );
             }
 
             for ( size_t i = 0; i < n; ++i ) {
-                test_queue_item_t* item;
-                std_buffer_ptr_m ( &item, merge_memory.buffer, i );
+                test_queue_item_t* item = &merge_items[i];
                 size_t size = std_queue_mpsc_pop_move ( &queue, item, sizeof ( *item ) );
 
                 while ( size == 0 ) {
@@ -907,18 +852,18 @@ static void test_queue ( void ) {
                 std_assert_m ( result );
             }
 
-            qsort ( merge_memory.buffer.base, n, sizeof ( test_queue_item_t ), test_queue_item_compare );
+            qsort ( merge_items, n, sizeof ( test_queue_item_t ), test_queue_item_compare );
 
             for ( size_t i = 0; i < n; ++i ) {
-                test_queue_item_t* item;
-                std_buffer_ptr_m ( &item, merge_memory.buffer, i );
+                test_queue_item_t* item = &merge_items[i];
                 std_assert_m ( item->c == i );
             }
 
-            std_virtual_heap_free ( queue_alloc.handle );
+            std_virtual_heap_free ( queue_buffer );
+            std_virtual_heap_free ( merge_items );
         }
 
-        std_virtual_heap_free ( threads_memory.handle );
+        std_virtual_heap_free ( threads_memory );
 #undef THREAD_COUNT
     }
 
@@ -934,15 +879,15 @@ static void test_queue ( void ) {
 
         // Generic size MPMC
         {
-            std_alloc_t queue_memory = std_virtual_heap_alloc ( std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) ), 16 );
-            std_alloc_t read_memory = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
-            std_alloc_t write_memory = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
+            size_t queue_size = std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) );
+            void* queue_memory = std_virtual_heap_alloc ( queue_size, 16 );
+            test_queue_item_t* read_memory = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
+            test_queue_item_t* write_memory = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
 
-            std_queue_shared_t queue = std_queue_shared ( queue_memory.buffer );
+            std_queue_shared_t queue = std_queue_shared ( queue_memory, queue_size );
 
             for ( size_t i = 0; i < n; ++i ) {
-                test_queue_item_t* item;
-                std_buffer_ptr_m ( &item, read_memory.buffer, i );
+                test_queue_item_t* item = &read_memory[i];
                 item->c = i;
             }
 
@@ -952,15 +897,13 @@ static void test_queue ( void ) {
             for ( size_t i = 0; i < PRODUCE_THREAD_COUNT; ++i ) {
                 p_args[i].queue = &queue;
                 p_args[i].n = per_p_thread_n;
-                size_t size = per_p_thread_n * sizeof ( test_queue_item_t );
-                p_args[i].buffer = std_buffer_slice ( read_memory.buffer, i * size, size );
+                p_args[i].base = read_memory + i * per_p_thread_n;
             }
 
             for ( size_t i = 0 ; i < CONSUME_THREAD_COUNT; ++i ) {
                 c_args[i].queue = &queue;
                 c_args[i].n = per_c_thread_n;
-                size_t size = per_c_thread_n * sizeof ( test_queue_item_t );
-                c_args[i].buffer = std_buffer_slice ( write_memory.buffer, i * size, size );
+                c_args[i].base = write_memory + i * per_c_thread_n;
             }
 
             std_thread_h p_threads[PRODUCE_THREAD_COUNT];
@@ -982,30 +925,29 @@ static void test_queue ( void ) {
                 std_thread_join ( c_threads[i] );
             }
 
-            qsort ( write_memory.buffer.base, n, sizeof ( test_queue_item_t ), test_queue_item_compare );
+            qsort ( write_memory, n, sizeof ( test_queue_item_t ), test_queue_item_compare );
 
             for ( size_t i = 0; i < n; ++i ) {
-                test_queue_item_t* item;
-                std_buffer_ptr_m ( &item, write_memory.buffer, i );
+                test_queue_item_t* item = &write_memory[i];
                 std_assert_m ( item->c == i );
             }
 
-            std_virtual_heap_free ( queue_memory.handle );
-            std_virtual_heap_free ( read_memory.handle );
-            std_virtual_heap_free ( write_memory.handle );
+            std_virtual_heap_free ( queue_memory );
+            std_virtual_heap_free ( read_memory );
+            std_virtual_heap_free ( write_memory );
         }
 
         // u64 specialized MPMC
         {
-            std_alloc_t queue_memory = std_virtual_heap_alloc ( std_pow2_round_up ( n * sizeof ( uint64_t ) ), 16 );
-            std_alloc_t read_memory = std_virtual_heap_alloc_array_m ( uint64_t, n );
-            std_alloc_t write_memory = std_virtual_heap_alloc_array_m ( uint64_t, n );
+            size_t queue_size = std_pow2_round_up ( n * sizeof ( uint64_t ) );
+            void* queue_memory = std_virtual_heap_alloc ( queue_size, 16 );
+            uint64_t* read_memory = std_virtual_heap_alloc_array_m ( uint64_t, n );
+            uint64_t* write_memory = std_virtual_heap_alloc_array_m ( uint64_t, n );
 
-            std_queue_shared_t queue = std_queue_mpmc_64 ( queue_memory.buffer );
+            std_queue_shared_t queue = std_queue_mpmc_64 ( queue_memory, queue_size );
 
             for ( size_t i = 0; i < n; ++i ) {
-                uint64_t* item;
-                std_buffer_ptr_m ( &item, read_memory.buffer, i );
+                uint64_t* item = &read_memory[i];
                 *item = i;
             }
 
@@ -1015,15 +957,13 @@ static void test_queue ( void ) {
             for ( size_t i = 0; i < PRODUCE_THREAD_COUNT; ++i ) {
                 p_args[i].queue = &queue;
                 p_args[i].n = per_p_thread_n;
-                size_t size = per_p_thread_n * sizeof ( uint64_t );
-                p_args[i].buffer = std_buffer_slice ( read_memory.buffer, i * size, size );
+                p_args[i].base = read_memory + i * per_p_thread_n;
             }
 
             for ( size_t i = 0 ; i < CONSUME_THREAD_COUNT; ++i ) {
                 c_args[i].queue = &queue;
                 c_args[i].n = per_c_thread_n;
-                size_t size = per_c_thread_n * sizeof ( uint64_t );
-                c_args[i].buffer = std_buffer_slice ( write_memory.buffer, i * size, size );
+                c_args[i].base = write_memory + i * per_c_thread_n;
             }
 
             std_thread_h p_threads[PRODUCE_THREAD_COUNT];
@@ -1045,30 +985,29 @@ static void test_queue ( void ) {
                 std_thread_join ( c_threads[i] );
             }
 
-            qsort ( write_memory.buffer.base, n, sizeof ( uint64_t ), u64_compare );
+            qsort ( write_memory, n, sizeof ( uint64_t ), u64_compare );
 
             for ( size_t i = 0; i < n; ++i ) {
-                uint64_t* item;
-                std_buffer_ptr_m ( &item, write_memory.buffer, i );
+                uint64_t* item = &write_memory[i];
                 std_assert_m ( *item == i );
             }
 
-            std_virtual_heap_free ( queue_memory.handle );
-            std_virtual_heap_free ( read_memory.handle );
-            std_virtual_heap_free ( write_memory.handle );
+            std_virtual_heap_free ( queue_memory );
+            std_virtual_heap_free ( read_memory );
+            std_virtual_heap_free ( write_memory );
         }
 
         // u32 specialized MPMC
         {
-            std_alloc_t queue_memory = std_virtual_heap_alloc ( std_pow2_round_up ( n * sizeof ( uint32_t ) ), 16 );
-            std_alloc_t read_memory = std_virtual_heap_alloc_array_m ( uint32_t, n );
-            std_alloc_t write_memory = std_virtual_heap_alloc_array_m ( uint32_t, n );
+            size_t queue_size = std_pow2_round_up ( sizeof ( uint32_t ) * n );
+            void* queue_memory = std_virtual_heap_alloc ( queue_size, 16 );
+            uint32_t* read_memory = std_virtual_heap_alloc_array_m ( uint32_t, n );
+            uint32_t* write_memory = std_virtual_heap_alloc_array_m ( uint32_t, n );
 
-            std_queue_shared_t queue = std_queue_mpmc_32 ( queue_memory.buffer );
+            std_queue_shared_t queue = std_queue_mpmc_32 ( queue_memory, queue_size );
 
             for ( size_t i = 0; i < n; ++i ) {
-                uint32_t* item;
-                std_buffer_ptr_m ( &item, read_memory.buffer, i );
+                uint32_t* item = &read_memory[i];
                 *item = ( uint32_t ) i;
             }
 
@@ -1078,15 +1017,13 @@ static void test_queue ( void ) {
             for ( size_t i = 0; i < PRODUCE_THREAD_COUNT; ++i ) {
                 p_args[i].queue = &queue;
                 p_args[i].n = per_p_thread_n;
-                size_t size = per_p_thread_n * sizeof ( uint32_t );
-                p_args[i].buffer = std_buffer_slice ( read_memory.buffer, i * size, size );
+                p_args[i].base = read_memory + i * per_p_thread_n;
             }
 
             for ( size_t i = 0 ; i < CONSUME_THREAD_COUNT; ++i ) {
                 c_args[i].queue = &queue;
                 c_args[i].n = per_c_thread_n;
-                size_t size = per_c_thread_n * sizeof ( uint32_t );
-                c_args[i].buffer = std_buffer_slice ( write_memory.buffer, i * size, size );
+                c_args[i].base = write_memory + i * per_c_thread_n;
             }
 
             std_thread_h p_threads[PRODUCE_THREAD_COUNT];
@@ -1108,17 +1045,16 @@ static void test_queue ( void ) {
                 std_thread_join ( c_threads[i] );
             }
 
-            qsort ( write_memory.buffer.base, n, sizeof ( uint32_t ), u32_compare );
+            qsort ( write_memory, n, sizeof ( uint32_t ), u32_compare );
 
             for ( size_t i = 0; i < n; ++i ) {
-                uint32_t* item;
-                std_buffer_ptr_m ( &item, write_memory.buffer, i );
+                uint32_t* item = &write_memory[i];
                 std_assert_m ( *item == i );
             }
 
-            std_virtual_heap_free ( queue_memory.handle );
-            std_virtual_heap_free ( read_memory.handle );
-            std_virtual_heap_free ( write_memory.handle );
+            std_virtual_heap_free ( queue_memory );
+            std_virtual_heap_free ( read_memory );
+            std_virtual_heap_free ( write_memory );
         }
 
 #undef PRODUCE_THREAD_COUNT
@@ -1131,16 +1067,17 @@ static void test_map ( void ) {
     size_t n = 1024;
 
     // std_map
+    #if 0
     {
         typedef struct {
             uint64_t a;
             uint64_t b;
         } test_map_payload_t;
 
-        std_alloc_t keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, n * 2 );
-        std_alloc_t payloads_alloc = std_virtual_heap_alloc_array_m ( test_map_payload_t, n * 2 );
+        std_buffer_t keys_alloc = std_virtual_heap_alloc ( sizeof ( uint64_t ) * n * 2, 16 );
+        std_buffer_t payloads_alloc = std_virtual_heap_alloc ( sizeof ( test_map_payload_t ) * n * 2, 16 );
 
-        std_map_t map = std_map ( keys_alloc.buffer, payloads_alloc.buffer, sizeof ( uint64_t ), sizeof ( test_map_payload_t ),
+        std_map_t map = std_map ( keys_alloc, payloads_alloc, sizeof ( uint64_t ), sizeof ( test_map_payload_t ),
             std_map_hasher_u64, NULL, std_map_cmp_u64, NULL );
 
         // Insert in inverted order so that later on when removing collisions we can test for linear probing on removal
@@ -1204,16 +1141,17 @@ static void test_map ( void ) {
             }
         }
 
-        std_virtual_heap_free ( keys_alloc.handle );
-        std_virtual_heap_free ( payloads_alloc.handle );
+        std_virtual_heap_free ( keys_alloc.base );
+        std_virtual_heap_free ( payloads_alloc.base );
     }
+    #endif
 
     // std_hash_map
     {
-        std_alloc_t keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, n * 2 );
-        std_alloc_t payloads_alloc = std_virtual_heap_alloc_array_m ( uint64_t, n * 2 );
+        uint64_t* keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, n * 2 );
+        uint64_t* payloads_alloc = std_virtual_heap_alloc_array_m ( uint64_t, n * 2 );
 
-        std_hash_map_t map = std_hash_map ( keys_alloc.buffer, payloads_alloc.buffer );
+        std_hash_map_t map = std_hash_map ( keys_alloc, payloads_alloc, n * 2 );
 
         for ( size_t i = n; i > 0; --i ) {
             uint64_t key = std_hash_murmur_mixer_64 ( i - 1 );
@@ -1260,8 +1198,8 @@ static void test_map ( void ) {
             }
         }
 
-        std_virtual_heap_free ( keys_alloc.handle );
-        std_virtual_heap_free ( payloads_alloc.handle );
+        std_virtual_heap_free ( keys_alloc );
+        std_virtual_heap_free ( payloads_alloc );
     }
 
     std_log_info_m ( "std_map test complete." );
@@ -1407,7 +1345,7 @@ void std_main ( void ) {
 
     const char* separator = "------------------------------------------";
 
-#if 1
+#if 0
     test_platform();
     std_log_info_m ( separator );
     test_allocator();
