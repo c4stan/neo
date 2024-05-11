@@ -6,15 +6,14 @@
 
 //==============================================================================
 
-std_queue_local_t std_queue_local ( std_buffer_t buffer ) {
-    if ( !std_pow2_test ( buffer.size ) ) {
-        std_log_warn_m ( "Local queue buffer size is not power of two, rounding it down." );
-        buffer.size = std_pow2_round_down ( buffer.size );
+std_queue_local_t std_queue_local ( void* base, size_t size ) {
+    if ( !std_pow2_test ( size ) ) {
+        size = std_pow2_round_down ( size );
     }
 
     std_queue_local_t queue;
-    queue.base = buffer.base;
-    queue.mask = buffer.size - 1;
+    queue.base = base;
+    queue.mask = size - 1;
     queue.top = 0;
     queue.bot = 0;
     return queue;
@@ -326,15 +325,17 @@ void* std_circular_pool_at_pool ( const std_circular_pool_t* pool, size_t idx ) 
 //==============================================================================
 // Shared
 
-std_queue_shared_t std_queue_shared ( std_buffer_t buffer ) {
-    if ( !std_pow2_test ( buffer.size ) ) {
-        std_log_warn_m ( "Shared queue buffer size is not power of two, rounding it down." );
-        buffer.size = std_pow2_round_down ( buffer.size );
+std_queue_shared_t std_queue_shared ( void* base, size_t size ) {
+    if ( !std_pow2_test ( size ) ) {
+        //std_log_warn_m ( "Shared queue buffer size is not power of two, rounding it down." );
+        size = std_pow2_round_down ( size );
     }
 
+    std_mem_zero ( base, size );
+
     std_queue_shared_t queue;
-    queue.base = buffer.base;
-    queue.mask = buffer.size - 1;
+    queue.base = base;
+    queue.mask = size - 1;
     queue.top = 0;
     queue.bot = 0;
     return queue;
@@ -573,8 +574,8 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
 }
 
 // 32
-std_queue_shared_t std_queue_mpmc_32 ( std_buffer_t buffer ) {
-    std_queue_shared_t queue = std_queue_shared ( buffer );
+std_queue_shared_t std_queue_mpmc_32 ( void* base, size_t size ) {
+    std_queue_shared_t queue = std_queue_shared ( base, size );
     std_mem_set ( queue.base, queue.mask + 1, 0xff );
     return queue;
 }
@@ -667,8 +668,8 @@ bool std_queue_mpmc_pop_move_32 ( std_queue_shared_t* queue, void* dest ) {
 }
 
 // 64
-std_queue_shared_t std_queue_mpmc_64 ( std_buffer_t buffer ) {
-    std_queue_shared_t queue = std_queue_shared ( buffer );
+std_queue_shared_t std_queue_mpmc_64 ( void* base, size_t size ) {
+    std_queue_shared_t queue = std_queue_shared ( base, size );
     std_mem_set ( queue.base, queue.mask + 1, 0xff );
     return queue;
 }

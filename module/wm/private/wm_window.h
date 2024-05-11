@@ -36,16 +36,11 @@ typedef struct wm_window_t {
 typedef struct wm_window_state_t {
     std_mutex_t mutex;
 
-    std_memory_h windows_memory_handle;
     wm_window_t* windows_array;
     wm_window_t* windows_freelist;
     wm_window_t* windows_list;
 
 #if defined(std_platform_win32_m)
-    std_memory_h map_keys_memory_handle;
-    std_memory_h map_values_memory_handle;
-    //wm_window_h windows_handles_buffer[wm_max_windows_m * 2];
-    //uint64_t windows_os_handles_buffer[wm_max_windows_m * 2]; // win32 HWND handle only
     std_hash_map_t map;   // window os handle -> wm_window_h handle
 #endif
 } wm_window_state_t;

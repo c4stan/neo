@@ -7,7 +7,6 @@
 typedef struct {
     xui_font_params_t params;
     xg_texture_h atlas_texture;
-    std_memory_h char_info_handle;
     void* char_info; // stbtt_packedchar*
     //std_memory_h font_info_handle;
     //stbtt_fontinfo font_info;
@@ -24,7 +23,6 @@ typedef struct {
 } xui_font_atlas_uniform_data_t;
 
 typedef struct {
-    std_memory_h fonts_memory_handle;
     xui_font_t* fonts_array;
     xui_font_t* fonts_freelist;
 

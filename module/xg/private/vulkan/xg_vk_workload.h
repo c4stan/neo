@@ -55,7 +55,6 @@ typedef struct {
 } xg_vk_workload_device_context_t;
 
 typedef struct {
-    std_memory_h workloads_memory_handle;
     xg_vk_workload_t* workloads_array;
     xg_vk_workload_t* workloads_freelist;
     std_mutex_t workloads_mutex;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <std_byte.h>
-#include <std_buffer.h>
+#include <std_allocator.h>
 
 // Generally, each list item is required to have a void* as their first member, to store an intrusive pointer to the next element.
 // In the case of freelist this is only true when the element is unused, so in practice it only needs its elements to be of size >= std_pointer_size_m.
@@ -47,10 +47,10 @@ void std_dlist_remove_offset ( void* item, uint64_t offset );
 
 // Freelist
 // The buffer base and the stride must both be pointer aligned.
-void* std_freelist ( std_buffer_t buffer, size_t stride );
+void* std_freelist ( void* base, size_t stride, size_t capacity );
 
-#define std_freelist_array_m( array, count ) std_array_typecast_m(array) std_freelist ( std_buffer (array, std_array_stride_m(array) * count), std_array_stride_m(array) )
-#define std_static_freelist_m( array ) std_array_typecast_m(array) std_freelist ( std_static_buffer_m ( (array) ), std_array_stride_m( (array) ) )
+#define std_freelist_m( array, count ) std_array_typecast_m ( array ) std_freelist ( array, std_static_array_stride_m( array ), count )
+#define std_static_freelist_m( array ) std_array_typecast_m ( array ) std_freelist ( array, std_static_array_stride_m( array ), std_static_array_capacity_m( array ) )
 
 // Freelist array
 // When pooling back, only the fist n bytes (where n is pointer size) are overwritten on the item, the rest is untouched.

@@ -10,25 +10,17 @@ static xg_vk_event_state_t* xg_vk_event_state;
 void xg_vk_event_load ( xg_vk_event_state_t* state ) {
     xg_vk_event_state = state;
 
-    std_alloc_t gpu_events_alloc = std_virtual_heap_alloc_array_m ( xg_vk_gpu_event_t, xg_vk_max_gpu_events_m );
-    std_alloc_t gpu_queue_events_alloc = std_virtual_heap_alloc_array_m ( xg_vk_gpu_queue_event_t, xg_vk_max_gpu_queue_events_m );
-    std_alloc_t cpu_queue_events_alloc = std_virtual_heap_alloc_array_m ( xg_vk_cpu_queue_event_t, xg_vk_max_cpu_queue_events_m );
+    state->gpu_events_array = std_virtual_heap_alloc_array_m ( xg_vk_gpu_event_t, xg_vk_max_gpu_events_m );
+    state->gpu_queue_events_array = std_virtual_heap_alloc_array_m ( xg_vk_gpu_queue_event_t, xg_vk_max_gpu_queue_events_m );
+    state->cpu_queue_events_array = std_virtual_heap_alloc_array_m ( xg_vk_cpu_queue_event_t, xg_vk_max_cpu_queue_events_m );
 
-    xg_vk_event_state->gpu_events_memory_handle = gpu_events_alloc.handle;
-    xg_vk_event_state->gpu_queue_events_memory_handle = gpu_queue_events_alloc.handle;
-    xg_vk_event_state->cpu_queue_events_memory_handle = cpu_queue_events_alloc.handle;
+    state->gpu_events_freelist = std_freelist_m ( state->gpu_events_array, xg_vk_max_gpu_events_m );
+    state->gpu_queue_events_freelist = std_freelist_m ( state->gpu_queue_events_array, xg_vk_max_gpu_queue_events_m );
+    state->cpu_queue_events_freelist = std_freelist_m ( state->cpu_queue_events_array, xg_vk_max_cpu_queue_events_m );
 
-    xg_vk_event_state->gpu_events_array = ( xg_vk_gpu_event_t* ) gpu_events_alloc.buffer.base;
-    xg_vk_event_state->gpu_queue_events_array = ( xg_vk_gpu_queue_event_t* ) gpu_queue_events_alloc.buffer.base;
-    xg_vk_event_state->cpu_queue_events_array = ( xg_vk_cpu_queue_event_t* ) cpu_queue_events_alloc.buffer.base;
-
-    xg_vk_event_state->gpu_events_freelist = std_freelist ( gpu_events_alloc.buffer, sizeof ( xg_vk_gpu_event_t ) );
-    xg_vk_event_state->gpu_queue_events_freelist = std_freelist ( gpu_queue_events_alloc.buffer, sizeof ( xg_vk_gpu_queue_event_t ) );
-    xg_vk_event_state->cpu_queue_events_freelist = std_freelist ( cpu_queue_events_alloc.buffer, sizeof ( xg_vk_cpu_queue_event_t ) );
-
-    std_mutex_init ( &xg_vk_event_state->gpu_events_mutex );
-    std_mutex_init ( &xg_vk_event_state->gpu_queue_events_mutex );
-    std_mutex_init ( &xg_vk_event_state->cpu_queue_events_mutex );
+    std_mutex_init ( &state->gpu_events_mutex );
+    std_mutex_init ( &state->gpu_queue_events_mutex );
+    std_mutex_init ( &state->cpu_queue_events_mutex );
 }
 
 void xg_vk_event_reload ( xg_vk_event_state_t* state ) {
@@ -36,9 +28,9 @@ void xg_vk_event_reload ( xg_vk_event_state_t* state ) {
 }
 
 void xg_vk_event_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_event_state->gpu_events_memory_handle );
-    std_virtual_heap_free ( xg_vk_event_state->gpu_queue_events_memory_handle );
-    std_virtual_heap_free ( xg_vk_event_state->cpu_queue_events_memory_handle );
+    std_virtual_heap_free ( xg_vk_event_state->gpu_events_array );
+    std_virtual_heap_free ( xg_vk_event_state->gpu_queue_events_array );
+    std_virtual_heap_free ( xg_vk_event_state->cpu_queue_events_array );
 }
 
 xg_gpu_event_h xg_gpu_event_create ( xg_device_h device_handle ) {

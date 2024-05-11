@@ -233,46 +233,51 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_f lay
 
     char layers_buffer[xg_vk_query_instance_layers_buffer_size_m];
     char extensions_buffer[xg_vk_query_instance_extensions_buffer_size_m];
-    std_stack_t layers_allocator = std_stack ( std_static_buffer_m ( layers_buffer ) );
-    std_stack_t extensions_allocator = std_stack ( std_static_buffer_m ( extensions_buffer ) );
+    std_stack_t layers_allocator = std_static_stack_m ( layers_buffer );
+    std_stack_t extensions_allocator = std_static_stack_m ( extensions_buffer );
 
     for ( size_t i = 0; i < std_static_array_capacity_m ( base_layers ); ++i ) {
-        size_t size = std_str_len ( base_layers[i] ) + 1;
-        layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
-        std_mem_copy ( ( char* ) layers[layer_i], base_layers[i], size );
-        ++layer_i;
+        layers[layer_i++] = std_stack_string_copy ( &layers_allocator, base_layers[i] );
+        //size_t size = std_str_len ( base_layers[i] ) + 1;
+        //layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
+        //std_mem_copy ( ( char* ) layers[layer_i], base_layers[i], size );
+        //++layer_i;
     }
 
     if ( layers_flags & xg_runtime_layer_debug_m ) {
         for ( size_t i = 0; i < std_static_array_capacity_m ( debug_layers ); ++i ) {
-            size_t size = std_str_len ( debug_layers[i] ) + 1;
-            layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
-            std_mem_copy ( ( char* ) layers[layer_i], debug_layers[i], size );
-            ++layer_i;
+            layers[layer_i++] = std_stack_string_copy ( &layers_allocator, debug_layers[i] );
+            //size_t size = std_str_len ( debug_layers[i] ) + 1;
+            //layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
+            //std_mem_copy ( ( char* ) layers[layer_i], debug_layers[i], size );
+            //++layer_i;
         }
     }
 
     if ( layers_flags & xg_runtime_layer_renderdoc_m ) {
         for ( size_t i = 0; i < std_static_array_capacity_m ( renderdoc_layers ); ++i ) {
-            size_t size = std_str_len ( renderdoc_layers[i] ) + 1;
-            layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
-            std_mem_copy ( ( char* ) layers[layer_i], renderdoc_layers[i], size );
-            ++layer_i;
+            layers[layer_i++] = std_stack_string_copy ( &layers_allocator, renderdoc_layers[i] );
+            //size_t size = std_str_len ( renderdoc_layers[i] ) + 1;
+            //layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
+            //std_mem_copy ( ( char* ) layers[layer_i], renderdoc_layers[i], size );
+            //++layer_i;
         }
     }
 
     for ( size_t i = 0; i < std_static_array_capacity_m ( base_extensions ); ++i ) {
-        size_t size = std_str_len ( base_extensions[i] ) + 1;
-        extensions[extension_i] = std_stack_push_array_m ( &extensions_allocator, char, size );
-        std_mem_copy ( ( char* ) extensions[extension_i], base_extensions[i], size );
-        ++extension_i;
+        extensions[extension_i++] = std_stack_string_copy ( &extensions_allocator, base_extensions[i] );
+        //size_t size = std_str_len ( base_extensions[i] ) + 1;
+        //extensions[extension_i] = std_stack_push_array_m ( &extensions_allocator, char, size );
+        //std_mem_copy ( ( char* ) extensions[extension_i], base_extensions[i], size );
+        //++extension_i;
     }
 
     for ( size_t i = 0; i < std_static_array_capacity_m ( platform_extensions ); ++i ) {
-        size_t size = std_str_len ( platform_extensions[i] ) + 1;
-        extensions[extension_i] = std_stack_push_array_m ( &extensions_allocator, char, size );
-        std_mem_copy ( ( char* ) extensions[extension_i], platform_extensions[i], size );
-        ++extension_i;
+        extensions[extension_i++] = std_stack_string_copy ( &extensions_allocator, platform_extensions[i] );
+        //size_t size = std_str_len ( platform_extensions[i] ) + 1;
+        //extensions[extension_i] = std_stack_push_array_m ( &extensions_allocator, char, size );
+        //std_mem_copy ( ( char* ) extensions[extension_i], platform_extensions[i], size );
+        //++extension_i;
     }
 
     // Create Instance

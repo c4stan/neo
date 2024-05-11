@@ -98,9 +98,6 @@ typedef struct {
 
 typedef struct {
     // Graphics pipelines
-    std_memory_h graphics_pipelines_memory_handle;
-    std_memory_h graphics_pipelines_map_keys_memory_handle;
-    std_memory_h graphics_pipelines_map_values_memory_handle;
     xg_vk_graphics_pipeline_t* graphics_pipelines_array;
     xg_vk_graphics_pipeline_t* graphics_pipelines_freelist;
     std_mutex_t graphics_pipelines_freelist_mutex;
@@ -108,9 +105,6 @@ typedef struct {
     std_mutex_t graphics_pipelines_map_mutex;
 
     // Compute pipelines
-    std_memory_h compute_pipelines_memory_handle;
-    std_memory_h compute_pipelines_map_keys_memory_handle;
-    std_memory_h compute_pipelines_map_values_memory_handle;
     xg_vk_compute_pipeline_t* compute_pipelines_array;
     xg_vk_compute_pipeline_t* compute_pipelines_freelist;
     std_mutex_t compute_pipelines_freelist_mutex;
@@ -118,9 +112,6 @@ typedef struct {
     std_mutex_t compute_pipelines_map_mutex;
 
     // Renderpasses
-    std_memory_h renderpasses_memory_handle;
-    std_memory_h renderpasses_map_keys_memory_handle;
-    std_memory_h renderpasses_map_values_memory_handle;
     xg_vk_renderpass_t* renderpasses_array;
     xg_vk_renderpass_t* renderpasses_freelist;
     std_mutex_t renderpasses_freelist_mutex;
@@ -128,18 +119,12 @@ typedef struct {
     std_mutex_t renderpasses_map_mutex;
 
     // Resource set layouts
-    std_memory_h set_layouts_memory_handle;
-    std_memory_h set_layouts_map_keys_memory_handle;
-    std_memory_h set_layouts_map_values_memory_handle;
     xg_vk_pipeline_resource_binding_set_layout_t* set_layouts_array;
     xg_vk_pipeline_resource_binding_set_layout_t* set_layouts_freelist;
     std_hash_map_t set_layouts_map;     // uint64_t hash -> xg_vk_descriptor_set_layout_h
     std_mutex_t set_layouts_mutex;
 
     // Framebuffers
-    std_memory_h framebuffers_memory_handle;
-    std_memory_h framebuffers_map_keys_memory_handle;
-    std_memory_h framebuffers_map_values_memory_handle;
     xg_vk_framebuffer_t* framebuffers_array;
     xg_vk_framebuffer_t* framebuffers_freelist;
     std_mutex_t framebuffers_freelist_mutex;

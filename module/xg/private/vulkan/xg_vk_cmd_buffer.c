@@ -116,6 +116,7 @@ typedef struct {
 
 */
 
+/*
 typedef struct {
     xg_workload_h workload;
 } xg_vk_cmd_buffer_sort_stage_input_t;
@@ -124,7 +125,7 @@ typedef struct {
     std_buffer_t sorted_cmd_headers;
     size_t count;
 } xg_vk_cmd_buffer_sort_stage_output_t;
-
+*/
 
 /*
 typedef struct {
@@ -199,13 +200,14 @@ void xg_vk_cmd_buffer_unload ( void ) {
             vkDestroyDescriptorPool ( device->vk_handle, submit_context->desc_allocator.vk_desc_pool, NULL );
         }
 
-        std_virtual_heap_free ( context->submit_contexts_memory_handle );
+        std_virtual_heap_free ( context->submit_contexts );
         std_mutex_deinit ( &context->submit_contexts_mutex );
     }
 
     std_mutex_deinit ( &xg_vk_cmd_buffer_state->device_contexts_mutex );
 }
 
+#if 0
 std_ignore_unused_warning_m()
 static void xg_vk_cmd_buffer_debug_print_cmd_buffer ( const std_buffer_t* cmd_headers ) {
     xg_cmd_header_t* cmd_header = ( xg_cmd_header_t* ) cmd_headers->base;
@@ -535,6 +537,7 @@ static void xg_vk_cmd_buffer_debug_print_cmd_buffer ( const std_buffer_t* cmd_he
         }
     }
 }
+#endif
 
 void xg_vk_cmd_buffer_activate_device ( xg_device_h device_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
@@ -546,9 +549,7 @@ void xg_vk_cmd_buffer_activate_device ( xg_device_h device_handle ) {
 
     context->device_handle = device_handle;
 
-    std_alloc_t submit_contexts_alloc = std_virtual_heap_alloc_array_m ( xg_vk_cmd_buffer_submit_context_t, xg_workload_max_queued_workloads_m );
-    context->submit_contexts_memory_handle = submit_contexts_alloc.handle;
-    context->submit_contexts = ( xg_vk_cmd_buffer_submit_context_t* ) submit_contexts_alloc.buffer.base;
+    context->submit_contexts = std_virtual_heap_alloc_array_m ( xg_vk_cmd_buffer_submit_context_t, xg_workload_max_queued_workloads_m );
     std_mutex_init ( &context->submit_contexts_mutex );
 
     context->submit_ring = std_ring ( xg_workload_max_queued_workloads_m );
@@ -620,6 +621,11 @@ void xg_vk_cmd_buffer_deactivate_device ( xg_device_h device_handle ) {
     // TODO
 }
 
+typedef struct {
+    xg_cmd_header_t* cmd_headers;
+    size_t count;
+} xg_vk_cmd_buffer_sort_result_t;
+
 /*
     main source for current implementation:
         https://cboard.cprogramming.com/c-programming/158635-merge-sort-top-down-versus-bottom-up-3.html#post1174189
@@ -647,7 +653,7 @@ void xg_vk_cmd_buffer_deactivate_device ( xg_device_h device_handle ) {
                 2 input read, 1 count write, 1 count read, 1 output write
 
 */
-static std_alloc_t xg_vk_cmd_buffer_sort_workload ( xg_workload_h workload_handle ) {
+static xg_vk_cmd_buffer_sort_result_t xg_vk_cmd_buffer_sort_workload ( xg_workload_h workload_handle ) {
     //
     // SETUP
     //
@@ -664,13 +670,15 @@ static std_alloc_t xg_vk_cmd_buffer_sort_workload ( xg_workload_h workload_handl
     // Stable u64 LSD radix sort using 8-bit bins
     // Allocate 2 buffers of same size as total items to be sorted and ping-pong on each sorting step
     // TODO pre-allocate these
-    std_alloc_t alloc1 = std_virtual_heap_alloc ( total_header_size, 16 );
-    std_alloc_t alloc2 = std_virtual_heap_alloc ( total_header_size, 16 );
-    alloc1.buffer.size = total_header_size;
-    alloc2.buffer.size = total_header_size;
+    //std_alloc_t alloc1 = std_virtual_heap_alloc ( total_header_size, 16 );
+    //std_alloc_t alloc2 = std_virtual_heap_alloc ( total_header_size, 16 );
+    //alloc1.buffer.size = total_header_size;
+    //alloc2.buffer.size = total_header_size;
+    //std_auto_m buffer1 = ( xg_cmd_header_t* ) alloc1.buffer.base;
+    //std_auto_m buffer2 = ( xg_cmd_header_t* ) alloc2.buffer.base;
 
-    std_auto_m buffer1 = ( xg_cmd_header_t* ) alloc1.buffer.base;
-    std_auto_m buffer2 = ( xg_cmd_header_t* ) alloc2.buffer.base;
+    std_auto_m buffer1 = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
+    std_auto_m buffer2 = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
 
     //
     // byte 0
@@ -878,8 +886,11 @@ static std_alloc_t xg_vk_cmd_buffer_sort_workload ( xg_workload_h workload_handl
     //
     // TERMINATE
     //
-    std_virtual_heap_free ( alloc1.handle );
-    return alloc2;
+    std_virtual_heap_free ( buffer1 );
+    xg_vk_cmd_buffer_sort_result_t result;
+    result.cmd_headers = buffer2;
+    result.count = total_header_count;
+    return result;
 }
 
 typedef struct {
@@ -1353,13 +1364,8 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
     VkCommandBuffer vk_cmd_buffer = context->cmd_allocator.vk_cmd_buffers[0]; // TODO
     context->cmd_allocator.cmd_buffers_count++;
 
-    xg_cmd_header_t* cmd_header = ( xg_cmd_header_t* ) context->cmd_headers.base;
-
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
-
-    std_assert_m ( std_align_test_ptr ( cmd_header, xg_cmd_buffer_cmd_alignment_m ) );
-
-    const xg_cmd_header_t* cmd_headers_end = ( xg_cmd_header_t* ) ( context->cmd_headers.base + context->cmd_headers.size );
+    std_assert_m ( std_align_test_ptr ( context->cmd_headers, xg_cmd_buffer_cmd_alignment_m ) );
 
     xg_vk_tranlsation_state_t state;
     {
@@ -1388,7 +1394,8 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
     //xg_vk_workload_query_pool_t* timestamp_pool = xg_workload_get_timestamp_query_pool ( context->workload );
     //std_assert_m ( timestamp_pool );
 
-    for ( const xg_cmd_header_t* header = cmd_header; header < cmd_headers_end; ++header ) {
+    for ( size_t cmd_header_it = 0; cmd_header_it < context->cmd_headers_count; ++cmd_header_it ) {
+        const xg_cmd_header_t* header = &context->cmd_headers[cmd_header_it];
         switch ( header->type ) {
 
             // -----------------------------------------------------------------------
@@ -2530,7 +2537,7 @@ void xg_vk_cmd_buffer_submit ( xg_workload_h workload_handle ) {
     // TODO merge
 
     // sort
-    std_alloc_t sorted_data_alloc = xg_vk_cmd_buffer_sort_workload ( workload_handle );
+    xg_vk_cmd_buffer_sort_result_t sort_result = xg_vk_cmd_buffer_sort_workload ( workload_handle );
 
     // TODO chunk?
 
@@ -2546,13 +2553,14 @@ void xg_vk_cmd_buffer_submit ( xg_workload_h workload_handle ) {
     xg_vk_cmd_buffer_destroy_workload_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_start_m );
 
     // translate
-    submit_context->cmd_headers = sorted_data_alloc.buffer;
+    submit_context->cmd_headers = sort_result.cmd_headers;
+    submit_context->cmd_headers_count = sort_result.count;
     xg_vk_cmd_translate_result_t translate_result;
     xg_vk_submit_context_translate ( &translate_result, submit_context, workload->device );
 
     // submit
     // TODO move this into xg_vk_device?
-    std_virtual_heap_free ( sorted_data_alloc.handle );
+    std_virtual_heap_free ( sort_result.cmd_headers );
     {
         VkCommandBuffer vk_cmd_buffer = submit_context->cmd_allocator.vk_cmd_buffers[0];
 

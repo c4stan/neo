@@ -271,9 +271,8 @@ typedef struct {
 
     // User routine and args
     xf_node_execute_f* execute_routine;
-    void* user_args;
-    std_allocator_i user_args_allocator;
-    uint64_t user_args_alloc_size;
+    std_buffer_t user_args;
+    bool copy_args;
 
     char debug_name[xf_debug_name_size_m];
     uint32_t debug_color;
@@ -313,9 +312,8 @@ typedef struct {
     .key_space_size = 0, \
     \
     .execute_routine = NULL, \
-    .user_args = NULL, \
-    .user_args_allocator = std_null_allocator_m, \
-    .user_args_alloc_size = 0, \
+    .user_args = std_null_buffer_m, \
+    .copy_args = true, \
     \
     .debug_name = {0}, \
     .debug_color = xg_debug_region_color_none_m, \
@@ -420,6 +418,8 @@ typedef struct {
 
 typedef struct {
     bool enabled;
+    bool passthrough;
+    char debug_name[xf_debug_name_size_m];
 } xf_node_info_t;
 
 typedef struct {
@@ -449,5 +449,5 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
-    void ( *debug_ui_graph ) ( xui_i* xui, xui_workload_h workload, xf_graph_h graph );
+    void ( *debug_ui_graph ) ( xui_i* xui, xui_workload_h workload, xf_graph_h graph ); // adding a xf->xui dependency here kind of sucks...
 } xf_i;

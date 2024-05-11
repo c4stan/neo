@@ -13,8 +13,6 @@ static void fs_test_run ( void ) {
         fs->get_volumes ( volumes, 32 );
         std_log_info_m ( std_fmt_size_m" volumes found:", n );
 
-        fs->read_file ( NULL, std_buffer ( NULL, 0 ), 9458575 );
-
         // TODO
         for ( size_t i = 0; i < n; ++i ) {
             fs_volume_info_t info;
@@ -143,7 +141,7 @@ static void fs_test_run ( void ) {
                 char path2[256];
                 std_str_copy ( path2, 256, path );
                 fs->append_path ( path2, 100, files[0] );
-                std_assert_m ( fs->get_file_path_info ( &info, path2 ) );
+                std_verify_m ( fs->get_file_path_info ( &info, path2 ) );
 
                 std_calendar_time_t creation_time = std_timestamp_to_calendar ( info.creation_time );
                 std_calendar_time_t last_write_time = std_timestamp_to_calendar ( info.last_write_time );

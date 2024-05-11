@@ -5,10 +5,10 @@
 
 #include <std_time.h>
 
-typedef struct {
-    std_alloc_t alloc;
-    size_t top;
-} xs_database_memory_page_t;
+//typedef struct {
+//    std_alloc_t alloc;
+//    size_t top;
+//} xs_database_memory_page_t;
 
 typedef struct {
     xs_database_build_params_t params;
@@ -34,7 +34,8 @@ typedef struct {
 } xs_database_pipeline_state_header_t;
 
 typedef struct {
-    xs_database_memory_page_t memory_pages[xs_database_max_memory_pages_m];
+    std_virtual_stack_t stack;
+    //xs_database_memory_page_t memory_pages[xs_database_max_memory_pages_m];
 
     const char* folders[xs_database_max_folders_m];
     size_t folders_count;

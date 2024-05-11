@@ -1,6 +1,5 @@
 #include <std_module.h>
 #include <std_platform.h>
-#include <std_buffer.h>
 #include <std_hash.h>
 #include <std_list.h>
 #include <std_mutex.h>
@@ -20,39 +19,39 @@ static std_module_state_t* std_module_state;
 // ----------------------------------------------------------------------------
 
 // The hash is locally stored in the key, so that it doesn't need to be recomputed a bunch of times
-static uint64_t std_module_hash_name ( const void* _name, void* _ ) {
-    std_unused_m ( _ );
-    const std_module_name_t* name = ( const std_module_name_t* ) _name;
-    return name->hash;
-}
+//static uint64_t std_module_hash_name ( const void* _name, void* _ ) {
+//    std_unused_m ( _ );
+//    const std_module_name_t* name = ( const std_module_name_t* ) _name;
+//    return name->hash;
+//}
 
-static bool std_module_cmp_name ( uint64_t hash1, const void* _name1, const void* _name2, void* _ ) {
-    std_unused_m ( _ );
-    std_unused_m ( hash1 );
-    const std_module_name_t* name1 = ( const std_module_name_t* ) _name1;
-    const std_module_name_t* name2 = ( const std_module_name_t* ) _name2;
+//static bool std_module_cmp_name ( uint64_t hash1, const void* _name1, const void* _name2, void* _ ) {
+//    std_unused_m ( _ );
+//    std_unused_m ( hash1 );
+//    const std_module_name_t* name1 = ( const std_module_name_t* ) _name1;
+//    const std_module_name_t* name2 = ( const std_module_name_t* ) _name2;
+//
+//    if ( name1->hash != name2->hash ) {
+//        return false;
+//    }
+//
+//    return std_str_cmp ( name1->string, name2->string ) == 0;
+//}
 
-    if ( name1->hash != name2->hash ) {
-        return false;
-    }
+//static uint64_t std_module_hash_api ( const void* api, void* _ ) {
+//    std_unused_m ( _ );
+//    uint64_t key = * ( const size_t* ) api;
+//    uint64_t hash = std_hash_murmur_mixer_64 ( key );
+//    return hash;
+//}
 
-    return std_str_cmp ( name1->string, name2->string ) == 0;
-}
-
-static uint64_t std_module_hash_api ( const void* api, void* _ ) {
-    std_unused_m ( _ );
-    uint64_t key = * ( const size_t* ) api;
-    uint64_t hash = std_hash_murmur_mixer_64 ( key );
-    return hash;
-}
-
-static bool std_module_cmp_api ( uint64_t hash1, const void* _api1, const void* _api2, void* _ ) {
-    std_unused_m ( _ );
-    std_unused_m ( hash1 );
-    void** api1 = ( void** ) _api1;
-    void** api2 = ( void** ) _api2;
-    return *api1 == *api2;
-}
+//static bool std_module_cmp_api ( uint64_t hash1, const void* _api1, const void* _api2, void* _ ) {
+//    std_unused_m ( _ );
+//    std_unused_m ( hash1 );
+//    void** api1 = ( void** ) _api1;
+//    void** api2 = ( void** ) _api2;
+//    return *api1 == *api2;
+//}
 
 // ----------------------------------------------------------------------------
 
@@ -60,6 +59,7 @@ void std_module_init ( std_module_state_t* state ) {
     //state->modules_buffer = std_buffer ( state->modules_array, std_module_max_modules_m * sizeof ( std_module_t ) );
     //state->modules_freelist = std_freelist ( state->modules_buffer, sizeof ( std_module_t ) );
     state->modules_freelist = std_static_freelist_m ( state->modules_array );
+    #if 0
     state->modules_name_map =
     std_map (
         std_buffer ( state->modules_name_map_keys, std_module_map_slots_m * sizeof ( std_module_name_t ) ),
@@ -78,6 +78,10 @@ void std_module_init ( std_module_state_t* state ) {
         std_module_hash_api, NULL,
         std_module_cmp_api, NULL
         );
+    #else
+    state->modules_name_map = std_hash_map ( state->modules_name_map_keys, state->modules_name_map_payloads, std_module_map_slots_m );
+state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
+    #endif
     std_mutex_init ( &state->modules_mutex );
 }
 
@@ -104,7 +108,7 @@ void std_module_fakeload_api ( const char* name, void* api ) {
 #ifdef std_platform_win32_m
     module->handle = 0;
 #endif
-    std_map_insert ( &std_module_state->modules_api_map, api, module );
+    std_hash_map_insert ( &std_module_state->modules_api_map, ( uint64_t ) api, ( uint64_t ) module );
     std_mutex_unlock ( &std_module_state->modules_mutex );
 }
 #endif
@@ -113,12 +117,10 @@ void std_module_fakeload_api ( const char* name, void* api ) {
 
 static std_module_t* std_module_lookup ( const char* name ) {
     // Lock, try to lookup an already loaded module with this name
-    std_module_name_t module_name;
-    module_name.hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
-    std_str_copy ( module_name.string, std_module_name_max_len_m, name );
+    uint64_t name_hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
 
     std_mutex_lock ( &std_module_state->modules_mutex );
-    void* module_lookup = std_map_lookup ( &std_module_state->modules_name_map, &module_name );
+    uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_name_map, name_hash );
 
     if ( module_lookup ) {
         std_mutex_unlock ( &std_module_state->modules_mutex );
@@ -183,7 +185,7 @@ void* std_module_get ( const char* name ) {
     char module_file_name[std_module_name_max_len_m];
     char module_entrypoint_name[std_module_name_max_len_m];
 
-    const char* file_prefix = std_modules_path_m;
+    const char* file_prefix = std_submodules_path_m;
     const char* file_postfix = ".dll";
     const char* entrypoint_postfix = "_load";
 
@@ -276,8 +278,8 @@ void* std_module_get ( const char* name ) {
     module->name.hash = hash;
     std_str_copy ( module->name.string, std_module_name_max_len_m, name );
     module->handle = ( uint64_t ) handle;
-    std_map_insert ( &std_module_state->modules_api_map, &module->api, &module );
-    std_map_insert ( &std_module_state->modules_name_map, &module->name, &module );
+    std_hash_map_insert ( &std_module_state->modules_api_map, ( uint64_t ) module->api, ( uint64_t ) module );
+    std_hash_map_insert ( &std_module_state->modules_name_map, hash, ( uint64_t ) module );
     // Unlock, return
     std_mutex_unlock ( &std_module_state->modules_mutex );
     return api;
@@ -286,7 +288,7 @@ void* std_module_get ( const char* name ) {
 void std_module_release ( void* api ) {
     // Lock, try to lookup
     std_mutex_lock ( &std_module_state->modules_mutex );
-    void* module_lookup = std_map_lookup ( &std_module_state->modules_api_map, &api );
+    uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_api_map, ( uint64_t ) &api );
 
     if ( module_lookup == NULL ) {
         std_mutex_unlock ( &std_module_state->modules_mutex );
@@ -347,64 +349,41 @@ void std_module_release ( void* api ) {
 #endif
 
     std_list_push ( &std_module_state->modules_freelist, module );
-    std_map_remove ( &std_module_state->modules_api_map, module_lookup );
+    std_hash_map_remove ( &std_module_state->modules_api_map, ( uint64_t ) &api );
 
-    void* module_name_lookup = std_map_lookup ( &std_module_state->modules_name_map, &module->name );
-    std_assert_m ( module_name_lookup );
-    std_map_remove ( &std_module_state->modules_name_map, module_name_lookup );
+    std_verify_m ( std_hash_map_remove ( &std_module_state->modules_name_map, module->name.hash ) );
 
     std_mutex_unlock ( &std_module_state->modules_mutex );
     return;
 }
 
-size_t std_module_build ( const char* solution_name, std_buffer_t output ) {
+size_t std_module_build ( const char* solution_name, void* output, size_t output_size ) {
     // Prepare the builder process args
     const char* argv[std_process_max_args_m];
     size_t argc = 0;
     char args_buffer[std_process_args_max_len_m];
-#if 0
-    {
-        std_assert_m ( std_process_max_args_m > 4 );
-        std_array_t array = std_static_array_m ( args_buffer );
-
-        argv[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, std_builder_path_m );
-        std_array_push ( &array, 1 );
-
-        argv[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, "build" );
-        std_array_push ( &array, 1 );
-
-        argv[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, solution_name );
-        std_array_push ( &array, 1 );
-
-        argv[argc++] = &args_buffer[array.count];
-        std_str_append ( args_buffer, &array, "-r" ); // reload flag
-    }
-#endif
     {
         std_stack_t stack = std_static_stack_m ( args_buffer );
         
-        argv[argc++] = &args_buffer[stack.top];
-        std_stack_push_copy_string ( &stack, std_builder_path_m );
+        argv[argc++] = stack.top;
+        std_stack_string_copy ( &stack, std_builder_path_m );
 
-        argv[argc++] = &args_buffer[stack.top];
-        std_stack_push_copy_string ( &stack, "build" );
+        argv[argc++] = stack.top;
+        std_stack_string_copy ( &stack, "build" );
 
-        argv[argc++] = &args_buffer[stack.top];
-        std_stack_push_copy_string ( &stack, solution_name );
+        argv[argc++] = stack.top;
+        std_stack_string_copy ( &stack, solution_name );
 
-        argv[argc++] = &args_buffer[stack.top];
-        std_stack_push_copy_string ( &stack, "-r" ); // reload flag
+        argv[argc++] = stack.top;
+        std_stack_string_copy ( &stack, "-r" ); // reload flag
     }
 
     // The builder will send back the build results to this process through this pipe
     std_process_pipe_params_t pipe_params;
     pipe_params.name = "std_module_updates_pipe";
     pipe_params.flags = std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m;
-    pipe_params.write_capacity = output.size;
-    pipe_params.read_capacity = output.size;
+    pipe_params.write_capacity = output_size;
+    pipe_params.read_capacity = output_size;
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
     std_assert_m ( pipe != std_process_null_handle_m );
 
@@ -415,7 +394,7 @@ size_t std_module_build ( const char* solution_name, std_buffer_t output ) {
     std_process_pipe_wait_for_connection ( pipe );
 
     size_t read_size = 0;
-    bool result = std_process_pipe_read ( &read_size, output.base, output.size, pipe );
+    bool result = std_process_pipe_read ( &read_size, output, output_size, pipe );
     std_assert_m ( result );
 
     result = std_process_wait_for ( compiler );
@@ -431,7 +410,7 @@ std_warnings_ignore_m ( "-Wunused-macros" )
 
 void std_module_reload ( const char* solution_name ) {
     char buffer[1024];
-    std_module_build ( solution_name, std_static_buffer_m ( buffer ) );
+    std_module_build ( solution_name, buffer, std_static_array_size_m ( buffer ) );
 
     int32_t updated_modules_count = std_str_to_i32 ( buffer );
 
@@ -476,7 +455,7 @@ void std_module_reload ( const char* solution_name ) {
             char module_file_name[std_module_name_max_len_m];
             char module_entrypoint_name[std_module_name_max_len_m];
 
-            const char* file_prefix = std_modules_path_m;
+            const char* file_prefix = std_submodules_path_m;
             const char* file_postfix = ".dll";
             const char* entrypoint_postfix = "_reload";
 

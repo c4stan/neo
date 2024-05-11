@@ -239,9 +239,7 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
     node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( material, xg_default_texture_view_m );
     node_params.depth_stencil_target = depth;
     node_params.execute_routine = geometry_pass;
-    node_params.user_args_allocator = std_virtual_heap_allocator();
-    node_params.user_args_alloc_size = sizeof ( geometry_pass_args_t );
-    node_params.user_args = &pass_args;
+    node_params.user_args = std_buffer_m ( &pass_args );
     std_str_copy_m ( node_params.debug_name, "geometry" );
     node_params.passthrough.enable = true;
     node_params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_ignore_m;

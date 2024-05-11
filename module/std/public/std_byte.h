@@ -3,7 +3,7 @@
 #include <std_platform.h>
 #include <std_compiler.h>
 
-// TODO make sure these all get inlined, or use macros
+// TODO turn this into an .inl
 
 void        std_mem_copy ( void* dest, const void* source, size_t size );
 bool        std_mem_cmp  ( const void* a, const void* b, size_t size );
@@ -114,7 +114,7 @@ size_t      std_bit_count_32 ( uint32_t value );
 size_t      std_bit_count_64 ( uint64_t value );
 
 size_t      std_align     ( size_t value, size_t align );
-char*     std_align_ptr ( void* value, size_t align );
+char*       std_align_ptr ( void* value, size_t align );
 uint32_t    std_align_u32 ( uint32_t value, uint32_t align );
 uint64_t    std_align_u64 ( uint64_t value, uint64_t align );
 
@@ -124,6 +124,9 @@ bool        std_align_test     ( size_t value, size_t align );
 bool        std_align_test_ptr ( void* value, size_t align );
 bool        std_align_test_u32 ( uint32_t value, uint32_t align );
 bool        std_align_test_u64 ( uint64_t value, uint64_t align );
+
+size_t      std_align_size ( size_t value, size_t align );
+size_t      std_align_size_ptr ( void* value, size_t align );
 
 bool        std_pow2_test     ( size_t value );
 bool        std_pow2_test_u32 ( uint32_t value );
@@ -200,3 +203,5 @@ void std_bitset_clear ( const void* bitset, size_t idx );
 // returns false if no bit set to 1 was found
 bool std_bitset_scan ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx, size_t u64_blocks_count );
 bool std_bitset_scan_rev ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx );
+
+#include <std_byte.inl>

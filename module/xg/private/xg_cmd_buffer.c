@@ -32,10 +32,15 @@ int xg_vk_cmd_buffer_header_compare_f ( const void* _a, const void* _b ) {
 static xg_cmd_buffer_state_t* xg_cmd_buffer_state;
 
 static void xg_cmd_buffer_alloc_memory ( xg_cmd_buffer_t* cmd_buffer ) {
-    std_alloc_t alloc = std_virtual_heap_alloc ( xg_cmd_buffer_cmd_buffer_size_m * 2, 16 );
-    cmd_buffer->memory_handle = alloc.handle;
-    cmd_buffer->cmd_headers_allocator = std_queue_local ( std_buffer_slice ( alloc.buffer, 0, xg_cmd_buffer_cmd_buffer_size_m ) );
-    cmd_buffer->cmd_args_allocator = std_queue_local ( std_buffer_slice ( alloc.buffer, xg_cmd_buffer_cmd_buffer_size_m, xg_cmd_buffer_cmd_buffer_size_m ) );
+    void* cmd_headers_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_cmd_buffer_size_m, 16 );
+    void* cmd_args_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_cmd_buffer_size_m, 16 );
+    cmd_buffer->cmd_headers_allocator = std_queue_local ( cmd_headers_buffer, xg_cmd_buffer_cmd_buffer_size_m );
+    cmd_buffer->cmd_args_allocator = std_queue_local ( cmd_args_buffer, xg_cmd_buffer_cmd_buffer_size_m );
+}
+
+static void xg_cmd_buffer_free_memory ( xg_cmd_buffer_t* cmd_buffer ) {
+    std_virtual_heap_free ( cmd_buffer->cmd_headers_allocator.base );
+    std_virtual_heap_free ( cmd_buffer->cmd_args_allocator.base );
 }
 
 void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state ) {
@@ -45,16 +50,14 @@ void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state ) {
     // Command Buffers contain poiners to the actual memory, which is allocated somewhere else.
     // xg_cmd_buffer_preallocated_cmd_buffers_m is the number of buffers that have their memory allocated from the start.
     // Once the pool runs out of buffers and more are requestd, it can grow, by lazily allocating more buffers.
-    std_alloc_t cmd_buffers_alloc = std_virtual_heap_alloc_array_m ( xg_cmd_buffer_t, xg_cmd_buffer_max_cmd_buffers_m );
-
-    xg_cmd_buffer_state->cmd_buffers_memory_handle = cmd_buffers_alloc.handle;
-    xg_cmd_buffer_state->cmd_buffers_array = ( xg_cmd_buffer_t* ) cmd_buffers_alloc.buffer.base;
-    xg_cmd_buffer_state->cmd_buffers_freelist = std_freelist ( cmd_buffers_alloc.buffer, sizeof ( xg_cmd_buffer_t ) );
+    xg_cmd_buffer_state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_cmd_buffer_t, xg_cmd_buffer_max_cmd_buffers_m );
+    xg_cmd_buffer_state->cmd_buffers_freelist = NULL;//std_freelist_m ( xg_cmd_buffer_state->cmd_buffers_array, sizeof ( xg_cmd_buffer_t ) );
     std_mutex_init ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 
     for ( size_t i = 0; i < xg_cmd_buffer_preallocated_cmd_buffers_m; ++i ) {
         xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[i];
         xg_cmd_buffer_alloc_memory ( cmd_buffer );
+        std_list_push ( &xg_cmd_buffer_state->cmd_buffers_freelist, cmd_buffer );
     }
 
     xg_cmd_buffer_state->allocated_cmd_buffers_count = xg_cmd_buffer_preallocated_cmd_buffers_m;
@@ -69,7 +72,12 @@ void xg_cmd_buffer_reload ( xg_cmd_buffer_state_t* state ) {
 }
 
 void xg_cmd_buffer_unload ( void ) {
-    std_virtual_heap_free ( xg_cmd_buffer_state->cmd_buffers_memory_handle );
+    for ( size_t i = 0; i < xg_cmd_buffer_state->allocated_cmd_buffers_count; ++i ) {
+        xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[i];
+        xg_cmd_buffer_free_memory ( cmd_buffer );
+    }
+
+    std_virtual_heap_free ( xg_cmd_buffer_state->cmd_buffers_array );
     std_mutex_deinit ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 }
 

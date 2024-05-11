@@ -9,7 +9,6 @@
 // TODO allocate cmds on opposide sides of the buffer depending on time_e
 typedef struct {
     xg_workload_h workload;
-    std_memory_h memory_handle;
     std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
     std_queue_local_t cmd_args_allocator;
 } xg_resource_cmd_buffer_t;
@@ -36,6 +35,7 @@ typedef struct {
     // Abusing the fact that x64 pointers have their top 16 bits unused
     // https://stackoverflow.com/questions/31522582/can-i-use-some-bits-of-pointer-x86-64-for-custom-data-and-how-if-possible
     // Args contains a memory address.
+    // TODO use a relative pointer, can preserve globality while reducing size by pre-reserving all memory for all buffers in a single virtual range
     uint64_t args : 48;
     uint64_t type : 16;
 } xg_resource_cmd_header_t;
@@ -84,7 +84,6 @@ typedef struct {
 // ---
 
 typedef struct {
-    std_memory_h cmd_buffers_memory_handle;
     xg_resource_cmd_buffer_t* cmd_buffers_array;
     xg_resource_cmd_buffer_t* cmd_buffers_freelist;
     uint64_t allocated_cmd_buffers_count;

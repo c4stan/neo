@@ -33,13 +33,13 @@ static std_log_state_t* std_log_state;
 static void std_log_default_callback ( const std_log_msg_t* msg ) {
     const char* type_prefix = "";
 
-    if ( msg->flags & std_log_level_crash_m ) {
+    if ( msg->level == std_log_level_crash_m ) {
         type_prefix = "[CRASH] ";
-    } else if ( msg->flags & std_log_level_error_m ) {
+    } else if ( msg->level == std_log_level_error_m ) {
         type_prefix = "[ERROR] ";
-    } else if ( msg->flags & std_log_level_warn_m ) {
+    } else if ( msg->level == std_log_level_warn_m ) {
         type_prefix = "[WARN] ";
-    } else if ( msg->flags & std_log_level_info_m ) {
+    } else if ( msg->level == std_log_level_info_m ) {
         type_prefix = "[INFO] ";
     }
 
@@ -47,9 +47,9 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
     const char* color_postfix = "";
 #if std_enabled_m(std_log_colored_console_output_m)
 
-    if ( msg->flags & ( std_log_level_error_m | std_log_level_crash_m ) ) {
+    if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         color_prefix = std_terminal_color_red_m;
-    } else if ( msg->flags & std_log_level_warn_m ) {
+    } else if ( msg->level == std_log_level_bit_warn_m ) {
         color_prefix = std_terminal_color_yellow_m;
     }
 
@@ -60,34 +60,30 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
     std_tick_t now = std_tick_now();
     float delta_millis = std_tick_to_milli_f32 ( now - program_start );
 
-    if ( msg->flags == 0 ) {
-        printf ( msg->payload );
-    } else {
-        printf ( std_fmt_str_m
-            "[" std_fmt_f32_dec_m(3) "] "
-            "[" std_fmt_u32_m "/" std_fmt_str_m "] "
-            "[" std_fmt_str_m ":" std_fmt_size_m "] "
-            std_fmt_str_m
-            std_fmt_str_m
-            std_fmt_str_m,
-            color_prefix,
-            delta_millis / 1000.f,
-            std_thread_uid ( std_thread_this() ),
-            std_thread_name ( std_thread_this() ),
-            msg->file, msg->line,
-            type_prefix,
-            msg->payload,
-            std_terminal_color_reset_m );
-    }
+    printf ( std_fmt_str_m
+        "[" std_fmt_f32_dec_m(3) "] "
+        "[" std_fmt_u32_m "/" std_fmt_str_m "] "
+        "[" std_fmt_str_m ":" std_fmt_size_m "] "
+        std_fmt_str_m
+        std_fmt_str_m
+        std_fmt_str_m,
+        color_prefix,
+        delta_millis / 1000.f,
+        std_thread_uid ( std_thread_this() ),
+        std_thread_name ( std_thread_this() ),
+        msg->scope.file, msg->scope.line,
+        type_prefix,
+        msg->payload,
+        std_terminal_color_reset_m );
 
-    if ( msg->flags & ( std_log_level_warn_m | std_log_level_error_m | std_log_level_crash_m ) ) {
+    if ( ( 1 << msg->level ) & ( std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         fflush ( stdout );
         if ( std_log_state->is_debugger_attached ) {
             std_debug_break_m();
         }
     }
 
-    if ( msg->flags & std_log_level_crash_m ) {
+    if ( msg->level == std_log_level_crash_m ) {
         std_process_this_exit ( std_process_exit_code_error_m );
     }
 }
@@ -174,8 +170,8 @@ static bool std_log_detect_debugger ( void ) {
 }
 
 void std_log_init ( std_log_state_t* state ) {
-    state->log_callback = std_log_default_callback;
     state->is_debugger_attached = std_log_detect_debugger();
+    state->log_callback = std_log_default_callback;
 }
 
 void std_log_attach ( std_log_state_t* state ) {
@@ -183,9 +179,6 @@ void std_log_attach ( std_log_state_t* state ) {
 }
 
 // Default callback used in case something needs to be logged at boot time.
-// The fflush call makes sure that the program flushes its output buffer before
-// a possible crash.
-// TODO only flush when things are really bad? (e.g. check for std_log_level_error_m)
 static void std_log_boot_callback ( const std_log_msg_t* msg ) {
     printf ( msg->payload );
     fflush ( stdout );
@@ -195,13 +188,7 @@ static void std_log_boot_callback ( const std_log_msg_t* msg ) {
 void std_log_boot ( void ) {
     static std_log_state_t state;
     std_log_attach ( &state );
-    std_log_set_callback ( std_log_boot_callback );
-}
-
-//==============================================================================
-
-void std_log_set_callback ( std_log_callback_f* callback ) {
-    std_log_state->log_callback = callback;
+    std_log_state->log_callback = std_log_boot_callback;
 }
 
 //==============================================================================
@@ -231,4 +218,32 @@ void std_log_print ( std_log_msg_t msg, ... ) {
 bool std_log_debugger_attached ( void ) {
     // TODO detect every time?
     return std_log_state->is_debugger_attached;
+}
+
+//==============================================================================
+
+void std_log_os_error ( std_log_scope_t scope ) {
+    char buffer[2048];
+    std_stack_t stack = std_static_stack_m ( buffer );
+
+#if defined std_platform_win32_m
+    DWORD error_code = GetLastError();
+
+    std_stack_string_append ( &stack, "OS-" );
+    char code_string[32];
+    std_u32_to_str ( error_code, code_string, 32 );
+    std_stack_string_append ( &stack, code_string );
+    std_stack_string_append ( &stack, ": " );
+
+    // TODO avoid heap alloc, prefix os msg with something
+    FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), ( LPSTR ) stack.top - 1, stack.end - stack.top, NULL );
+
+    std_log_msg_t msg;
+    msg.scope = scope;
+    msg.payload = buffer;
+    msg.level = std_log_level_error_m;
+    std_log_print ( msg );
+#else
+    // TODO
+#endif
 }

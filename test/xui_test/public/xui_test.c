@@ -62,6 +62,7 @@ typedef struct {
 
 static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    xg_resource_cmd_buffer_h resource_cmd_buffer = node_args->resource_cmd_buffer;
     uint64_t key = node_args->base_key;
 
     xf_ui_pass_args_t* args = ( xf_ui_pass_args_t* ) user_args;
@@ -83,6 +84,7 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
         params.device = args->device;
         params.workload = args->xg_workload;
         params.cmd_buffer = cmd_buffer;
+        params.resource_cmd_buffer = resource_cmd_buffer;
         params.key = key;
         params.render_target_format = xg_format_b8g8r8a8_unorm_m;
         params.viewport.width = args->resolution_x;
@@ -154,8 +156,8 @@ static void xui_test ( void ) {
         fs_file_h font_file = fs->open_file ( "assets/ProggyVector-Regular.ttf", fs_file_read_m );
         fs_file_info_t font_file_info;
         fs->get_file_info ( &font_file_info, font_file );
-        std_alloc_t font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
-        fs->read_file ( NULL, font_data_alloc.buffer, font_file );
+        void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
+        fs->read_file ( font_data_alloc, font_file_info.size, font_file );
 
         xui_font_params_t font_params;
         font_params.xg_device = device;
@@ -163,7 +165,7 @@ static void xui_test ( void ) {
         font_params.first_char_code = xui_font_char_ascii_base_m;
         font_params.char_count = xui_font_char_ascii_count_m;
         font_params.outline = false;
-        font = xui->create_font ( font_data_alloc.buffer, &font_params );
+        font = xui->create_font ( std_buffer ( font_data_alloc, font_file_info.size ), &font_params );
     }
 
     // create ui entities
@@ -196,7 +198,8 @@ static void xui_test ( void ) {
         node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
         node_params.presentable_texture = swapchain_multi_texture;
         node_params.execute_routine = ui_pass;
-        node_params.user_args = &ui_node_args;
+        node_params.user_args = std_buffer_m ( &ui_node_args );
+        node_params.copy_args = false;
         std_str_copy_m ( node_params.debug_name, "ui" );
         node_params.debug_color = xg_debug_region_color_green_m;
         node_params.key_space_size = 128;
@@ -332,15 +335,15 @@ static void xui_test ( void ) {
 #endif
 
     //const char* ui_select_items[] = {"qwe", "asd", "zxc"};
-    std_alloc_t select_alloc = std_virtual_heap_alloc ( 128, 8 );
+    void* select_alloc = std_virtual_heap_alloc ( 128, 8 );
     {
-        std_stack_t stack = std_stack ( select_alloc.buffer );
-        char** p1 = std_stack_push_m ( &stack, char* );
-        char** p2 = std_stack_push_m ( &stack, char* );
-        char** p3 = std_stack_push_m ( &stack, char* );
-        char* s1 = std_stack_push_array_m ( &stack, char, 8 );
-        char* s2 = std_stack_push_array_m ( &stack, char, 8 );
-        char* s3 = std_stack_push_array_m ( &stack, char, 8 );
+        std_stack_t stack = std_stack ( select_alloc, 128 );
+        char** p1 = std_stack_alloc_m ( &stack, char* );
+        char** p2 = std_stack_alloc_m ( &stack, char* );
+        char** p3 = std_stack_alloc_m ( &stack, char* );
+        char* s1 = std_stack_alloc_array_m ( &stack, char, 8 );
+        char* s2 = std_stack_alloc_array_m ( &stack, char, 8 );
+        char* s3 = std_stack_alloc_array_m ( &stack, char, 8 );
         std_str_copy_m ( s1, "qwe" );
         std_str_copy_m ( s2, "asd" );
         std_str_copy_m ( s3, "zxc" );
@@ -351,7 +354,7 @@ static void xui_test ( void ) {
     xui_select_state_t ui_select = xui_select_state_m (
         .width = 100,
         .height = 20,
-        .items = ( const char** ) select_alloc.buffer.base,
+        .items = ( const char** ) select_alloc,
         .item_count = 3,
         .item_idx = 0,
         .font = font,

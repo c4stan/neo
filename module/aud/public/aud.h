@@ -1,7 +1,6 @@
 #pragma once
 
 #include <std_module.h>
-#include <std_buffer.h>
 #include <std_queue.h>
 
 #define aud_module_name_m aud
@@ -51,7 +50,7 @@ typedef struct {
     bool ( *activate_device ) ( aud_device_h device, const aud_device_params_t* params );
     bool  ( *deactivate_device ) ( aud_device_h deivce );
 
-    void ( *play ) ( aud_device_h device, std_buffer_t buffer );
+    void ( *play ) ( aud_device_h device, void* data, size_t size );
 
     aud_source_h ( *create_source ) ( const aud_source_params_t* params );
     void ( *feed_source ) ( aud_source_h source, const void* data, uint64_t size );

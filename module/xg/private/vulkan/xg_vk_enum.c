@@ -321,7 +321,7 @@ VkLogicOp xg_logic_op_to_vk ( xg_blend_logic_op_e op ) {
     }
 }
 
-VkBufferUsageFlags  xg_buffer_usage_to_vk ( xg_buffer_usage_f usage ) {
+VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_f usage ) {
     VkBufferUsageFlags flags = 0;
 
     if ( usage & xg_buffer_usage_copy_dest_m ) {
@@ -354,6 +354,14 @@ VkBufferUsageFlags  xg_buffer_usage_to_vk ( xg_buffer_usage_f usage ) {
 
     if ( usage & xg_buffer_usage_vertex_buffer_m ) {
         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    }
+
+    if ( usage & xg_vk_buffer_usage_device_addressed_m ) {
+        flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    }
+
+    if ( usage & xg_vk_buffer_usage_raytrace_geometry_m ) {
+        flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     }
 
     return flags;

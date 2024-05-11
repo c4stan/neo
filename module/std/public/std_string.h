@@ -72,7 +72,7 @@ size_t std_str_count ( const char* str, const char* token );
 size_t std_size_to_str_approx ( char* dest, size_t cap, size_t size_value );
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value );
 
-void std_str_append ( char* dest, std_array_t* array, const char* source );
+//void std_str_append ( char* dest, std_array_t* array, const char* source );
 
 uint32_t std_str_hash_32 ( const char* str );
 uint64_t std_str_hash_64 ( const char* str );

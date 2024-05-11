@@ -11,10 +11,8 @@ static xui_workload_state_t* xui_workload_state;
 void xui_workload_load ( xui_workload_state_t* state ) {
     xui_workload_state = state;
 
-    std_alloc_t workloads_alloc = std_virtual_heap_alloc_array_m ( xui_workload_t, xui_workload_max_workloads_m );
-    xui_workload_state->workloads_memory_handle = workloads_alloc.handle;
-    xui_workload_state->workloads_array = ( xui_workload_t* ) workloads_alloc.buffer.base;
-    xui_workload_state->workloads_freelist = std_freelist_array_m ( xui_workload_state->workloads_array, xui_workload_max_workloads_m );
+    xui_workload_state->workloads_array = std_virtual_heap_alloc_array_m ( xui_workload_t, xui_workload_max_workloads_m );
+    xui_workload_state->workloads_freelist = std_freelist_m ( xui_workload_state->workloads_array, xui_workload_max_workloads_m );
     xui_workload_state->workloads_count = 0;
 
     // TODO have xg provide some default null textures, similar to default samplers
@@ -26,7 +24,7 @@ void xui_workload_reload ( xui_workload_state_t* state ) {
 }
 
 void xui_workload_unload ( void ) {
-    std_virtual_heap_free ( xui_workload_state->workloads_memory_handle );
+    std_virtual_heap_free ( xui_workload_state->workloads_array );
 
     // TODO destroy null_texture
 }
@@ -372,7 +370,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     }
 
     // delete buffer
-    xg->cmd_destroy_buffer ( flush_params->cmd_buffer, vertex_buffer_handle, xg_resource_cmd_buffer_time_workload_complete_m );
+    xg->cmd_destroy_buffer ( flush_params->resource_cmd_buffer, vertex_buffer_handle, xg_resource_cmd_buffer_time_workload_complete_m );
 
     // queue up the workload
 #if 0

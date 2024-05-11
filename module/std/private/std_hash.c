@@ -2,7 +2,6 @@
 
 #include <std_compiler.h>
 #include <std_log.h>
-#include <std_platform.h>
 
 // ------------------------------------------------------------------------------------------------------
 // Hash
@@ -390,7 +389,7 @@ uint64_t std_hash_metro_end ( std_hash_metro_state_t* metro_state ) {
 // ------------------------------------------------------------------------------------------------------
 // Map
 // ------------------------------------------------------------------------------------------------------
-
+#if 0
 std_map_t std_map ( std_buffer_t keys, std_buffer_t payloads, size_t key_stride, size_t payload_stride,
                     std_map_hash_f* hash, void* hash_arg, std_map_cmp_f* cmp, void* cmp_arg ) {
     std_map_t map;
@@ -408,14 +407,6 @@ std_map_t std_map ( std_buffer_t keys, std_buffer_t payloads, size_t key_stride,
     size_t payloads_cap = payloads.size / payload_stride;
     size_t min_cap = std_min ( keys_cap, payloads_cap );
     size_t cap = std_pow2_round_down ( min_cap );
-
-    if ( keys_cap != payloads_cap ) {
-        std_log_warn_m ( "Map keys and payloads buffers have different capacities, using the lower one." );
-    }
-
-    if ( cap != min_cap ) {
-        std_log_warn_m ( "Map capacity is not a power of two, rounding it down." );
-    }
 
     std_assert_m ( cap > 0 );
     map.mask = cap - 1;
@@ -583,23 +574,19 @@ void std_map_clear ( std_map_t* map ) {
     map->pop = 0;
     std_mem_set ( map->keys, ( map->mask + 1 ) * map->key_stride, 0xff );
 }
-
+#endif
 // ======================================================================================= //
 //                                     H A S H   M A P
 // ======================================================================================= //
 
-std_hash_map_t std_hash_map ( std_buffer_t hashes, std_buffer_t payloads ) {
+std_hash_map_t std_hash_map ( uint64_t* hashes, uint64_t* payloads, size_t capacity ) {
     std_hash_map_t map;
-    map.hashes = ( uint64_t* ) hashes.base;
-    map.payloads = ( uint64_t* ) payloads.base;
+    map.hashes = hashes;
+    map.payloads = payloads;
     map.count = 0;
+    map.mask = capacity - 1;
 
-    size_t min_cap = std_min ( hashes.size, payloads.size ) / sizeof ( uint64_t );
-    size_t cap = std_pow2_round_down ( min_cap );
-
-    map.mask = cap - 1;
-
-    for ( size_t i = 0; i < cap; ++i ) {
+    for ( size_t i = 0; i < capacity; ++i ) {
         map.hashes[i] = UINT64_MAX;
     }
 
@@ -662,11 +649,52 @@ uint64_t* std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ) {
     return NULL;
 }
 
-bool std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ) {
+static bool std_hash_map_remove_at_idx ( std_hash_map_t* map, size_t idx ) {
     // Load
     size_t      mask = map->mask;
     uint64_t*   hashes = map->hashes;
     uint64_t*   payloads = map->payloads;
+
+    // On remove we try to move up all items that follow the removed one until an empty slot
+    // is encountered. The rule that all elements can be accessed by hash lookup + linear probing
+    // must remain valid.
+    size_t next_idx = idx;
+
+    // This is just to ensure that at most we go through all elements in the map once.
+    for ( size_t i = 0; i < mask + 1; ++i ) {
+        next_idx = ( next_idx + 1 ) & mask;
+        uint64_t next_hash = hashes[next_idx];
+
+        // If next element is invalid, no more moving necessary. Can return.
+        if ( next_hash == UINT64_MAX ) {
+            hashes[idx] = UINT64_MAX;
+            --map->count;
+            return true;
+        }
+
+        // Check if next wants to move up.
+        uint64_t next_ideal_idx = next_hash & mask;
+        uint64_t after_swap_cost = std_ring_distance_u64 ( next_ideal_idx, idx, mask + 1 );
+        uint64_t curr_cost = std_ring_distance_u64 ( next_ideal_idx, next_idx, mask + 1 );
+
+        if ( after_swap_cost < curr_cost ) {
+            hashes[idx] = next_hash;
+            payloads[idx] = payloads[next_idx];
+            // After swap, cell idx is now valid and cell next_idx is invalid, and the remove algorithm continues on next_idx.
+            i += std_ring_distance_u64 ( idx, next_idx, mask + 1 );
+            idx = next_idx;
+        }
+    }
+
+    // Execution should reach this only when removing an item from a completely full map
+    return true;
+}
+
+bool std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ) {
+    // Load
+    size_t      mask = map->mask;
+    uint64_t*   hashes = map->hashes;
+    //uint64_t*   payloads = map->payloads;
 
     // Compute idx
     size_t      idx = hash & mask;
@@ -676,7 +704,8 @@ bool std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ) {
         uint64_t idx_hash = hashes[idx];
 
         if ( idx_hash == hash ) {
-            goto remove;
+            //goto remove;
+            return std_hash_map_remove_at_idx ( map, idx );
         } else if ( idx_hash == UINT64_MAX ) {
             return false;
         } else {
@@ -686,6 +715,7 @@ bool std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ) {
 
     return false;
 
+#if 0
 remove: {
         // On remove we try to move up all items that follow the removed one until an empty slot
         // is encountered. The rule that all elements can be accessed by hash lookup + linear probing
@@ -721,21 +751,23 @@ remove: {
 
     // Execution should reach this only when removing an item from a completely full map
     return true;
+#endif    
+}
+
+bool std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t* payload ) {
+    size_t idx = payload - map->payloads;
+    return std_hash_map_remove_at_idx ( map, idx );
 }
 
 // ------
 
-std_hash_set_t std_hash_set ( std_buffer_t hashes ) {
+std_hash_set_t std_hash_set ( uint64_t* hashes, size_t capacity ) {
     std_hash_set_t set;
-    set.hashes = ( uint64_t* ) hashes.base;
+    set.hashes = hashes;
     set.count = 0;
+    set.mask = capacity - 1;
 
-    size_t min_cap = hashes.size / sizeof ( uint64_t );
-    size_t cap = std_pow2_round_down ( min_cap );
-
-    set.mask = cap - 1;
-
-    for ( size_t i = 0; i < cap; ++i ) {
+    for ( size_t i = 0; i < capacity; ++i ) {
         set.hashes[i] = UINT64_MAX;
     }
 

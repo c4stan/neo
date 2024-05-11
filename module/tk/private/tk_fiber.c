@@ -83,10 +83,10 @@ void tk_fiber_init ( void ) {
     tk_fiber_state.fiber_contexts = fiber_contexts_array;
     tk_fiber_state.workloads = workloads_array;
 
-    tk_fiber_state.dispatch_queue = std_queue_shared ( std_static_buffer_m ( dispatch_queue_array ) );
-    tk_fiber_state.ready_fiber_contexts = std_queue_mpmc_32 ( std_static_buffer_m ( ready_fiber_contexts_queue_array ) );
-    tk_fiber_state.free_fiber_contexts = std_queue_mpmc_32 ( std_static_buffer_m ( free_fiber_contexts_queue_array ) );
-    tk_fiber_state.free_workloads = std_queue_mpmc_32 ( std_static_buffer_m ( free_workloads_queue_array ) );
+    tk_fiber_state.dispatch_queue = std_queue_shared ( dispatch_queue_array, sizeof ( dispatch_queue_array ) );
+    tk_fiber_state.ready_fiber_contexts = std_queue_mpmc_32 ( ready_fiber_contexts_queue_array, sizeof ( ready_fiber_contexts_queue_array ) );
+    tk_fiber_state.free_fiber_contexts = std_queue_mpmc_32 ( free_fiber_contexts_queue_array, sizeof ( free_fiber_contexts_queue_array ) );
+    tk_fiber_state.free_workloads = std_queue_mpmc_32 ( free_workloads_queue_array, sizeof ( free_workloads_queue_array ) );
 
     std_mem_zero_m ( thread_contexts_array );
     std_mem_zero_m ( workloads_array );

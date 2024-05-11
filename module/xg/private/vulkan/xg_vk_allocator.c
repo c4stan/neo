@@ -14,10 +14,8 @@ static xg_vk_allocator_state_t* xg_vk_allocator_state;
 void xg_vk_allocator_load ( xg_vk_allocator_state_t* state ) {
     xg_vk_allocator_state = state;
 
-    std_alloc_t allocations_alloc = std_virtual_heap_alloc_array_m ( xg_vk_alloc_t, xg_vk_max_allocations_m );
-    state->allocations_memory_handle = allocations_alloc.handle;
-    state->allocations_array = ( xg_vk_alloc_t* ) allocations_alloc.buffer.base;
-    state->allocations_freelist = std_freelist ( allocations_alloc.buffer, sizeof ( xg_vk_alloc_t ) );
+    state->allocations_array = std_virtual_heap_alloc_array_m ( xg_vk_alloc_t, xg_vk_max_allocations_m );
+    state->allocations_freelist = std_freelist_m ( state->allocations_array, xg_vk_max_allocations_m );
     
     for ( uint32_t i = 0; i < xg_vk_max_active_devices_m; ++i ) {
         for ( uint32_t j = 0; j < xg_memory_type_count_m; ++j ) {
@@ -34,7 +32,7 @@ void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state ) {
 }
 
 void xg_vk_allocator_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_allocator_state->allocations_memory_handle );
+    std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
     std_mutex_deinit ( &xg_vk_allocator_state->allocations_mutex );
 }
 
@@ -231,16 +229,14 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
     std_mutex_init ( &heap->mutex );
 
     uint64_t segment_count = std_div_ceil ( size, xg_vk_allocator_tlsf_min_segment_size_m );
-    std_alloc_t alloc = std_virtual_heap_alloc_array_m ( xg_vk_allocator_tlsf_segment_t, segment_count );
-    heap->segments_handle = alloc.handle;
-    heap->segments = ( xg_vk_allocator_tlsf_segment_t* ) alloc.buffer.base;
+    heap->segments = std_virtual_heap_alloc_array_m ( xg_vk_allocator_tlsf_segment_t, segment_count );
 
     for (uint32_t i = 0; i < segment_count; ++i ) {
         std_mem_zero_m ( &heap->segments[i] );
         heap->segments[i].retired = true;
     }
 
-    heap->unused_segments_freelist = std_freelist(alloc.buffer, sizeof(xg_vk_allocator_tlsf_segment_t));
+    heap->unused_segments_freelist = std_freelist_m ( heap->segments, segment_count );
     heap->unused_segments_count = segment_count;
 
     heap->gpu_alloc = xg_vk_allocator_simple_alloc(device, size, type);

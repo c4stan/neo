@@ -13,7 +13,7 @@ typedef struct {
 } se_pending_query_t;
 
 typedef struct {
-    std_alloc_t result_alloc;
+    //std_alloc_t result_alloc;
     se_query_result_t result;
     uint32_t gen;
 } se_resolved_query_t;
@@ -64,10 +64,8 @@ se_query_h se_query_create ( const se_query_params_t* params ) {
 void se_query_resolve ( void ) {
     // Extract alive entities
     // TODO better allocation method
-    std_alloc_t component_flags_alloc = std_virtual_alloc ( sizeof ( se_component_flags_t ) * se_max_entities_m );
-    std_alloc_t entity_handles_alloc = std_virtual_alloc ( sizeof ( se_entity_h ) * se_max_entities_m );
-    se_component_flags_t* flags = ( se_component_flags_t* ) component_flags_alloc.buffer.base;
-    se_entity_h* entities = ( se_entity_h* ) entity_handles_alloc.buffer.base;
+    se_component_flags_t* flags = std_virtual_heap_alloc_array_m ( se_component_flags_t, se_max_entities_m );
+    se_entity_h* entities = std_virtual_heap_alloc_array_m ( se_entity_h, se_max_entities_m );
     size_t entity_count = se_entity_extract ( flags, entities );
 
     std_mutex_lock ( &se_query_state.resolved_queries_mutex );
@@ -75,6 +73,8 @@ void se_query_resolve ( void ) {
     if ( se_query_state.resolved_query_count != 0 ) {
         std_log_error_m ( "Need to dispose of previously resolved queries before triggering another resolve" );
         std_mutex_unlock ( &se_query_state.resolved_queries_mutex );
+        std_virtual_heap_free ( flags );
+        std_virtual_heap_free ( entities );
         return;
     }
 
@@ -85,10 +85,10 @@ void se_query_resolve ( void ) {
         se_resolved_query_t* resolved_query = &se_query_state.resolved_queries[query_it];
 
         // TODO reserve virtual memory and only commit as many chunks as needed
-        resolved_query->result_alloc = std_virtual_alloc ( std_align ( sizeof ( se_entity_h ) * entity_count, std_virtual_page_size() ) );
+        se_entity_h* result_entities = std_virtual_heap_alloc_array_m ( se_entity_h, entity_count );
 
         // TODO vectorize
-        se_entity_h* result_entities = ( se_entity_h* ) resolved_query->result_alloc.buffer.base;
+        //se_entity_h* result_entities = ( se_entity_h* ) resolved_query->result_alloc.buffer.base;
         size_t result_entity_count = 0;
 
         for ( size_t entity_it = 0; entity_it < entity_count; ++entity_it ) {
@@ -119,8 +119,8 @@ void se_query_resolve ( void ) {
 
     std_mutex_unlock ( &se_query_state.resolved_queries_mutex );
 
-    std_virtual_free ( component_flags_alloc.handle );
-    std_virtual_free ( entity_handles_alloc.handle );
+    std_virtual_heap_free ( flags );
+    std_virtual_heap_free ( entities );
 }
 
 void se_query_results_dispose ( void ) {
@@ -131,7 +131,7 @@ void se_query_results_dispose ( void ) {
     // TODO avoid freeing and reallocating this every time?
     for ( size_t i = 0; i < count; ++i ) {
         se_resolved_query_t* query = &se_query_state.resolved_queries[i];
-        std_virtual_free ( query->result_alloc.handle );
+        std_virtual_heap_free ( query->result.entities );
         ++query->gen;
     }
 

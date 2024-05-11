@@ -74,17 +74,14 @@ const xg_vk_cpu_queue_event_t* xg_vk_cpu_queue_event_get ( xg_cpu_queue_event_h 
 */
 
 typedef struct {
-    std_memory_h gpu_events_memory_handle;
     xg_vk_gpu_event_t* gpu_events_array;
     xg_vk_gpu_event_t* gpu_events_freelist;
     std_mutex_t gpu_events_mutex;
 
-    std_memory_h gpu_queue_events_memory_handle;
     xg_vk_gpu_queue_event_t* gpu_queue_events_array;
     xg_vk_gpu_queue_event_t* gpu_queue_events_freelist;
     std_mutex_t gpu_queue_events_mutex;
 
-    std_memory_h cpu_queue_events_memory_handle;
     xg_vk_cpu_queue_event_t* cpu_queue_events_array;
     xg_vk_cpu_queue_event_t* cpu_queue_events_freelist;
     std_mutex_t cpu_queue_events_mutex;

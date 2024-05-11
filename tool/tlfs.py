@@ -1,7 +1,8 @@
 import math
 
 def convert_size(size_bytes):
-    return size_bytes
+    aligned = size_bytes % 16 == 0
+    return "%s %s" % (size_bytes, aligned)
     if size_bytes == 0:
         return "0B"
     size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
@@ -10,7 +11,7 @@ def convert_size(size_bytes):
     s = round(size_bytes / p, 2)
     return "%s %s" % (s, size_name[i])
 
-min_x = 10
+min_x = 7
 max_x = 36
 buckets = 16
 

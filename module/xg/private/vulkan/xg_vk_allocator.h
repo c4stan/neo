@@ -101,7 +101,6 @@ typedef struct {
     std_mutex_t mutex;
     xg_alloc_t gpu_alloc;
     uint64_t allocated_size;
-    std_memory_h segments_handle;
     xg_vk_allocator_tlsf_segment_t* segments;
     xg_vk_allocator_tlsf_segment_t* unused_segments_freelist;
     uint64_t unused_segments_count;
@@ -120,7 +119,6 @@ typedef struct {
 } xg_vk_allocator_device_context_t;
 
 typedef struct {
-    std_memory_h allocations_memory_handle;
     xg_vk_alloc_t* allocations_array;
     xg_vk_alloc_t* allocations_freelist;
     std_mutex_t allocations_mutex;

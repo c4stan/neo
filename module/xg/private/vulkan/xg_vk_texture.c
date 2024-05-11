@@ -13,10 +13,8 @@ static xg_vk_texture_state_t* xg_vk_texture_state;
 void xg_vk_texture_load ( xg_vk_texture_state_t* state ) {
     xg_vk_texture_state = state;
 
-    std_alloc_t textures_alloc = std_virtual_heap_alloc_array_m ( xg_vk_texture_t, xg_vk_max_textures_m );
-    xg_vk_texture_state->textures_memory_handle = textures_alloc.handle;
-    xg_vk_texture_state->textures_array = ( xg_vk_texture_t* ) textures_alloc.buffer.base;
-    xg_vk_texture_state->textures_freelist = std_freelist ( textures_alloc.buffer, sizeof ( xg_vk_texture_t ) );
+    xg_vk_texture_state->textures_array = std_virtual_heap_alloc_array_m ( xg_vk_texture_t, xg_vk_max_textures_m );
+    xg_vk_texture_state->textures_freelist = std_freelist_m ( xg_vk_texture_state->textures_array, xg_vk_max_textures_m );
     std_mutex_init ( &xg_vk_texture_state->textures_mutex );
 }
 
@@ -25,13 +23,13 @@ void xg_vk_texture_reload ( xg_vk_texture_state_t* state ) {
 }
 
 void xg_vk_texture_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_texture_state->textures_memory_handle );
+    std_virtual_heap_free ( xg_vk_texture_state->textures_array );
     std_mutex_deinit ( &xg_vk_texture_state->textures_mutex );
 }
 
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params ) {
     xg_texture_h texture_handle = xg_texture_reserve ( params );
-    std_assert_m ( xg_texture_alloc ( texture_handle ) );
+    std_verify_m ( xg_texture_alloc ( texture_handle ) );
 
     return texture_handle;
 }
@@ -103,12 +101,9 @@ void xg_texture_create_view ( xg_vk_texture_view_t* view, xg_texture_h texture_h
         if ( texture->params.debug_name[0] ) {
             char buffer[xg_debug_name_size_m + 16] = {0};
             std_stack_t stack = std_static_stack_m ( buffer );
-            std_stack_push_append_string ( &stack, texture->params.debug_name );
-            std_stack_push_append_string ( &stack, "view" );
-            //std_array_t array = std_static_array_m ( buffer );
-            //std_str_append ( buffer, &array, texture->params.debug_name );
-            //std_str_append ( buffer, &array, " view" ); // TODO add more info
-
+            std_stack_string_append ( &stack, texture->params.debug_name );
+            std_stack_string_append ( &stack, "view" );
+            
             VkDebugUtilsObjectNameInfoEXT debug_name;
             debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
             debug_name.pNext = NULL;
@@ -187,11 +182,8 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     if ( params->view_access == xg_texture_view_access_default_only_m ) {
         std_mem_zero_m ( &texture->external_views );
     } else if ( params->view_access == xg_texture_view_access_separate_mips_m ) {
-        // TODO allocate from a specialized pool, don't use the generic virtual heap
-        std_alloc_t mips_alloc = std_virtual_heap_alloc_array_m ( xg_vk_texture_view_t, params->mip_levels );
-        texture->external_views.mips.handle = mips_alloc.handle;
-        std_mem_zero ( mips_alloc.buffer.base, mips_alloc.buffer.size );
-        texture->external_views.mips.array = ( xg_vk_texture_view_t* ) mips_alloc.buffer.base;
+        texture->external_views.mips.array = std_virtual_heap_alloc_array_m ( xg_vk_texture_view_t, params->mip_levels );
+        std_mem_zero ( texture->external_views.mips.array, sizeof ( xg_vk_texture_view_t ) * params->mip_levels );
     } else if ( params->view_access == xg_texture_view_access_dynamic_m ) {
         std_not_implemented_m();
     }
@@ -334,7 +326,7 @@ bool xg_texture_destroy ( xg_texture_h texture_handle ) {
             vkDestroyImageView ( device->vk_handle, texture->external_views.mips.array[i].vk_handle, NULL );
         }
 
-        std_virtual_heap_free ( texture->external_views.mips.handle );
+        std_virtual_heap_free ( texture->external_views.mips.array );
     }
 
     if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {

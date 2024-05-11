@@ -7,10 +7,8 @@ static rv_visible_state_t* rv_visible_state;
 void rv_visible_load ( rv_visible_state_t* state ) {
     rv_visible_state = state;
 
-    std_alloc_t visible_alloc = std_virtual_heap_alloc_array_m ( rv_visible_t, rv_visible_max_visibles_m );
-    rv_visible_state->memory_handle = visible_alloc.handle;
-    rv_visible_state->visible_array = ( rv_visible_t* ) visible_alloc.buffer.base;
-    rv_visible_state->visible_freelist = std_freelist ( visible_alloc.buffer, sizeof ( rv_visible_t ) );
+    rv_visible_state->visible_array = std_virtual_heap_alloc_array_m ( rv_visible_t, rv_visible_max_visibles_m );
+    rv_visible_state->visible_freelist = std_freelist_m ( rv_visible_state->visible_array, rv_visible_max_visibles_m );
     std_mutex_init ( &rv_visible_state->visible_mutex );
 }
 
@@ -19,7 +17,7 @@ void rv_visible_reload ( rv_visible_state_t* state ) {
 }
 
 void rv_visible_unload ( void ) {
-    std_virtual_heap_free ( rv_visible_state->memory_handle );
+    std_virtual_heap_free ( rv_visible_state->visible_array );
     std_mutex_deinit ( &rv_visible_state->visible_mutex );
 }
 

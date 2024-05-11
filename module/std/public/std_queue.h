@@ -1,7 +1,7 @@
 #pragma once
 
 #include <std_compiler.h>
-#include <std_buffer.h>
+#include <std_allocator.h>
 #include <std_log.h>
 #include <std_byte.h>
 
@@ -16,10 +16,11 @@ typedef struct {
     size_t top;
     size_t bot;
     size_t mask;        // Equals to (size - 1). Size must be pow2.
-} std_queue_local_t;
+} std_queue_local_t;    // TODO rename to std_queue_t
 
+// TODO base the implementation on std_ring_t
 // The implementation wraps the stores when the queue buffer wraps around. In that case alignment is not guaranteed.
-std_queue_local_t   std_queue_local             ( std_buffer_t buffer );
+std_queue_local_t   std_queue_local             ( void* base, size_t size );
 void                std_queue_local_clear       ( std_queue_local_t* queue );
 size_t              std_queue_local_size        ( const std_queue_local_t* queue );
 size_t              std_queue_local_used_size   ( const std_queue_local_t* queue );
@@ -73,18 +74,20 @@ std_static_align_m ( std_l1d_size_m ) typedef struct {
     https://fastcompression.blogspot.com/2015/08/accessing-unaligned-memory.html
 */
 
-std_queue_shared_t  std_queue_shared            ( std_buffer_t buffer );
+std_queue_shared_t  std_queue_shared            ( void* base, size_t size );
 void                std_queue_shared_clear      ( std_queue_shared_t* queue );
 size_t              std_queue_shared_size       ( std_queue_shared_t* queue );
 size_t              std_queue_shared_used_size  ( std_queue_shared_t* queue );
 
 const void*         std_queue_shared_sc_peek    ( std_queue_shared_t* queue );
 
+#define std_static_queue_shared( array ) std_queue_shared ( array, sizeof ( array ) )
+
 // TODO implement peek for sc ?
 
 // SPSC queue API never fails, because it assumes that the caller checks free/used size before calling push/pop.
 // It also doesn't store any additional info in the queue other than the payload, because no publish flag is necessary.
-// If dynamic payload size is required the used can implement that anyway using a 2-message protocol, where the first
+// If dynamic payload size is required the user can implement that anyway using a 2-message protocol, where the first
 // push is of constant size and contains the size of the second. Since there's only 1 producer and 1 consumer, this is
 // thread safe.
 void                std_queue_spsc_push         ( std_queue_shared_t* queue, const void* item, size_t size );
@@ -116,12 +119,12 @@ size_t              std_queue_mpmc_pop_move     ( std_queue_shared_t* queue, voi
 #define             std_queue_shared_32_reserved_value_m 0xffffffff
 #define             std_queue_shared_64_reserved_value_m 0xffffffffffffffff
 
-std_queue_shared_t  std_queue_mpmc_32               ( std_buffer_t buffer );
+std_queue_shared_t  std_queue_mpmc_32               ( void* base, size_t size );
 bool                std_queue_mpmc_push_32          ( std_queue_shared_t* queue, const void* item );
 bool                std_queue_mpmc_pop_discard_32   ( std_queue_shared_t* queue );
 bool                std_queue_mpmc_pop_move_32      ( std_queue_shared_t* queue, void* dest );
 
-std_queue_shared_t  std_queue_mpmc_64               ( std_buffer_t buffer );
+std_queue_shared_t  std_queue_mpmc_64               ( void* base, size_t size );
 bool                std_queue_mpmc_push_64          ( std_queue_shared_t* queue, const void* item );
 bool                std_queue_mpmc_pop_discard_64   ( std_queue_shared_t* queue );
 bool                std_queue_mpmc_pop_move_64      ( std_queue_shared_t* queue, void* dest );

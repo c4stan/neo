@@ -89,6 +89,7 @@ def print_help():
     print('\t\t' + Color.OKBLUE + '-opt' + Color.ENDC + ' to enable optimization flags')
     print('\t\t' + Color.OKBLUE + '-d' + Color.ENDC + ' to enable permissive warnings')
     print('\t' + Color.OKGREEN + 'makegen' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run makegen on a workspace')
+    print('\t' + Color.OKGREEN + 'clear' + Color.ENDC + ' to clear the console')
     print('\t' + Color.OKGREEN + 'clean' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to clean a workspace')
     print('\t' + Color.OKGREEN + 'run' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run an app executable')
     print('\t' + Color.OKGREEN + 'debug' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to debug an app executable using Visual Studio')
@@ -98,9 +99,9 @@ def print_help():
     print('\t' + Color.OKGREEN + 'create' + Color.OKBLUE + ' <root> <name>' + Color.ENDC + ' to create a new workspace under the root')
     #print('\t' + Color.OKGREEN + 'gitinit' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to initialize the local git repo for a workspace')
     #print('\t' + Color.OKGREEN + 'githublink' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to link the local git repo of a workspace to github')
-    print('\t' + Color.OKGREEN + 'gitpush' + Color.OKBLUE + ' <name> <comment>' + Color.ENDC + ' to git push local changes')
-    print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to git pull remote changes')
-    print('\t' + Color.OKGREEN + 'gitstatus' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to get the git status')
+    print('\t' + Color.OKGREEN + 'gitpush' + Color.OKBLUE + ' <comment>' + Color.ENDC + ' to git push local changes')
+    print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + Color.ENDC + ' to git pull remote changes')
+    print('\t' + Color.OKGREEN + 'gitstatus' + Color.OKBLUE + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
     print('')
 
@@ -271,6 +272,7 @@ def build_workspace(name, flags):
     generator = makegen.Generator(get_index(), name, build_flags)
     generator.load()
     generator.generate()
+    push_path(path + '/' + generator.get_build_path())
     make_target = 'all'
     if '-r' in flags:
         make_target = 'reload'
@@ -280,6 +282,7 @@ def build_workspace(name, flags):
         print('Building...')
         cmd = 'make ' + make_flags + ' ' + make_target
     result = os.system(cmd)
+    pop_path()
     pop_path()
     if result == 0:
         changelist = generator.gather_dlls()
@@ -303,7 +306,7 @@ def clear_workspace(name):
     for workspace in workspaces:
         path = get_workspace_path(workspace)
         push_path(path)
-        deletes = ['output', 'modules']
+        deletes = ['output', 'modules', 'submodules', 'build']
         for delete in deletes:
             delete_path = delete
             if os.path.exists(delete_path):
@@ -378,10 +381,10 @@ def run_app(name, flags, params):
         config = 'release'
 
     if makedef['output'] == ['app']:
-        cmd = './modules/' + config + '/std_launcher.exe'
+        cmd = './submodules/' + config + '/std_launcher.exe'
         SUBPROCESS = subprocess.Popen([cmd, name])
     else:
-        cmd = './output/' + config + '/' + name + '.exe'
+        cmd = './build/' + config + '/output/' + name + '.exe'
         SUBPROCESS = subprocess.Popen([cmd] + params)
     pop_path()
 
@@ -399,10 +402,10 @@ def debug_app(name, flags):
         config = 'release'
     if platform.system() == 'Windows':
         if makedef['output'] == ['app']:
-            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'modules\\' + config + '\\' + "std_launcher" + '.exe' + ' ' + name
+            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'submodules\\' + config + '\\' + "std_launcher" + '.exe' + ' ' + name
         else:
             #cmd = 'start ..\\remedybg.exe ' + 'output\\debug\\' + name + '.exe'
-            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'output\\' + config + '\\' + name + '.exe'
+            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\' + name + '.exe'
     elif platform.system() == 'Linux':
         # TODD try https://github.com/nakst/gf
         cmd = 'code .'
@@ -424,7 +427,7 @@ def fixup_debug_app(name):
             '"name": "(gdb) Launch",'\
             '"type": "cppdbg",'\
             '"request": "launch",'\
-            '"program": "${workspaceRoot}/output/debug/' + name + '.exe",'\
+            '"program": "${workspaceRoot}/build/debug/output/' + name + '.exe",'\
             '"args": [],'\
             '"stopAtEntry": false,'\
             '"cwd": "${workspaceFolder}",'\
@@ -623,8 +626,11 @@ def git_push(tokens):
         print(Color.FAIL + 'Provide a comment.' + Color.ENDC)
         return
 
+    print('git add .')
     os.system('git add .')
+    print('git commit -m "' + comment + '"')
     os.system('git commit -m "' + comment + '"')
+    print('git push')
     os.system('git push')
 
 def git_pull():
@@ -642,6 +648,9 @@ def make_title(words):
         p = subprocess.Popen(['xclip', '-selection', 'clipboard'], stdin=subprocess.PIPE)
         p.communicate(input=title.strip().encode('ascii'))
 
+def clear_console():
+    os.system('cls')
+
 def parse(string):
     tokens = string.split(' ')
     cmd = tokens[0]
@@ -654,6 +663,8 @@ def parse(string):
         list_workspaces()
     elif cmd == 'build':
         build_workspace(tokens[1], tokens[2:])
+    elif cmd == 'clear' and len(tokens) == 1:
+        clear_console()
     elif cmd == 'clean' or cmd == 'clear':
         clear_workspace(tokens[1])
     elif cmd == 'explorer':
@@ -680,7 +691,7 @@ def parse(string):
     #    git_init_github(tokens[1])
     elif cmd == 'gitpush':
         #git_push_workspace(tokens[1], tokens[2:])
-        git_push(tokens)
+        git_push(tokens[1:])
     elif cmd == 'gitpull':
         #git_pull_workspace(tokens[1])
         git_pull()

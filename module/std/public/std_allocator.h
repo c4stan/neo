@@ -1,7 +1,6 @@
 #pragma once
 
 #include <std_byte.h>
-#include <std_buffer.h>
 #include <std_compiler.h>
 
 /* =========================================================================== *
@@ -122,51 +121,6 @@
 * =========================================================================== */
 
 /*
-    Allocator Interface
-*/
-// TODO rename to std_alloc_h?
-typedef struct {
-    uint64_t id;
-    uint64_t size;
-} std_memory_h;
-
-#define std_null_memory_handle_id_m   UINT64_MAX
-#define std_null_memory_handle_size_m UINT64_MAX
-
-#define std_null_memory_handle_m ( std_memory_h ) { std_null_memory_handle_id_m, std_null_memory_handle_size_m }
-#define std_memory_handle_is_null_m( handle ) ( handle.id == std_null_memory_handle_id_m || handle.size == std_null_memory_handle_size_m )
-
-typedef struct {
-    std_memory_h handle;
-    // TODO flatten this?
-    std_buffer_t buffer;
-} std_alloc_t;
-
-#define std_null_alloc_m ( std_alloc_t ) { std_null_memory_handle_m, { NULL, 0 } }
-
-typedef std_alloc_t ( std_alloc_f )     ( void* allocator, size_t size, size_t align );
-typedef bool        ( std_free_f )      ( void* allocator, std_memory_h handle );
-
-typedef struct {
-    void*           impl;
-    std_alloc_f*    alloc;
-    std_free_f*     free;
-} std_allocator_i;
-
-#define std_null_allocator_m ( std_allocator_i ) { \
-    .impl = NULL, \
-    .alloc = NULL, \
-    .free = NULL, \
-}
-
-#define std_allocator_is_null_m( _allocator ) ( ( (_allocator).impl == NULL ) && ( (_allocator).alloc == NULL ) && ( (_allocator).free == NULL ) )
-
-// TODO remove these?
-#define         std_alloc_m( allocator, size, align )       (allocator)->alloc ( (allocator)->impl, size, align )
-#define         std_alloc_array_m( allocator, type, count ) (allocator)->alloc ( (allocator)->impl, sizeof ( type ) * (count), std_alignof_m ( type ) )
-#define         std_free_m( allocator, handle )             (allocator)->free ( (allocator)->impl, handle )
-
-/*
     Program stack
 */
 #if defined(std_platform_win32_m)
@@ -179,96 +133,138 @@ typedef struct {
 /*
     Virtual memory page allocator
 */
-// Doesn't implement std_allocator_i, as it wouldn't make much sense.
-// Doesn't do any tracking, the caller is expected to.
-// Every reserve size gets padded to be a multiple of page size.
-// std_virtual_alloc is just reserve + map.
-size_t      std_virtual_page_size ( void );
-std_alloc_t std_virtual_alloc     ( size_t size );
-// TODO make these return a std_virtual_buffer_t? unify the 2 apis?
-std_alloc_t std_virtual_reserve   ( size_t size );
-bool        std_virtual_map       ( std_memory_h handle, size_t offset, size_t size );
-bool        std_virtual_unmap     ( std_memory_h handle, size_t offset, size_t size );
-bool        std_virtual_free      ( std_memory_h handle );
+size_t std_virtual_page_size ( void );
 
-std_allocator_i std_virtual_allocator ( void );
+void* std_virtual_alloc ( size_t size );
+void* std_virtual_reserve ( size_t size );
+bool std_virtual_map ( void* begin, void* end ); // begin included, end excluded
+bool std_virtual_unmap ( void* begin, void* end );
+bool std_virtual_free ( void* begin, void* end ); // on Win32 this range must match the entire reserved range
 
 /*
     Virtual heap allocator
-    WARNING: NOT GOOD FOR COMPLEX ALLOCATION PATTERNS
-    Shared first-fit heap allocator that borrows memory pages from the virtual page allocator and uses them to satisfy requests.
-    The implementation is very simple and performs very slow in situations where there's a high number of varying sized
-    allocs and frees happening out of order. It doesn't allocate any extra upfront space (other than the virtual page size)
-    to make later allocations cheaper and all its logic is guarded by a single mutex.
-    Using this over allocating a number of raw virtual pages through the virtual page allocator has the only advantage that
-    unused memory within the page boundary can get reused in later allocations that also go through this allocator, instead of being wasted.
 */
-std_alloc_t std_virtual_heap_alloc ( size_t size, size_t align );
-bool        std_virtual_heap_free ( std_memory_h handle );
-#define     std_virtual_heap_alloc_array_m( type, count ) std_virtual_heap_alloc ( sizeof ( type ) * (count), std_alignof_m ( type ) )
-#define     std_virtual_heap_alloc_m( type ) std_virtual_heap_alloc_array_m(type, 1)
-
-std_allocator_i std_virtual_heap_allocator ( void );
+void*   std_virtual_heap_alloc ( size_t size, size_t align );
+bool    std_virtual_heap_free ( void* ptr );
+#define std_virtual_heap_alloc_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
+#define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
 
 /*
-    Virtual buffer
-    Utility to manage and grow a virtual buffer on request. Internally uses the virtual memory page allocator.
+    Buffer utilities
 */
+// Just a utility struct. Can be used as return value, or to store a memory segment without having to split it into 2 separate fields
 typedef struct {
-    std_memory_h handle;
-    char* base;
-    size_t reserved_size;
-    size_t mapped_size;
-    size_t top;
-} std_virtual_buffer_t;
+    void* base;
+    size_t size;
+} std_buffer_t;
 
-std_virtual_buffer_t    std_virtual_buffer_reserve ( size_t size );
-char*                   std_virtual_buffer_push ( std_virtual_buffer_t* buffer, size_t size );
-void                    std_virtual_buffer_free ( std_virtual_buffer_t* buffer );
+std_buffer_t std_buffer ( void* base, size_t size );
+#define std_buffer_m( item ) std_buffer ( item, sizeof ( *item ) )
+#define std_null_buffer_m ( std_buffer_t ) { NULL, 0 }
 
-/*
-    Stack
-    Simple linear stack. TODO move out of here?
-*/
+// Linear fixed size allocator. Can be manually resized by cloning to a bigger separate stack and freeing the old one. 
 typedef struct {
-    std_buffer_t buffer;
-    size_t top;
+    void* begin;
+    void* top;
+    void* end;
 } std_stack_t;
 
-std_stack_t         std_stack                   ( std_buffer_t buffer );
-char*               std_stack_push              ( std_stack_t* stack, size_t size, size_t align );
-char*               std_stack_push_noalign      ( std_stack_t* stack, size_t size );
-void                std_stack_push_copy         ( std_stack_t* stack, const void* data, size_t size, size_t align );
-void                std_stack_push_copy_noalign ( std_stack_t* stack, const void* data, size_t size );
-void                std_stack_align             ( std_stack_t* stack, size_t align );
-void                std_stack_align_zero        ( std_stack_t* stack, size_t align );
-void                std_stack_pop               ( std_stack_t* stack, size_t size );
-void                std_stack_clear             ( std_stack_t* stack );
-void                std_stack_push_copy_string  ( std_stack_t* stack, const char* str );
-void                std_stack_push_append_string ( std_stack_t* stack, const char* str );
+std_stack_t std_stack ( void* base, size_t size );
+void*       std_stack_alloc ( std_stack_t* buffer, size_t size );
+void*       std_stack_write ( std_stack_t* buffer, const void* data, size_t size );
+bool        std_stack_align ( std_stack_t* buffer, size_t align );
+bool        std_stack_align_zero ( std_stack_t* buffer, size_t align );
+void*       std_stack_alloc_align ( std_stack_t* buffer, size_t size, size_t align );
+void*       std_stack_write_align ( std_stack_t* buffer, const void* data, size_t size, size_t align );
+void        std_stack_clear ( std_stack_t* buffer );
+char*       std_stack_string_copy ( std_stack_t* buffer, const char* std );
+char*       std_stack_string_append ( std_stack_t* buffer, const char* std );
+void        std_stack_free ( std_stack_t* buffer, size_t size );
+void        std_stack_clone ( std_stack_t* from, std_stack_t* to );
 
-std_alloc_t         std_stack_alloc             ( std_stack_t* stack, size_t size, size_t align );
-bool                std_stack_free              ( std_stack_t* stack, std_memory_h memory );
-std_allocator_i     std_stack_allocator         ( std_stack_t* stack );
+#define std_static_stack_m( array ) std_stack ( array, sizeof ( array ) )
+#define std_stack_alloc_array_m( stack, type, count ) ( type* ) std_stack_alloc_align ( stack, sizeof ( type ) * (count), std_alignof_m ( type ) )
+#define std_stack_alloc_m( stack, type ) std_stack_alloc_array_m ( stack, type, 1 )
+#define std_stack_write_noalign_m( stack, data ) std_stack_write ( stack, data, sizeof ( *data ) )
+#define std_stack_array_count_m( stack, type ) ( ( (stack)->top - (stack)->begin ) / sizeof ( type ) )
 
-#define             std_stack_push_m( stack, type )                 ( type* ) std_stack_push ( (stack), sizeof ( type ) , std_alignof_m ( type ) )
-#define             std_stack_push_array_m( stack, type, count )    ( type* ) std_stack_push ( (stack), sizeof ( type ) * (count), std_alignof_m ( type ) )
-#define             std_stack_push_noalign_m( stack, type )         ( type* ) std_stack_push_noalign ( (stack), (data), sizeof ( type ) )
-#define             std_stack_push_noalign_array_m( stack, type, count )  ( type* ) std_stack_push_noalign ( (stack), sizeof ( type ) * (count) )
-#define             std_stack_push_copy_noalign_m( stack, data )    std_stack_push_copy_noalign ( (stack), (data), sizeof ( *(data) ) )
-#define             std_stack_push_copy_noalign_array_m( stack, data, count ) std_stack_push_copy_noalign ( (stack), (data), sizeof ( *(data) ) * (count) )
-#define             std_stack_alloc_array_m( stack, type, count )   std_stack_alloc ( (stack), sizeof ( type ) * (count), std_alignof_m ( type ) )
-#define             std_stack_count_m( stack, type )                ( (stack)->top / sizeof ( type ) )
-#define             std_static_stack_m( buffer ) std_stack ( std_static_buffer_m ( buffer ) )
+// Linear allocator based on virtual memory. The mapped segment will grow until the whore reserved range is full. It will not grow further.
+typedef struct {
+    union {
+        std_stack_t mapped;
+        struct {
+            void* begin;
+            void* top;
+            void* end;
+        };
+    };
+    void* virtual_end;
+} std_virtual_stack_t;
+
+std_virtual_stack_t std_virtual_stack ( void* base, size_t mapped_size, size_t virtual_size );
+std_virtual_stack_t std_virtual_stack_create ( size_t virtual_size );
+void                std_virtual_stack_destroy ( std_virtual_stack_t* stack );
+void*       std_virtual_stack_alloc ( std_virtual_stack_t* buffer, size_t size );
+void*       std_virtual_stack_write ( std_virtual_stack_t* buffer, const void* data, size_t size );
+bool        std_virtual_stack_align ( std_virtual_stack_t* buffer, size_t align );
+bool        std_virtual_stack_align_zero ( std_virtual_stack_t* buffer, size_t align );
+void*       std_virtual_stack_alloc_align ( std_virtual_stack_t* buffer, size_t size, size_t align );
+void*       std_virtual_stack_write_align ( std_virtual_stack_t* buffer, const void* data, size_t size, size_t align );
+void        std_virtual_stack_clear ( std_virtual_stack_t* buffer );
+char*       std_virtual_stack_string_copy ( std_virtual_stack_t* buffer, const char* std );
+char*       std_virtual_stack_string_append ( std_virtual_stack_t* buffer, const char* std );
+void        std_virtual_stack_free ( std_virtual_stack_t* buffer, size_t size );
+
+/*
+    Linear stack allocator
+*/
+#if 0
+typedef enum {
+    std_arena_allocator_heap_m,
+    std_arena_allocator_virtual_m,
+    std_arena_allocator_none_m,
+} std_arena_allocator_e;
+
+typedef struct {
+    std_buffer_t buffer;
+    void* virtual_end;
+    std_arena_allocator_e allocator;
+} std_arena_t;
+
+std_arena_t std_arena_create ( std_arena_allocator_e allocator, size_t size );
+std_arena_t std_arena ( void* base, size_t size, size_t virtual_size, std_arena_allocator_e allocator );
+void        std_arena_destroy ( std_arena_t* arena );
+void*       std_arena_alloc ( std_arena_t* arena, size_t size );
+bool        std_arena_write ( std_arena_t* arena, const void* data, size_t size );
+bool        std_arena_align ( std_arena_t* arena, size_t align );
+bool        std_arena_align_zero ( std_arena_t* arena, size_t align );
+void*       std_arena_alloc_align ( std_arena_t* arena, size_t size, size_t align );
+bool        std_arena_write_align ( std_arena_t* arena, const void* data, size_t size, size_t align );
+void        std_arena_free ( std_arena_t* arena, size_t size );
+void        std_arena_clear ( std_arena_t* arena );
+size_t      std_arena_used_size ( std_arena_t* arena );
+
+char*       std_arena_string_copy ( std_arena_t* arena, const char* str );
+char*       std_arena_string_append ( std_arena_t* arena, const char* str );
+
+#define     std_static_arena_m( array ) std_arena ( array, sizeof ( array ), sizeof ( array ), std_arena_allocator_none_m );
+#define     std_fixed_arena_m( base, size ) std_arena ( base, size, 0, std_arena_allocator_none_m );
+#define     std_heap_arena_m( base, size ) std_arena ( base, size, 0, std_arena_allocator_heap_m );
+#define     std_virtual_arena_m( buffer ) std_arena ( buffer.base, buffer.mapped_size, buffer.reserved_size, std_arena_allocator_virtual_m );
+
+#define     std_arena_write_noalign_m( arena, data ) std_arena_write ( arena, data, sizeof ( *data ) )
+#define     std_arena_alloc_m( arena, type ) ( type* ) std_arena_alloc_align ( arena, sizeof ( type ) , std_alignof_m ( type ) )
+#define     std_arena_alloc_array_m( arena, type, count ) ( type* ) std_arena_alloc_align ( arena, sizeof ( type ) * (count), std_alignof_m ( type ) )
+#endif
 
 /*
     Tagged allocator
     // TODO remove?
 */
+#if 0
 size_t       std_tagged_page_size ( void );
 std_buffer_t std_tagged_alloc ( size_t size, uint64_t tag );
 void         std_tagged_free ( uint64_t tag );
+#endif
 
-// TODO remove
-std_alloc_t std_tlsf_alloc ( size_t size, size_t align );
-void        std_tlsf_free ( std_memory_h handle );
+

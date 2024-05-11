@@ -81,7 +81,7 @@
 
 #include <std_compiler.h>
 #include <std_log.h>
-#include <std_buffer.h>
+#include <std_allocator.h>
 
 // Returns a pointer to the specified module api. Modules are ref counted.
 // TODO give a way to preload all modules at boot time and never unload
@@ -98,7 +98,7 @@ void std_module_release ( void* api );
 void std_module_reload ( const char* build_target );
 #define std_module_reload_m() std_module_reload ( std_pp_eval_string_m ( std_module_name_m ) )
 
-size_t std_module_build ( const char* build_target, std_buffer_t output );
+size_t std_module_build ( const char* build_target, void* output, size_t output_size );
 
 // Implemented in std_state.c
 void std_runtime_bind ( void* std_runtime );
@@ -115,16 +115,13 @@ void NAME##_state_bind ( NAME##_state_t* state );
 \
 NAME##_state_t* NAME##_state_alloc ( void ) { \
     std_assert_m ( !NAME##_state ); \
-    std_alloc_t state_alloc = std_virtual_heap_alloc ( sizeof ( NAME##_state_t ), std_alignof_m ( NAME##_state_t ) ); \
-    std_auto_m state = ( NAME##_state_t* ) state_alloc.buffer.base; \
-    state->memory_handle = state_alloc.handle; \
-    NAME##_state = state; \
-    return state; \
+    NAME##_state = std_virtual_heap_alloc_m ( NAME##_state_t ); \
+    return NAME##_state; \
 } \
 \
 void NAME##_state_free ( void ) { \
     std_assert_m ( NAME##_state ); \
-    std_virtual_heap_free ( NAME##_state->memory_handle ); \
+    std_virtual_heap_free ( NAME##_state ); \
     NAME##_state = NULL; \
 } \
 \

@@ -78,20 +78,18 @@ void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
 void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
     xg_workload_state = state;
 
-    std_alloc_t workloads_alloc = std_virtual_heap_alloc_array_m ( xg_vk_workload_t, xg_workload_max_allocated_workloads_m );
-    xg_workload_state->workloads_memory_handle = workloads_alloc.handle;
-    xg_workload_state->workloads_array = ( xg_vk_workload_t* ) workloads_alloc.buffer.base;
-    xg_workload_state->workloads_freelist = std_freelist ( workloads_alloc.buffer, sizeof ( xg_vk_workload_t ) );
-    std_mutex_init ( &xg_workload_state->workloads_mutex );
-    xg_workload_state->workloads_uid = 0;
+    state->workloads_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_t, xg_workload_max_allocated_workloads_m );
+    state->workloads_freelist = std_freelist_m ( state->workloads_array, xg_workload_max_allocated_workloads_m );
+    std_mutex_init ( &state->workloads_mutex );
+    state->workloads_uid = 0;
 
     for ( size_t i = 0; i < xg_workload_max_allocated_workloads_m; ++i ) {
-        xg_vk_workload_t* workload = &xg_workload_state->workloads_array[i];
+        xg_vk_workload_t* workload = &state->workloads_array[i];
         std_mutex_init ( &workload->mutex );
         workload->gen = 0;
     }
 
-    std_mem_zero_m ( &xg_workload_state->device_contexts );
+    std_mem_zero_m ( &state->device_contexts );
 
     std_assert_m ( xg_workload_max_allocated_workloads_m <= ( 1 << xg_workload_handle_idx_bits_m ) );
 }
@@ -105,7 +103,7 @@ void xg_vk_workload_unload ( void ) {
         std_mutex_deinit ( &xg_workload_state->workloads_array[i].mutex );
     }
 
-    std_virtual_heap_free ( xg_workload_state->workloads_memory_handle );
+    std_virtual_heap_free ( xg_workload_state->workloads_array );
     std_mutex_deinit ( &xg_workload_state->workloads_mutex );
     // TODO
 }

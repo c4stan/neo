@@ -2,7 +2,6 @@
 
 #include <xg.h>
 
-#include <std_buffer.h>
 #include <std_allocator.h>
 #include <std_queue.h>
 #include <std_mutex.h>
@@ -33,7 +32,6 @@
 typedef struct {
     //xg_device_h device;
     xg_workload_h workload;
-    std_memory_h memory_handle;
     std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
     std_queue_local_t cmd_args_allocator;
 } xg_cmd_buffer_t;
@@ -254,7 +252,6 @@ typedef struct {
 //
 
 typedef struct {
-    std_memory_h        cmd_buffers_memory_handle;
     xg_cmd_buffer_t*    cmd_buffers_array;
     xg_cmd_buffer_t*    cmd_buffers_freelist;
     uint64_t            allocated_cmd_buffers_count;

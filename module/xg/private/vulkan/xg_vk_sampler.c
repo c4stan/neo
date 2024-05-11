@@ -10,10 +10,8 @@ static xg_vk_sampler_state_t* xg_vk_sampler_state;
 void xg_vk_sampler_load ( xg_vk_sampler_state_t* state ) {
     xg_vk_sampler_state = state;
 
-    std_alloc_t samplers_alloc = std_virtual_heap_alloc_array_m ( xg_vk_sampler_t, xg_vk_max_samplers_m );
-    xg_vk_sampler_state->samplers_memory_handle = samplers_alloc.handle;
-    xg_vk_sampler_state->samplers_array = ( xg_vk_sampler_t* ) samplers_alloc.buffer.base;
-    xg_vk_sampler_state->samplers_freelist = std_freelist ( samplers_alloc.buffer, sizeof ( xg_vk_sampler_t ) );
+    xg_vk_sampler_state->samplers_array = std_virtual_heap_alloc_array_m ( xg_vk_sampler_t, xg_vk_max_samplers_m );
+    xg_vk_sampler_state->samplers_freelist = std_freelist_m ( xg_vk_sampler_state->samplers_array, xg_vk_max_samplers_m );
     std_mutex_init ( &xg_vk_sampler_state->samplers_mutex );
 
     for ( uint32_t i = 0; i < xg_vk_max_devices_m; ++i ) {
@@ -28,7 +26,7 @@ void xg_vk_sampler_reload ( xg_vk_sampler_state_t* state ) {
 }
 
 void xg_vk_sampler_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_sampler_state->samplers_memory_handle );
+    std_virtual_heap_free ( xg_vk_sampler_state->samplers_array );
     std_mutex_deinit ( &xg_vk_sampler_state->samplers_mutex );
 }
 

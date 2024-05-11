@@ -1,7 +1,6 @@
 #pragma once
 
 #include <std_platform.h>
-#include <std_buffer.h>
 #include <std_module.h>
 #include <std_time.h>
 
@@ -42,10 +41,11 @@ typedef struct {
     uint64_t serial_number;
     fs_volume_flags_t flags;
     char name[fs_volume_name_size_m];
-    char file_system[fs_volume_fs_size_m];
+    char file_system[fs_volume_filesystem_name_size_m];
 } fs_volume_info_t;
 
 typedef uint64_t fs_file_h;
+typedef uint64_t fs_virtual_file_h;
 #define fs_null_handle_m UINT64_MAX
 
 // TODO why is this a bitset? should be an enum? values are exclusive
@@ -69,8 +69,9 @@ typedef enum {
 } fs_file_flags_t;
 
 typedef enum {
-    fs_file_read_m        = 1 << 0,
-    fs_file_write_m       = 1 << 1,
+    fs_file_read_m          = 1 << 0,
+    fs_file_write_m         = 1 << 1,
+    fs_file_append_m        = 1 << 1,
 } fs_file_access_t;
 
 typedef enum {
@@ -118,6 +119,8 @@ typedef enum {
 
 typedef void ( fs_iterator_callback_f ) ( const char* name, fs_path_flags_t flags, void* arg );
 
+#define fs_read_error_m UINT64_MAX
+
 typedef struct fs_i {
     fs_list_h   ( *get_first_volume ) ( fs_volume_h* volume );
     bool        ( *get_next_volume ) ( fs_list_h* list, fs_volume_h* volume );
@@ -145,22 +148,29 @@ typedef struct fs_i {
     size_t      ( *get_dir_subdirs ) ( char** subdirs, size_t subdirs_cap, size_t subdir_cap, const char* path );
     bool        ( *get_dir_info ) ( fs_dir_info_t* info, const char* path );
 
-    fs_file_h       ( *create_file ) ( const char* path, fs_file_access_t access, fs_already_existing_e already_existing );
-    bool            ( *create_file_path ) ( const char* path, fs_file_access_t access, fs_already_existing_e already_existing );
-    bool            ( *delete_file ) ( fs_file_h file );
-    bool            ( *delete_file_path ) ( const char* path );
-    bool            ( *copy_file ) ( fs_file_h file, const char* dest, fs_already_existing_e already_existing );
-    bool            ( *copy_file_path ) ( const char* path, const char* dest, fs_already_existing_e already_existing );
-    bool            ( *move_file ) ( fs_file_h file, const char* dest, fs_already_existing_e already_existing );
-    bool            ( *move_file_path ) ( const char* path, const char* dest, fs_already_existing_e already_existing );
-    fs_file_h       ( *open_file ) ( const char* path, fs_file_access_t access );
-    bool            ( *close_file ) ( fs_file_h file );
-    std_buffer_t    ( *map_file ) ( fs_file_h file, fs_map_permits_t permits );
-    bool            ( *unmap_file ) ( std_buffer_t mapping );
-    bool            ( *read_file ) ( size_t* actual_read_size, std_buffer_t dest, fs_file_h file );
-    bool            ( *write_file ) ( size_t* actual_write_size, std_buffer_t source, fs_file_h file );
-    bool            ( *seek_file ) ( fs_file_h file, fs_file_point_t base, int64_t offset );
-    bool            ( *get_file_info ) ( fs_file_info_t* info, fs_file_h file );
-    bool            ( *get_file_path_info ) ( fs_file_info_t* info, const char* path );
-    size_t          ( *get_file_path ) ( char* path, size_t cap, fs_file_h file );
+    fs_file_h   ( *create_file ) ( const char* path, fs_file_access_t access, fs_already_existing_e already_existing );
+    bool        ( *create_file_path ) ( const char* path, fs_file_access_t access, fs_already_existing_e already_existing );
+    bool        ( *delete_file ) ( fs_file_h file );
+    bool        ( *delete_file_path ) ( const char* path );
+    bool        ( *copy_file ) ( fs_file_h file, const char* dest, fs_already_existing_e already_existing );
+    bool        ( *copy_file_path ) ( const char* path, const char* dest, fs_already_existing_e already_existing );
+    bool        ( *move_file ) ( fs_file_h file, const char* dest, fs_already_existing_e already_existing );
+    bool        ( *move_file_path ) ( const char* path, const char* dest, fs_already_existing_e already_existing );
+    fs_file_h   ( *open_file ) ( const char* path, fs_file_access_t access );
+    bool        ( *close_file ) ( fs_file_h file );
+    void*       ( *map_file ) ( fs_file_h file, size_t size, fs_map_permits_t permits );
+    bool        ( *unmap_file ) ( fs_file_h file, void* mapping );
+    uint64_t    ( *read_file ) ( void* dest, size_t read_size, fs_file_h file );
+    bool        ( *write_file ) ( fs_file_h file, const void* source, size_t write_size );
+    bool        ( *seek_file ) ( fs_file_h file, fs_file_point_t base, int64_t offset );
+    bool        ( *get_file_info ) ( fs_file_info_t* info, fs_file_h file );
+    bool        ( *get_file_path_info ) ( fs_file_info_t* info, const char* path );
+    size_t      ( *get_file_path ) ( char* path, size_t cap, fs_file_h file );
+
+    fs_virtual_file_h    ( *create_virtual_file ) ( const char* path, size_t virtual_size );
+    std_virtual_stack_t* ( *get_virtual_file_writer ) ( fs_virtual_file_h file );
+    bool                 ( *flush_virtual_file ) ( fs_virtual_file_h file );
+    void                 ( *close_virtual_file ) ( fs_virtual_file_h file );
+
+    std_buffer_t        ( *read_file_path_to_heap ) ( const char* path );
 } fs_i;

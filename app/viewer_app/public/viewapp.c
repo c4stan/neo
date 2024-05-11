@@ -648,10 +648,10 @@ static void viewapp_boot ( void ) {
         fs_file_h font_file = fs->open_file ( "assets/ProggyVector-Regular.ttf", fs_file_read_m );
         fs_file_info_t font_file_info;
         fs->get_file_info ( &font_file_info, font_file );
-        std_alloc_t font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
-        fs->read_file ( NULL, font_data_alloc.buffer, font_file );
+        void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
+        fs->read_file ( font_data_alloc, font_file_info.size, font_file );
 
-        m_state->ui.font = xui->create_font ( font_data_alloc.buffer,
+        m_state->ui.font = xui->create_font ( std_buffer ( font_data_alloc, font_file_info.size ),
                 &xui_font_params_m (
                     .xg_device = device,
                     .pixel_height = 16,
@@ -767,12 +767,16 @@ static void viewapp_boot ( void ) {
         .debug_name = "normal_texture",
     ) );
 
-    xf_texture_h object_id_texture = xf->declare_texture ( &xf_texture_params_m (
-        .width = resolution_x,
-        .height = resolution_y,
-        .format = xg_format_r8g8b8a8_uint_m,
-        .debug_name = "gbuffer_object_id",
+    xf_texture_h object_id_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_r8g8b8a8_uint_m,
+            .debug_name = "gbuffer_object_id",
+        ),
     ) );
+    m_state->render.object_id_texture = object_id_texture;
+    xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
 
     xf_texture_h depth_stencil_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
@@ -985,8 +989,8 @@ static void viewapp_boot ( void ) {
         .pipeline = xs->lookup_pipeline_state ( "ssr_ta" ),
         .render_targets_count = 1,
         .render_targets = { ssr_accumulation_texture },
-        .texture_reads_count = 5,
-        .texture_reads = { ssr_blur_y_texture, ssr_history_texture, depth_stencil_texture, prev_depth_stencil_texture, normal_texture },
+        .texture_reads_count = 7,
+        .texture_reads = { ssr_blur_y_texture, ssr_history_texture, depth_stencil_texture, prev_depth_stencil_texture, normal_texture, object_id_texture, prev_object_id_texture },
         .samplers_count = 1,
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
@@ -1031,8 +1035,8 @@ static void viewapp_boot ( void ) {
         .pipeline = xs->lookup_pipeline_state ( "taa" ),
         .render_targets_count = 1,
         .render_targets = { taa_accumulation_texture },
-        .texture_reads_count = 3,
-        .texture_reads = { combine_texture, depth_stencil_texture, taa_history_texture },
+        .texture_reads_count = 4,
+        .texture_reads = { combine_texture, depth_stencil_texture, taa_history_texture, object_id_texture },
         .samplers_count = 2,
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
@@ -1189,7 +1193,7 @@ static std_app_state_e viewapp_update ( void ) {
                     case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
                     case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
                 }
-                std_stack_push_append_string ( &stack, memory_type_name );
+                std_stack_string_append ( &stack, memory_type_name );
                 xui->add_label ( xui_workload, &type_label );
             }
             {
@@ -1200,13 +1204,13 @@ static std_app_state_e viewapp_update ( void ) {
                 std_stack_t stack = std_static_stack_m ( size_label.text );
                 char buffer[32];
                 std_size_to_str_approx ( buffer, 32, info.allocated_size );
-                std_stack_push_append_string ( &stack, buffer );
-                std_stack_push_append_string ( &stack, "/" );
+                std_stack_string_append ( &stack, buffer );
+                std_stack_string_append ( &stack, "/" );
                 std_size_to_str_approx ( buffer, 32, info.reserved_size );
-                std_stack_push_append_string ( &stack, buffer );
-                std_stack_push_append_string ( &stack, "/" );
+                std_stack_string_append ( &stack, buffer );
+                std_stack_string_append ( &stack, "/" );
                 std_size_to_str_approx ( buffer, 32, info.system_size );
-                std_stack_push_append_string ( &stack, buffer );
+                std_stack_string_append ( &stack, buffer );
                 xui->add_label ( xui_workload, &size_label );
             }
             xui->newline();
@@ -1310,6 +1314,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     xs->update_pipeline_states ( workload );
 
+    // TODO have xf automatically (optionally?) advance these on graph execution
     xf->advance_multi_texture ( m_state->render.swapchain_multi_texture );
     xf->advance_multi_texture ( m_state->render.depth_stencil_texture );
     xf->advance_multi_texture ( m_state->render.ssgi_raymarch_texture );
@@ -1318,6 +1323,7 @@ static std_app_state_e viewapp_update ( void ) {
     xf->advance_multi_texture ( m_state->render.ssgi_2_raymarch_texture );
     xf->advance_multi_texture ( m_state->render.ssgi_2_accumulation_texture );
     xf->advance_multi_texture ( m_state->render.taa_accumulation_texture );
+    xf->advance_multi_texture ( m_state->render.object_id_texture );
 
     return std_app_state_tick_m;
 }

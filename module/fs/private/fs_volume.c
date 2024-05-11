@@ -142,8 +142,8 @@ bool fs_volume_get_info ( fs_volume_info_t* info, const fs_volume_h* volume ) {
     len = fs_path_to_str ( name, info->name, fs_volume_name_size_m );
     std_assert_m ( len > 0 && len < fs_volume_name_size_m );
 
-    len = fs_path_to_str ( fs, info->file_system, fs_volume_fs_size_m );
-    std_assert_m ( len > 0 && len < fs_volume_fs_size_m );
+    len = fs_path_to_str ( fs, info->file_system, fs_volume_filesystem_name_size_m );
+    std_assert_m ( len > 0 && len < fs_volume_filesystem_name_size_m );
 
     info->flags = 0;
 

@@ -21,11 +21,8 @@ static xg_vk_swapchain_state_t* xg_vk_swapchain_state;
 void xg_vk_swapchain_load ( xg_vk_swapchain_state_t* state ) {
     xg_vk_swapchain_state = state;
 
-    std_alloc_t swapchains_alloc = std_virtual_heap_alloc_array_m ( xg_vk_swapchain_t, xg_vk_max_swapchains_m );
-
-    xg_vk_swapchain_state->swapchains_memory_handle = swapchains_alloc.handle;
-    xg_vk_swapchain_state->swapchains_array = ( xg_vk_swapchain_t* ) swapchains_alloc.buffer.base;
-    xg_vk_swapchain_state->swapchains_freelist = std_freelist ( swapchains_alloc.buffer, sizeof ( xg_vk_swapchain_t ) );
+    xg_vk_swapchain_state->swapchains_array = std_virtual_heap_alloc_array_m ( xg_vk_swapchain_t, xg_vk_max_swapchains_m );
+    xg_vk_swapchain_state->swapchains_freelist = std_freelist_m ( xg_vk_swapchain_state->swapchains_array, xg_vk_max_swapchains_m );
     std_mutex_init ( &xg_vk_swapchain_state->swapchains_mutex );
 }
 
@@ -34,7 +31,7 @@ void xg_vk_swapchain_reload ( xg_vk_swapchain_state_t* state ) {
 }
 
 void xg_vk_swapchain_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_swapchain_state->swapchains_memory_handle );
+    std_virtual_heap_free ( xg_vk_swapchain_state->swapchains_array );
     std_mutex_deinit ( &xg_vk_swapchain_state->swapchains_mutex );
 }
 

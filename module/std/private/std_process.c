@@ -77,20 +77,11 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
 
     // remaining invocation args
     {
-        #if 0
-        std_array_t array = std_array ( std_process_args_max_len_m + std_process_max_args_m );
-
-        for ( size_t i = 1; i  < args_count; ++i ) {
-            process->args[i - 1] = process->args_buffer;
-            std_str_append ( process->args_buffer, &array, args[i] );
-            std_array_push ( &array, 1 );
-        }
-        #endif
         std_stack_t stack = std_static_stack_m ( process->args_buffer );
 
         for ( size_t i = 1; i < args_count; ++i ) {
-            process->args[i - 1] = process->args_buffer + stack.top;
-            std_stack_push_copy_string ( &stack, args[i] );
+            process->args[i - 1] = stack.top;
+            std_stack_string_copy ( &stack, args[i] );
         }
     }
     process->args_count = args_count - 1;
@@ -228,27 +219,14 @@ std_process_h std_process ( const char* executable, const char* process_name, co
         std_mem_zero_m ( &pi );
 
         char cmdline[std_process_cmdline_max_len_m];
-        #if 0
-        {
-            std_array_t array = std_array ( std_process_cmdline_max_len_m );
-
-            std_str_append ( cmdline, &array, executable );
-
-            for ( size_t i = 0; i < args_count; ++i ) {
-                std_str_append ( cmdline, &array, " " );
-                std_str_append ( cmdline, &array, args[i] );
-            }
-        }
-        #endif
-
         {
             std_stack_t stack = std_static_stack_m ( cmdline );
 
-            std_stack_push_append_string ( &stack, executable );
+            std_stack_string_append ( &stack, executable );
 
             for ( size_t i = 0; i < args_count; ++i ) {
-                std_stack_push_append_string ( &stack, " " );
-                std_stack_push_append_string ( &stack, args[i] );
+                std_stack_string_append ( &stack, " " );
+                std_stack_string_append ( &stack, args[i] );
             }
         }
 
@@ -369,23 +347,12 @@ std_process_h std_process ( const char* executable, const char* process_name, co
     std_str_copy ( process->executable_path, std_process_path_max_len_m, executable );
     std_str_copy ( process->name, std_process_name_max_len_m, process_name );
 
-    #if 0
-    {
-        std_array_t array = std_array ( std_process_args_max_len_m + std_process_max_args_m );
-
-        for ( size_t i = 0; i  < args_count; ++i ) {
-            process->args[i] = process->args_buffer;
-            std_str_append ( process->args_buffer, &array, args[i] );
-            std_array_push ( &array, 1 );
-        }
-    }
-    #endif
     {
         std_stack_t stack = std_static_stack_m ( process->args_buffer );
 
         for ( size_t i = 0; i < args_count; ++i ) {
-            process->args[i] = process->args_buffer + stack.top;
-            std_stack_push_copy_string ( &stack, args[i] );
+            process->args[i] = stack.top;
+            std_stack_string_copy ( &stack, args[i] );
         }
     }
 
@@ -594,12 +561,9 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     char pipe_name[256];
     {
         const char* win32_pipe_prefix = "\\\\.\\pipe\\";
-        //std_array_t array = std_static_array_m ( pipe_name );
-        //std_str_append ( pipe_name, &array, win32_pipe_prefix );
-        //std_str_append ( pipe_name, &array, params->name );
         std_stack_t stack  = std_static_stack_m ( pipe_name );
-        std_stack_push_append_string ( &stack, win32_pipe_prefix );
-        std_stack_push_append_string ( &stack, params->name );
+        std_stack_string_append ( &stack, win32_pipe_prefix );
+        std_stack_string_append ( &stack, params->name );
     }
 
     HANDLE handle = CreateNamedPipe ( pipe_name, open_mode, pipe_mode, max_instances, out_buffer_size, in_buffer_size, 0, NULL );
@@ -693,12 +657,9 @@ std_pipe_h std_process_pipe_connect ( const char* name, std_process_pipe_flags_b
     char pipe_name[256];
     {
         const char* win32_pipe_prefix = "\\\\.\\pipe\\";
-        //std_array_t array = std_static_array_m ( pipe_name );
-        //std_str_append ( pipe_name, &array, win32_pipe_prefix );
-        //std_str_append ( pipe_name, &array, name );
         std_stack_t stack  = std_static_stack_m ( pipe_name );
-        std_stack_push_append_string ( &stack, win32_pipe_prefix );
-        std_stack_push_append_string ( &stack, name );
+        std_stack_string_append ( &stack, win32_pipe_prefix );
+        std_stack_string_append ( &stack, name );
     }
 
     HANDLE handle = CreateFile ( pipe_name, access, 0, NULL, OPEN_EXISTING, 0, NULL );

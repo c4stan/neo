@@ -31,29 +31,21 @@ static void wm_api_init ( wm_i* wm ) {
 
 void* wm_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
-
     wm_state_t* state = wm_state_alloc();
-
     wm_window_load ( &state->window );
-
     wm_api_init ( &state->api );
     return &state->api;
 }
 
 void wm_reload ( void* std_runtime, void* api ) {
     std_runtime_bind ( std_runtime );
-
     wm_state_t* state = ( wm_state_t* ) api;
-
     wm_window_reload ( &state->window );
-
     wm_api_init ( &state->api );
-
     wm_state_bind ( state );
 }
 
 void wm_unload ( void ) {
     wm_window_unload();
-
     wm_state_free();
 }

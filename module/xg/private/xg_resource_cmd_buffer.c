@@ -14,10 +14,10 @@ static xg_resource_cmd_buffer_state_t* xg_resource_cmd_buffer_state;
 static void  xg_resource_cmd_buffer_alloc_memory ( xg_resource_cmd_buffer_t* cmd_buffer ) {
     // Copied from xg_cmd_buffer
 
-    std_alloc_t alloc = std_virtual_heap_alloc ( xg_cmd_buffer_resource_cmd_buffer_size_m * 2, 16 );
-    cmd_buffer->memory_handle = alloc.handle;
-    cmd_buffer->cmd_headers_allocator = std_queue_local ( std_buffer_slice ( alloc.buffer, 0, xg_cmd_buffer_resource_cmd_buffer_size_m ) );
-    cmd_buffer->cmd_args_allocator = std_queue_local ( std_buffer_slice ( alloc.buffer, xg_cmd_buffer_resource_cmd_buffer_size_m, xg_cmd_buffer_resource_cmd_buffer_size_m ) );
+    void* cmd_headers_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_resource_cmd_buffer_size_m, 16 );
+    void* cmd_args_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_resource_cmd_buffer_size_m, 16 );
+    cmd_buffer->cmd_headers_allocator = std_queue_local ( cmd_headers_buffer, xg_cmd_buffer_resource_cmd_buffer_size_m );
+    cmd_buffer->cmd_args_allocator = std_queue_local ( cmd_args_buffer, xg_cmd_buffer_resource_cmd_buffer_size_m );
 }
 
 void xg_resource_cmd_buffer_load ( xg_resource_cmd_buffer_state_t* state ) {
@@ -25,11 +25,8 @@ void xg_resource_cmd_buffer_load ( xg_resource_cmd_buffer_state_t* state ) {
 
     xg_resource_cmd_buffer_state = state;
 
-    std_alloc_t cmd_buffers_alloc = std_virtual_heap_alloc_array_m ( xg_resource_cmd_buffer_t, xg_cmd_buffer_max_resource_cmd_buffers_m );
-
-    xg_resource_cmd_buffer_state->cmd_buffers_memory_handle = cmd_buffers_alloc.handle;
-    xg_resource_cmd_buffer_state->cmd_buffers_array = ( xg_resource_cmd_buffer_t* ) cmd_buffers_alloc.buffer.base;
-    xg_resource_cmd_buffer_state->cmd_buffers_freelist = std_freelist ( cmd_buffers_alloc.buffer, sizeof ( xg_resource_cmd_buffer_t ) );
+    xg_resource_cmd_buffer_state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_resource_cmd_buffer_t, xg_cmd_buffer_max_resource_cmd_buffers_m );
+    xg_resource_cmd_buffer_state->cmd_buffers_freelist = std_freelist_m ( xg_resource_cmd_buffer_state->cmd_buffers_array, xg_cmd_buffer_max_resource_cmd_buffers_m );
     std_mutex_init ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
 
     for ( size_t i = 0; i < xg_cmd_buffer_preallocated_resource_cmd_buffers_m; ++i ) {
@@ -49,7 +46,7 @@ void xg_resource_cmd_buffer_reload ( xg_resource_cmd_buffer_state_t* state ) {
 }
 
 void xg_resource_cmd_buffer_unload ( void ) {
-    std_virtual_heap_free ( xg_resource_cmd_buffer_state->cmd_buffers_memory_handle );
+    std_virtual_heap_free ( xg_resource_cmd_buffer_state->cmd_buffers_array );
     std_mutex_deinit ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
 }
 

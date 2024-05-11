@@ -3,7 +3,6 @@
 #include "wm_state.h"
 
 #include <std_mutex.h>
-#include <std_buffer.h>
 #include <std_list.h>
 #include <std_platform.h>
 #include <std_log.h>
@@ -66,20 +65,16 @@ static wm_window_state_t* wm_window_state;
 void wm_window_load ( wm_window_state_t* state ) {
     wm_window_state = state;
 
-    std_alloc_t windows_alloc = std_virtual_heap_alloc_array_m ( wm_window_t, wm_max_windows_m );
-    wm_window_state->windows_memory_handle = windows_alloc.handle;
-    wm_window_state->windows_array = ( wm_window_t* ) windows_alloc.buffer.base;
-    wm_window_state->windows_freelist = std_freelist ( windows_alloc.buffer, sizeof ( wm_window_t ) );
+    wm_window_state->windows_array = std_virtual_heap_alloc_array_m ( wm_window_t, wm_max_windows_m );
+    wm_window_state->windows_freelist = std_freelist_m ( wm_window_state->windows_array, wm_max_windows_m );
     wm_window_state->windows_list = NULL;
 
     std_mutex_init ( &wm_window_state->mutex );
 
 #if defined(std_platform_win32_m)
-    std_alloc_t map_keys_alloc = std_virtual_heap_alloc_array_m ( wm_window_h, wm_max_windows_m * 2 );
-    std_alloc_t map_values_alloc = std_virtual_heap_alloc_array_m ( uint64_t, wm_max_windows_m * 2 );
-    wm_window_state->map_keys_memory_handle = map_keys_alloc.handle;
-    wm_window_state->map_values_memory_handle = map_values_alloc.handle;
-    wm_window_state->map = std_hash_map ( map_keys_alloc.buffer, map_values_alloc.buffer );
+    void* map_keys = std_virtual_heap_alloc_array_m ( wm_window_h, wm_max_windows_m * 2 );
+    void* map_values = std_virtual_heap_alloc_array_m ( uint64_t, wm_max_windows_m * 2 );
+    wm_window_state->map = std_hash_map ( map_keys, map_values, wm_max_windows_m * 2 );
 #endif
 
 #if defined(std_platform_linux_m)
@@ -104,10 +99,10 @@ void wm_window_reload ( wm_window_state_t* state ) {
 void wm_window_unload ( void ) {
     // TODO check for resource leaks?
 
-    std_virtual_heap_free ( wm_window_state->windows_memory_handle );
+    std_virtual_heap_free ( wm_window_state->windows_array );
 #if defined(std_platform_win32_m)
-    std_virtual_heap_free ( wm_window_state->map_keys_memory_handle );
-    std_virtual_heap_free ( wm_window_state->map_values_memory_handle );
+    std_virtual_heap_free ( wm_window_state->map.hashes );
+    std_virtual_heap_free ( wm_window_state->map.payloads );
 #endif
 }
 

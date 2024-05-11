@@ -1,7 +1,6 @@
 #pragma once
 
 #include <std_module.h>
-#include <std_buffer.h>
 
 #include <wm.h>
 
@@ -59,7 +58,8 @@ typedef uint64_t xg_texture_h;
 typedef uint64_t xg_sampler_h;
 typedef uint64_t xg_pipeline_resource_group_h;
 
-typedef uint64_t xg_raytrace_acceleration_structure_h;
+typedef uint64_t xg_raytrace_geometry_h;
+typedef uint64_t xg_raytrace_world_h;
 typedef uint64_t xg_raytrace_pipeline_state_h;
 
 #define xg_null_handle_m UINT64_MAX
@@ -1170,14 +1170,14 @@ typedef enum {
 */
 
 typedef enum {
-    xg_buffer_usage_copy_source_m                     = 1 << 0,
-    xg_buffer_usage_copy_dest_m                       = 1 << 1,
-    xg_buffer_usage_texel_uniform_m                   = 1 << 2,
-    xg_buffer_usage_texel_storage_m                   = 1 << 3,
-    xg_buffer_usage_uniform_m                         = 1 << 4,
-    xg_buffer_usage_storage_m                         = 1 << 5,
-    xg_buffer_usage_index_buffer_m                    = 1 << 6,
-    xg_buffer_usage_vertex_buffer_m                   = 1 << 7,
+    xg_buffer_usage_copy_source_m           = 1 << 0,
+    xg_buffer_usage_copy_dest_m             = 1 << 1,
+    xg_buffer_usage_texel_uniform_m         = 1 << 2,
+    xg_buffer_usage_texel_storage_m         = 1 << 3,
+    xg_buffer_usage_uniform_m               = 1 << 4,
+    xg_buffer_usage_storage_m               = 1 << 5,
+    xg_buffer_usage_index_buffer_m          = 1 << 6,
+    xg_buffer_usage_vertex_buffer_m         = 1 << 7,
 } xg_buffer_usage_f;
 
 typedef enum {
@@ -1681,6 +1681,8 @@ typedef struct {
     char debug_name[xg_debug_name_size_m];
 } xg_texture_info_t;
 
+typedef uint64_t xg_buffer_address_t;
+
 typedef struct {
     // TODO rename to alloc?
     xg_alloc_t allocation;
@@ -1824,6 +1826,39 @@ typedef enum {
     && ( view.aspect == xg_texture_aspect_default_m || view.aspect == ( _allowed_usage & xg_texture_usage_depth_stencil_m ? xg_texture_aspect_depth_m : xg_texture_aspect_color_m ) ) \
 )
 
+typedef struct {
+    xg_device_h device;
+    xg_buffer_h vertex_buffer;
+    uint64_t vertex_buffer_offset;
+    xg_format_e vertex_format;
+    uint32_t vertex_count;
+    uint32_t vertex_stride;
+    xg_buffer_h index_buffer;
+    uint64_t index_buffer_offset;
+    uint32_t index_count;
+    xg_buffer_h transform_buffer;
+    uint64_t transform_buffer_offset;
+    char debug_name[xg_debug_name_size_m];
+} xg_raytrace_geometry_data_t;
+
+typedef struct {
+    xg_raytrace_geometry_data_t* geometries;
+    uint32_t geometries_count;
+} xg_raytrace_geometry_params_t;
+
+typedef struct {
+    xg_raytrace_geometry_h geometry;
+    // one transform per instance
+    xg_buffer_h transform_buffer;
+    uint64_t transform_buffer_offset;
+    uint32_t transform_count;
+} xg_raytrace_geometry_instance_t;
+
+typedef struct {
+    xg_raytrace_geometry_instance_t* instances;
+    uint32_t instances_count;
+} xg_raytrace_world_params_t;
+
 // XG API
 typedef struct {
     // Device
@@ -1938,6 +1973,10 @@ typedef struct {
     xg_sampler_h            ( *create_sampler )                     ( const xg_sampler_params_t* params );
     xg_sampler_h            ( *get_default_sampler )                ( xg_device_h device, xg_default_sampler_e sampler );
 
+    // TODO separate creation and build
+    xg_raytrace_geometry_h  ( *create_raytrace_geometry )           ( const xg_raytrace_geometry_params_t* params );
+    xg_raytrace_world_h     ( *create_raytrace_world )              ( const xg_raytrace_world_params_t* params );
+
     // Pipeline state
     xg_graphics_pipeline_state_h    ( *create_graphics_pipeline )   ( xg_device_h device, const xg_graphics_pipeline_params_t* params );
     xg_compute_pipeline_state_h     ( *create_compute_pipeline )    ( xg_device_h device, const xg_compute_pipeline_params_t* params );
@@ -1945,6 +1984,7 @@ typedef struct {
 
     void                    ( *destroy_graphics_pipeline )          ( xg_graphics_pipeline_state_h pipeline );
     void                    ( *destroy_compute_pipeline )           ( xg_compute_pipeline_state_h pipeline );
+    void                    ( *destroy_raytrace_pipeline )          ( xg_raytrace_pipeline_state_h pipeline );
 
     xg_allocator_i          ( *get_default_allocator )              ( xg_device_h device, xg_memory_type_e type );
     void                    ( *get_default_allocator_info )         ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );

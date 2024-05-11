@@ -5,17 +5,6 @@
 #include <std_array.h>
 #include <std_allocator.h>
 
-#define xf_resource_heap_container_decl( __type, __name ) \
-    std_memory_h __name ## _memory_handle; \
-    __type* __name ## _array; \
-    __type* __name ## _freelist;
-
-#define xf_resource_heap_container_alloc( __state, __name, __count ) \
-    std_alloc_t __name ## _alloc = std_virtual_heap_alloc_array_m ( std_typeof_m ( *( (__state)->__name ## _array ) ), __count ); \
-    (__state)->__name ## _memory_handle = __name ## _alloc.handle; \
-    (__state)->__name ## _array = ( std_typeof_m ( ( (__state)->__name ## _array ) ) ) __name ## _alloc.buffer.base; \
-    (__state)->__name ## _freelist = std_freelist ( __name ## _alloc.buffer, sizeof ( *( (__state)->__name ## _array ) ) )
-
 /*
     Resource flow
         user declares resources trough declare_texture/buffer api, gets a xf resource handle
@@ -142,20 +131,15 @@ typedef struct {
 } xf_multi_buffer_t;
 
 typedef struct {
-    std_memory_h buffers_memory_handle;
     xf_buffer_t* buffers_array;
     xf_buffer_t* buffers_freelist;
 
-    //std_memory_h multi_buffers_memory_handle;
-    //xf_multi_buffer_t* multi_buffers_array;
-    //xf_multi_buffer_t* multi_buffers_freelist;
-    xf_resource_heap_container_decl ( xf_multi_buffer_t, multi_buffers );
+    xf_multi_buffer_t* multi_buffers_array;
+    xf_multi_buffer_t* multi_buffers_freelist;
 
-    std_memory_h textures_memory_handle;
     xf_texture_t* textures_array;
     xf_texture_t* textures_freelist;
 
-    std_memory_h multi_textures_memory_handle;
     xf_multi_texture_t* multi_textures_array;
     xf_multi_texture_t* multi_textures_freelist;
 } xf_resource_state_t;
@@ -237,8 +221,8 @@ xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
 
 xf_texture_h xf_resource_multi_texture_get ( xf_texture_h multi_texture, int32_t offset );
 
-void xf_resource_texture_state_barrier ( xg_texture_memory_barrier_t* barriers, std_array_t* array, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
+void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
 
-void xf_resource_buffer_state_barrier ( xg_buffer_memory_barrier_t* barriers, std_array_t* array, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
+void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
 
 void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );

@@ -10,7 +10,6 @@ typedef struct {
 } rv_visible_t;
 
 typedef struct {
-    std_memory_h memory_handle;
     rv_visible_t* visible_array;
     rv_visible_t* visible_freelist;
     uint64_t* visible_bitset;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <std_module.h>
-#include <std_buffer.h>
 #include <std_platform.h>
 #include <std_hash.h>
 

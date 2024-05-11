@@ -13,15 +13,11 @@
 static xf_graph_state_t* xf_graph_state;
 
 void xf_graph_load ( xf_graph_state_t* state ) {
-    std_alloc_t graphs_alloc = std_virtual_heap_alloc_array_m ( xf_graph_t, xf_graph_max_graphs_m );
-    state->graphs_handle = graphs_alloc.handle;
-    state->graphs_array = ( xf_graph_t* ) graphs_alloc.buffer.base;
-    state->graphs_freelist = std_freelist ( graphs_alloc.buffer, sizeof ( xf_graph_t ) );
+    state->graphs_array = std_virtual_heap_alloc_array_m ( xf_graph_t, xf_graph_max_graphs_m );
+    state->graphs_freelist = std_freelist_m ( state->graphs_array, xf_graph_max_graphs_m );
 
-    std_alloc_t nodes_alloc = std_virtual_heap_alloc_array_m ( xf_node_t, xf_graph_max_nodes_m );
-    state->nodes_handle = nodes_alloc.handle;
-    state->nodes_array = ( xf_node_t* ) nodes_alloc.buffer.base;
-    state->nodes_freelist = std_freelist ( nodes_alloc.buffer, sizeof ( xf_node_t ) );
+    state->nodes_array = std_virtual_heap_alloc_array_m ( xf_node_t, xf_graph_max_nodes_m );
+    state->nodes_freelist = std_freelist_m ( state->nodes_array, xf_graph_max_nodes_m );
 
     xf_graph_state = state;
 }
@@ -32,18 +28,8 @@ void xf_graph_reload ( xf_graph_state_t* state ) {
 
 void xf_graph_unload ( void ) {
     // TODO free active graphs resources
-    std_virtual_heap_free ( xf_graph_state->graphs_handle );
-    std_virtual_heap_free ( xf_graph_state->nodes_handle );
-}
-
-void xf_graph_init ( void ) {
-    static xf_node_t nodes_array[xf_graph_max_nodes_m];
-    static xf_graph_t graphs_array[xf_graph_max_graphs_m];
-
-    xf_graph_state->nodes_array = nodes_array;
-    xf_graph_state->nodes_freelist = std_static_freelist_m ( nodes_array );
-    xf_graph_state->graphs_array = graphs_array;
-    xf_graph_state->graphs_freelist = std_static_freelist_m ( graphs_array );
+    std_virtual_heap_free ( xf_graph_state->graphs_array );
+    std_virtual_heap_free ( xf_graph_state->nodes_array );
 }
 
 xf_graph_h xf_graph_create ( xg_device_h device, xg_swapchain_h swapchain ) {
@@ -223,12 +209,13 @@ xf_node_h xf_graph_add_node ( xf_graph_h graph_handle, const xf_node_params_t* p
     node->edge_count = 0;
     node->enabled = true;
 
-    if ( !std_allocator_is_null_m ( node->params.user_args_allocator ) ) {
-        node->user_args_alloc = std_alloc_m ( &node->params.user_args_allocator, node->params.user_args_alloc_size, 16 );
-        std_mem_copy ( node->user_args_alloc.buffer.base, node->params.user_args, node->params.user_args_alloc_size );
-        node->params.user_args = node->user_args_alloc.buffer.base;
+    if ( node->params.copy_args && node->params.user_args.base ) {
+        void* alloc = std_virtual_heap_alloc ( node->params.user_args.size, 16 ); // TODO some kind of linear allocator
+        std_mem_copy ( alloc, node->params.user_args.base, node->params.user_args.size );
+        //node->params.user_args = node->user_args; // TODO is this necessary?
+        node->user_args = alloc;
     } else {
-        node->user_args_alloc = std_null_alloc_m;
+        node->user_args = node->params.user_args.base;
     }
 
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
@@ -253,7 +240,7 @@ typedef struct {
     char node_flags[xf_graph_max_nodes_m];
     xf_node_h nodes_map_keys[xf_graph_max_nodes_m * 2];
     uint64_t nodes_map_payloads[xf_graph_max_nodes_m * 2];
-    std_map_t nodes_map;
+    std_hash_map_t nodes_map;
 } xf_graph_linearize_data_t;
 
 static void xf_graph_linearize_node ( xf_graph_linearize_data_t* ld, xf_node_h node );
@@ -302,7 +289,7 @@ static void xf_graph_linearize_resource_dependencies ( xf_graph_linearize_data_t
     // Then push the writer
     for ( size_t i = 0; i < deps->writers_count; ++i ) {
         xf_node_h writer_handle = deps->writers[i];
-        void* lookup = std_map_lookup ( &data->nodes_map, &writer_handle );
+        void* lookup = std_hash_map_lookup ( &data->nodes_map, writer_handle );
         std_assert_m ( lookup );
         uint64_t writer_idx = * ( uint64_t* ) lookup;
 
@@ -316,7 +303,7 @@ static void xf_graph_linearize_resource_dependencies ( xf_graph_linearize_data_t
 }
 
 static void xf_graph_linearize_node ( xf_graph_linearize_data_t* ld, xf_node_h node_handle ) {
-    void* lookup = std_map_lookup ( &ld->nodes_map, &node_handle );
+    void* lookup = std_hash_map_lookup ( &ld->nodes_map, node_handle );
     std_assert_m ( lookup );
     uint64_t node_idx = * ( uint64_t* ) lookup;
     ld->node_flags[node_idx] = 1;
@@ -367,12 +354,12 @@ static void xf_graph_linearize ( xf_graph_t* graph ) {
 
     // Create node handle -> graph node idx temp map, used to lookup node handles coming from resources and tell if they're part of the graph or not
     // Could by avoided if nodes were stored directly inside their graph owner instead of being stored separately and referenced by handle
-    ld.nodes_map = std_map_u64 ( std_static_buffer_m ( ld.nodes_map_keys ), std_static_buffer_m ( ld.nodes_map_payloads ) );
+    ld.nodes_map = std_hash_map ( ld.nodes_map_keys, ld.nodes_map_payloads, xf_graph_max_nodes_m * 2 );
 
     for ( size_t i = 0; i < graph->nodes_count; ++i ) {
         uint64_t key = ( uint64_t ) ( graph->nodes[i] );
         uint64_t payload = i;
-        std_map_insert ( &ld.nodes_map, &key, &payload );
+        std_hash_map_insert ( &ld.nodes_map, key, payload );
     }
 
     // Traverse up and linearize
@@ -687,9 +674,9 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
             // TODO avoid this limit?
 #define xf_graph_max_barriers_per_pass_m 128
             xg_texture_memory_barrier_t texture_barriers[xf_graph_max_barriers_per_pass_m];
-            std_array_t texture_barriers_array = std_static_array_m ( texture_barriers );
+            std_stack_t texture_barriers_stack = std_static_stack_m ( texture_barriers );
             xg_buffer_memory_barrier_t buffer_barriers[xf_graph_max_barriers_per_pass_m]; // TODO split defines
-            std_array_t buffer_barriers_array = std_static_array_m ( buffer_barriers );
+            std_stack_t buffer_barriers_stack = std_static_stack_m ( buffer_barriers );
 
             if ( !node->enabled ) {
                 for ( uint32_t i = 0; i < params->render_targets_count; ++i ) {
@@ -701,14 +688,14 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                             .stage = xg_pipeline_stage_transfer_m,
                             .access = xg_memory_access_transfer_write_m
                         );
-                        xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, target->texture, target->view, &state );
+                        xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &state );
 
                         xg->cmd_begin_debug_region ( cmd_buffer, node->params.debug_name, node->params.debug_color, sort_key );
 
                         {
                             xg_barrier_set_t barrier_set = xg_barrier_set_m();
                             barrier_set.texture_memory_barriers = texture_barriers;
-                            barrier_set.texture_memory_barriers_count = texture_barriers_array.count;
+                            barrier_set.texture_memory_barriers_count = std_stack_array_count_m ( &texture_barriers_stack, xg_texture_memory_barrier_t );
                             xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
                         }
 
@@ -729,20 +716,20 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                             .stage = xg_pipeline_stage_transfer_m,
                             .access = xg_memory_access_transfer_write_m
                         );
-                        xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, target->texture, target->view, &target_state );
+                        xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &target_state );
                         xf_texture_execution_state_t source_state = xf_texture_execution_state_m (
                             .layout = xg_texture_layout_copy_source_m,
                             .stage = xg_pipeline_stage_transfer_m,
                             .access = xg_memory_access_transfer_read_m
                         );
-                        xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, source->texture, source->view, &source_state );
+                        xf_resource_texture_state_barrier ( &texture_barriers_stack, source->texture, source->view, &source_state );
 
                         xg->cmd_begin_debug_region ( cmd_buffer, node->params.debug_name, node->params.debug_color, sort_key );
 
                         {
                             xg_barrier_set_t barrier_set = xg_barrier_set_m();
                             barrier_set.texture_memory_barriers = texture_barriers;
-                            barrier_set.texture_memory_barriers_count = texture_barriers_array.count;
+                            barrier_set.texture_memory_barriers_count = std_stack_array_count_m ( &texture_barriers_stack, xg_texture_memory_barrier_t );
                             xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
                         }
 
@@ -783,7 +770,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_shader_read_m
                 );
 
-                xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, resource->texture, resource->view, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
 
                 io.shader_texture_reads[i].texture = texture->xg_handle;
                 io.shader_texture_reads[i].view = resource->view;
@@ -800,7 +787,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_shader_write_m
                 );
 
-                xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, resource->texture, resource->view, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
 
                 io.shader_texture_writes[i].texture = texture->xg_handle;
                 io.shader_texture_writes[i].view = resource->view;
@@ -815,7 +802,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_shader_read_m
                 );
 
-                xf_resource_buffer_state_barrier ( buffer_barriers, &buffer_barriers_array, resource->buffer, &state );
+                xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
 
                 io.shader_buffer_reads[i] = buffer->xg_handle;
             }
@@ -828,7 +815,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_shader_write_m
                 );
 
-                xf_resource_buffer_state_barrier ( buffer_barriers, &buffer_barriers_array, resource->buffer, &state );
+                xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
 
                 io.shader_buffer_writes[i] = buffer->xg_handle;
             }
@@ -842,7 +829,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_transfer_read_m
                 );
 
-                xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, copy->texture, copy->view, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, copy->texture, copy->view, &state );
 
                 io.copy_texture_reads[i].texture = texture->xg_handle;
                 io.copy_texture_reads[i].view = copy->view;
@@ -858,7 +845,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_transfer_write_m
                 );
 
-                xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, copy->texture, copy->view, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, copy->texture, copy->view, &state );
 
                 io.copy_texture_writes[i].texture = texture->xg_handle;
                 io.copy_texture_writes[i].view = copy->view;
@@ -874,7 +861,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_color_write_m
                 );
 
-                xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, target->texture, target->view, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &state );
 
                 io.render_targets[i].texture = texture->xg_handle;
                 io.render_targets[i].view = target->view;
@@ -891,7 +878,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 );
 
                 // TODO support early fragment test
-                xf_resource_texture_state_barrier ( texture_barriers, &texture_barriers_array, texture_handle, xg_default_texture_view_m, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, texture_handle, xg_default_texture_view_m, &state );
 
                 io.depth_stencil_target = texture->xg_handle;
             }
@@ -901,7 +888,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
             {
                 xg_barrier_set_t barrier_set = xg_barrier_set_m();
                 barrier_set.texture_memory_barriers = texture_barriers;
-                barrier_set.texture_memory_barriers_count = texture_barriers_array.count;
+                barrier_set.texture_memory_barriers_count = ( texture_barriers_stack.top - texture_barriers_stack.begin ) / sizeof ( xg_texture_memory_barrier_t );
+                barrier_set.texture_memory_barriers_count = std_stack_array_count_m ( &texture_barriers_stack, xg_texture_memory_barrier_t );
                 xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key++ );
             }
 
@@ -914,7 +902,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 node_args.base_key = sort_key;
                 node_args.io = &io;
                 //node_args.params = &node->params;
-                node->params.execute_routine ( &node_args, node->params.user_args );
+                node->params.execute_routine ( &node_args, node->user_args );
             }
 
             sort_key += node->params.key_space_size;
@@ -922,8 +910,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
             if ( node->params.presentable_texture != xf_null_handle_m ) {
                 xf_texture_h texture_handle = node->params.presentable_texture;
 
-                xg_texture_memory_barrier_t present_barrier;
-                std_array_t present_barrier_array = std_array ( 1 );
+                xg_texture_memory_barrier_t present_barrier[1];
+                std_stack_t present_barrier_stack = std_static_stack_m ( present_barrier );
 
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_present_m,
@@ -931,11 +919,11 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_none_m
                 );
 
-                xf_resource_texture_state_barrier ( &present_barrier, &present_barrier_array, texture_handle, xg_default_texture_view_m, &state );
-                std_assert_m ( present_barrier_array.count == 1 );
+                xf_resource_texture_state_barrier ( &present_barrier_stack, texture_handle, xg_default_texture_view_m, &state );
+                std_assert_m ( present_barrier_stack.top == present_barrier + 1 );
 
                 xg_barrier_set_t barrier_set = xg_barrier_set_m();
-                barrier_set.texture_memory_barriers = &present_barrier;
+                barrier_set.texture_memory_barriers = present_barrier;
                 barrier_set.texture_memory_barriers_count = 1;
                 xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
             }

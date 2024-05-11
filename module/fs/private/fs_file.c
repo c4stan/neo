@@ -275,7 +275,7 @@ bool fs_file_close ( fs_file_h file ) {
 #endif
 }
 
-std_buffer_t fs_file_map ( fs_file_h file, fs_map_permits_t permits ) {
+void* fs_file_map ( fs_file_h file, size_t size, fs_map_permits_t permits ) {
 #if defined(std_platform_win32_m)
     DWORD page_permits = 0;
     DWORD map_permits = 0;
@@ -301,21 +301,21 @@ std_buffer_t fs_file_map ( fs_file_h file, fs_map_permits_t permits ) {
         map_permits |= FILE_MAP_COPY;
     }
 
-    fs_file_info_t file_info;
-    fs_file_get_info ( &file_info, file );
+    //fs_file_info_t file_info;
+    //fs_file_get_info ( &file_info, file );
     uint32_t size_high, size_low;
-    std_u64_to_2_u32 ( &size_high, &size_low, file_info.size );
+    std_u64_to_2_u32 ( &size_high, &size_low, size );
 
     HANDLE map_handle = CreateFileMapping ( ( HANDLE ) file, NULL, page_permits, size_high, size_low, NULL );
 
     if ( map_handle == NULL ) {
-        return std_null_buffer_m;
+        return NULL;
     }
 
     void* map = MapViewOfFile ( map_handle, map_permits, 0, 0, 0 );
     CloseHandle ( map_handle );
 
-    return std_buffer ( map, file_info.size );
+    return map;
 #elif defined(std_platform_linux_m)
     int prot = 0;
 
@@ -339,19 +339,20 @@ std_buffer_t fs_file_map ( fs_file_h file, fs_map_permits_t permits ) {
 
     fs_file_info_t file_info;
     fs_file_get_info ( &file_info, file );
-    void* map = mmap ( NULL, file_info.size, prot, flags, ( int ) file, 0 );
+    void* map = mmap ( NULL, size, prot, flags, ( int ) file, 0 );
 
     if ( map == MAP_FAILED ) {
         return std_null_buffer_m;
     }
 
-    return std_buffer ( map, file_info.size );
+    return map;
 #endif
 }
 
-bool fs_file_unmap ( std_buffer_t buffer ) {
+bool fs_file_unmap ( fs_file_h file, void* base ) {
 #if defined(std_platform_win32_m)
-    BOOL unmap_retcode = UnmapViewOfFile ( buffer.base );
+    std_unused_m ( file );
+    BOOL unmap_retcode = UnmapViewOfFile ( base );
 
     if ( unmap_retcode == FALSE ) {
         return false;
@@ -359,66 +360,81 @@ bool fs_file_unmap ( std_buffer_t buffer ) {
 
     return true;
 #elif defined(std_platform_linux_m)
-    int result = munmap ( buffer.base, buffer.size );
+    fs_file_info_t file_info;
+    fs_file_get_info ( &file_info, file );
+
+    int result = munmap ( base, file_info.size );
     return result == 0;
 #endif
 }
 
-bool fs_file_read ( size_t* actual_read_size, std_buffer_t dest, fs_file_h file ) {
+uint64_t fs_file_read ( void* dest, size_t size, fs_file_h file ) {
 #if defined(std_platform_win32_m)
-    DWORD read_size;
-    std_assert_m ( dest.size < UINT32_MAX );
-    BOOL read_retcode = ReadFile ( ( HANDLE ) file, dest.base, ( DWORD ) dest.size, &read_size, NULL );
+    void* p = dest;
+    size_t total_read_size = 0;
+    while ( total_read_size < size ) {
+        DWORD remaining_size = std_min ( UINT32_MAX, size - total_read_size );
+        DWORD read_size;
+        BOOL read_retcode = ReadFile ( ( HANDLE ) file, p, remaining_size, &read_size, NULL );
+        
+        if ( read_retcode == FALSE ) {
+            std_log_warn_m ( "File read failed with code " std_fmt_u32_m, read_retcode );
+            return fs_read_error_m;
+        }
 
-    if ( read_retcode == FALSE ) {
-        std_log_warn_m ( "File read failed with code " std_fmt_u32_m, read_retcode );
-        return false;
+        if ( read_size == 0 ) {
+            // Assuming we reached EOF. does this hold?
+            break;
+        }
+
+        p += read_size;
+        total_read_size += read_size;
     }
 
-    if ( actual_read_size ) {
-        *actual_read_size = ( size_t ) read_size;
-    }
-
-    return true;
+    return total_read_size;
 #elif defined(std_platform_linux_m)
-    ssize_t result = read ( ( int ) file, dest.base, dest.size );
+    ssize_t result = read ( ( int ) file, dest, size );
 
     if ( result == -1 ) {
         std_log_warn_m ( "File read failed with code " std_fmt_i32_m ": " std_fmt_str_m, errno, strerror ( errno ) );
-        return false;
+        return fs_read_error_m;
     }
 
-    if ( actual_read_size ) {
-        *actual_read_size = ( size_t ) result;
-    }
-
-    return true;
+    return ( uint64_t ) result;
 #endif
 }
 
-bool fs_file_write ( size_t* actual_write_size, std_buffer_t source, fs_file_h file ) {
+bool fs_file_write ( fs_file_h file, const void* source, size_t size ) {
 #if defined(std_platform_win32_m)
-    DWORD write_size;
-    std_assert_m ( source.size < UINT32_MAX );
-    BOOL write_retcode = WriteFile ( ( HANDLE ) file, source.base, ( DWORD ) source.size, &write_size, NULL );
+    const void* p = source;
+    size_t total_write_size = 0;
+    while ( total_write_size < size ) {
+        DWORD remaining_size = std_min ( UINT32_MAX, size - total_write_size );
+        DWORD write_size;
+        BOOL write_retcode = WriteFile ( ( HANDLE ) file, p, remaining_size, &write_size, NULL );
 
-    if ( write_retcode == FALSE ) {
-        std_log_warn_m ( "File write failed with code " std_fmt_u32_m, write_retcode );
-        return false;
+        if ( write_retcode == FALSE ) {
+            std_log_warn_m ( "File write failed with code " std_fmt_u32_m, write_retcode );
+            return false;
+        }
+
+        if ( write_size == 0 ) {
+            break;
+        }
+
+        p += write_size;
+        total_write_size += write_size;
     }
 
-    *actual_write_size = ( size_t ) write_size;
-    return true;
+    return total_write_size == size;
 #elif defined(std_platform_linux_m)
-    ssize_t result = read ( ( int ) file, source.base, source.size );
+    ssize_t result = write ( ( int ) file, source, size );
 
     if ( result == -1 ) {
         std_log_warn_m ( "File write failed with code " std_fmt_i32_m ": " std_fmt_str_m, errno, strerror ( errno ) );
-        *actual_write_size = 0;
         return false;
     }
 
-    *actual_write_size = ( size_t ) result;
     return true;
 #endif
 }
@@ -573,4 +589,23 @@ size_t fs_file_get_path ( char* path, size_t cap, fs_file_h file ) {
     return ( size_t ) len;
 
 #endif
+}
+
+std_buffer_t fs_file_path_read_alloc ( const char* path ) {
+    fs_file_h file = fs_file_open ( path, fs_file_read_m );
+    fs_file_info_t file_info;
+    bool valid_info = fs_file_get_info ( &file_info, file );
+    if ( !valid_info ) {
+        return std_null_buffer_m;
+    }
+    
+    void* buffer = std_virtual_heap_alloc ( file_info.size, 16 );
+    uint64_t read_size = fs_file_read ( buffer, file_info.size, file );
+    if ( read_size == fs_read_error_m ) {
+        return std_null_buffer_m;
+        std_virtual_heap_free ( buffer );
+    }
+
+    fs_file_close ( file );
+    return std_buffer ( buffer, file_info.size );
 }

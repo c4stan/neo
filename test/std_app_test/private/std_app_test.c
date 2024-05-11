@@ -9,7 +9,6 @@
 
 typedef struct {
     std_app_i api;
-    std_memory_h memory_handle;
     bool boot;
 #if std_enabled_m(wm_input_state_m)
     bool first_print;
@@ -21,7 +20,7 @@ static std_app_test_state_t* m_state;
 
 static std_app_state_e std_app_test_tick ( void ) {
     if ( m_state->boot ) {
-        std_alloc_t p = std_virtual_heap_alloc ( 16, 16 );
+        void* p = std_virtual_heap_alloc ( 16, 16 );
         std_unused_m ( p );
 
         wm_i* wm = std_module_get_m ( wm_module_name_m );
@@ -64,7 +63,7 @@ static std_app_state_e std_app_test_tick ( void ) {
         }
 
 #if std_enabled_m(wm_input_state_m)
-        wm->debug_print_window_input_state ( m_state->window, !m_state->first_print );
+        //wm->debug_print_window_input_state ( m_state->window, !m_state->first_print );
         m_state->first_print = false;
 #endif
 
@@ -95,9 +94,7 @@ static void std_app_test_api_init ( std_app_i* app ) {
 void* std_app_test_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
 
-    std_alloc_t alloc = std_virtual_heap_alloc_m ( std_app_test_state_t );
-    std_auto_m state = ( std_app_test_state_t* ) alloc.buffer.base;
-    state->memory_handle = alloc.handle;
+    std_auto_m state = std_virtual_heap_alloc_m ( std_app_test_state_t );
     state->boot = true;
     state->first_print = true;
     state->window = wm_null_handle_m;
@@ -113,7 +110,7 @@ void std_app_test_unload ( void ) {
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     wm->destroy_window ( m_state->window );
     std_module_release ( wm );
-    std_virtual_heap_free ( m_state->memory_handle );
+    std_virtual_heap_free ( m_state );
 }
 
 void std_app_test_reload ( void* std_runtime, void* api ) {

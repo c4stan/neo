@@ -15,12 +15,16 @@ static xs_database_state_t* xs_database_state;
 void xs_database_load ( xs_database_state_t* state ) {
     xs_database_state = state;
 
+#if 0
     for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
         xs_database_memory_page_t* page = &xs_database_state->memory_pages[i];
 
         page->alloc = std_null_alloc_m;
         page->top = 0;
     }
+#endif
+
+    xs_database_state->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
 
     xs_database_state->folders_count = 0;
     xs_database_state->pipeline_states_count = 0;
@@ -32,7 +36,7 @@ void xs_database_load ( xs_database_state_t* state ) {
     //static uint64_t pipeline_handle_array[xs_database_max_pipeline_states_m * 2];
     //static uint64_t pipeline_handle_payload_array[xs_database_max_pipeline_states_m * 2];
 
-    xs_database_state->pipeline_name_hash_to_state_map = std_hash_map ( std_static_buffer_m ( pipeline_name_hash_array ), std_static_buffer_m ( pipeline_name_hash_payload_array ) );
+    xs_database_state->pipeline_name_hash_to_state_map = std_hash_map ( pipeline_name_hash_array, pipeline_name_hash_payload_array, xs_database_max_pipeline_states_m * 2 );
     //xs_database_state.pipeline_handle_to_state_map = std_hash_map ( std_static_buffer_m ( pipeline_handle_array ), std_static_buffer_m ( pipeline_handle_payload_array ) );
 
     xs_database_state->output_path[0] = '\0';
@@ -48,6 +52,7 @@ void xs_database_unload ( void ) {
 }
 
 static char* xs_database_alloc_string ( size_t size ) {
+#if 0
     xs_database_memory_page_t* memory_page = NULL;
 
     for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
@@ -70,7 +75,11 @@ static char* xs_database_alloc_string ( size_t size ) {
 
     char* dest = ( char* ) memory_page->alloc.buffer.base + memory_page->top;
     memory_page->top += size;
+
     return dest;
+#endif
+    void* alloc = std_virtual_stack_alloc ( &xs_database_state->stack, size );
+    return ( char* ) alloc;
 }
 
 typedef struct {
@@ -180,6 +189,7 @@ bool xs_database_set_output_folder ( const char* input_path ) {
 }
 
 void xs_database_clear ( void ) {
+#if 0
     for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
         xs_database_memory_page_t* page = &xs_database_state->memory_pages[i];
 
@@ -191,6 +201,8 @@ void xs_database_clear ( void ) {
             break;
         }
     }
+#endif
+    std_virtual_stack_clear ( &xs_database_state->stack );
 
     xs_database_state->folders_count = 0;
     xs_database_state->pipeline_states_count = 0;
@@ -219,7 +231,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         xs_database_pipeline_state_header_t* header = &xs_database_state->pipeline_state_headers[header_it];
 
         fs_file_info_t info;
-        std_assert_m ( fs->get_file_path_info ( &info, header->path ) );
+        std_verify_m ( fs->get_file_path_info ( &info, header->path ) );
 
         dirty_headers |= xs_database_state->pipeline_state_headers_last_build_timestamp.count < info.last_write_time.count;
     
@@ -240,7 +252,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         std_assert_m ( pipeline_state_file != fs_null_handle_m );
 
         fs_file_info_t pipeline_state_file_info;
-        std_assert_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
+        std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
 
         fs->close_file ( pipeline_state_file );
 
@@ -320,14 +332,12 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
             std_str_copy ( output_path, fs_path_size_m, input_path );
         }
 
-        struct {
-            std_memory_h handle;
-            std_buffer_t buffer;
-        } shader_bytecode[xg_shading_stage_count_m];
+        fs->create_dir ( output_path );
+
+        std_buffer_t shader_bytecode[xg_shading_stage_count_m];
 
         for ( size_t i = 0; i < xg_shading_stage_count_m; ++i ) {
-            shader_bytecode[i].handle = std_null_memory_handle_m;
-            shader_bytecode[i].buffer = std_null_buffer_m;
+            shader_bytecode[i] = std_null_buffer_m;
         }
 
         char shader_path[fs_path_size_m];
@@ -345,7 +355,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
 
                     // check shader source edit time
                     fs_file_info_t shader_source_info;
-                    std_assert_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
+                    std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
 
                     if ( pipeline_state->last_build_timestamp.count < shader_source_info.last_write_time.count ) {
                         needs_to_build = true;
@@ -417,11 +427,8 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                         len = len2;
                     }
 
-                    //std_array_t array = std_static_array_m ( binary_path );
-                    //array.count = len;
-
                     std_stack_t stack = std_static_stack_m ( binary_path );
-                    stack.top = len + 1;
+                    stack.top = stack.begin + len + 1;
 
                     const char* stage_tag = "";
 
@@ -437,14 +444,14 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                     //std_str_append ( binary_path, &array, stage_tag );
                     //std_str_append ( binary_path, &array, ".spv" );
 
-                    std_stack_push_append_string ( &stack, "-" );
-                    std_stack_push_append_string ( &stack, stage_tag );
-                    std_stack_push_append_string ( &stack, ".spv" );
+                    std_stack_string_append ( &stack, "-" );
+                    std_stack_string_append ( &stack, stage_tag );
+                    std_stack_string_append ( &stack, ".spv" );
 
                     // check if shader needs to be (re)compiled
                     bool skip_compile = false;
                     fs_file_info_t shader_source_info;
-                    std_assert_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
+                    std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
                     fs_file_info_t shader_output_info;
                     if ( fs->get_file_path_info ( &shader_output_info, binary_path ) ) {
                         if ( shader_output_info.last_write_time.count > shader_source_info.last_write_time.count
@@ -476,18 +483,26 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                     }
 
                     // read generated shader bytecode
+                    #if 0
                     fs_file_h bytecode_file = fs->open_file ( binary_path, fs_file_read_m );
                     std_assert_m ( bytecode_file != fs_null_handle_m );
 
                     fs_file_info_t bytecode_file_info;
-                    std_assert_m ( fs->get_file_info ( &bytecode_file_info, bytecode_file ) );
+                    std_verify_m ( fs->get_file_info ( &bytecode_file_info, bytecode_file ) );
 
-                    std_alloc_t alloc = std_virtual_heap_alloc ( bytecode_file_info.size, 16 );
-                    shader_bytecode[stage].handle = alloc.handle;
-                    std_assert_m ( fs->read_file ( NULL, alloc.buffer, bytecode_file ) );
-                    shader_bytecode[stage].buffer = std_buffer ( alloc.buffer.base, bytecode_file_info.size );
-
+                    {
+                        size_t size = bytecode_file_info.size;
+                        void* alloc = std_virtual_heap_alloc ( size, 16 );
+                        shader_bytecode[stage].size = bytecode_file_info.size;
+                        std_verify_m ( fs->read_file ( alloc, size, bytecode_file ) );
+                        shader_bytecode[stage].base = alloc;
+                        shader_bytecode[stage].size = size;
+                    }
                     fs->close_file ( bytecode_file );
+                    #else
+                    shader_bytecode[stage] = fs->read_file_path_to_heap ( binary_path );
+                    std_assert_m ( shader_bytecode[stage].base );
+                    #endif
                 }
             }
 
@@ -497,7 +512,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                 result.failed_shaders += shader_fail;
 
                 for ( size_t i = 0; i < xg_shading_stage_count_m; ++i ) {
-                    std_virtual_heap_free ( shader_bytecode[i].handle );
+                    std_virtual_heap_free ( shader_bytecode[i].base );
                 }
 
                 continue;
@@ -510,27 +525,29 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
             switch ( pipeline_state->type ) {
                 case xg_pipeline_graphics_m:
                     if ( shader_references->referenced_stages & xg_shading_stage_bit_vertex_m ) {
-                        graphics_state->params.state.vertex_shader.enable = true;
-                        graphics_state->params.state.vertex_shader.buffer = shader_bytecode[xg_shading_stage_vertex_m].buffer;
-                        graphics_state->params.state.vertex_shader.hash = std_hash_metro ( shader_bytecode[xg_shading_stage_vertex_m].buffer.base, shader_bytecode[xg_shading_stage_vertex_m].buffer.size );
+                        xg_pipeline_state_shader_t* shader = &graphics_state->params.state.vertex_shader;
+                        shader->enable = true;
+                        shader->buffer = shader_bytecode[xg_shading_stage_vertex_m];
+                        shader->hash = std_hash_metro ( shader_bytecode[xg_shading_stage_vertex_m].base, shader_bytecode[xg_shading_stage_vertex_m].size );
                     }
 
                     if ( shader_references->referenced_stages & xg_shading_stage_bit_fragment_m ) {
-                        graphics_state->params.state.fragment_shader.enable = true;
-                        graphics_state->params.state.fragment_shader.buffer = shader_bytecode[xg_shading_stage_fragment_m].buffer;
-                        graphics_state->params.state.fragment_shader.hash = std_hash_metro ( shader_bytecode[xg_shading_stage_fragment_m].buffer.base, shader_bytecode[xg_shading_stage_fragment_m].buffer.size );
+                        xg_pipeline_state_shader_t* shader = &graphics_state->params.state.fragment_shader;
+                        shader->enable = true;
+                        shader->buffer = shader_bytecode[xg_shading_stage_fragment_m];
+                        shader->hash = std_hash_metro ( shader_bytecode[xg_shading_stage_fragment_m].base, shader_bytecode[xg_shading_stage_fragment_m].size );
                     }
 
-                    for ( uint32_t i = 0; i < 20; ++i )
-                        pipeline_handle = xg->create_graphics_pipeline ( device, &graphics_state->params );
+                    pipeline_handle = xg->create_graphics_pipeline ( device, &graphics_state->params );
 
                     break;
 
                 case xg_pipeline_compute_m:
                     if ( shader_references->referenced_stages & xg_shading_stage_bit_compute_m ) {
-                        compute_state->params.state.compute_shader.enable = true;
-                        compute_state->params.state.compute_shader.buffer = shader_bytecode[xg_shading_stage_compute_m].buffer;
-                        compute_state->params.state.compute_shader.hash = std_hash_metro ( shader_bytecode[xg_shading_stage_compute_m].buffer.base, shader_bytecode[xg_shading_stage_compute_m].buffer.size );
+                        xg_pipeline_state_shader_t* shader = &compute_state->params.state.compute_shader;
+                        shader->enable = true;
+                        shader->buffer = shader_bytecode[xg_shading_stage_compute_m];
+                        shader->hash = std_hash_metro ( shader_bytecode[xg_shading_stage_compute_m].base, shader_bytecode[xg_shading_stage_compute_m].size );
                     }
 
                     pipeline_handle = xg->create_compute_pipeline ( device, &compute_state->params );
@@ -549,7 +566,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
             pipeline_state->pipeline_handle = pipeline_handle;
 
             for ( size_t i = 0; i < xg_shading_stage_count_m; ++i ) {
-                std_virtual_heap_free ( shader_bytecode[i].handle );
+                std_virtual_heap_free ( shader_bytecode[i].base );
             }
 
             ++result.successful_pipeline_states;

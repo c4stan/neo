@@ -6,7 +6,7 @@
 
 typedef struct {
     xs_i api;
-    std_memory_h memory_handle;
+    //std_memory_h memory_handle;
     xs_database_state_t database;
 } xs_state_t;
 

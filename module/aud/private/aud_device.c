@@ -18,8 +18,9 @@
 typedef struct {
     bool is_submitted;
     aud_device_h device;
-    std_alloc_t data_alloc;
-    std_buffer_t data_buffer; // TODO remove
+    void* data;
+    size_t size;
+    //std_alloc_t data_alloc;
 #if defined(std_platform_win32_m)
     WAVEHDR win32_header;
 #endif
@@ -287,7 +288,8 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
         for ( uint64_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
             aud_device_submit_context_t* context = &device->submit_contexts[i];
             std_mem_zero_m ( context );
-            context->data_alloc = std_virtual_heap_alloc ( submit_block_size, 16 );
+            context->data = std_virtual_heap_alloc ( submit_block_size, 16 );
+            context->size = submit_block_size;
         }
 
         device->submit_ring = std_ring ( aud_device_max_submit_contexts_m );
@@ -344,7 +346,7 @@ static void aud_device_recycle_submission_contexts ( aud_device_t* device, bool 
     }
 }
 
-void aud_device_play ( aud_device_h device_handle, std_buffer_t buffer ) {
+void aud_device_play ( aud_device_h device_handle, void* data, size_t size ) {
     aud_device_t* device = &aud_device_state.devices_array[device_handle];
 
     if ( std_unlikely_m ( ( device->flags & aud_devuce_existing_m ) == 0 ) ) {
@@ -358,9 +360,8 @@ void aud_device_play ( aud_device_h device_handle, std_buffer_t buffer ) {
 
 #if defined(std_platform_win32_m)
     submit_context->device = device_handle;
-    submit_context->data_buffer = buffer;
-    submit_context->win32_header.lpData = ( char* ) buffer.base;
-    submit_context->win32_header.dwBufferLength = ( DWORD ) buffer.size;
+    submit_context->win32_header.lpData = ( char* ) data;
+    submit_context->win32_header.dwBufferLength = ( DWORD ) size;
     submit_context->is_submitted = true;
 
     MMRESULT result = waveOutPrepareHeader ( ( HWAVEOUT ) device->os_handle, &submit_context->win32_header, sizeof ( WAVEHDR ) );
@@ -380,7 +381,7 @@ char* aud_device_get_buffer ( aud_device_h device_handle ) {
 
     aud_device_submit_context_t* submit_context = &device->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
 
-    return submit_context->data_alloc.buffer.base;
+    return submit_context->data;
 }
 
 void aud_device_push_buffer ( aud_device_h device_handle, uint64_t buffer_size ) {
@@ -390,12 +391,12 @@ void aud_device_push_buffer ( aud_device_h device_handle, uint64_t buffer_size )
     aud_device_recycle_submission_contexts ( device, true );
 
     aud_device_submit_context_t* submit_context = &device->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
-    std_assert_m ( buffer_size <= submit_context->data_alloc.buffer.size );
+    std_assert_m ( buffer_size <= submit_context->size );
     std_ring_push ( &device->submit_ring, 1 );
 
 #if defined(std_platform_win32_m)
     submit_context->device = device_handle;
-    submit_context->win32_header.lpData = ( char* ) submit_context->data_alloc.buffer.base;
+    submit_context->win32_header.lpData = ( char* ) submit_context->data;
     submit_context->win32_header.dwBufferLength = ( DWORD ) buffer_size;
     submit_context->is_submitted = true;
 

@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#if 0
+
 // http://graphics.stanford.edu/~seander/bithacks.html
 
 // ------------------------------------------------------------------------------------------------------
@@ -305,6 +307,16 @@ bool std_align_test_u64 ( uint64_t value, uint64_t align ) {
     return ( value & ( align - 1 ) ) == 0;
 }
 
+size_t std_align_size ( size_t value, size_t align ) {
+    size_t mask = align - 1;
+    return ( align - ( value & mask ) ) & mask;
+}
+
+size_t std_align_size_ptr ( void* value, size_t align ) {
+    size_t mask = align - 1;
+    return ( align - ( ( size_t ) value & mask ) ) & mask;
+}
+
 char* std_align_ptr ( void* value, size_t align ) {
     std_assert_m ( align != 0 );
     std_assert_m ( std_pow2_test ( align ) );
@@ -487,6 +499,8 @@ uint64_t std_2_u32_to_u64 ( uint32_t high, uint32_t low ) {
 uint64_t std_ring_distance_u64 ( uint64_t a, uint64_t b, uint64_t ring_size ) {
     return a <= b ? b - a : ring_size - b + a;
 }
+
+#endif
 
 // Bitset
 // TODO use 32 bit blocks?

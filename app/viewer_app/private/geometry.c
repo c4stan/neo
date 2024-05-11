@@ -12,11 +12,11 @@ geometry_data_t generate_sphere ( float rad, uint32_t meridians_count, uint32_t 
 
     // vbuffer
     uint64_t vertex_capacity = ( parallels_count + 1 ) * ( meridians_count + 1 );
-    std_alloc_t pos_alloc = std_virtual_heap_alloc ( sizeof ( float ) * vertex_capacity * 3, 16 );
-    std_alloc_t nor_alloc = std_virtual_heap_alloc ( sizeof ( float ) * vertex_capacity * 3, 16 );
+    float* pos = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    float* nor = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
     //std_alloc_t tan_alloc = std_virtual_heap_alloc ( sizeof ( float ) * vertex_capacity * 3, 16 );
-    float* pos = ( float* ) pos_alloc.buffer.base;
-    float* nor = ( float* ) nor_alloc.buffer.base;
+    //float* pos = ( float* ) pos_alloc.buffer.base;
+    //float* nor = ( float* ) nor_alloc.buffer.base;
     //float* tang = ( float* ) tan_alloc.buffer.base;
     uint32_t vert_count = 0;
 
@@ -44,8 +44,8 @@ geometry_data_t generate_sphere ( float rad, uint32_t meridians_count, uint32_t 
     }
 
     // ibuffer
-    std_alloc_t idx_alloc = std_virtual_heap_alloc ( sizeof ( uint32_t ) * parallels_count * meridians_count * 6, 4 );
-    uint32_t* idx =  ( uint32_t* ) idx_alloc.buffer.base;
+    uint32_t* idx = std_virtual_heap_alloc_array_m ( uint32_t, parallels_count * meridians_count * 6 );
+    //uint32_t* idx =  ( uint32_t* ) idx_alloc.buffer.base;
     uint32_t idx_count = 0;
 
     for ( uint32_t i = 0; i < parallels_count; ++i ) {
@@ -89,13 +89,13 @@ geometry_data_t generate_sphere ( float rad, uint32_t meridians_count, uint32_t 
 
 geometry_data_t generate_plane ( float side ) {
     uint64_t vertex_capacity = 6;
-    std_alloc_t pos_alloc = std_virtual_heap_alloc ( sizeof ( float ) * vertex_capacity * 3, 16 );
-    std_alloc_t nor_alloc = std_virtual_heap_alloc ( sizeof ( float ) * vertex_capacity * 3, 16 );
-    float* pos = ( float* ) pos_alloc.buffer.base;
-    float* nor = ( float* ) nor_alloc.buffer.base;
+    float* pos = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    float* nor = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    //float* pos = ( float* ) pos_alloc.buffer.base;
+    //float* nor = ( float* ) nor_alloc.buffer.base;
 
-    std_alloc_t idx_alloc = std_virtual_heap_alloc ( sizeof ( uint32_t ) * 6, 4 );
-    uint32_t* idx =  ( uint32_t* ) idx_alloc.buffer.base;
+    uint32_t* idx = std_virtual_heap_alloc_array_m ( uint32_t, 6 );
+    //uint32_t* idx =  ( uint32_t* ) idx_alloc.buffer.base;
 
     uint32_t vert_it = 0;
     uint32_t idx_it = 0;

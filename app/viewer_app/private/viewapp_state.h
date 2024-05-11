@@ -54,6 +54,7 @@ typedef struct {
     xf_texture_h ssgi_2_raymarch_texture;
     xf_texture_h ssgi_2_accumulation_texture;
     xf_texture_h taa_accumulation_texture;
+    xf_texture_h object_id_texture;
 } viewapp_render_state_t;
 
 // UI
@@ -158,7 +159,6 @@ typedef struct {
 // Viewapp
 typedef struct {
     std_app_i api;
-    std_memory_h memory_handle;
 
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;

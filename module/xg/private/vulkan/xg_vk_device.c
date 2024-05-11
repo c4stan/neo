@@ -7,7 +7,6 @@
 #include <xg_enum.h>
 
 #include <std_string.h>
-#include <std_buffer.h>
 #include <std_log.h>
 #include <std_byte.h>
 #include <std_atomic.h>
@@ -49,6 +48,10 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 
     std_assert_m ( device->supported_features.geometryShader );
 
+#if std_enabled_m(xg_vk_enable_raytracing)
+    std_assert_m ( device->supported_features.bufferDeviceAddress );
+#endif
+
     // Print generic properties
     uint32_t api_major = VK_VERSION_MAJOR ( device->generic_properties.apiVersion );
     uint32_t api_minor = VK_VERSION_MINOR ( device->generic_properties.apiVersion );
@@ -69,7 +72,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     uint64_t max_sampled_images_per_stage = ( uint64_t ) device->generic_properties.limits.maxPerStageDescriptorSampledImages;
     uint64_t max_vertex_input_attributes = ( uint64_t ) device->generic_properties.limits.maxVertexInputAttributes;
     uint64_t max_vertex_input_streams = ( uint64_t ) device->generic_properties.limits.maxVertexInputBindings;
-#if std_log_enabled_levels_m & std_log_level_info_m
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     char max_uniform_range_str[32];
     char max_texel_elements_str[32];
     char max_storage_range_str[32];
@@ -431,10 +434,8 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 void xg_vk_device_load ( xg_vk_device_state_t* state ) {
     xg_vk_device_state = state;
 
-    std_alloc_t devices_alloc = std_virtual_heap_alloc_array_m ( xg_vk_device_t, xg_vk_max_devices_m );
-    state->devices_memory_handle = devices_alloc.handle;
-    state->devices_array = ( xg_vk_device_t* ) devices_alloc.buffer.base;
-    state->devices_freelist = std_freelist ( devices_alloc.buffer, sizeof ( xg_vk_device_t ) );
+    state->devices_array = std_virtual_heap_alloc_array_m ( xg_vk_device_t, xg_vk_max_devices_m );
+    state->devices_freelist = std_freelist_m ( state->devices_array, xg_vk_max_devices_m );
     std_mutex_init ( &state->devices_mutex );
 
     // Query all physical devices
@@ -472,7 +473,7 @@ void xg_vk_device_unload ( void ) {
         }
     }
 
-    std_virtual_heap_free ( xg_vk_device_state->devices_memory_handle );
+    std_virtual_heap_free ( xg_vk_device_state->devices_array );
 }
 
 const xg_vk_device_t* xg_vk_device_get ( xg_device_h device_handle ) {

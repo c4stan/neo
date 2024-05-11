@@ -1,6 +1,7 @@
 #pragma once
 
-#include <std_buffer.h>
+#include <std_allocator.h>
+#include <std_platform.h>
 
 uint32_t    std_hash_murmur_mixer_32 ( uint32_t value );
 uint64_t    std_hash_murmur_mixer_64 ( uint64_t value );
@@ -36,11 +37,14 @@ uint64_t    std_hash_metro_end ( std_hash_metro_state_t* state );
 // you should NOT store pointers to payloads for a long time, as those can get moved around on any remove
 // remove takes a payload ptr, not a key, and assumes that the payload provided is valid (the map contains a valid key for it)
 //
+// TODO rework to not use any fun ptr
+//
+#if 0
 typedef bool        ( std_map_cmp_f )  ( uint64_t hash1, const void* key1, const void* key2, void* usr_arg );
 typedef uint64_t    ( std_map_hash_f ) ( const void* key, void* usr_arg );
 typedef struct {
-    char* keys;
-    char* payloads;
+    void* keys;
+    void* payloads;
     size_t pop;
     size_t mask;
     std_map_hash_f* hasher;
@@ -54,8 +58,8 @@ typedef struct {
 // NOTE: The capacity for the map is determined at the min value between keys and payloads buffers capacity.
 //       This value is expected to be a power of two. If not, the capacity goes down to the closes pow2 and
 //       a warning is produced.
-std_map_t                       std_map          ( std_buffer_t keys, std_buffer_t payloads, size_t key_stride, size_t payload_stride,
-                                                   std_map_hash_f* key_hash, void* hash_arg, std_map_cmp_f* key_cmp, void* cmp_arg );
+std_map_t                       std_map          ( void* keys, void* payloads, size_t key_stride, size_t payload_stride, size_t capacity, 
+                                                    std_map_hash_f* key_hash, void* hash_arg, std_map_cmp_f* key_cmp, void* cmp_arg );
 std_map_t                       std_map_u64      ( std_buffer_t keys, std_buffer_t payloads );
 void*                           std_map_insert   ( std_map_t* map, const void* key, const void* payload );  // returns pointer to payload copy
 void                            std_map_remove   ( std_map_t* map, const void* payload );
@@ -69,6 +73,7 @@ uint64_t std_map_hasher_u64 ( const void* key, void* unused );
 #define std_static_map_m( keys, payloads, hasher, hasher_arg, cmp, cmp_arg ) \
     std_map ( std_static_buffer_m ( keys ), std_static_buffer_m ( payloads ), sizeof( *keys ), sizeof( *payloads ), \
     hasher, hasher_arg, cmp, cmp_arg )
+#endif
 
 // Differently from std_map, std_hash_map doesn't store the original key value, and only works with hashes
 // The hash function is expected to be handled from outside and there's no internal guard against 2 different keys
@@ -81,10 +86,11 @@ typedef struct {
     size_t mask;
 } std_hash_map_t;
 
-std_hash_map_t      std_hash_map ( std_buffer_t keys, std_buffer_t values );
+std_hash_map_t      std_hash_map ( uint64_t* keys, uint64_t* values, size_t capacity );
 bool                std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload );
-bool                std_hash_map_remove ( std_hash_map_t* map, uint64_t hash );
-uint64_t*           std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash );
+bool                std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ); // TODO rename std_hash_map_remove_hash
+uint64_t*           std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ); // TODO split into _edit (returns u64 ptr) and _get(?) (returns u64 value)
+bool                std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t* payload );
 
 #define std_static_hash_map_m( keys, payloads ) std_hash_map ( std_static_buffer_m ( keys ), std_static_buffer_m ( payloads ) )
 
@@ -112,7 +118,7 @@ typedef struct {
     size_t mask;
 } std_hash_set_t;
 
-std_hash_set_t      std_hash_set ( std_buffer_t hashes );
+std_hash_set_t      std_hash_set ( uint64_t* hashes, size_t capacity );
 bool                std_hash_set_insert ( std_hash_set_t* set, uint64_t hash );
 bool                std_hash_set_remove ( std_hash_set_t* set, uint64_t hash );
 bool                std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash );

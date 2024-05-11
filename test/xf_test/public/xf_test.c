@@ -176,7 +176,7 @@ static void xf_test ( void ) {
         xf_node_params_t node_params = xf_default_node_params_m;
         node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( color_texture, xg_texture_view_m() );
         node_params.execute_routine = xf_triangle_pass;
-        node_params.user_args = &triangle_pass_args;
+        node_params.user_args = std_buffer_m ( &triangle_pass_args );
         std_str_copy_m ( node_params.debug_name, "triangle" );
         node_params.debug_color = xg_debug_region_color_green_m;
 

@@ -37,14 +37,26 @@ begin texture
     register 4
 end
 
+// object id
+begin texture
+    stage fragment
+    register 5
+end
+
+// prev object id
+begin texture
+    stage fragment
+    register 6
+end
+
 // point sampler
 begin sampler
     stage fragment
-    register 5
+    register 7
 end
 
 // draw constants
 begin buffer
     stage fragment
-    register 6
+    register 8
 end

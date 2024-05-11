@@ -62,7 +62,7 @@ typedef struct xf_node_t {
     xf_node_params_t params;
     xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
     uint32_t edge_count;
-    std_alloc_t user_args_alloc;
+    void* user_args;
     bool enabled;
     //tk_workload_h cpu_workload;
 } xf_node_t;
@@ -78,11 +78,9 @@ typedef struct {
 } xf_graph_t;
 
 typedef struct {
-    std_memory_h graphs_handle;
     xf_graph_t* graphs_array;
     xf_graph_t* graphs_freelist;
 
-    std_memory_h nodes_handle;
     xf_node_t* nodes_array;
     xf_node_t* nodes_freelist;
 } xf_graph_state_t;

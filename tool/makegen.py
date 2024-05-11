@@ -195,9 +195,19 @@ def abspath(path):
 def relpath(path, relative_to):
     try:
         return normpath(os.path.relpath(path, relative_to))
-    except ValueError:
+    except:
         # windows can't handle relative paths crossing drives, return the absolute path if that's the case
         return path
+
+def create_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)    
+
+def create_file(path):
+    directory, filename = os.path.split(path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    return open(path, 'w')
 
 def string_hash(string):
     h = 5381
@@ -276,10 +286,10 @@ def parse_makedef_bindings(path):
                 value = exp[1].strip()
                 if os.path.exists(value):
                     value = normpath(value)
-                    if value[0] != '"':
-                        value = '"' + value
-                    if value[-1] != '"':
-                        value = value + '"'
+                    #if value[0] != '"':
+                    #    value = '"' + value
+                    #if value[-1] != '"':
+                    #    value = value + '"'
                 entries[name] = value
 
                 log.verbose(name + ': ' + str(value))
@@ -447,11 +457,10 @@ class Project:
         log.pop_verbose()
 
     # Resolve module dependencies by converting them to 'normal' dependencies
-    def solve_module_dependencies(self):
-        log.verbose("Solving module dependencies:")
+    def gather_module_dependencies(self):
+        log.verbose("Gathering module dependencies...")
         log.push_verbose()
 
-        log.verbose("Gathering module dependencies...")
         gather_dependencies(self.solution, self.module_dependencies, self.module_dependencies)
 
         for module in self.module_dependencies:
@@ -474,33 +483,41 @@ class Project:
                     output_container = self.external_exes
 
                 config = config_str(self.config)
-                path = normpath(module_path + '/output/' + config + '/' + module + '.' + output_str(output))
-                log.verbose("EXT DEP: " + path)
+                path = normpath(module_path + '/build/' + config + '/output/' + module + '.' + output_str(output))
+                #log.verbose("EXT DEP: " + path)
                 output_container.append(path)
                 self.external_depencencies.append(path)
 
             if output == OUTPUT_LIB:
                 for lib in project.external_libs:
+                    #log.verbose("EXT LIB: " + lib)
                     self.external_libs.append(lib)
 
-            for define in defs:
-                path = normpath(define)
-                self.defines.append(path)
+            #for define in defs:
+            #    path = normpath(define)
+            #    self.defines.append(path)
 
             include_path = normpath(module_path + '/public')
-            log.verbose("EXT INC: " + include_path)
+            #log.verbose("EXT INC: " + include_path)
             self.external_paths.append(include_path)
 
+            include_defs = normpath(include_path + '/define')
+            if (os.path.exists(include_defs)):
+                self.defines.append(include_defs)
+
         if self.output == OUTPUT_APP:
+            # todo add to external_exes?
             config_name = config_str(self.config)
-            launcher_path = self.index.workspace_map['std_launcher']
-            self.launcher_path = normpath(launcher_path + '/output/' + config_name + '/' + 'std_launcher.exe')
+            launcher_name = 'std_launcher'
+            launcher_path = self.index.workspace_map[launcher_name]
+            self.launcher_path = normpath(launcher_path + '/build/' + config_name + '/output/' + 'std_launcher.exe')
+            #log.verbose('EXT EXE: ' + launcher_name)
 
         log.pop_verbose()
 
     # Normalizes all stored paths and looks for the correspondent files
     def prepare(self, rootpath):
-        self.solve_module_dependencies()
+        self.gather_module_dependencies()
 
         self.project_paths = [normpath(self.path + '/' + path) for path in self.project_paths]
         self.project_ignores = [normpath(path) for path in self.project_ignores]
@@ -518,20 +535,20 @@ class Project:
             log.verbose(ignore)
         log.pop_verbose()
 
-        log.verbose('External paths:')
+        log.verbose('External include paths:')
         log.push_verbose()
         for path in self.external_paths:
             log.verbose(path)
         log.pop_verbose()
 
-        log.verbose('External dependencies:')
+        log.verbose('Submodule dependencies:')
         log.push_verbose()
         for dep in self.external_depencencies:
             log.verbose(dep)
         log.pop_verbose()
 
         # TODO what are these 2 blocks for?
-        log.verbose("Solving external libs...")
+        log.verbose("External libs:")
         log.push_verbose()
         external_libs = []
         for lib in self.external_libs:
@@ -541,7 +558,7 @@ class Project:
         self.external_libs = external_libs
         log.pop_verbose()
 
-        log.verbose("Solving external dlls...")
+        log.verbose("External dlls:")
         log.push_verbose()
         external_dlls = []
         for dll in self.external_dlls:
@@ -556,7 +573,7 @@ class Project:
         return True
 
     # Builds the make targets
-    def build(self, rootpath, solution_name):
+    def build(self, rootpath, build_path, solution_name):
         # call prepare (normalize paths and map files) first
         if (not self.prepare(self.path)):
             return
@@ -569,8 +586,8 @@ class Project:
         log.verbose('Building project headers list (' + headers_macro.name + '):')
         log.push_verbose()
         for header in self.inc:
-            path = relpath(header, rootpath)
-            headers_macro.value += path + ' '
+            path = relpath(header, rootpath + '/' + build_path)
+            headers_macro.value += path.replace(" ", "\\ ") + ' ' # Escape spaces in paths, can't wrap macro paths with " "
             log.verbose(path)
         # Add in here headers coming from dependencies too
         for module in self.module_dependencies:
@@ -588,7 +605,7 @@ class Project:
         log.verbose('Building project .def files list (' + defs_macro.name + '):')
         log.push_verbose()
         for define in self.defines:
-            path = relpath(define, rootpath)
+            path = relpath(define, rootpath + '/' + build_path)
             log.verbose(path)
             defs_macro.value += path + ' '
         log.pop_verbose()
@@ -606,13 +623,7 @@ class Project:
         else:
             assert False
 
-        output_path = relpath(self.path + '/output/' + config_path, rootpath)
-        build_path = relpath(self.path + '/build/' + config_path, rootpath)
-
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-        if not os.path.exists(build_path):
-            os.makedirs(build_path)
+        output_path = relpath(self.path + '/build/' + config_path + '/output', rootpath + '/' + build_path)
 
         # Group all objs that will be created by a compile step on source files (/src) into a macro.
         # example: <project>OBJS<config> = x.o y.o ...
@@ -622,7 +633,7 @@ class Project:
         log.push_verbose()
         for src in self.src:
             _, name, _ = parse_path(src)
-            path = relpath(output_path + '/' + name + '.o', rootpath)
+            path = output_path + '/' + name + '.o'
             objs_macro.value += path + ' '
             log.verbose(path)
         log.pop_verbose()
@@ -637,18 +648,18 @@ class Project:
         objs_dep = '$(' + objs_macro.name + ')'
         main_target.dependencies = [objs_dep]
         for dep in self.external_depencencies:
-            main_target.dependencies.append(' ' + relpath(dep, rootpath))
+            main_target.dependencies.append(' ' + relpath(dep, rootpath + '/' + build_path))
 
         def_cmd = '-Dstd_module_name_m=' + self.name
         def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
         def_cmd += ' -Dstd_solution_module_name_m=' + solution_name
-        def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/builder.py\\"'
+        def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/build.py\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_debug_m=std_on_m'
-            def_cmd += ' -Dstd_modules_path_m=\\"modules/debug/\\"'
+            def_cmd += ' -Dstd_submodules_path_m=\\"submodules/debug/\\"'
         elif self.config == CONFIG_RELEASE:
             def_cmd += ' -Dstd_debug_m=std_off_m'
-            def_cmd += ' -Dstd_modules_path_m=\\"modules/release/\\"'
+            def_cmd += ' -Dstd_submodules_path_m=\\"submodules/release/\\"'
         def_cmd += ' -Dstd_rootpath_m=\\"' + normpath(self.index.root_path) + '/\\"'
         stack_size = '1000000'
         # Parse all def files
@@ -667,7 +678,7 @@ class Project:
             value = self.bindings[key]
             def_cmd += ' -Dstd_binding_' + key + '_m=' + value
 
-        compiler_defs_file = open(build_path + '/defines', 'w')
+        compiler_defs_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/defines')
         compiler_defs_file.write(def_cmd)
 
         main_target.cmd = ''
@@ -714,7 +725,7 @@ class Project:
             for dep in self.external_depencencies:
                 _, _, ext = parse_path(dep)
                 if ext == '.dll':
-                    dlls_macro.value += relpath(dep, rootpath) + ' '
+                    dlls_macro.value += relpath(dep, rootpath + '/' + build_path) + ' '
 
             dlls_target = Target()
             dlls_target.macros.append(dlls_macro)
@@ -737,7 +748,7 @@ class Project:
             #compile_flags += ' ' + EXTENDED_WARNINGS_FLAGS
             compile_flags = concat([compile_flags, EXTENDED_WARNINGS_FLAGS])
 
-        compiler_flags_file = open(build_path + '/flags', 'w')
+        compiler_flags_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/flags')
         compiler_flags_file.write(compile_flags)
 
         # Generates one target for each obj, each depending on the corresponding source file and all header files.
@@ -746,7 +757,7 @@ class Project:
             target = Target()
             _, name, ext = parse_path(src)
             target.name = normpath(output_path + '/' + name + '.o')
-            target.dependencies = [relpath(src, rootpath), '$(' + headers_macro.name + ')', '$(' + defs_macro.name + ')']
+            target.dependencies = [relpath(src, rootpath + '/' + build_path), '$(' + headers_macro.name + ')', '$(' + defs_macro.name + ')']
 
             src_def_cmd = '-Dstd_file_name_m=' + name + ext
             src_def_cmd += ' -Dstd_file_name_hash_m=' + str(string_hash(name))
@@ -757,21 +768,21 @@ class Project:
                 target.cmd = '\t@clang -std=c99 -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                 for path in self.project_paths:
                     #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
-                    target.cmd += ' -I' + relpath(path, rootpath)
+                    target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                 for path in self.external_paths:
                     # TODO for each external path create a macro instead of referencing its path directly?
                     #      that way it would be easier to configure external references when sharing the generated makefile
                     #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
-                    target.cmd += ' -I' + relpath(path, rootpath)
+                    target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                 #target.cmd += ' -Wall /J ' + CORE_WARNINGS_FLAGS
                 #if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
                 #    target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
-                target.cmd += ' -o $@ -c ' + relpath(src, rootpath)
+                target.cmd += ' -o $@ -c ' + relpath(src, rootpath + '/' + build_path)
                 #target.cmd += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION
                 target.cmd += ' ' + src_def_cmd
                 #target.cmd += ' ' + def_cmd
-                target.cmd += ' @' + normpath(build_path + '/defines')
-                target.cmd += ' @' + normpath(build_path + '/flags')
+                target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
+                target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
             elif platform.system() == 'Linux':
                 target.cmd = '\t@clang ' + config_flags
                 if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
@@ -784,7 +795,7 @@ class Project:
                 target.cmd += ' -Wall -funsigned-char ' + CORE_WARNINGS_FLAGS
                 if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
                     target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
-                target.cmd += ' -g -c ' + relpath(src, rootpath)
+                target.cmd += ' -g -c ' + relpath(src, rootpath + '/' + build_path)
                 if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                     target.cmd += ' -o ' + normpath(output_path + '/' + name + '.asm')
                 else:
@@ -792,14 +803,14 @@ class Project:
                 target.cmd += ' -fPIC' # needed when building a shared lib, static libs used by the shared lib must also have this...
                 target.cmd += ' ' + src_def_cmd
                 #target.cmd += ' ' + def_cmd
-                target.cmd += ' @' + normpath(build_path + '/defines')
+                target.cmd += ' @' + normpath('defines')
 
             #target.cmd += ' -march=native'
 
             #TODO test this, is it working?
             if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP):
                 #if platform.system() == 'Linux':
-                target.cmd = '\t@clang -E ' + relpath(src, rootpath) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
                 for path in self.project_paths:
                     target.cmd += ' -I' + path
                 for path in self.external_paths:
@@ -813,30 +824,32 @@ class Project:
 
         self.targets = targets
 
+        create_dir(relpath(self.path + '/build/' + config_path, rootpath) + '/output/')
+
     # external_dlls are located and copied locally as part of the build process by this script
     def gather_dlls(self, path):
         copied_dlls = []
 
         config = config_str(self.config)
-
         modules_path = normpath(path + '/' + config)
-        if not os.path.exists(modules_path):
-            log.verbose('Creating path ' + modules_path)
-            os.makedirs(modules_path)
 
         # TODO remove this, use external_exes instead
         if self.output == OUTPUT_APP and not (BUILD_FLAGS & BUILD_FLAG_RELOAD):            
+            create_dir(modules_path)
             base, name, ext = parse_path(self.launcher_path)
             shutil.copy(self.launcher_path, modules_path)
-            output_path = self.path + '/output/' + config
+            output_path = self.path + '/build/' + config + '/output'
             dll = output_path + '/' + self.name + '.dll'
             shutil.copy(dll, modules_path)
 
         dlls_to_copy = self.external_dlls.copy()
         if self.output == OUTPUT_APP:
-            output_path = self.path + '/output/' + config
+            output_path = self.path + '/build/' + config + '/output'
             dll = output_path + '/' + self.name + '.dll'
             dlls_to_copy.append((config, dll))
+
+        if len(dlls_to_copy) > 0:
+            create_dir(modules_path)
 
         for item in dlls_to_copy:
             config = ''
@@ -914,7 +927,7 @@ class Solution:
         return self.projects[name]
 
     def gather_dlls(self):
-        return self.main_project.gather_dlls(normpath(self.main_project.path + '/modules'))
+        return self.main_project.gather_dlls(normpath(self.main_project.path + '/submodules'))
 
     def output_build_changes(self, changelist):
         message = str(len(changelist)) + '\0'
@@ -932,19 +945,24 @@ class Solution:
         win32file.WriteFile(pipe, message.encode(), None)
         pipe.close()
 
+    def get_build_path(self):
+        config_path = config_str(self.config)
+        makefile_path = '/build/' + config_path
+        return makefile_path
+
     # Writes the make file
     def write(self):
-        # Create clean makefile
-        makefile_path = self.main_project.path + '/' + 'Makefile'
-        makefile = open(makefile_path, 'w')
-        # Build all targets
+        # Create makefile
+        config_path = config_str(self.config)
+        makefile_path = normpath(self.main_project.path + '/build/' + config_path + '/Makefile')
+        makefile = create_file(makefile_path)
         targets_map = {}
         for key in self.projects:
             project = self.projects[key]
             #project.build(path)
             log.verbose('Building project ' + project.name + ' (' + project.path + ')')
             log.push_verbose()
-            project.build(self.main_project.path, self.name)
+            project.build(self.main_project.path, 'build/' + config_path, self.name)
             log.pop_verbose()
             targets_map[project] = project.targets
             #if project.output == OUTPUT_EXE:
@@ -962,7 +980,6 @@ class Solution:
         # Write the makefile
         log.verbose('Writing makefile (' + makefile_path + ')')
         phony = []
-        output_path = config_str(self.config)
         # --- ALL target ---
         if TARGET_ALL in self.custom_targets:
             makefile.write('all:')
@@ -973,10 +990,10 @@ class Solution:
         if TARGET_CLEAN in self.custom_targets:
             makefile.write('clean:\n\t')
             separator = ''
-            path = relpath(self.main_project.path + '/output/' + output_path + '/*', self.root)
+            path = relpath(self.main_project.path + '/build/' + config_path + '/output/*', self.root)
             makefile.write(separator + 'rm -rf ' + path)
             separator = ' && '
-            path = relpath(self.main_project.path + '/modules/' + output_path + '/*', self.root)
+            path = relpath(self.main_project.path + '/submodules/' + config_path + '/*', self.root)
             makefile.write(separator + 'rm -rf ' + path)
             makefile.write('\n\n')
             phony.append('clean')
@@ -997,10 +1014,11 @@ class Solution:
                         makefile.write(':')
                         for dep in target.dependencies:
                             makefile.write(' ' + dep)
-                    makefile.write('\n\t@printf "\\t$@\\n"\n')
+                    #makefile.write('\n\t@printf "\\t$@\\n"\n')
+                    makefile.write('\n\t@printf "\\t$(notdir $@)\\n"\n')
                     if target in project.main_targets:
                         _, pdb_name, _ = parse_path(target.name)
-                        pdb_path = relpath(self.main_project.path + '/output/' + output_path + '/' + pdb_name + '.pdb', self.root)
+                        pdb_path = relpath(self.main_project.path + '/build/' + config_path + '/output/' + pdb_name + '.pdb', self.root)
                         makefile.write('\t@rm -f ' + pdb_path + '\n')
                     makefile.write(target.cmd)
                     makefile.write('\n\n')
@@ -1047,9 +1065,13 @@ class Generator:
         project = Project(self.index, name)
         project.output = output
         project.project_paths = makedef['code']
-        if 'defs' in makedef:
-            for define in makedef['defs']:
-                project.defines.append(path + '/' + define)
+        for project_path in project.project_paths:
+            def_path = normpath(path + '/' + project_path + '/define')
+            if (os.path.exists(def_path)):
+                project.defines.append(def_path)
+        #if 'defs' in makedef:
+        #    for define in makedef['defs']:
+        #        project.defines.append(path + '/' + define)
         if 'deps' in makedef:
             project.module_dependencies = makedef['deps']
         if 'ignorelist' in makedef:
@@ -1126,6 +1148,9 @@ class Generator:
         log.push_verbose()
         self.solution.output_build_error()
         log.pop_verbose()
+
+    def get_build_path(self):
+        return self.solution.get_build_path()
 
 class Index:
     def init(self, root_path, tool_path, workspace_paths):

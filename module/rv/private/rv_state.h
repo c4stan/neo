@@ -8,7 +8,6 @@
 
 typedef struct {
     rv_i api;
-    std_memory_h memory_handle;
     rv_view_state_t view;
     //rv_visible_state_t visible;
     //rv_query_state_t query;

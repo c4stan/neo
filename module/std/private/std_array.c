@@ -2,6 +2,7 @@
 
 #include <std_log.h>
 
+#if 0
 std_array_t std_array ( uint64_t capacity ) {
     std_array_t array;
     array.count = 0;
@@ -18,3 +19,4 @@ void std_array_pop ( std_array_t* array, uint64_t count ) {
     std_assert_m ( array->count >= count );
     array->count -= count;
 }
+#endif

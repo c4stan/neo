@@ -18,9 +18,6 @@ static void wm_test_run_2 ( void ) {
 }
 
 static void wm_test_run ( void ) {
-    std_alloc_t p = std_virtual_heap_alloc ( 16, 16 );
-    std_unused_m ( p );
-
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     std_assert_m ( wm );
 

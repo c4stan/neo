@@ -234,7 +234,7 @@ static void run_se_test_2 ( void ) {
             xf_node_params_t node_params = xf_default_node_params_m;
             node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
             node_params.execute_routine = se_clear_pass;
-            node_params.user_args = NULL;
+            node_params.user_args = std_null_buffer_m;
             std_str_copy_m ( node_params.debug_name, "clear_pass" );
 
             clear_pass = xf->create_node ( graph, &node_params );
@@ -246,7 +246,7 @@ static void run_se_test_2 ( void ) {
             node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
             node_params.presentable_texture = swapchain_multi_texture;
             node_params.execute_routine = se_test_pass;
-            node_params.user_args = NULL;
+            node_params.user_args = std_null_buffer_m;
             std_str_copy_m ( node_params.debug_name, "se_pass" );
 
             test_pass = xf->create_node ( graph, &node_params );

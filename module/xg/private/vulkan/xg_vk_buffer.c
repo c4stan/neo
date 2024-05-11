@@ -8,11 +8,9 @@ static xg_vk_buffer_state_t* xg_vk_buffer_state;
 
 void xg_vk_buffer_load ( xg_vk_buffer_state_t* state ) {
     xg_vk_buffer_state = state;
-    std_alloc_t buffers_alloc = std_virtual_heap_alloc_array_m ( xg_vk_buffer_t, xg_vk_max_buffers_m );
-    xg_vk_buffer_state->buffers_memory_handle = buffers_alloc.handle;
-    xg_vk_buffer_state->buffers_array = ( xg_vk_buffer_t* ) buffers_alloc.buffer.base;
-    xg_vk_buffer_state->buffers_freelist = std_freelist ( buffers_alloc.buffer, sizeof ( xg_vk_buffer_t ) );
-    std_mutex_init ( &xg_vk_buffer_state->buffers_mutex );
+    state->buffers_array = std_virtual_heap_alloc_array_m ( xg_vk_buffer_t, xg_vk_max_buffers_m );
+    state->buffers_freelist = std_freelist_m ( state->buffers_array, xg_vk_max_buffers_m );
+    std_mutex_init ( &state->buffers_mutex );
 }
 
 void xg_vk_buffer_reload ( xg_vk_buffer_state_t* state ) {
@@ -20,7 +18,7 @@ void xg_vk_buffer_reload ( xg_vk_buffer_state_t* state ) {
 }
 
 void xg_vk_buffer_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_buffer_state->buffers_memory_handle );
+    std_virtual_heap_free ( xg_vk_buffer_state->buffers_array );
     std_mutex_deinit ( &xg_vk_buffer_state->buffers_mutex );
 }
 

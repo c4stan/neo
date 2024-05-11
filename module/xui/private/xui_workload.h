@@ -79,7 +79,6 @@ typedef struct {
 } xui_workload_device_context_t;
 
 typedef struct {
-    std_memory_h workloads_memory_handle;
     xui_workload_t* workloads_array;
     xui_workload_t* workloads_freelist;
     uint64_t workloads_count;

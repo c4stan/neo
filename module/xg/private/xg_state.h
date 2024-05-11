@@ -14,7 +14,6 @@
 
 typedef struct {
     xg_i api;
-    std_memory_h memory_handle;
     xg_cmd_buffer_state_t cmd_buffer;
     xg_resource_cmd_buffer_state_t resource_cmd_buffer;
     xg_debug_capture_state_t debug_capture;

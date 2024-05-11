@@ -34,7 +34,6 @@ typedef struct {
 } xg_vk_swapchain_t;
 
 typedef struct {
-    std_memory_h swapchains_memory_handle;
     xg_vk_swapchain_t* swapchains_array;
     xg_vk_swapchain_t* swapchains_freelist;
     std_mutex_t swapchains_mutex;

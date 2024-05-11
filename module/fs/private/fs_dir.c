@@ -5,6 +5,42 @@
 #include <std_string.h>
 #include <std_log.h>
 
+static bool fs_dir_create_recursive_from_path_buffer ( void ) {
+#if defined std_platform_win32_m
+    WCHAR* p = t_path_buffer;
+#else
+    // TODO
+#endif
+    while ( *p ) {
+        if ( *p == '\\' || *p == '/' ) {
+            *p = '\0';
+            BOOL create_retcode = CreateDirectoryW ( t_path_buffer, NULL );
+
+            if ( create_retcode == FALSE ) {
+                if ( GetLastError() != ERROR_ALREADY_EXISTS ) {
+                    std_log_os_error_m();
+                    return false;   
+                }
+            }
+
+            *p = '/';
+        }
+
+        ++p;
+    }
+
+    BOOL create_retcode = CreateDirectoryW ( t_path_buffer, NULL );
+
+    if ( create_retcode == FALSE ) {
+        if ( GetLastError() != ERROR_ALREADY_EXISTS ) {
+            std_log_os_error_m();
+            return false;   
+        }
+    }
+
+    return true;
+}
+
 bool fs_dir_create ( const char* path ) {
     std_assert_m ( path != NULL );
 
@@ -15,7 +51,18 @@ bool fs_dir_create ( const char* path ) {
     BOOL create_retcode = CreateDirectoryW ( t_path_buffer, NULL );
 
     if ( create_retcode == FALSE ) {
-        return false;
+        if ( GetLastError() == ERROR_PATH_NOT_FOUND ) {
+            // CreateDirectory fails if any intermediate dir level in the path is missing.
+            // In that case we yry to recursively create the entire path.
+            if ( !fs_dir_create_recursive_from_path_buffer() ) {
+                return false;
+            }
+        } else {
+            if ( GetLastError() != ERROR_ALREADY_EXISTS ) {
+                std_log_os_error_m();                
+            }
+            return false;   
+        }
     }
 
     return true;

@@ -4,7 +4,7 @@ import os
 import sys
 import platform
 
-import builder_impl as builder
+import build_impl as builder
 
 tool_path = os.path.normpath(os.path.abspath(os.path.dirname(__file__)))
 root_path = os.path.normpath(os.path.join(tool_path, '..'))
@@ -20,10 +20,10 @@ if len(args) > 0:
     builder.parse(string)
 else:
     # run the cli
-    #if platform.system() == 'Windows':
-    #    os.system('cls')
-    #else:
-    #    os.system('clear')
+    if platform.system() == 'Windows':
+        os.system('cls')
+    else:
+        os.system('clear')
     builder.print_header()
     builder.print_help()
     while True:

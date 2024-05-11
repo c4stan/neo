@@ -34,7 +34,9 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
 
     source->params = *params;
     uint64_t size = params->capacity_ms * params->sample_frequency * params->bits_per_sample / 8 / 1000;
-    source->buffer = std_virtual_buffer_reserve ( std_align ( size, std_virtual_page_size() ) );
+    //source->buffer = std_virtual_buffer_reserve ( std_align ( size, std_virtual_page_size() ) );
+    void* buffer = std_virtual_heap_alloc ( size, 8 );
+    source->stack = std_stack ( buffer, size );
     source->time_played = 0;
     source->volume = 1;
     source->active_idx = UINT64_MAX;
@@ -45,9 +47,10 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
 
 void aud_source_feed ( aud_source_h source_handle, const void* data, uint64_t size ) {
     aud_source_t* source = &aud_source_state.sources_array[source_handle];
-    void* base = source->buffer.base + source->buffer.top;
-    std_virtual_buffer_push ( &source->buffer, size );
-    std_mem_copy ( base, data, size );
+    //void* base = source->buffer.base + source->buffer.top;
+    //std_virtual_buffer_push ( &source->buffer, size );
+    //std_mem_copy ( base, data, size );
+    std_stack_write ( &source->stack, data, size );
 }
 
 void aud_source_play ( aud_source_h source_handle ) {
@@ -84,7 +87,8 @@ void aud_source_destroy ( aud_source_h source_handle ) {
 
     aud_source_t* source = &aud_source_state.sources_array[source_handle];
     aud_source_state.active_sources[source->active_idx] = aud_source_state.active_sources[aud_source_state.active_sources_count--];
-    std_virtual_buffer_free ( &source->buffer );
+    std_virtual_heap_free ( source->stack.begin );
+    //std_virtual_buffer_free ( &source->buffer );
     std_list_push ( &aud_source_state.sources_freelist, source );
 
     std_mutex_unlock ( &aud_source_state.sources_mutex );
@@ -132,8 +136,8 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
             double decimal = source_sample - source_sample_idx_a;
             uint64_t source_sample_idx_b = ( uint64_t ) ( source_sample + 1 );
 
-            char* source_sample_a = source->buffer.base + source_sample_idx_a * source_sample_stride;
-            char* source_sample_b = source->buffer.base + source_sample_idx_b * source_sample_stride;
+            char* source_sample_a = source->stack.begin + source_sample_idx_a * source_sample_stride;
+            char* source_sample_b = source->stack.begin + source_sample_idx_b * source_sample_stride;
             double sample_a = 0;
             double sample_b = 0;
 

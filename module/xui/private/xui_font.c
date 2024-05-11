@@ -26,10 +26,8 @@ static xui_font_state_t* xui_font_state;
 void xui_font_load ( xui_font_state_t* state ) {
     xui_font_state = state;
 
-    std_alloc_t fonts_alloc = std_virtual_heap_alloc_array_m ( xui_font_t, xui_font_max_fonts_m );
-    xui_font_state->fonts_memory_handle = fonts_alloc.handle;
-    xui_font_state->fonts_array = ( xui_font_t* ) fonts_alloc.buffer.base;
-    xui_font_state->fonts_freelist = std_freelist_array_m ( xui_font_state->fonts_array, xui_font_max_fonts_m );
+    xui_font_state->fonts_array = std_virtual_heap_alloc_array_m ( xui_font_t, xui_font_max_fonts_m );
+    xui_font_state->fonts_freelist = std_freelist_m ( xui_font_state->fonts_array, xui_font_max_fonts_m );
     xui_font_state->uniform_data = NULL;
 }
 
@@ -44,7 +42,7 @@ void xui_font_reload ( xui_font_state_t* state ) {
 }
 
 void xui_font_unload ( void ) {
-    std_virtual_heap_free ( xui_font_state->fonts_memory_handle );
+    std_virtual_heap_free ( xui_font_state->fonts_array );
 }
 
 xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t* params ) {
@@ -67,7 +65,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
 
     // Atlas
     size_t atlas_size = xui_font_texture_atlas_width_m * xui_font_texture_atlas_height_m;
-    std_alloc_t atlas_alloc = std_virtual_heap_alloc ( atlas_size, 16 );
+    void* atlas_alloc = std_virtual_heap_alloc ( atlas_size, 16 );
 #if 0
     std_alloc_t char_info_alloc = std_virtual_heap_alloc ( sizeof ( stbtt_bakedchar ) * params->char_count, 16 );
 
@@ -76,20 +74,18 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     std_assert_m ( bake_result > 0 );
 #else
     stbtt_pack_context pack_context;
-    std_alloc_t char_info_alloc = std_virtual_heap_alloc ( sizeof ( stbtt_packedchar ) * params->char_count, 16 );
+    font->char_info = std_virtual_heap_alloc_array_m ( stbtt_packedchar, params->char_count );
 
-    stbtt_PackBegin ( &pack_context, ( unsigned char* ) atlas_alloc.buffer.base, xui_font_texture_atlas_width_m, xui_font_texture_atlas_height_m, 0, 4, NULL );
+    stbtt_PackBegin ( &pack_context, ( unsigned char* ) atlas_alloc, xui_font_texture_atlas_width_m, xui_font_texture_atlas_height_m, 0, 4, NULL );
     stbtt_PackSetOversampling ( &pack_context, 2, 2 );
-    stbtt_PackFontRange ( &pack_context, ( unsigned char* ) ttf_data.base, 0, ( float ) params->pixel_height, ( int ) params->first_char_code, ( int ) params->char_count, ( stbtt_packedchar* ) char_info_alloc.buffer.base );
+    stbtt_PackFontRange ( &pack_context, ( unsigned char* ) ttf_data.base, 0, ( float ) params->pixel_height, ( int ) params->first_char_code, ( int ) params->char_count, font->char_info );
     stbtt_PackEnd ( &pack_context );
 #endif
-
-    font->char_info_handle = char_info_alloc.handle;
 
 #if 0
     font->char_info = ( stbtt_bakedchar* ) char_info_alloc.buffer.base;
 #else
-    font->char_info = ( stbtt_packedchar* ) char_info_alloc.buffer.base;
+    //font->char_info = ( stbtt_packedchar* ) char_info_alloc.buffer.base;
 #endif
 
     xg_texture_h raster_texture;
@@ -125,7 +121,9 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     xg_buffer_info_t staging_buffer_info;
     xg->get_buffer_info ( &staging_buffer_info, staging_buffer );
 
-    std_mem_copy ( staging_buffer_info.allocation.mapped_address, atlas_alloc.buffer.base, atlas_size );
+    std_mem_copy ( staging_buffer_info.allocation.mapped_address, atlas_alloc, atlas_size );
+
+    std_virtual_heap_free ( atlas_alloc );
 
     //xg->cmd_start_debug_capture ( cmd_buffer, xg_debug_capture_stop_time_workload_submit_m, key );
 

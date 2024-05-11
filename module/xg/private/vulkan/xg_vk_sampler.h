@@ -14,7 +14,6 @@ typedef struct {
 } xg_vk_sampler_t;
 
 typedef struct {
-    std_memory_h samplers_memory_handle;
     xg_vk_sampler_t* samplers_array;
     xg_vk_sampler_t* samplers_freelist;
     std_mutex_t samplers_mutex;

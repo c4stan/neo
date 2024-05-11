@@ -282,15 +282,13 @@ void rv_view_init ( void ) {
 void rv_view_load ( rv_view_state_t* state ) {
     rv_view_state = state;
 
-    std_alloc_t views_alloc = std_virtual_heap_alloc_array_m ( rv_view_t, rv_view_max_views_m );
-    rv_view_state->views_memory_handle = views_alloc.handle;
-    rv_view_state->views_array = ( rv_view_t* ) views_alloc.buffer.base;
-    rv_view_state->views_freelist = std_freelist ( views_alloc.buffer, sizeof ( rv_view_t ) );
+    rv_view_state->views_array = std_virtual_heap_alloc_array_m ( rv_view_t, rv_view_max_views_m );
+    rv_view_state->views_freelist = std_freelist_m ( rv_view_state->views_array, rv_view_max_views_m );
     std_mutex_init ( &rv_view_state->views_mutex );
 }
 
 void rv_view_unload ( void ) {
-    std_virtual_heap_free ( rv_view_state->views_memory_handle );
+    std_virtual_heap_free ( rv_view_state->views_array );
 }
 
 void rv_view_reload ( rv_view_state_t* state ) {

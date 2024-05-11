@@ -21,6 +21,7 @@ void set_ui_pass_xui_workload ( xui_workload_h workload ) {
 
 static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    xg_resource_cmd_buffer_h resource_cmd_buffer = node_args->resource_cmd_buffer;
     uint64_t key = node_args->base_key;
 
     ui_pass_args_t* args = ( ui_pass_args_t* ) user_args;
@@ -42,6 +43,7 @@ static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* use
         params.device = args->device;
         params.workload = node_args->workload;
         params.cmd_buffer = cmd_buffer;
+        params.resource_cmd_buffer = resource_cmd_buffer;
         params.key = key;
         params.render_target_format = args->render_target_format;
         params.viewport.width = args->resolution_x;
@@ -81,9 +83,7 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
         std_str_copy_m ( params.debug_name, "ui" );
         params.debug_color = xg_debug_region_color_green_m;
         params.key_space_size = 128;
-        params.user_args = &args;
-        params.user_args_allocator = std_virtual_heap_allocator();
-        params.user_args_alloc_size = sizeof ( args );
+        params.user_args = std_buffer_m ( &args );
 
         ui_node = xf->create_node ( graph, &params );
     }

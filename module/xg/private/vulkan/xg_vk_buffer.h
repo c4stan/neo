@@ -20,7 +20,6 @@ typedef struct {
 } xg_vk_buffer_t;
 
 typedef struct {
-    std_memory_h buffers_memory_handle;
     xg_vk_buffer_t* buffers_array;
     xg_vk_buffer_t* buffers_freelist;
     std_mutex_t buffers_mutex;

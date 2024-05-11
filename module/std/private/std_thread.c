@@ -19,7 +19,7 @@ static DWORD WINAPI std_thread_launcher ( LPVOID param ) {
     std_thread_t* thread;
     thread = ( std_thread_t* ) param;
     std_thread_h thread_handle = ( std_thread_h ) ( thread - std_thread_state->threads_array );
-    std_assert_m ( TlsSetValue ( ( DWORD ) std_thread_state->tls_alloc, ( LPVOID ) thread_handle ) == TRUE );
+    std_verify_m ( TlsSetValue ( ( DWORD ) std_thread_state->tls_alloc, ( LPVOID ) thread_handle ) == TRUE );
     thread->routine ( thread->arg );
     return 0;   // Don't care about letting the OS know what happened at thread runtime
 }
@@ -29,7 +29,7 @@ static void* std_thread_launcher ( void* param ) {
     thread = ( std_thread_t* ) param;
     std_thread_h thread_handle = ( std_thread_h ) ( thread - std_thread_state->threads_array );
     // TODO test this
-    std_assert_m ( pthread_setspecific ( ( pthread_key_t ) std_thread_state->tls_alloc, ( void* ) thread_handle ) == 0 );
+    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) std_thread_state->tls_alloc, ( void* ) thread_handle ) == 0 );
     thread->routine ( thread->arg );
     return NULL;
 }
@@ -107,9 +107,9 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
     std_thread_h thread_handle = ( std_thread_h ) ( thread - state->threads_array );
 
 #if defined(std_platform_win32_m)
-    std_assert_m ( TlsSetValue ( ( DWORD ) state->tls_alloc, ( LPVOID ) thread_handle ) == TRUE );
+    std_verify_m ( TlsSetValue ( ( DWORD ) state->tls_alloc, ( LPVOID ) thread_handle ) == TRUE );
 #elif defined(std_platform_linux_m)
-    std_assert_m ( pthread_setspecific ( ( pthread_key_t ) state->tls_alloc, ( void* ) thread_handle ) == 0 );
+    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) state->tls_alloc, ( void* ) thread_handle ) == 0 );
 #endif
 }
 
@@ -124,7 +124,7 @@ void std_thread_init ( std_thread_state_t* state ) {
     state->tls_alloc = TlsAlloc();
     std_assert_m ( state->tls_alloc != TLS_OUT_OF_INDEXES );
 #elif defined(std_platform_linux_m)
-    std_assert_m ( pthread_key_create ( ( pthread_key_t* ) &state->tls_alloc, NULL ) == 0 );
+    std_verify_m ( pthread_key_create ( ( pthread_key_t* ) &state->tls_alloc, NULL ) == 0 );
 #endif
     std_mutex_init ( &state->mutex );
     std_thread_register_main ( state );

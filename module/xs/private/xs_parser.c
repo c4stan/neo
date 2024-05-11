@@ -19,7 +19,7 @@ typedef struct {
     const char* line_begin;
 
     const char* path;
-    void* state;
+    void* state; // xs_parser_graphics_pipeline_state_t* / compute / ...
 
 #if 0
     xg_pipeline_e pipeline_type;
@@ -1524,16 +1524,20 @@ static void xs_parser_parse_variation ( xs_parser_parsing_context_t* context, co
 uint32_t xs_parser_parse_graphics_pipeline_variations_from_path ( xs_parser_graphics_pipeline_state_t* variations, const xs_parser_graphics_pipeline_state_t* base_state, const char* path ) {
     fs_i* fs = std_module_get_m ( fs_module_name_m );
 
+#if 0
     fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
     std_assert_m ( pipeline_state_file != fs_null_handle_m );
     fs_file_info_t pipeline_state_file_info;
-    std_assert_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
-    std_alloc_t state_alloc = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
-    std_assert_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
+    std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
+    void* file_buffer = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
+    std_verify_m ( fs->read_file ( state_alloc, pipeline_state_file_info.size, pipeline_state_file ) );
     fs->close_file ( pipeline_state_file );
+#else
+    std_buffer_t file_buffer = fs->read_file_path_to_heap ( path );
+#endif
 
     xs_parser_parsing_context_t context;
-    xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, ( void* ) base_state, std_buffer ( state_alloc.buffer.base, pipeline_state_file_info.size ), path );
+    xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, ( void* ) base_state, file_buffer, path );
 
     char token[xs_shader_parser_max_token_size_m];
     //size_t branch_depth = 0;
@@ -1566,7 +1570,7 @@ uint32_t xs_parser_parse_graphics_pipeline_variations_from_path ( xs_parser_grap
         }
     }
 
-    std_virtual_heap_free ( state_alloc.handle );
+    std_virtual_heap_free ( file_buffer.base );
 
     std_module_release ( fs );
 
@@ -1582,24 +1586,28 @@ uint32_t xs_parser_parse_graphics_pipeline_variations_from_path ( xs_parser_grap
 bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipeline_state_t* state, const char* path ) {
     fs_i* fs = std_module_get_m ( fs_module_name_m );
 
+#if 0
     fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
     std_assert_m ( pipeline_state_file != fs_null_handle_m );
     fs_file_info_t pipeline_state_file_info;
-    std_assert_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
-    std_alloc_t state_alloc = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
-    std_assert_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
+    std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
+    void* file_buffer = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
+    std_verify_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
     fs->close_file ( pipeline_state_file );
+#else
+    std_buffer_t file_buffer = fs->read_file_path_to_heap ( path );
+#endif
 
     //state_alloc.buffer.base[pipeline_state_file_info.size] = 0;
 
     std_module_release ( fs );
 
     xs_parser_parsing_context_t context;
-    xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, state, std_buffer ( state_alloc.buffer.base, pipeline_state_file_info.size ), path );
+    xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, state, file_buffer, path );
 
     xs_parser_parse_graphics_pipeline_state ( &context );
 
-    std_virtual_heap_free ( state_alloc.handle );
+    std_virtual_heap_free ( file_buffer.base );
 
     // TODO remove permutations
     //if ( context.shader_permutations->permutation_count == 0 ) {
@@ -1674,20 +1682,24 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
 bool xs_parser_parse_compute_pipeline_state_from_path ( xs_parser_compute_pipeline_state_t* state, const char* path ) {
     fs_i* fs = std_module_get_m ( fs_module_name_m );
 
+#if 0
     fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
     std_assert_m ( pipeline_state_file != fs_null_handle_m );
     fs_file_info_t pipeline_state_file_info;
-    std_assert_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
+    std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
     std_alloc_t state_alloc = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
-    std_assert_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
+    std_verify_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
     fs->close_file ( pipeline_state_file );
+#else
+    std_buffer_t file_buffer = fs->read_file_path_to_heap ( path );
+#endif
 
     xs_parser_parsing_context_t context;
-    xs_parser_parsing_context_init ( &context, xg_pipeline_compute_m, state, std_buffer ( state_alloc.buffer.base, pipeline_state_file_info.size ), path );
+    xs_parser_parsing_context_init ( &context, xg_pipeline_compute_m, state, file_buffer, path );
 
     xs_parser_parse_compute_pipeline_state ( &context );
 
-    std_virtual_heap_free ( state_alloc.handle );
+    std_virtual_heap_free ( file_buffer.base );
 
     //if ( context.shader_permutations->permutation_count == 0 ) {
     //    context.shader_permutations->permutation_count = 1;

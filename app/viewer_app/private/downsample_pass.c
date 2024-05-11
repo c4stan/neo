@@ -115,9 +115,7 @@ xf_node_h add_downsample_pass ( xf_graph_h graph, xf_texture_h source, xf_textur
     params.render_targets[params.render_targets_count++] = xf_render_target_dependency_m ( destination, xg_default_texture_view_m );
     params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( source, xg_shading_stage_fragment_m );
     params.execute_routine = downsample_pass;
-    params.user_args = &pass_args;
-    params.user_args_allocator = std_virtual_heap_allocator();
-    params.user_args_alloc_size = sizeof ( pass_args );
+    params.user_args = std_buffer_m ( &pass_args );
     std_str_copy_m ( params.debug_name, name );
     xf_node_h node = xf->create_node ( graph, &params );
 

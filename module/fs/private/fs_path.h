@@ -2,7 +2,6 @@
 
 #include <fs.h>
 
-#include <std_buffer.h>
 #include <std_allocator.h>
 
 /* ----------------------------------------------------------------------------

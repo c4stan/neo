@@ -22,7 +22,7 @@ begin texture
     register 2
 end
 
-begin sampler
+begin texture
     stage fragment
     register 3
 end
@@ -30,4 +30,9 @@ end
 begin sampler
     stage fragment
     register 4
+end
+
+begin sampler
+    stage fragment
+    register 5
 end

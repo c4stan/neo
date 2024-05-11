@@ -9,10 +9,12 @@ layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_depth;
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_prev_depth;
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 4 ) uniform texture2D tex_normal_roughness;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 5 ) uniform texture2D tex_id;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 6 ) uniform texture2D tex_prev_id;
 
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 5 ) uniform sampler sampler_point;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 7 ) uniform sampler sampler_point;
 
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 6 ) uniform shader_cbuffer_t {
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 8 ) uniform shader_cbuffer_t {
     vec2 resolution_f32;
 } draw_cbuffer;
 
@@ -91,6 +93,16 @@ void main ( void ) {
     //float d2 =  ( prev_depth );
     //out_color = vec4 ( abs ( d1 - d2 ) * 100000000, 0, 0, 1 );
     //return;
+
+    vec4 object_id_sample = texture ( sampler2D ( tex_id, sampler_point ), screen_uv.xy );
+    vec4 prev_object_id_sample = texture ( sampler2D ( tex_prev_id, sampler_point ), prev_screen.xy );
+    uint object_id = floatBitsToUint ( object_id_sample.x );
+    uint prev_object_id = floatBitsToUint ( prev_object_id_sample.x );
+
+    if ( object_id != prev_object_id ) {
+        out_color = vec4 ( color, 1 );
+        return;
+    }
 
 #if 0
     // depth disocclusion
@@ -178,6 +190,8 @@ void main ( void ) {
     ///
 #else
     
+
+    #if 1
     vec3 vsum = 0.0.xxx;
     vec3 vsum2 = 0.0.xxx;
     float wsum = 0.0;
@@ -209,6 +223,9 @@ void main ( void ) {
     vec2 pixel_offset = screen_offset * frame_cbuffer.resolution_f32;
     float motion_factor = clamp ( dot ( 1.0.xx, 0.5 - abs ( 0.5 - fract ( pixel_offset ) ) ), 0.0, 1.0 );
     float blend_factor = 0.05 * (1 + motion_factor * 4);// 1.0 / 8.0;
+    #else
+    float blend_factor = 0.1;
+    #endif
 #endif
     vec3 new_color = mix ( history, color, blend_factor );
     

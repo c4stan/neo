@@ -81,7 +81,6 @@ typedef struct {
 } xg_vk_device_t;
 
 typedef struct {
-    std_memory_h devices_memory_handle;
     xg_vk_device_t* devices_array;
     xg_vk_device_t* devices_freelist;
     std_mutex_t devices_mutex;

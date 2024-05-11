@@ -18,7 +18,6 @@ typedef struct {
 } rv_view_t;
 
 typedef struct {
-    std_memory_h views_memory_handle;
     rv_view_t* views_array;
     rv_view_t* views_freelist;
     std_mutex_t views_mutex;

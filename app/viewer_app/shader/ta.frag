@@ -7,7 +7,7 @@
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_color;
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture2D tex_history;
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_depth;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_prev_depth;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_id;
 
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 4 ) uniform sampler sampler_point;
 
@@ -76,7 +76,7 @@ void main ( void ) {
 
     // history sample
     vec3 history = texture ( sampler2D ( tex_history, sampler_point ), prev_screen.xy ).xyz;
-    float prev_depth = texture ( sampler2D ( tex_prev_depth, sampler_point ), prev_screen.xy ).x;
+    //float prev_depth = texture ( sampler2D ( tex_prev_depth, sampler_point ), prev_screen.xy ).x;
 
     //float d1 =  ( depth );
     //float d2 =  ( prev_depth );

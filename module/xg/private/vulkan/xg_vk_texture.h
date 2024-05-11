@@ -38,15 +38,11 @@ typedef struct {
 
     union {
         struct {
-            std_memory_h handle;
             xg_vk_texture_view_t* array;
         } mips;
         // TODO use std_map_t? and store <xg_vk_texture_view_t, xg_texture_view_t> in payload
         struct {
             // TODO not implemented yet
-            std_memory_h keys_handle;
-            std_memory_h payloads_handle;
-            std_memory_h map_handle;
             std_hash_map_t* map; // xg_texture_view_t -> xg_vk_texture_view_t
         } table;
     } external_views;
@@ -56,7 +52,6 @@ typedef struct {
 } xg_vk_texture_t;
 
 typedef struct {
-    std_memory_h textures_memory_handle;
     xg_vk_texture_t* textures_array;
     xg_vk_texture_t* textures_freelist;
     std_mutex_t textures_mutex;

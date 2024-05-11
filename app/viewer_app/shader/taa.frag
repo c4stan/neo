@@ -7,9 +7,10 @@
 layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
 layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
 layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_history;
+layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_id;
 
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
-layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_linear;
+layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
+layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_linear;
 
 layout ( location = 0 ) out vec4 out_color;
 

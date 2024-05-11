@@ -118,71 +118,54 @@ static xg_vk_pipeline_state_t* xg_vk_pipeline_state;
 void xg_vk_pipeline_load ( xg_vk_pipeline_state_t* state ) {
     xg_vk_pipeline_state = state;
 
-    // Allocs
-    std_alloc_t graphics_pipelines_alloc = std_virtual_heap_alloc_array_m ( xg_vk_graphics_pipeline_t, xg_vk_max_graphics_pipelines_m );
-    std_alloc_t graphics_pipelines_map_keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_graphics_pipelines_m * 2 );
-    std_alloc_t graphics_pipelines_map_values_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_graphics_pipelines_m * 2 );
+    state->graphics_pipelines_array = std_virtual_heap_alloc_array_m ( xg_vk_graphics_pipeline_t, xg_vk_max_graphics_pipelines_m );
+    state->graphics_pipelines_freelist = std_freelist_m ( state->graphics_pipelines_array, xg_vk_max_graphics_pipelines_m );
+    state->graphics_pipelines_map = std_hash_map ( 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_graphics_pipelines_m * 2 ), 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_graphics_pipelines_m * 2 ),
+        xg_vk_max_graphics_pipelines_m * 2
+    );
+    std_mutex_init ( &state->graphics_pipelines_freelist_mutex );
+    std_mutex_init ( &state->graphics_pipelines_map_mutex );
 
-    std_alloc_t compute_pipelines_alloc = std_virtual_heap_alloc_array_m ( xg_vk_compute_pipeline_t, xg_vk_max_compute_pipelines_m );
-    std_alloc_t compute_pipelines_map_keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_compute_pipelines_m * 2 );
-    std_alloc_t compute_pipelines_map_values_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_compute_pipelines_m * 2 );
+    state->compute_pipelines_array = std_virtual_heap_alloc_array_m ( xg_vk_compute_pipeline_t, xg_vk_max_compute_pipelines_m );
+    state->compute_pipelines_freelist = std_freelist_m ( state->compute_pipelines_array, xg_vk_max_compute_pipelines_m );
+    state->compute_pipelines_map = std_hash_map ( 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_compute_pipelines_m * 2 ), 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_compute_pipelines_m * 2 ),
+        xg_vk_max_compute_pipelines_m * 2
+    );
+    std_mutex_init ( &state->compute_pipelines_freelist_mutex );
+    std_mutex_init ( &state->compute_pipelines_map_mutex );
 
-    std_alloc_t renderpasses_alloc = std_virtual_heap_alloc_array_m ( xg_vk_renderpass_t, xg_vk_max_renderpasses_m );
-    std_alloc_t renderpasses_map_keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_renderpasses_m * 2 );
-    std_alloc_t renderpasses_map_values_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_renderpasses_m * 2 );
+    state->renderpasses_array = std_virtual_heap_alloc_array_m ( xg_vk_renderpass_t, xg_vk_max_renderpasses_m );
+    state->renderpasses_freelist = std_freelist_m ( state->renderpasses_array, xg_vk_max_renderpasses_m );
+    state->renderpasses_map = std_hash_map ( 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_renderpasses_m * 2 ), 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_renderpasses_m * 2 ),
+        xg_vk_max_renderpasses_m * 2
+    );
+    std_mutex_init ( &state->renderpasses_freelist_mutex );
+    std_mutex_init ( &state->renderpasses_map_mutex );
 
-    std_alloc_t set_layouts_alloc = std_virtual_heap_alloc_array_m ( xg_vk_pipeline_resource_binding_set_layout_t, xg_vk_max_descriptor_sets_layouts_m );
-    std_alloc_t set_layouts_map_keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_descriptor_sets_layouts_m * 2 );
-    std_alloc_t set_layouts_map_values_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_descriptor_sets_layouts_m * 2 );
+    state->set_layouts_array = std_virtual_heap_alloc_array_m ( xg_vk_pipeline_resource_binding_set_layout_t, xg_vk_max_descriptor_sets_layouts_m );
+    state->set_layouts_freelist = std_freelist_m ( state->set_layouts_array, xg_vk_max_descriptor_sets_layouts_m );
+    state->set_layouts_map = std_hash_map ( 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_descriptor_sets_layouts_m * 2 ),
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_descriptor_sets_layouts_m * 2 ),
+        xg_vk_max_descriptor_sets_layouts_m * 2
+    );
+    std_mutex_init ( &state->set_layouts_mutex );
 
-    std_alloc_t framebuffers_alloc = std_virtual_heap_alloc_array_m ( xg_vk_framebuffer_t, xg_vk_max_framebuffers_m );
-    std_alloc_t framebuffers_map_keys_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_framebuffers_m * 2 );
-    std_alloc_t framebuffers_map_values_alloc = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_framebuffers_m * 2 );
-
-    // State init
-    xg_vk_pipeline_state->graphics_pipelines_memory_handle = graphics_pipelines_alloc.handle;
-    xg_vk_pipeline_state->graphics_pipelines_map_keys_memory_handle = graphics_pipelines_map_keys_alloc.handle;
-    xg_vk_pipeline_state->graphics_pipelines_map_values_memory_handle = graphics_pipelines_map_values_alloc.handle;
-    xg_vk_pipeline_state->graphics_pipelines_array = ( xg_vk_graphics_pipeline_t* ) graphics_pipelines_alloc.buffer.base;
-    xg_vk_pipeline_state->graphics_pipelines_freelist = std_freelist ( graphics_pipelines_alloc.buffer, sizeof ( xg_vk_graphics_pipeline_t ) );
-    xg_vk_pipeline_state->graphics_pipelines_map = std_hash_map ( graphics_pipelines_map_keys_alloc.buffer, graphics_pipelines_map_values_alloc.buffer );
-    std_mutex_init ( &xg_vk_pipeline_state->graphics_pipelines_freelist_mutex );
-    std_mutex_init ( &xg_vk_pipeline_state->graphics_pipelines_map_mutex );
-
-    xg_vk_pipeline_state->compute_pipelines_memory_handle = compute_pipelines_alloc.handle;
-    xg_vk_pipeline_state->compute_pipelines_map_keys_memory_handle = graphics_pipelines_map_keys_alloc.handle;
-    xg_vk_pipeline_state->compute_pipelines_map_values_memory_handle = graphics_pipelines_map_values_alloc.handle;
-    xg_vk_pipeline_state->compute_pipelines_array = ( xg_vk_compute_pipeline_t* ) compute_pipelines_alloc.buffer.base;
-    xg_vk_pipeline_state->compute_pipelines_freelist = std_freelist ( compute_pipelines_alloc.buffer, sizeof ( xg_vk_compute_pipeline_t ) );
-    xg_vk_pipeline_state->compute_pipelines_map = std_hash_map ( compute_pipelines_map_keys_alloc.buffer, compute_pipelines_map_values_alloc.buffer );
-    std_mutex_init ( &xg_vk_pipeline_state->compute_pipelines_freelist_mutex );
-    std_mutex_init ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
-
-    xg_vk_pipeline_state->renderpasses_memory_handle = renderpasses_alloc.handle;
-    xg_vk_pipeline_state->renderpasses_map_keys_memory_handle = renderpasses_map_keys_alloc.handle;
-    xg_vk_pipeline_state->renderpasses_map_values_memory_handle = renderpasses_map_values_alloc.handle;
-    xg_vk_pipeline_state->renderpasses_array = ( xg_vk_renderpass_t* ) renderpasses_alloc.buffer.base;
-    xg_vk_pipeline_state->renderpasses_freelist = std_freelist ( renderpasses_alloc.buffer, sizeof ( xg_vk_renderpass_t ) );
-    xg_vk_pipeline_state->renderpasses_map = std_hash_map ( renderpasses_map_keys_alloc.buffer, renderpasses_map_values_alloc.buffer );
-    std_mutex_init ( &xg_vk_pipeline_state->renderpasses_freelist_mutex );
-    std_mutex_init ( &xg_vk_pipeline_state->renderpasses_map_mutex );
-
-    xg_vk_pipeline_state->set_layouts_memory_handle = set_layouts_alloc.handle;
-    xg_vk_pipeline_state->set_layouts_map_keys_memory_handle = set_layouts_map_keys_alloc.handle;
-    xg_vk_pipeline_state->set_layouts_map_values_memory_handle = set_layouts_map_values_alloc.handle;
-    xg_vk_pipeline_state->set_layouts_array = ( xg_vk_pipeline_resource_binding_set_layout_t* ) set_layouts_alloc.buffer.base;
-    xg_vk_pipeline_state->set_layouts_freelist = std_freelist ( set_layouts_alloc.buffer, sizeof ( xg_vk_pipeline_resource_binding_set_layout_t ) );
-    xg_vk_pipeline_state->set_layouts_map = std_hash_map ( set_layouts_map_keys_alloc.buffer, set_layouts_map_values_alloc.buffer );
-    std_mutex_init ( &xg_vk_pipeline_state->set_layouts_mutex );
-
-    xg_vk_pipeline_state->framebuffers_memory_handle = framebuffers_alloc.handle;
-    xg_vk_pipeline_state->framebuffers_map_keys_memory_handle = framebuffers_map_keys_alloc.handle;
-    xg_vk_pipeline_state->framebuffers_map_values_memory_handle = framebuffers_map_values_alloc.handle;
-    xg_vk_pipeline_state->framebuffers_array = ( xg_vk_framebuffer_t* ) framebuffers_alloc.buffer.base;
-    xg_vk_pipeline_state->framebuffers_freelist = std_freelist ( framebuffers_alloc.buffer, sizeof ( xg_vk_framebuffer_t ) );
-    xg_vk_pipeline_state->framebuffers_map = std_hash_map ( framebuffers_map_keys_alloc.buffer, framebuffers_map_values_alloc.buffer );
-    std_mutex_init ( &xg_vk_pipeline_state->framebuffers_freelist_mutex );
-    std_mutex_init ( &xg_vk_pipeline_state->framebuffers_map_mutex );
+    state->framebuffers_array = std_virtual_heap_alloc_array_m ( xg_vk_framebuffer_t, xg_vk_max_framebuffers_m );
+    state->framebuffers_freelist = std_freelist_m ( state->framebuffers_array, xg_vk_max_framebuffers_m );
+    state->framebuffers_map = std_hash_map ( 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_framebuffers_m * 2 ), 
+        std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_max_framebuffers_m * 2 ),
+        xg_vk_max_framebuffers_m * 2
+    );
+    std_mutex_init ( &state->framebuffers_freelist_mutex );
+    std_mutex_init ( &state->framebuffers_map_mutex );
 }
 
 void xg_vk_pipeline_reload ( xg_vk_pipeline_state_t* state ) {
@@ -192,21 +175,21 @@ void xg_vk_pipeline_reload ( xg_vk_pipeline_state_t* state ) {
 void xg_vk_pipeline_unload ( void ) {
     // TODO free all vulkan objects
 
-    std_virtual_heap_free ( xg_vk_pipeline_state->graphics_pipelines_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->graphics_pipelines_map_keys_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->graphics_pipelines_map_values_memory_handle );
+    std_virtual_heap_free ( xg_vk_pipeline_state->graphics_pipelines_array );
+    std_virtual_heap_free ( xg_vk_pipeline_state->graphics_pipelines_map.hashes );
+    std_virtual_heap_free ( xg_vk_pipeline_state->graphics_pipelines_map.payloads );
 
-    std_virtual_heap_free ( xg_vk_pipeline_state->compute_pipelines_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->compute_pipelines_map_keys_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->compute_pipelines_map_values_memory_handle );
+    std_virtual_heap_free ( xg_vk_pipeline_state->compute_pipelines_array );
+    std_virtual_heap_free ( xg_vk_pipeline_state->compute_pipelines_map.hashes );
+    std_virtual_heap_free ( xg_vk_pipeline_state->compute_pipelines_map.payloads );
 
-    std_virtual_heap_free ( xg_vk_pipeline_state->renderpasses_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->renderpasses_map_keys_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->renderpasses_map_values_memory_handle );
+    std_virtual_heap_free ( xg_vk_pipeline_state->renderpasses_array );
+    std_virtual_heap_free ( xg_vk_pipeline_state->renderpasses_map.hashes );
+    std_virtual_heap_free ( xg_vk_pipeline_state->renderpasses_map.payloads );
 
-    std_virtual_heap_free ( xg_vk_pipeline_state->set_layouts_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->set_layouts_map_keys_memory_handle );
-    std_virtual_heap_free ( xg_vk_pipeline_state->set_layouts_map_values_memory_handle );
+    std_virtual_heap_free ( xg_vk_pipeline_state->set_layouts_array );
+    std_virtual_heap_free ( xg_vk_pipeline_state->set_layouts_map.hashes );
+    std_virtual_heap_free ( xg_vk_pipeline_state->set_layouts_map.payloads );
 
     std_mutex_deinit ( &xg_vk_pipeline_state->graphics_pipelines_freelist_mutex );
     std_mutex_deinit ( &xg_vk_pipeline_state->graphics_pipelines_map_mutex );
@@ -221,37 +204,37 @@ static uint64_t xg_vk_framebuffer_params_hash ( const xg_render_textures_layout_
     bool use_depth_stencil = render_textures_layout->depth_stencil.format != xg_format_undefined_m;
 
     char state_buffer[sizeof ( *render_textures_layout )];
-    std_stack_t hash_allocator = std_stack ( std_static_buffer_m ( state_buffer ) );
+    std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
     // Hash format and spp of every render target. It identifies the renderpass/framebuffer and everything else is unused/left default.
     // Every pipeline will have a pointer to its shared renderpass. This way at render time on every pso change
     // it's enough to get the pso's renderpass, and begin a new renderpass if it's different from the previous.
     // Memset to zero and copy each field to guarantee padding value
-    std_stack_push_copy_noalign_m ( &hash_allocator, &use_depth_stencil );
+    std_stack_write_noalign_m ( &hash_allocator, &use_depth_stencil );
 
     if ( use_depth_stencil ) {
-        std_stack_push_copy_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.format );
-        std_stack_push_copy_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.samples_per_pixel );
+        std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.format );
+        std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.samples_per_pixel );
     }
 
-    std_stack_push_copy_noalign_m ( &hash_allocator, &render_textures_layout->render_targets_count );
+    std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->render_targets_count );
 
     if ( render_textures_layout->render_targets_count ) {
         std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_render_target_layout_t ) );
-        xg_render_target_layout_t* sorted_render_targets = std_stack_push_noalign_array_m ( &hash_allocator, xg_render_target_layout_t, render_textures_layout->render_targets_count );
+        std_auto_m sorted_render_targets = std_stack_alloc_array_m ( &hash_allocator, xg_render_target_layout_t, render_textures_layout->render_targets_count );
         std_mem_zero_array_m ( sorted_render_targets, render_textures_layout->render_targets_count );
         std_sort_insertion_copy ( sorted_render_targets, render_textures_layout->render_targets, sizeof ( xg_render_target_layout_t ), render_textures_layout->render_targets_count, xg_vk_pipeline_render_target_layout_cmp );
 
         for ( size_t i = 0; i < render_textures_layout->render_targets_count; ++i ) {
-            std_stack_push_copy_noalign_m ( &hash_allocator, &sorted_render_targets[i].format );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &sorted_render_targets[i].samples_per_pixel );
+            std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].format );
+            std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].samples_per_pixel );
         }
     }
 
-    std_stack_push_copy_noalign_m ( &hash_allocator, &width );
-    std_stack_push_copy_noalign_m ( &hash_allocator, &height );
+    std_stack_write_noalign_m ( &hash_allocator, &width );
+    std_stack_write_noalign_m ( &hash_allocator, &height );
 
-    uint64_t hash = std_hash_metro ( hash_allocator.buffer.base, hash_allocator.top );
+    uint64_t hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
     return hash;
 }
 
@@ -259,34 +242,34 @@ static uint64_t xg_vk_renderpass_params_hash ( const xg_render_textures_layout_t
     bool use_depth_stencil = render_textures_layout->depth_stencil.format != xg_format_undefined_m;
 
     char state_buffer[sizeof ( *render_textures_layout )];
-    std_stack_t hash_allocator = std_stack ( std_static_buffer_m ( state_buffer ) );
+    std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
     // Hash format and spp of every render target. It identifies the renderpass/framebuffer and everything else is unused/left default.
     // Every pipeline will have a pointer to its shared renderpass. This way at render time on every pso change
     // it's enough to get the pso's renderpass, and begin a new renderpass if it's different from the previous.
     // Memset to zero and copy each field to guarantee padding value
-    std_stack_push_copy_noalign_m ( &hash_allocator, &use_depth_stencil );
+    std_stack_write_noalign_m ( &hash_allocator, &use_depth_stencil );
 
     if ( use_depth_stencil ) {
-        std_stack_push_copy_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.format );
-        std_stack_push_copy_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.samples_per_pixel );
+        std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.format );
+        std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.samples_per_pixel );
     }
 
-    std_stack_push_copy_noalign_m ( &hash_allocator, &render_textures_layout->render_targets_count );
+    std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->render_targets_count );
 
     if ( render_textures_layout->render_targets_count ) {
         std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_render_target_layout_t ) );
-        xg_render_target_layout_t* sorted_render_targets = std_stack_push_noalign_array_m ( &hash_allocator, xg_render_target_layout_t, render_textures_layout->render_targets_count );
+        std_auto_m sorted_render_targets = std_stack_alloc_array_m ( &hash_allocator, xg_render_target_layout_t, render_textures_layout->render_targets_count );
         std_mem_zero_array_m ( sorted_render_targets, render_textures_layout->render_targets_count );
         std_sort_insertion_copy ( sorted_render_targets, render_textures_layout->render_targets, sizeof ( xg_render_target_layout_t ), render_textures_layout->render_targets_count, xg_vk_pipeline_render_target_layout_cmp );
 
         for ( size_t i = 0; i < render_textures_layout->render_targets_count; ++i ) {
-            std_stack_push_copy_noalign_m ( &hash_allocator, &sorted_render_targets[i].format );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &sorted_render_targets[i].samples_per_pixel );
+            std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].format );
+            std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].samples_per_pixel );
         }
     }
 
-    uint64_t hash = std_hash_metro ( hash_allocator.buffer.base, hash_allocator.top );
+    uint64_t hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
     return hash;
 }
 
@@ -375,7 +358,7 @@ static xg_vk_framebuffer_h xg_vk_framebuffer_create ( xg_device_h device_handle,
     xg_vk_framebuffer->hash = framebuffer_hash;
     xg_vk_framebuffer->ref_count = 1;
 
-    std_assert_m ( std_hash_map_insert ( &xg_vk_pipeline_state->framebuffers_map, framebuffer_hash, xg_vk_framebuffer_handle ) );
+    std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->framebuffers_map, framebuffer_hash, xg_vk_framebuffer_handle ) );
 
     return xg_vk_framebuffer_handle;
 }
@@ -500,7 +483,7 @@ static xg_vk_renderpass_h xg_vk_renderpass_create ( xg_device_h device_handle, c
     xg_vk_renderpass->hash = renderpass_hash;
     xg_vk_renderpass->render_textures_layout = *render_textures_layout;
 
-    std_assert_m ( std_hash_map_insert ( &xg_vk_pipeline_state->renderpasses_map, renderpass_hash, xg_vk_renderpass_handle ) );
+    std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->renderpasses_map, renderpass_hash, xg_vk_renderpass_handle ) );
 
     return xg_vk_renderpass_handle;
 }
@@ -688,7 +671,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
     char state_buffer[sizeof ( params->state ) + sizeof ( params->resource_bindings )];
-    std_stack_t hash_allocator = std_stack ( std_static_buffer_m ( state_buffer ) );
+    std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
     // Compute shader
     VkPipelineShaderStageCreateInfo shader_info;
@@ -711,17 +694,17 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         shader_info.pName = "main";
         shader_info.pSpecializationInfo = NULL;
 
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.compute_shader.hash );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.compute_shader.hash );
     }
 
     xg_vk_pipeline_layout_creation_results_t pipeline_layout_results;
     xg_vk_pipeline_create_pipeline_layout ( &pipeline_layout_results, device, &params->resource_bindings, &params->constant_bindings, params->debug_name );
 
-    std_stack_push_copy_noalign_m ( &hash_allocator, &pipeline_layout_results.resource_bindings_hash );
-    std_stack_push_copy_noalign_m ( &hash_allocator, &pipeline_layout_results.constant_bindings_hash );
+    std_stack_write_noalign_m ( &hash_allocator, &pipeline_layout_results.resource_bindings_hash );
+    std_stack_write_noalign_m ( &hash_allocator, &pipeline_layout_results.constant_bindings_hash );
 
     // Pipeline
-    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.buffer.base, hash_allocator.top );
+    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
 
     uint64_t* pipeline_lookup = std_hash_map_lookup ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline_hash );
 
@@ -778,7 +761,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         xg_vk_pipeline->common.reference_count = 1;
 
         std_mutex_lock ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
-        std_assert_m ( std_hash_map_insert ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline_hash, xg_vk_pipeline_handle ) );
+        std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline_hash, xg_vk_pipeline_handle ) );
         std_mutex_unlock ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
     } else {
         xg_vk_pipeline_handle = *pipeline_lookup;
@@ -803,7 +786,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
     //xg_vk_pipeline->resource_bindings_layout = *resource_bindings_layout;
 
     char state_buffer[sizeof ( params->state ) + sizeof ( params->resource_bindings )];
-    std_stack_t hash_allocator = std_stack ( std_static_buffer_m ( state_buffer ) );
+    std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
     // Begin constructing Vulkan pipeline
     // Shaders
@@ -832,7 +815,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             shader_info[shader_count].pName = "main";
             shader_info[shader_count].pSpecializationInfo = NULL;
 
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.vertex_shader.hash );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.vertex_shader.hash );
             ++shader_count;
         }
 
@@ -852,7 +835,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             shader_info[shader_count].pName = "main";
             shader_info[shader_count].pSpecializationInfo = NULL;
 
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.fragment_shader.hash );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.fragment_shader.hash );
 
             ++shader_count;
         }
@@ -896,11 +879,11 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         // Compute hash
         //xg_vertex_stream_t sorted_input_streams[xg_input_layout_max_streams_m];
         //std_mem_zero_m ( &sorted_input_streams );
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.input_layout.stream_count );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.input_layout.stream_count );
 
         if ( params->state.input_layout.stream_count ) {
             std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_vertex_stream_t ) );
-            xg_vertex_stream_t* sorted_input_streams = std_stack_push_noalign_array_m ( &hash_allocator, xg_vertex_stream_t, params->state.input_layout.stream_count );
+            std_auto_m sorted_input_streams = std_stack_alloc_array_m ( &hash_allocator, xg_vertex_stream_t, params->state.input_layout.stream_count );
             std_mem_zero_array_m ( sorted_input_streams, params->state.input_layout.stream_count );
             std_sort_insertion_copy ( sorted_input_streams, params->state.input_layout.streams, sizeof ( xg_vertex_stream_t ), params->state.input_layout.stream_count, xg_vk_pipeline_vertex_stream_cmp );
 
@@ -957,22 +940,22 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             viewport.pViewports = &v;
             viewport.pScissors = &s;
 
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.viewport_state.x );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.viewport_state.y );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.viewport_state.width );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.viewport_state.height );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.viewport_state.min_depth );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.viewport_state.max_depth );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.x );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.y );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.width );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.height );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.min_depth );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.max_depth );
         } else {
             uint32_t u32_0 = 0;
             float f32_0 = 0;
 
-            std_stack_push_copy_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &f32_0 );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &f32_0 );
+            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
+            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
+            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
+            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
+            std_stack_write_noalign_m ( &hash_allocator, &f32_0 );
+            std_stack_write_noalign_m ( &hash_allocator, &f32_0 );
         }
     }
     // Rasterizer
@@ -996,21 +979,21 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         rasterizer.depthBiasConstantFactor = params->state.rasterizer_state.depth_bias_state.const_factor;
         rasterizer.depthBiasSlopeFactor = params->state.rasterizer_state.depth_bias_state.slope_factor;
 
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.disable_rasterization );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.disable_rasterization );
 
         if ( params->state.rasterizer_state.disable_rasterization ) {
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.cull_mode );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.frontface_winding_mode );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.polygon_mode );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.line_width );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.enable_depth_clamp );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.cull_mode );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.frontface_winding_mode );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.polygon_mode );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.line_width );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.enable_depth_clamp );
 
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.enable );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.enable );
 
             if ( params->state.rasterizer_state.depth_bias_state.enable ) {
-                std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.clamp );
-                std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.const_factor );
-                std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.slope_factor );
+                std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.clamp );
+                std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.const_factor );
+                std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.slope_factor );
             }
         }
     }
@@ -1034,8 +1017,8 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         msaa.alphaToOneEnable = VK_FALSE;
 
         if ( params->state.rasterizer_state.disable_rasterization ) {
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.sample_count );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.mode );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.sample_count );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.mode );
         }
     }
     // Depth stencil
@@ -1071,35 +1054,35 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         ds.back.writeMask = params->state.depth_stencil_state.stencil.back_face_op.write_mask;
         ds.back.reference = params->state.depth_stencil_state.stencil.back_face_op.reference;
 
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_test );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_test );
 
         if ( params->state.depth_stencil_state.depth.enable_test ) {
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_write );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.compare_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_bound_test );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.min_bound );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.max_bound );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_write );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.compare_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_bound_test );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.min_bound );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.max_bound );
         }
 
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.enable_test );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.enable_test );
 
         if ( params->state.depth_stencil_state.stencil.enable_test ) {
             // TODO
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_pass_depth_fail_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_fail_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_depth_pass_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_mask );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.write_mask );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.reference );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_pass_depth_fail_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_fail_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_depth_pass_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_mask );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.write_mask );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.reference );
 
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_pass_depth_fail_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_fail_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_depth_pass_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_op );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_mask );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.write_mask );
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.reference );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_pass_depth_fail_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_fail_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_depth_pass_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_mask );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.write_mask );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.reference );
         }
     }
     // Color blend
@@ -1134,11 +1117,11 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         bs.blendConstants[3] = 0;
 
         //xg_render_target_blend_state_t sorted_render_targets[xg_pipeline_output_max_color_targets_m];
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.blend_state.render_targets_count );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.blend_state.render_targets_count );
 
         if ( params->state.blend_state.render_targets_count ) {
             std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_render_target_blend_state_t ) );
-            xg_render_target_blend_state_t* sorted_render_targets = std_stack_push_noalign_array_m ( &hash_allocator, xg_render_target_blend_state_t, params->state.blend_state.render_targets_count );
+            std_auto_m sorted_render_targets = std_stack_alloc_array_m ( &hash_allocator, xg_render_target_blend_state_t, params->state.blend_state.render_targets_count );
             std_mem_zero_array_m ( sorted_render_targets, params->state.blend_state.render_targets_count );
 
             std_sort_insertion_copy ( sorted_render_targets, params->state.blend_state.render_targets, sizeof ( xg_render_target_blend_state_t ), params->state.blend_state.render_targets_count, xg_vk_pipeline_render_target_blend_state_cmp );
@@ -1155,10 +1138,10 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             }
         }
 
-        std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.blend_state.enable_blend_logic_op );
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.blend_state.enable_blend_logic_op );
 
         if ( params->state.blend_state.enable_blend_logic_op ) {
-            std_stack_push_copy_noalign_m ( &hash_allocator, &params->state.blend_state.blend_logic_op );
+            std_stack_write_noalign_m ( &hash_allocator, &params->state.blend_state.blend_logic_op );
         }
     }
     // Dynamic state
@@ -1199,7 +1182,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         std_assert_m ( renderpass )
         std_assert_m ( renderpass->hash == renderpass_hash );
 
-        std_stack_push_copy_noalign_m ( &hash_allocator, &renderpass_hash );
+        std_stack_write_noalign_m ( &hash_allocator, &renderpass_hash );
     }
 #if 0
     // Framebuffer
@@ -1379,13 +1362,13 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
     xg_vk_pipeline_layout_creation_results_t pipeline_layout_results;
     xg_vk_pipeline_create_pipeline_layout ( &pipeline_layout_results, device, &params->resource_bindings, &params->constant_bindings, params->debug_name );
 
-    std_stack_push_copy_noalign_m ( &hash_allocator, &pipeline_layout_results.resource_bindings_hash );
-    std_stack_push_copy_noalign_m ( &hash_allocator, &pipeline_layout_results.constant_bindings_hash );
+    std_stack_write_noalign_m ( &hash_allocator, &pipeline_layout_results.resource_bindings_hash );
+    std_stack_write_noalign_m ( &hash_allocator, &pipeline_layout_results.constant_bindings_hash );
 #endif
 
     // Pipeline
     // TODO try to batch vkCreateGraphicsPipelines calls
-    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.buffer.base, hash_allocator.top );
+    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
 
     uint64_t* pipeline_lookup = std_hash_map_lookup ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline_hash );
 
@@ -1489,7 +1472,7 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
     std_mutex_unlock ( &xg_vk_pipeline_state->graphics_pipelines_freelist_mutex );
 
     std_mutex_lock ( &xg_vk_pipeline_state->graphics_pipelines_map_mutex );
-    std_assert_m ( std_hash_map_remove ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline->common.hash ) );
+    std_verify_m ( std_hash_map_remove ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline->common.hash ) );
     std_mutex_unlock ( &xg_vk_pipeline_state->graphics_pipelines_map_mutex );
 }
 
@@ -1512,7 +1495,7 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
     std_mutex_unlock ( &xg_vk_pipeline_state->compute_pipelines_freelist_mutex );
 
     std_mutex_lock ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
-    std_assert_m ( std_hash_map_remove ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline->common.hash ) );
+    std_verify_m ( std_hash_map_remove ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline->common.hash ) );
     std_mutex_unlock ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
 }
 

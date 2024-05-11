@@ -318,6 +318,7 @@ typedef struct {
     xg_device_h device;
     xg_workload_h workload;
     xg_cmd_buffer_h cmd_buffer;
+    xg_resource_cmd_buffer_h resource_cmd_buffer;
     uint64_t key;
 
     xg_format_e render_target_format;

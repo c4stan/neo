@@ -213,23 +213,23 @@ void std_dlist_remove_offset ( void* _item, uint64_t offset ) {
 
 // =============================================================================
 
-void* std_freelist ( std_buffer_t buffer, size_t stride ) {
-    std_assert_m ( buffer.base != NULL );
+void* std_freelist ( void* base, size_t stride, size_t capacity ) {
+    std_assert_m ( base != NULL );
     std_assert_m ( stride >= std_pointer_size_m );
+    std_assert_m ( std_align_test_ptr ( base, std_pointer_size_m ) );
     std_assert_m ( std_align_test ( stride, std_pointer_size_m ) );
-    size_t i;
+    std_assert_m ( capacity > 0 );
 
-    for ( i = 0; i <= buffer.size - stride; i += stride ) {
-        void* next = buffer.base + i + stride;
-        std_mem_copy ( buffer.base + i, &next, sizeof ( next ) );
+    void* p;
+    void* end = base + stride * ( capacity - 1 ); 
+    for ( p = base; p < end; p += stride ) {
+        void* next = p + stride;
+        std_mem_copy ( p, &next, sizeof ( next ) );
     }
-
     void* next = NULL;
-    std_mem_copy ( buffer.base + i - stride, &next, sizeof ( next ) );
-    //std_list_t list;
-    //list.head = buffer.base;
-    //return list;
-    return buffer.base;
+    std_mem_copy ( p, &next, sizeof ( next ) );
+
+    return base;
 }
 
 // =============================================================================

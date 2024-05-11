@@ -52,6 +52,7 @@ static void fs_api_init ( fs_i* fs ) {
     fs->get_file_info = fs_file_get_info;
     fs->get_file_path_info = fs_file_path_get_info;
     fs->get_file_path = fs_file_get_path;
+    fs->read_file_path_to_heap = fs_file_path_read_alloc;
 }
 
 void* fs_load ( void* std_runtime ) {

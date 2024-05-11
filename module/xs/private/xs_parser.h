@@ -2,8 +2,6 @@
 
 #include <xs.h>
 
-bool xs_parser_set_renderpass_list ( std_buffer_t xsrp );
-
 typedef struct {
     xg_shading_stage_b referenced_stages;
     char shaders[xg_shading_stage_count_m][xs_shader_name_max_len_m];

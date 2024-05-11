@@ -79,8 +79,9 @@
     #define std_line_num_m                                        __LINE__
     #define std_field_size_m( type, field )                       sizeof( ( ( type * ) 0 )->field )
     #define std_field_offset_m( type, field )                     offsetof( type, field )
-    #define std_array_stride_m( a )                               sizeof ( a[0] )
+    #define std_static_array_stride_m( a )                        sizeof ( a[0] )
     #define std_static_array_capacity_m( a )                      sizeof ( a ) / sizeof ( a[0] )
+    #define std_static_array_size_m( a )                          sizeof ( a )
     #define std_array_typecast_m( a )                             ( std_typeof_m ( &( (a)[0] ) ) )
     #define std_no_return_m                                       __attribute__((noreturn)) void
     #define std_static_assert_m( exp )                            _Static_assert ( exp, "FAILED STATIC ASSERT: " #exp )

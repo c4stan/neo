@@ -2,7 +2,6 @@
 
 #include <std_platform.h>
 #include <std_log.h>
-#include <std_buffer.h>
 #include <std_list.h>
 #include <std_hash.h>
 #include <std_mutex.h>
@@ -39,14 +38,28 @@ typedef struct {
     std_module_t*       modules_freelist;
 
     // std_module_name_t* -> std_module_t*
+    #if 0
     std_module_name_t   modules_name_map_keys[std_module_map_slots_m];
     std_module_t**      modules_name_map_payloads[std_module_map_slots_m];
     std_map_t           modules_name_map;
+    #else
+    //uint64_t* modules_name_map_keys;
+    //uint64_t* modules_name_map_values;
+    uint64_t modules_name_map_keys[std_module_map_slots_m]; // name hash
+    uint64_t modules_name_map_payloads[std_module_map_slots_m]; // std_module_t*
+    std_hash_map_t modules_name_map;
+    #endif
 
     // void* api -> std_module_t*
+    #if 0
     void*               modules_api_map_keys[std_module_map_slots_m];
     std_module_t**      module_api_map_payloads[std_module_map_slots_m];
     std_map_t           modules_api_map;
+    #else
+    uint64_t modules_api_map_keys[std_module_map_slots_m]; // void*
+    uint64_t module_api_map_payloads[std_module_map_slots_m]; // std_module_t*
+    std_hash_map_t modules_api_map;
+    #endif
 
     std_mutex_t         modules_mutex;
 } std_module_state_t;
@@ -54,8 +67,10 @@ typedef struct {
 //==============================================================================
 
 typedef struct {
-    std_alloc_t nodes_alloc;
-    size_t      nodes_mapped_size;
+    std_virtual_stack_t nodes_stack;
+    //std_virtual_buffer_t nodes_buffer;
+    //std_alloc_t nodes_alloc;
+    //size_t      nodes_mapped_size;
     size_t      nodes_count;
     size_t      total_size;
     std_mutex_t mutex;
@@ -69,7 +84,9 @@ typedef struct {
 
 // TODO remove?
 typedef struct {
-    std_alloc_t bins_alloc;
+    //std_alloc_t bins_alloc;
+    //std_virtual_buffer_t bins_buffer;
+    std_virtual_stack_t bins_stack;
     size_t bin_size;
     size_t bin_capacity;
     void* bins_freelist;
@@ -85,28 +102,32 @@ typedef struct {
 #define std_allocator_tlsf_y_size_m 16          // 16 subdivision buckets per X level
 #define std_allocator_tlsf_log2_y_size_m 4
 
-#define std_allocator_tlsf_header_size_m 8
+#define std_allocator_tlsf_header_size_m 8 // freelist pointers excluded
 #define std_allocator_tlsf_footer_size_m 8
 #define std_allocator_tlsf_min_segment_size_m ( 1 << std_allocator_tlsf_min_x_level_m )
 #define std_allocator_tlsf_max_segment_size_m ( ( 1ull << std_allocator_tlsf_max_x_level_m ) - 1 )
 #define std_allocator_tlsf_free_segment_bit_m (1 << 0)
 #define std_allocator_tlsf_free_prev_segment_bit_m (1 << 1)
+#define std_allocator_tlsf_alignment_bit_m (1 << 2)
 #define std_allocator_tlsf_size_mask_m ( ( ~0ull ) << 3 )
 
 typedef struct {
     std_mutex_t mutex;
-    std_virtual_buffer_t buffer;
+    std_virtual_stack_t stack;
     void* freelists[std_allocator_tlsf_x_size_m][std_allocator_tlsf_y_size_m];
     uint16_t available_freelists[std_allocator_tlsf_x_size_m];
     uint64_t available_rows;
+    size_t allocated_size;
 } std_allocator_tlsf_heap_t;
 
 typedef struct {
     size_t                          virtual_page_size;
     //uint32_t                        virtual_page_size_bit_idx; // idx of the top bit in the page size value
-    std_allocator_virtual_heap_t    virtual_heap;
-    size_t                          tagged_page_size;
+    // TODO remove
+    //std_allocator_virtual_heap_t    virtual_heap;
+    // TODO remove? rework?
     std_allocator_tagged_heap_t     tagged_heap;
+    size_t                          tagged_page_size;
     std_allocator_tlsf_heap_t       tlsf_heap;
 } std_allocator_state_t;
 
@@ -142,6 +163,9 @@ typedef struct {
 //} std_string_state_t;
 
 //==============================================================================
+
+// TODO remove?
+typedef void ( std_log_callback_f ) ( const std_log_msg_t* msg );
 
 typedef struct {
     std_log_callback_f* log_callback;
