@@ -4,12 +4,12 @@ import os
 import sys
 import platform
 
-import build_impl as builder
+import clparse as parser
 
 tool_path = os.path.normpath(os.path.abspath(os.path.dirname(__file__)))
 root_path = os.path.normpath(os.path.join(tool_path, '..'))
 workspace_paths = ['module', 'test', 'app'] 
-builder.init(root_path, tool_path, workspace_paths)
+parser.init(root_path, tool_path, workspace_paths)
 
 args = sys.argv[1:]
 if len(args) > 0:
@@ -17,15 +17,15 @@ if len(args) > 0:
     string = ''
     for arg in args:
         string += arg + ' '
-    builder.parse(string)
+    parser.parse(string)
 else:
     # run the cli
     if platform.system() == 'Windows':
         os.system('cls')
     else:
         os.system('clear')
-    builder.print_header()
-    builder.print_help()
+    parser.print_header()
+    parser.print_help()
     while True:
         try:
             string = input('> ')
@@ -33,13 +33,13 @@ else:
                 quit()
             elif (string == 'reload' or string == 'update'):
                 try:
-                    importlib.reload(builder)
-                    builder.reload(root_path, tool_path, workspace_paths)
+                    importlib.reload(parser)
+                    parser.reload(root_path, tool_path, workspace_paths)
                     print('Reload successful.')
                 except Exception as e:
                     print('Reload error: ' + str(e))
             else:
-                builder.parse(string)
+                parser.parse(string)
         except EOFError as e:
             pass
         except Exception as e:
