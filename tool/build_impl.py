@@ -626,11 +626,11 @@ def git_push(tokens):
         print(Color.FAIL + 'Provide a comment.' + Color.ENDC)
         return
 
-    print('git add .')
+    print(Color.OKBLUE + '>git add .' + Color.ENDC)
     os.system('git add .')
-    print('git commit -m "' + comment + '"')
+    print(Color.OKBLUE + 'git commit -m "' + comment + '"'  + Color.ENDC)
     os.system('git commit -m "' + comment + '"')
-    print('git push')
+    print(Color.OKBLUE + 'git push'  + Color.ENDC)
     os.system('git push')
 
 def git_pull():
