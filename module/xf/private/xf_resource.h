@@ -221,6 +221,8 @@ xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
 
 xf_texture_h xf_resource_multi_texture_get ( xf_texture_h multi_texture, int32_t offset );
 
+xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture );
+
 void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
 
 void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );

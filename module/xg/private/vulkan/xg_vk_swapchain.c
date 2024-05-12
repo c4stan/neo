@@ -197,7 +197,16 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     std_log_info_m ( "Swapchain created with " std_fmt_size_m " backbuffer textures", acquired_texture_count );
 
     for ( size_t i = 0; i < texture_count; ++i ) {
-        swapchain->textures[i] = xg_vk_texture_register_swapchain_texture ( &swapchain_texture_params, swapchain_textures[i] );
+        char id[8];
+        std_u32_to_str ( i, id, 8 );
+        xg_texture_params_t texture_params = swapchain_texture_params;
+        std_stack_t stack = std_static_stack_m ( texture_params.debug_name );
+        stack.top += std_str_len ( texture_params.debug_name );
+        std_stack_string_append ( &stack, "(" );
+        std_stack_string_append ( &stack, id );
+        std_stack_string_append ( &stack, ")" );
+
+        swapchain->textures[i] = xg_vk_texture_register_swapchain_texture ( &texture_params, swapchain_textures[i] );
     }
 
     swapchain->texture_count = texture_count;

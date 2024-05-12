@@ -707,7 +707,7 @@ static void viewapp_boot ( void ) {
     //viewapp_scene_field();
 
     xf_i* xf = m_state->modules.xf;
-    xf_graph_h graph = xf->create_graph ( device, swapchain );
+    xf_graph_h graph = xf->create_graph ( device, xg_null_handle_m );
     m_state->render.graph = graph;
 
     // setup
@@ -750,6 +750,7 @@ static void viewapp_boot ( void ) {
     }
 
     // gbuffer laydown
+    // TODO remove multi?
     xf_texture_h color_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
@@ -1307,23 +1308,11 @@ static std_app_state_e viewapp_update ( void ) {
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
     xg->acquire_next_swapchain_texture ( m_state->render.swapchain, workload );
-
     xf->execute_graph ( m_state->render.graph, workload );
     xg->submit_workload ( workload );
     xg->present_swapchain ( m_state->render.swapchain, workload );
 
     xs->update_pipeline_states ( workload );
-
-    // TODO have xf automatically (optionally?) advance these on graph execution
-    xf->advance_multi_texture ( m_state->render.swapchain_multi_texture );
-    xf->advance_multi_texture ( m_state->render.depth_stencil_texture );
-    xf->advance_multi_texture ( m_state->render.ssgi_raymarch_texture );
-    xf->advance_multi_texture ( m_state->render.ssgi_accumulation_texture );
-    xf->advance_multi_texture ( m_state->render.ssr_accumulation_texture );
-    xf->advance_multi_texture ( m_state->render.ssgi_2_raymarch_texture );
-    xf->advance_multi_texture ( m_state->render.ssgi_2_accumulation_texture );
-    xf->advance_multi_texture ( m_state->render.taa_accumulation_texture );
-    xf->advance_multi_texture ( m_state->render.object_id_texture );
 
     return std_app_state_tick_m;
 }

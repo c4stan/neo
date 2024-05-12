@@ -1023,17 +1023,23 @@ std_allocator_i std_arena_allocator ( std_arena_t* allocator ) {
         Maximum allocation size requestable by the user is 2^max_x - 1 - sizeof(header).
 
     Allocated block contents:
-        ------------------------------------------
-        |       header       |     user data     |
-        ------------------------------------------
-        |  size + flags : 8  |       120/+       |
-        ------------------------------------------
+        ----------------------------------------------------------------------------------
+        |       header       |      unused       |     alignment     |     user data     |
+        ----------------------------------------------------------------------------------
+        |  size + flags : 8  |        0/+        |    offset : 0/8   |        8/+        |
+        ----------------------------------------------------------------------------------
 
-        all blocks are 8 byte aligned, so size is also 8 byte aligned, so first 2 bits in size can be used to store additional flags
-        bit 0 is used to tag whether the block is free or not
-        bit 1 is used to tag whether the *prev* block (the one adjacent on the left of the memory address space) is free or not.
-        //bit 2 is used to tag whether the *next* block (the one adjacent on the left of the memory address space) is free or not.
-        min block size is 128 bytes, so user data is 120 bytes or more
+        all blocks are 8 byte aligned, so header is also 8 byte aligned, so first 3 bits in size can be used to store additional flags
+            bit 0 is used to tag whether the block is free or not
+            bit 1 is used to tag whether the *prev* block (the one adjacent on the left of the memory address space) is free or not.
+            bit 2 is used to tag whether the block is an alignment block (see below)
+        alignment info is only stored if the allocation requested an alignment greater than 8
+            the user data is offset the amount needed inside the block to achieve the requested alignment
+            the alignment info is stored right before the user data, in 8 bytes. it contains the size in bytes between the end of the header and the start of the user data. this value is also guaranteed to be multiple of 8, and bit 2 is set to 1 to indicate that this is alignment info and not the actual header.
+            the header has its regular info, and its bit 2 is set to 0. the memory in between header and alignment is unused.
+        if alignment is 8, no alignment info is stored and user data comes right after the header
+            the header has its regular info, and its bit 2 is set to 0
+        min block size is 128 bytes. size of user data depends on requested size and alignment.
 
     Free block contents:
         ---------------------------------------------------------------------------------------------------------------------------

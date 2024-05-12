@@ -427,7 +427,7 @@ static size_t xf_graph_deps_distance_score ( size_t* nodes_list, size_t nodes_li
 }
 */
 
-static void xf_graph_build_texture ( xf_texture_h texture_handle, xg_i* xg, xg_device_h device, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+static void xf_graph_build_texture ( xf_graph_t* graph, xf_texture_h texture_handle, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     const xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
     if ( texture->is_dirty ) {
@@ -436,85 +436,94 @@ static void xf_graph_build_texture ( xf_texture_h texture_handle, xg_i* xg, xg_d
             xg->get_texture_info ( &info, texture->xg_handle );
             xf_resource_texture_update_info ( texture_handle, &info );
             std_assert_m ( ( texture->required_usage & texture->allowed_usage ) == texture->required_usage );
-            return;
-        }
+        } else {
+            bool create_new = false;
 
-        bool create_new = false;
-
-        if ( texture->xg_handle == xg_null_handle_m ) {
-            create_new = true;
-        }
-
-        // TODO only create new if current usage is smaller than required?
-        if ( texture->required_usage != texture->allowed_usage ) {
-            create_new = true;
-
-            if ( texture->xg_handle != xg_null_handle_m ) {
-                xg->cmd_destroy_texture ( resource_cmd_buffer, texture->xg_handle, xg_resource_cmd_buffer_time_workload_start_m );
-            }
-        }
-
-        if ( create_new ) {
-            xg_texture_params_t params;
-            params.allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m );
-            params.device = device;
-            params.width = texture->params.width;
-            params.height = texture->params.height;
-            params.depth = texture->params.depth;
-            params.mip_levels = texture->params.mip_levels;
-            params.array_layers = texture->params.array_layers;
-            params.dimension = texture->params.dimension;
-            params.format = texture->params.format;
-            params.samples_per_pixel = texture->params.samples_per_pixel;
-            params.allowed_usage = texture->required_usage;
-            params.view_access = texture->params.view_access;
-            std_str_copy_m ( params.debug_name, texture->params.debug_name );
-
-            // Tag all render tagets as copy src/dest. Matches xg_vk_pipeline framebuffer creation logic
-            if ( texture->required_usage & xg_texture_usage_render_target_m ) {
-                params.allowed_usage |= xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m;
+            if ( texture->xg_handle == xg_null_handle_m ) {
+                create_new = true;
             }
 
-            if ( texture->required_usage & xg_texture_usage_depth_stencil_m ) {
-                params.allowed_usage |= xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m;
+            // TODO only create new if current usage is smaller than required?
+            if ( texture->required_usage != texture->allowed_usage ) {
+                create_new = true;
+
+                if ( texture->xg_handle != xg_null_handle_m ) {
+                    xg->cmd_destroy_texture ( resource_cmd_buffer, texture->xg_handle, xg_resource_cmd_buffer_time_workload_start_m );
+                }
             }
 
-            params.initial_layout = xg_texture_layout_undefined_m;
-            xg_texture_h new_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params );
-            xf_resource_texture_map_to_new ( texture_handle, new_texture );
+            if ( create_new ) {
+                xg_texture_params_t params;
+                params.allocator = xg->get_default_allocator ( graph->device, xg_memory_type_gpu_only_m );
+                params.device = graph->device;
+                params.width = texture->params.width;
+                params.height = texture->params.height;
+                params.depth = texture->params.depth;
+                params.mip_levels = texture->params.mip_levels;
+                params.array_layers = texture->params.array_layers;
+                params.dimension = texture->params.dimension;
+                params.format = texture->params.format;
+                params.samples_per_pixel = texture->params.samples_per_pixel;
+                params.allowed_usage = texture->required_usage;
+                params.view_access = texture->params.view_access;
+                std_str_copy_m ( params.debug_name, texture->params.debug_name );
 
-            xg_texture_info_t info;
-            xg->get_texture_info ( &info, texture->xg_handle );
-            xf_resource_texture_set_allowed_usage ( texture_handle, params.allowed_usage );
+                // Tag all render tagets as copy src/dest. Matches xg_vk_pipeline framebuffer creation logic
+                if ( texture->required_usage & xg_texture_usage_render_target_m ) {
+                    params.allowed_usage |= xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m;
+                }
 
-            if ( texture->params.clear_on_create ) {
-                // TODO support depth stencil clears
-                // TODO is hard coding 0 as key ok here?
-                xg->cmd_clear_texture ( cmd_buffer, new_texture, texture->params.clear.color, 0 );
+                if ( texture->required_usage & xg_texture_usage_depth_stencil_m ) {
+                    params.allowed_usage |= xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m;
+                }
+
+                params.initial_layout = xg_texture_layout_undefined_m;
+                xg_texture_h new_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params );
+                xf_resource_texture_map_to_new ( texture_handle, new_texture );
+
+                xg_texture_info_t info;
+                xg->get_texture_info ( &info, texture->xg_handle );
+                xf_resource_texture_set_allowed_usage ( texture_handle, params.allowed_usage );
+
+                if ( texture->params.clear_on_create ) {
+                    // TODO support depth stencil clears
+                    // TODO is hard coding 0 as key ok here?
+                    xg->cmd_clear_texture ( cmd_buffer, new_texture, texture->params.clear.color, 0 );
+                }
             }
+
+            // TODO
+            std_unused_m ( cmd_buffer );
+            // doesn't need to accumulate on a shared sort key, just key everything to 0 and let the sorter move it all at the beginning
+    #if 0
+
+            if ( texture->deps.write.node != xf_null_handle_m ) {
+                if ( texture->write_event == xg_null_handle_m ) {
+                    texture->write_event = xg->create_event ( device );
+                } else {
+                    xg->cmd_reset_event ( cmd_buffer, texture->write_event, *sort_key );
+                    *sort_key += 1;
+                }
+            }
+
+    #endif
+
+            xf_resource_texture_set_dirty ( texture_handle, false );
         }
-
-        // TODO
-        std_unused_m ( cmd_buffer );
-        // doesn't need to accumulate on a shared sort key, just key everything to 0 and let the sorter move it all at the beginning
-#if 0
-
-        if ( texture->deps.write.node != xf_null_handle_m ) {
-            if ( texture->write_event == xg_null_handle_m ) {
-                texture->write_event = xg->create_event ( device );
-            } else {
-                xg->cmd_reset_event ( cmd_buffer, texture->write_event, *sort_key );
-                *sort_key += 1;
-            }
-        }
-
-#endif
-
-        xf_resource_texture_set_dirty ( texture_handle, false );
     }
 
     // TODO better way of doing this?
     xf_resource_texture_alias ( texture_handle, xf_null_handle_m );
+
+    if ( xf_resource_texture_is_multi ( texture_handle ) ) {
+        xf_texture_h multi_texture_handle = xf_resource_multi_texture_get_default ( texture_handle );
+        if ( std_hash_set_insert ( &graph->multi_textures_hash_set, std_hash_64_m ( multi_texture_handle ) ) ) {
+            //xf_texture_info_t info;
+            //xf_resource_texture_get_info ( &info, multi_texture_handle );
+            //std_log_info_m ( info.debug_name );
+            graph->multi_textures_array[graph->multi_textures_count++] = multi_texture_handle;
+        }
+    }
 }
 
 static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_i* xg, xg_device_h device, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
@@ -565,27 +574,30 @@ static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_i* xg, xg_devi
 }
 
 static void xf_graph_build_resources ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    graph->multi_textures_hash_set = std_hash_set ( graph->multi_textures_hashes, xf_graph_max_multi_textures_per_graph_m );
+    graph->multi_textures_count = 0;
+
     // Doesn't matter here if we follow nodes execution order or not
     for ( size_t i = 0; i < graph->nodes_count; ++i ) {
         xf_node_t* node = &xf_graph_state->nodes_array[graph->nodes[i]];
 
         for ( size_t resource_it = 0; resource_it < node->params.render_targets_count; ++resource_it ) {
             xf_node_render_target_dependency_t* resource = &node->params.render_targets[resource_it];
-            xf_graph_build_texture ( resource->texture, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+            xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
         }
 
         if ( node->params.depth_stencil_target != xf_null_handle_m ) {
-            xf_graph_build_texture ( node->params.depth_stencil_target, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+            xf_graph_build_texture ( graph, node->params.depth_stencil_target, xg, cmd_buffer, resource_cmd_buffer );
         }
 
         for ( size_t resource_it = 0; resource_it < node->params.shader_texture_writes_count; ++resource_it ) {
             xf_node_shader_texture_dependency_t* resource = &node->params.shader_texture_writes[resource_it];
-            xf_graph_build_texture ( resource->texture, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+            xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
         }
 
         for ( size_t resource_it = 0; resource_it < node->params.shader_texture_reads_count; ++resource_it ) {
             xf_node_shader_texture_dependency_t* resource = &node->params.shader_texture_reads[resource_it];
-            xf_graph_build_texture ( resource->texture, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+            xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
         }
 
         for ( size_t resource_it = 0; resource_it < node->params.shader_buffer_writes_count; ++resource_it ) {
@@ -600,12 +612,12 @@ static void xf_graph_build_resources ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffe
 
         for ( size_t resource_it = 0; resource_it < node->params.copy_texture_writes_count; ++resource_it ) {
             xf_texture_h texture_handle = node->params.copy_texture_writes[resource_it].texture;
-            xf_graph_build_texture ( texture_handle, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+            xf_graph_build_texture ( graph, texture_handle, xg, cmd_buffer, resource_cmd_buffer );
         }
 
         for ( size_t resource_it = 0; resource_it < node->params.copy_texture_reads_count; ++resource_it ) {
             xf_texture_h texture_handle = node->params.copy_texture_reads[resource_it].texture;
-            xf_graph_build_texture ( texture_handle, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+            xf_graph_build_texture ( graph, texture_handle, xg, cmd_buffer, resource_cmd_buffer );
         }
 
         for ( size_t resource_it = 0; resource_it < node->params.copy_buffer_writes_count; ++resource_it ) {
@@ -930,6 +942,11 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
             xg->cmd_end_debug_region ( cmd_buffer, sort_key );
         }
+    }
+
+    // Advance multi resources
+    for ( uint64_t i = 0; i < graph->multi_textures_count; ++i ) {
+        xf_resource_multi_texture_advance ( graph->multi_textures_array[i] );
     }
 }
 

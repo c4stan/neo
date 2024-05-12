@@ -519,6 +519,14 @@ xf_texture_h xf_resource_multi_texture_get ( xf_texture_h multi_texture_handle, 
     return handle;
 }
 
+xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture_handle ) {
+    std_assert_m ( std_bit_test_64 ( multi_texture_handle, 63 ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
+    std_bit_set_ms_64 ( &handle, 1 );
+    return handle;
+}
+
 void xf_resource_texture_refresh_external ( xf_texture_h texture_handle ) {
     // TODO what really needs to get cleared/refreshed here?
     if ( std_bit_test_64 ( texture_handle, 63 ) ) {

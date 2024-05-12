@@ -85,8 +85,6 @@ xf_node_h add_simple_screen_pass ( xf_graph_h graph, const char* name, const sim
     std_assert_m ( params->render_targets_count > 0 );
     xf_texture_info_t render_target_info;
     xf->get_texture_info ( &render_target_info, params->render_targets[0] );
-    xf_graph_info_t graph_info;
-    xf->get_graph_info ( &graph_info, graph );
 
     simple_screen_pass_args_t args;
     args.params = *params;

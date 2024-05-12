@@ -800,7 +800,7 @@ bool std_hash_set_insert ( std_hash_set_t* set, uint64_t hash ) {
         idx = ( idx + 1 ) & mask;
     }
 
-    std_log_error_m ( false, "hash set is full!" );
+    std_log_error_m ( "hash set is full!" );
     return false;
 }
 

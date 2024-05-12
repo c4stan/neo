@@ -74,7 +74,11 @@ typedef struct {
     size_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
     size_t nodes_count;
     xg_swapchain_h swapchain;
-    xf_texture_h multi_textures[xf_graph_max_multi_textures_per_graph_m];
+    
+    xf_texture_h multi_textures_array[xf_graph_max_multi_textures_per_graph_m];
+    uint64_t multi_textures_count;
+    uint64_t multi_textures_hashes[xf_graph_max_multi_textures_per_graph_m];
+    std_hash_set_t multi_textures_hash_set;
 } xf_graph_t;
 
 typedef struct {
