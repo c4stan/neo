@@ -8,6 +8,10 @@
     #include <pthread.h>
 #endif
 
+#if defined (std_platform_win32_m)
+    #include <processthreadsapi.h>
+#endif
+
 //==============================================================================
 
 static std_thread_state_t* std_thread_state;
@@ -96,9 +100,12 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
 
     if ( std_str_cmp ( thread->name, "" ) != 0 ) {
 #if defined(std_platform_win32_m)
+#if !defined(std_compiler_gcc_m)
+        // TODO why can't gcc find SetThreadDescription?
         WCHAR unicode_name[std_thread_name_max_len_m];
         MultiByteToWideChar ( CP_UTF8, 0, thread->name, -1, unicode_name, std_thread_name_max_len_m );
         SetThreadDescription ( os_handle, unicode_name );
+#endif
 #elif defined(std_platform_linux_m)
         pthread_setname_np ( os_handle, thread->name );
 #endif
@@ -177,9 +184,11 @@ std_thread_h std_thread ( std_thread_routine_f* routine, void* arg, const char* 
         SetThreadAffinityMask ( os_handle, core_mask );
     }
 
+#if !defined(std_compiler_gcc_m)
     WCHAR unicode_name[std_thread_name_max_len_m];
     MultiByteToWideChar ( CP_UTF8, 0, thread->name, -1, unicode_name, std_thread_name_max_len_m );
     SetThreadDescription ( os_handle, unicode_name );
+#endif
 
 #elif defined(std_platform_linux_m)
     pthread_attr_t attributes;

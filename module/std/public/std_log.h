@@ -5,7 +5,11 @@
 #include <std_process.h>
 
 // Type encodings for format, same as stdio
+#if defined(std_compiler_gcc_m)
+#define std_fmt_size_m    "%"PRIu64
+#else
 #define std_fmt_size_m    "%zu"
+#endif
 #define std_fmt_int_m     "%d"
 #define std_fmt_uint_m    "%u"
 #define std_fmt_h32_m     "0x%X"

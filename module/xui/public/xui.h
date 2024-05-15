@@ -280,6 +280,20 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef struct {
+    float position[3];
+    float rotation[4];
+    xui_id_t id;
+    uint64_t sort_order;
+    xui_style_t style;
+} xui_gizmo_state_t;
+
+// TODO
+#define xui_gizmo_state_m(...) ( xui_gizmo_state_t ) { \
+    .position = { 0, 0, 0 }, \
+    .rotation = { } \
+}
+
 #define xui_line_id_m() ( xui_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )
 
 // Font
@@ -362,4 +376,6 @@ typedef struct {
     void ( *add_label )     ( xui_workload_h workload, xui_label_state_t*  state );
     void ( *add_select )    ( xui_workload_h workload, xui_select_state_t* state );
     void ( *add_switch )    ( xui_workload_h workload, xui_switch_state_t* state );
+
+    void ( *draw_gizmo )    ( xui_workload_h workload, xui_gizmo_state_t* state );
 } xui_i;
