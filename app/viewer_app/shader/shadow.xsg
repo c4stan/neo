@@ -1,21 +1,7 @@
 vertex_shader depth.vert
 
 include common_graphics.xsi
-
-begin rasterizer
-    cull off
-end
-
-begin depth_stencil
-    format D16_UNORM
-    min_depth_bound 0
-    max_depth_bound 1
-    depth_bound_test off
-    depth_test on
-    depth_write on
-    depth_test_op less
-    stencil_test off
-end
+include depth_write_d16.xsi
 
 begin input 0
     pos R32G32B32_FLOAT

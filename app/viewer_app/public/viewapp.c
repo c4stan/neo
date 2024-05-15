@@ -328,7 +328,7 @@ static void viewapp_scene_cornell_box ( void ) {
         { 0, 0, -1 },
         { -1, 0, 0 },
         { 1, 0, 0 },
-        { 0, 1, 0 },
+        { 0, -1, 0 },
         { 0, 1, 0 },
     };
 
@@ -418,6 +418,7 @@ static void viewapp_scene_cornell_box ( void ) {
                 .aspect_ratio = 1,
                 .near_z = 0.1,
                 .far_z = 100,
+                .reverse_z = false,
             ),
         );
         light_component->view = rv->create_view ( &view_params );
@@ -527,6 +528,7 @@ static void viewapp_scene_field ( void ) {
                 .aspect_ratio = 1,
                 .near_z = 0.1,
                 .far_z = 100,
+                .reverse_z = false,
             ),
         ) );
         se->add_component ( entity, LIGHT_COMPONENT_ID, ( se_component_h ) light_component );
@@ -557,6 +559,7 @@ static void viewapp_scene_field ( void ) {
                 .aspect_ratio = 1,
                 .near_z = 0.1f,
                 .far_z = 100.f,
+                .reverse_z = false,
             ),
         ) );
         se->add_component ( entity, LIGHT_COMPONENT_ID, ( se_component_h ) light_component );
@@ -694,6 +697,7 @@ static void viewapp_boot ( void ) {
                 .far_z = 1000,
                 .fov_y = 50.f * rv_deg_to_rad_m,
                 .jitter = { 1.f / resolution_x, 1.f / resolution_y },
+                .reverse_z = false,
             ),
         );
         rv_view_h view = rv->create_view ( &view_params );
@@ -733,7 +737,7 @@ static void viewapp_boot ( void ) {
     xf_node_h shadow_clear_node = add_simple_clear_pass ( graph, "shadow_clear", &simple_clear_pass_params_m ( 
         .depth_stencil_textures_count = 1,
         .depth_stencil_textures = { shadow_texture },
-        .depth_stencil_clears = { { .depth = 1, .stencil = 0 } }
+        .depth_stencil_clears = { xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m ) }
     ) );
 
     // shadows
@@ -796,7 +800,7 @@ static void viewapp_boot ( void ) {
         .color_clears = { xg_color_clear_m(), xg_color_clear_m(), xg_color_clear_m() },
         .depth_stencil_textures_count = 1,
         .depth_stencil_textures = { depth_stencil_texture },
-        .depth_stencil_clears = { xg_depth_stencil_clear_m() }
+        .depth_stencil_clears = { xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m ) }
     ) );
 
     xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );

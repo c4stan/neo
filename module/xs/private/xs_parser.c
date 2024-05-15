@@ -287,6 +287,7 @@ static xg_format_e xs_parser_format_to_enum ( const char* format ) {
         return xg_format_d32_sfloat_m;
     }
 
+    std_assert_m ( false );
     return xg_format_undefined_m;
 }
 

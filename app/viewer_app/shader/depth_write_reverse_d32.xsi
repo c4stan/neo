@@ -1,0 +1,10 @@
+begin depth_stencil
+    format D32_SFLOAT
+    min_depth_bound 1
+    max_depth_bound 0
+    depth_bound_test off
+    depth_test on
+    depth_write on
+    depth_test_op greater
+    stencil_test off
+end

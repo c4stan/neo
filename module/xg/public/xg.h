@@ -905,9 +905,13 @@ typedef struct {
     uint32_t stencil;
 } xg_depth_stencil_clear_t;
 
+#define xg_depth_clear_regular_m 1.f
+#define xg_depth_clear_reverse_m 0.f
+
 #define xg_depth_stencil_clear_m( ... ) ( xg_depth_stencil_clear_t ) { \
-    .depth = 1, \
+    .depth = xg_depth_clear_regular_m, \
     .stencil = 0, \
+    __VA_ARGS__ \
 }
 
 typedef struct {
