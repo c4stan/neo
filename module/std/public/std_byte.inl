@@ -1,3 +1,5 @@
+#pragma once
+
 #include <std_log.h>
 #include <std_platform.h>
 

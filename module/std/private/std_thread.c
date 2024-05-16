@@ -100,12 +100,9 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
 
     if ( std_str_cmp ( thread->name, "" ) != 0 ) {
 #if defined(std_platform_win32_m)
-#if !defined(std_compiler_gcc_m)
-        // TODO why can't gcc find SetThreadDescription?
         WCHAR unicode_name[std_thread_name_max_len_m];
         MultiByteToWideChar ( CP_UTF8, 0, thread->name, -1, unicode_name, std_thread_name_max_len_m );
         SetThreadDescription ( os_handle, unicode_name );
-#endif
 #elif defined(std_platform_linux_m)
         pthread_setname_np ( os_handle, thread->name );
 #endif
@@ -184,11 +181,9 @@ std_thread_h std_thread ( std_thread_routine_f* routine, void* arg, const char* 
         SetThreadAffinityMask ( os_handle, core_mask );
     }
 
-#if !defined(std_compiler_gcc_m)
     WCHAR unicode_name[std_thread_name_max_len_m];
     MultiByteToWideChar ( CP_UTF8, 0, thread->name, -1, unicode_name, std_thread_name_max_len_m );
     SetThreadDescription ( os_handle, unicode_name );
-#endif
 
 #elif defined(std_platform_linux_m)
     pthread_attr_t attributes;
@@ -209,6 +204,8 @@ std_thread_h std_thread ( std_thread_routine_f* routine, void* arg, const char* 
     std_assert_m ( result == 0 );
     os_id = os_handle; // TODO how to get tid from pthread handle? not sure if possible at all
     pthread_setname_np ( os_handle, thread->name );
+
+    thread->is_alive = true;
 #endif
 
     // Lock again
@@ -235,6 +232,7 @@ bool std_thread_join ( std_thread_h thread_handle ) {
 #elif defined(std_platform_linux_m)
     int result = pthread_join ( ( pthread_t ) thread->os_handle, NULL );
     std_assert_m ( result == 0 );
+    thread->is_alive = false;
 #endif
     std_mutex_lock ( &std_thread_state->mutex );
     std_mem_zero_m ( thread );
@@ -299,9 +297,10 @@ bool std_thread_alive ( std_thread_h thread_handle ) {
 
 #elif defined(std_platform_linux_m)
     // TODO make sure this is ok
-    int result = pthread_kill ( thread->os_handle, 0 );
+    //int result = pthread_kill ( thread->os_handle, 0 );
     //int result = pthread_tryjoin_np ( thread->os_handle, NULL );
-    return result == 0;
+    //return result == 0;
+    return thread->is_alive;
 #endif
 }
 

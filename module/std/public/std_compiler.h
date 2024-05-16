@@ -88,11 +88,17 @@
     #define std_pad_m( size )                                     std_pp_eval_concat_m ( char __pad, std_line_num_m ) [size]
     #define std_auto_m                                            __auto_type
 
+    #if defined(std_platform_win32_m)
+        #define std_debug_break_m()                                   __debugbreak()
+    #else
+        #define std_debug_break_m()                                   __builtin_debugtrap()
+    #endif
+
 #elif defined(std_compiler_gcc_m)
 
     #define std_warnings_save_state_m()                           _Pragma ( "GCC diagnostic push" )
     #define std_warnings_restore_state_m()                        _Pragma ( "GCC diagnostic pop" )
-    #define std_warnings_ignore_m( x )                            _Pragma ( std_pp_string_m ( GCC diagnostic ignored x ) )
+    #define std_warnings_ignore_m( x )                            _Pragma ( std_pp_eval_concat_m ( std_pp_eval_concat_m ( std_pp_string_m ( GCC diagnostic ignored ), " " ), x ) )
     //#define std_ignore_warning_begin_m( x )                       _Pragma ( "clang diagnostic push" ) _Pragma ( std_pp_string_m ( clang diagnostic ignored x ) )
     //#define std_ignore_warning_end_m()                            _Pragma ( "clang diagnostic pop" )
     // TODO remove this
@@ -149,14 +155,14 @@
     #define std_pad_m( size )                                     std_pp_eval_concat_m ( char __pad, std_line_num_m ) [size]
     #define std_auto_m                                            __auto_type
 
+    #if defined(std_platform_win32_m)
+        #define std_debug_break_m()                                 __debugbreak()
+    #else
+        #define std_debug_break_m()                                 __builtin_trap()
+    #endif
+
 #else
 
     #error The only currently supported compiler is Clang.
 
-#endif
-
-#if defined(std_platform_win32_m)
-    #define std_debug_break_m()                                   __debugbreak()
-#else
-    #define std_debug_break_m()                                   __builtin_debugtrap()
 #endif

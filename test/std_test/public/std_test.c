@@ -1330,6 +1330,26 @@ static void test_byte ( void ) {
     std_log_info_m ( "std_byte test complete." );
 }
 
+#if defined ( std_compiler_gcc_m )
+static void test_array_fun ( std_array_decl_m ( int )* int_array ) {
+    int_array->data[int_array->count++] = 2;
+}
+
+static void test_array ( void ) {
+    std_log_info_m ( "testing std_array..." );
+    int a[3];
+    std_auto_m static_int_array = std_static_array_m ( int, a );
+    std_auto_m heap_int_array = std_heap_array_m ( int, 3 );
+    static_int_array.data[static_int_array.count++] = 1;
+    test_array_fun ( &static_int_array );
+    test_array_fun ( &heap_int_array );
+    std_assert_m ( static_int_array.data[0] == 1 );
+    std_assert_m ( static_int_array.data[1] == 2 );
+    std_assert_m ( heap_int_array.data[0] == 2 );
+    std_log_info_m ( "std_array test complete." );
+}
+#endif
+
 void std_main ( void ) {
     //std_log_set_callback ( log_callback );
 
@@ -1345,7 +1365,7 @@ void std_main ( void ) {
 
     const char* separator = "------------------------------------------";
 
-#if 0
+#if 1
     test_platform();
     std_log_info_m ( separator );
     test_allocator();
@@ -1361,6 +1381,10 @@ void std_main ( void ) {
     test_time();
     std_log_info_m ( separator );
     test_byte();
+#if defined ( std_compiler_gcc_m )
+    std_log_info_m ( separator );
+    test_array();
+#endif
     std_log_info_m ( separator );
     test_queue();
 #else

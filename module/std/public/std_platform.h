@@ -7,6 +7,7 @@
 */
 
 // Detect platform
+// TODO remove as many includes as possible from here and move them into the specific C files where they're needed
 #if defined(_WIN32)
     #define std_platform_win32_m
     #define WIN32_LEAN_AND_MEAN

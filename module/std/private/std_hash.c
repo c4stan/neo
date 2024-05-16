@@ -616,7 +616,7 @@ bool std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload 
         idx = ( idx + 1 ) & mask;
     }
 
-    std_log_error_m ( false, "hash map is full!" );
+    std_log_error_m ( "hash map is full!" );
     return false;
 }
 

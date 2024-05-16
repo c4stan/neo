@@ -189,10 +189,9 @@ void std_platform_init ( std_platform_state_t* state ) {
             }
 
             physical_core->logical_cores_mask = mask;
-            uint32_t logical_core_idx;
-            bool another;
 
-            while ( ( another = std_bit_scan_64 ( mask, &logical_core_idx ) ) ) {
+            while ( mask ) {
+                uint32_t logical_core_idx = std_bit_scan_64 ( mask );
                 std_bit_clear_64 ( &mask, logical_core_idx );
 
                 if ( !std_bit_test_64 ( state->logical_cores_mask, logical_core_idx ) ) {

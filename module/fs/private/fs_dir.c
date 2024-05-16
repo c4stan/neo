@@ -5,12 +5,10 @@
 #include <std_string.h>
 #include <std_log.h>
 
-static bool fs_dir_create_recursive_from_path_buffer ( void ) {
 #if defined std_platform_win32_m
+static bool fs_dir_create_recursive_from_path_buffer ( void ) {
     WCHAR* p = t_path_buffer;
-#else
-    // TODO
-#endif
+
     while ( *p ) {
         if ( *p == '\\' || *p == '/' ) {
             *p = '\0';
@@ -40,6 +38,7 @@ static bool fs_dir_create_recursive_from_path_buffer ( void ) {
 
     return true;
 }
+#endif
 
 bool fs_dir_create ( const char* path ) {
     std_assert_m ( path != NULL );
@@ -194,7 +193,7 @@ size_t fs_dir_iterate ( const char* path, fs_iterator_callback_f callback, void*
     struct dirent* item = readdir ( dir );
 
     while ( item ) {
-        std_ignore_warning_m ( fs_path_flags_t flags = 0, "-Wassign-enum" )
+        std_ignore_warning_m ( fs_path_flags_t flags = 0, " -Wassign-enum" )
 
         if ( item->d_type == DT_DIR ) {
             flags |= fs_path_is_dir_m;

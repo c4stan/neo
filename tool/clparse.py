@@ -310,7 +310,10 @@ def clear_workspace(name):
         for delete in deletes:
             delete_path = delete
             if os.path.exists(delete_path):
-                cmd = 'rmdir /s /q "' + delete_path + '"'
+                if platform.system() == 'Windows':
+                    cmd = 'rmdir /s /q "' + delete_path + '"'
+                elif platform.system() == 'Linux':
+                    cmd = 'rm -rf "' + delete_path + '"'
                 print('Deleting ' + workspace + '/' + delete_path)
                 result = os.system(cmd)
         pop_path()
@@ -350,8 +353,11 @@ def explorer_workspace(name):
     if not validate_workspace(name):
         return
     path = get_workspace_path(name)
-    path = path.replace('/', '\\')
-    os.system('explorer ' + path)
+    if platform.system() == 'Windows':
+        path = path.replace('/', '\\')
+        os.system('explorer ' + path)
+    elif platform.system() == 'Linux' :
+        os.system('nautilus ' + path)
 
 def cmd_workspace(name, tokens):
     if not validate_workspace(name):
@@ -413,7 +419,7 @@ def debug_app(name, flags):
     pop_path()
 
 def fixup_debug_app(name):
-    if not name in APPS + TESTS:
+    if not validate_workspace(name):
         print(Color.FAIL + name + ' is not a registered app workspace.' + Color.ENDC)
         return False
     path = get_workspace_path(name)
@@ -649,7 +655,10 @@ def make_title(words):
         p.communicate(input=title.strip().encode('ascii'))
 
 def clear_console():
-    os.system('cls')
+    if platform.system() == 'Windows':
+        os.system('cls')
+    elif platform.system() == 'Linux':
+        os.system('clear')
 
 def parse(string):
     tokens = string.split(' ')

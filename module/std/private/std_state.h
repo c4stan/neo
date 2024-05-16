@@ -184,6 +184,10 @@ typedef struct {
     uint64_t                core_mask;
     char                    name[std_thread_name_max_len_m];
     size_t                  stack_size;
+#if defined ( std_platform_linux_m )
+    // because pthread doesn't provide a way to check whether a thread is alive or not, we just flag it as dead after a successful join...
+    bool                    is_alive;
+#endif
 } std_thread_t;
 
 typedef struct {

@@ -3,5 +3,5 @@ output = lib
 configs = debug, release
 code = public, private
 if linux
-    libs = m, dl, pthread
+    libs = m #, dl, pthread
 endif

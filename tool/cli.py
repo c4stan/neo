@@ -9,11 +9,11 @@ import clparse as parser
 tool_path = os.path.normpath(os.path.abspath(os.path.dirname(__file__)))
 root_path = os.path.normpath(os.path.join(tool_path, '..'))
 workspace_paths = ['module', 'test', 'app'] 
-parser.init(root_path, tool_path, workspace_paths)
 
 args = sys.argv[1:]
 if len(args) > 0:
     # parse the args and execute a single command
+    parser.init(root_path, tool_path, workspace_paths)
     string = ''
     for arg in args:
         string += arg + ' '
@@ -26,6 +26,7 @@ else:
         os.system('clear')
     parser.print_header()
     parser.print_help()
+    parser.init(root_path, tool_path, workspace_paths)
     while True:
         try:
             string = input('> ')

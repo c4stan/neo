@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#if 0
+#if 1
 
 // http://graphics.stanford.edu/~seander/bithacks.html
 

@@ -243,7 +243,21 @@ void std_log_os_error ( std_log_scope_t scope ) {
     msg.payload = buffer;
     msg.level = std_log_level_error_m;
     std_log_print ( msg );
-#else
-    // TODO
+#elif defined ( std_platform_linux_m )
+    int error_code = errno;
+
+    std_stack_string_append ( &stack, "OS-" );
+    char code_string[32];
+    std_u32_to_str ( error_code, code_string, 32 );
+    std_stack_string_append ( &stack, code_string );
+    std_stack_string_append ( &stack, ": " );
+
+    std_stack_string_append ( &stack, strerror ( error_code ) );
+
+    std_log_msg_t msg;
+    msg.scope = scope;
+    msg.payload = buffer;
+    msg.level = std_log_level_error_m;
+    std_log_print ( msg );
 #endif
 }

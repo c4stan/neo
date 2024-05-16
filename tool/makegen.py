@@ -685,7 +685,15 @@ class Project:
         compiler_defs_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/defines')
         compiler_defs_file.write(def_cmd)
 
-        compiler = COMPILER_CLANG
+        compiler = COMPILER_GCC
+
+        if compiler == COMPILER_GCC:
+            compiler_name = 'gcc-14'
+
+        if compiler == COMPILER_CLANG:
+            std = 'c99'
+        elif compiler == COMPILER_GCC:
+            std = 'gnu23'
 
         main_target.cmd = ''
         if compiler == COMPILER_CLANG:
@@ -696,11 +704,11 @@ class Project:
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
                     #main_target.cmd += '\t@clang-cl -Fa -Z7 -LD -o $@ ' + objs_dep
-                    main_target.cmd += '\t@clang -std=c99 -g -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@clang -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
                     #main_target.cmd += '\t@clang-cl -Fa -Z7 /entry:mainCRTStartup -o $@ ' + objs_dep
-                    main_target.cmd += '\t@clang -std=c99 -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
+                    main_target.cmd += '\t@clang -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
             elif platform.system() == 'Linux':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
@@ -721,15 +729,34 @@ class Project:
                     main_target.cmd += '\t@ar crus $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@gcc -std=c23 -g -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@' + compiler_name + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@gcc -std=c23 -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
-            # TODO linux
+                    main_target.cmd += '\t@' + compiler_name + ' -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
+            elif platform.system() == 'Linux':
+                if self.output == OUTPUT_LIB:
+                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
+                    # removed u flag from win32 version. https://bugzilla.redhat.com/show_bug.cgi?id=1155273
+                    main_target.cmd += '\t@ar crs $@ ' + objs_dep
+                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
+                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
+                    main_target.cmd += '\t@' + compiler_name + ' -shared ' + config_flags + ' -o $@ ' + objs_dep
+                elif self.output == OUTPUT_EXE:
+                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
+                    main_target.cmd += '\t@' + compiler_name + ' ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
 
-        if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP:
-            for lib in self.external_libs:
-                main_target.cmd += ' -l' + lib
+        # TODO when is this not supposed to happen? remove the if line completely?
+        if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP or self.output == OUTPUT_LIB:
+            if platform.system() == 'Windows':
+                for lib in self.external_libs:
+                    main_target.cmd += ' -l' + lib
+            elif platform.system() == 'Linux': # TODO not sure if this is a win32/linux or clang/gcc thing... ?
+                for lib in self.external_libs:
+                    base, name, ext = parse_path(lib)
+                    if ext == '':
+                        main_target.cmd += ' -l' + lib
+                    else:
+                        main_target.cmd += ' ' + lib
 
         if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP) or (BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM):
             main_target.cmd = ''
@@ -785,7 +812,7 @@ class Project:
                 if platform.system() == 'Windows':
                     # TODO make asm output optional?
                     #target.cmd = '\t@clang-cl ' + config_flags + ' -Zi -Fa' + normpath(output_path + '/' + name + '.asm') + ' '
-                    target.cmd = '\t@clang -std=c99 -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@clang -std=' + std + ' -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
@@ -823,11 +850,12 @@ class Project:
                     target.cmd += ' -fPIC' # needed when building a shared lib, static libs used by the shared lib must also have this...
                     target.cmd += ' ' + src_def_cmd
                     #target.cmd += ' ' + def_cmd
-                    target.cmd += ' @' + normpath('defines')
+                    target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
+                    target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
             elif compiler == COMPILER_GCC:
                 if platform.system() == 'Windows':
                     # TODO make asm output optional?
-                    target.cmd = '\t@gcc -std=c23 -g'# -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@' + compiler_name + ' -std=' + std + ' -g'# -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                     for path in self.external_paths:
@@ -844,7 +872,28 @@ class Project:
                     #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
-                # todo linux
+                elif platform.system() == 'Linux':
+                    target.cmd = '\t@' + compiler_name + ' -std=' + std + ' ' + config_flags
+                    if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
+                        target.cmd += ' -S'
+                        target.cmd += ' -mllvm --x86-asm-syntax=intel'
+                    for path in self.project_paths:
+                        target.cmd += ' -I' + path
+                    for path in self.external_paths:
+                        target.cmd += ' -I' + path
+                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNINGS_FLAGS
+                    if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
+                        target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
+                    target.cmd += ' -g -c ' + relpath(src, rootpath + '/' + build_path)
+                    if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
+                        target.cmd += ' -o ' + normpath(output_path + '/' + name + '.asm')
+                    else:
+                        target.cmd += ' -o $@'
+                    target.cmd += ' -fPIC' # needed when building a shared lib, static libs used by the shared lib must also have this...
+                    target.cmd += ' ' + src_def_cmd
+                    #target.cmd += ' ' + def_cmd
+                    target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
+                    target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
 
             #target.cmd += ' -march=native'
 

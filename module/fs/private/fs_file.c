@@ -342,7 +342,7 @@ void* fs_file_map ( fs_file_h file, size_t size, fs_map_permits_t permits ) {
     void* map = mmap ( NULL, size, prot, flags, ( int ) file, 0 );
 
     if ( map == MAP_FAILED ) {
-        return std_null_buffer_m;
+        return NULL;
     }
 
     return map;
