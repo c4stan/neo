@@ -1,4 +1,4 @@
-name = xui
+name = xi
 code = public, private
 defs = public.def
 configs = debug, release

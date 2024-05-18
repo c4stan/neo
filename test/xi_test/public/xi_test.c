@@ -4,7 +4,7 @@
 
 #include <xs.h>
 #include <xf.h>
-#include <xui.h>
+#include <xi.h>
 #include <fs.h>
 #include <se.h>
 
@@ -15,15 +15,15 @@
 #define UI_SWITCH_COMPONENT_ID 3
 
 typedef struct {
-    xui_window_state_t state;
+    xi_window_state_t state;
 } ui_window_component_t;
 
 typedef struct {
-    xui_label_state_t state;
+    xi_label_state_t state;
 } ui_label_component_t;
 
 typedef struct {
-    xui_switch_state_t state;
+    xi_switch_state_t state;
 } ui_switch_component_t;
 
 std_warnings_ignore_m ( "-Wunused-function" )
@@ -57,7 +57,7 @@ typedef struct {
     xg_workload_h xg_workload;
     uint64_t resolution_x;
     uint64_t resolution_y;
-    xui_workload_h xui_workload;
+    xi_workload_h xi_workload;
 } xf_ui_pass_args_t;
 
 static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -78,9 +78,9 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
         xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
     }
 
-    xui_i* xui = std_module_get_m ( xui_module_name_m );
+    xi_i* xi = std_module_get_m ( xi_module_name_m );
     {
-        xui_flush_params_t params;
+        xi_flush_params_t params;
         params.device = args->device;
         params.workload = args->xg_workload;
         params.cmd_buffer = cmd_buffer;
@@ -90,11 +90,11 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
         params.viewport.width = args->resolution_x;
         params.viewport.height = args->resolution_y;
 
-        xui->flush_workload ( args->xui_workload, &params );
+        xi->flush_workload ( args->xi_workload, &params );
     }
 }
 
-static void xui_test ( void ) {
+static void xi_test ( void ) {
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     std_assert_m ( wm );
 
@@ -130,11 +130,11 @@ static void xui_test ( void ) {
         std_assert_m ( swapchain != xg_null_handle_m );
     }
 
-    // let xui register its shaders before building the xs database
+    // let xi register its shaders before building the xs database
     // TODO support dynamic add and rebuild (do we already do that?)
     xs_i* xs = std_module_get_m ( xs_module_name_m );
-    xui_i* xui = std_module_get_m ( xui_module_name_m );
-    xui->register_shaders ( xs );
+    xi_i* xi = std_module_get_m ( xi_module_name_m );
+    xi->register_shaders ( xs );
     {
         xs->set_output_folder ( "output/shader/" );
 
@@ -150,7 +150,7 @@ static void xui_test ( void ) {
     }
 
     // create test font
-    xui_font_h font;
+    xi_font_h font;
     {
         fs_i* fs = std_module_get_m ( fs_module_name_m );
         fs_file_h font_file = fs->open_file ( "assets/ProggyVector-Regular.ttf", fs_file_read_m );
@@ -159,20 +159,20 @@ static void xui_test ( void ) {
         void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
         fs->read_file ( font_data_alloc, font_file_info.size, font_file );
 
-        xui_font_params_t font_params;
+        xi_font_params_t font_params;
         font_params.xg_device = device;
         font_params.pixel_height = 16;
-        font_params.first_char_code = xui_font_char_ascii_base_m;
-        font_params.char_count = xui_font_char_ascii_count_m;
+        font_params.first_char_code = xi_font_char_ascii_base_m;
+        font_params.char_count = xi_font_char_ascii_count_m;
         font_params.outline = false;
-        font = xui->create_font ( std_buffer ( font_data_alloc, font_file_info.size ), &font_params );
+        font = xi->create_font ( std_buffer ( font_data_alloc, font_file_info.size ), &font_params );
     }
 
     // create ui entities
-    // TODO: handles inside components, xui has create_x api that returns handle and layouts in immediate mode,
+    // TODO: handles inside components, xi has create_x api that returns handle and layouts in immediate mode,
     // and creates internal state for the element rect, then in the render pass callback flush_x on the handle
-    // causes xui to consume and draw the previously set up rect to an xg cmd buffer
-    // OR: simply build the xui_workload in here, and provide the workload only to the render pass, and the render
+    // causes xi to consume and draw the previously set up rect to an xg cmd buffer
+    // OR: simply build the xi_workload in here, and provide the workload only to the render pass, and the render
     // pass only calls flush on it.
 
     xf_i* xf = std_module_get_m ( xf_module_name_m );
@@ -214,51 +214,51 @@ static void xui_test ( void ) {
 
     // ui
     #if 0
-    xui_style_t window_style = xui_default_style_m;
+    xi_style_t window_style = xi_default_style_m;
     {
         window_style.font = font;
         window_style.font_height = 14;
-        window_style.color = xui_color_black_m;//xui_color_rgba_u32_m ( 100, 100, 100, 100 );
+        window_style.color = xi_color_black_m;//xi_color_rgba_u32_m ( 100, 100, 100, 100 );
     }
-    xui_style_t label_style = xui_default_style_m;
+    xi_style_t label_style = xi_default_style_m;
     {
         label_style.font = font;
     }
-    xui_style_t switch_style = xui_default_style_m;
+    xi_style_t switch_style = xi_default_style_m;
     {
         switch_style.font = font;
-        switch_style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m;
-        switch_style.color = xui_color_blue_m;
+        switch_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
+        switch_style.color = xi_color_blue_m;
     }
-    xui_style_t slider_style = xui_default_style_m;
+    xi_style_t slider_style = xi_default_style_m;
     {
-        slider_style.color = xui_color_blue_m;
-        slider_style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m;
+        slider_style.color = xi_color_blue_m;
+        slider_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
     }
-    xui_style_t button_style = xui_default_style_m;
+    xi_style_t button_style = xi_default_style_m;
     {
-        button_style.color = xui_color_blue_m;
-        button_style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m;
+        button_style.color = xi_color_blue_m;
+        button_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
         button_style.font = font;
         button_style.font_height = 14;
     }
-    xui_style_t text_style = xui_default_style_m;
+    xi_style_t text_style = xi_default_style_m;
     {
-        text_style.color = xui_color_blue_m;
-        text_style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m;
+        text_style.color = xi_color_blue_m;
+        text_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
         text_style.font = font;
         text_style.font_height = 14;
     }
-    xui_style_t select_style = xui_default_style_m;
+    xi_style_t select_style = xi_default_style_m;
     {
-        select_style.color = xui_color_blue_m;
-        select_style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m;
+        select_style.color = xi_color_blue_m;
+        select_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
         select_style.font = font;
         select_style.font_height = 14;
     }
     #endif
 
-    xui_window_state_t ui_window = xui_window_state_m (
+    xi_window_state_t ui_window = xi_window_state_m (
         .title = "window",
         .x = 50,
         .y = 100,
@@ -266,68 +266,68 @@ static void xui_test ( void ) {
         .height = 250,
         .padding_x = 10,
         .padding_y = 2,
-        .style = xui_style_m (
+        .style = xi_style_m (
             .font = font,
         ),
     );
 
-    xui_label_state_t ui_label = xui_label_state_m (
+    xi_label_state_t ui_label = xi_label_state_m (
         .text = "label",
         .height = 20,
     );
 
-    xui_switch_state_t ui_switch = xui_switch_state_m (
+    xi_switch_state_t ui_switch = xi_switch_state_m (
         .width = 20,
         .height = 20,
-        .style = xui_style_m ( 
-            .color = xui_color_blue_m,
-            .horizontal_alignment = xui_horizontal_alignment_right_to_left_m 
+        .style = xi_style_m ( 
+            .color = xi_color_blue_m,
+            .horizontal_alignment = xi_horizontal_alignment_right_to_left_m 
         ),
     );
-    xui_label_state_t ui_switch_label = xui_label_state_m (
+    xi_label_state_t ui_switch_label = xi_label_state_m (
         .text = "off",
         .height = 14,
     );
 
-    xui_slider_state_t ui_slider = xui_slider_state_m (
+    xi_slider_state_t ui_slider = xi_slider_state_m (
         .width = 100,
         .height = 20,
-        .style = xui_style_m ( 
-            .color = xui_color_blue_m,
-            .horizontal_alignment = xui_horizontal_alignment_right_to_left_m 
+        .style = xi_style_m ( 
+            .color = xi_color_blue_m,
+            .horizontal_alignment = xi_horizontal_alignment_right_to_left_m 
         ),
     );
     //char ui_slider_label_buffer[32];
     //{
     //    std_f32_to_str ( 0, ui_slider_label_buffer, 32 );
     //}
-    xui_label_state_t ui_slider_label = xui_label_state_m (
+    xi_label_state_t ui_slider_label = xi_label_state_m (
         .text = "0",
         .height = 14,
     );
 
-    xui_button_state_t ui_button = xui_button_state_m (
+    xi_button_state_t ui_button = xi_button_state_m (
         .width = 70,
         .height = 20,
         .text = "button",
-        .style = xui_style_m ( 
-            .color = xui_color_blue_m,
-            .horizontal_alignment = xui_horizontal_alignment_right_to_left_m 
+        .style = xi_style_m ( 
+            .color = xi_color_blue_m,
+            .horizontal_alignment = xi_horizontal_alignment_right_to_left_m 
         ),
     );
-    xui_label_state_t ui_button_label = xui_label_state_m (
+    xi_label_state_t ui_button_label = xi_label_state_m (
         .height = 14,
     );
 
 #if 0
     char ui_text_buffer[32] = {0};
-    xui_text_state_t ui_text = xui_text_state_m (
+    xi_text_state_t ui_text = xi_text_state_m (
         ui_text.width = 100;
         ui_text.height = 20;
         ui_text.text = ui_text_buffer;
         ui_text.text_capacity = 32;
     )
-    xui_label_state_t ui_text_label = xui_default_label_state_m;
+    xi_label_state_t ui_text_label = xi_default_label_state_m;
     {
         ui_text_label.height = 14;
         ui_text_label.text = ui_text.text;
@@ -351,7 +351,7 @@ static void xui_test ( void ) {
         *p2 = s2;
         *p3 = s3;
     }
-    xui_select_state_t ui_select = xui_select_state_m (
+    xi_select_state_t ui_select = xi_select_state_m (
         .width = 100,
         .height = 20,
         .items = ( const char** ) select_alloc,
@@ -359,22 +359,22 @@ static void xui_test ( void ) {
         .item_idx = 0,
         .font = font,
         .sort_order = 1,
-        .style = xui_style_m ( 
-            .color = xui_color_blue_m,
-            .horizontal_alignment = xui_horizontal_alignment_right_to_left_m 
+        .style = xi_style_m ( 
+            .color = xi_color_blue_m,
+            .horizontal_alignment = xi_horizontal_alignment_right_to_left_m 
         ),
     );
-    xui_label_state_t ui_select_label = xui_label_state_m (
+    xi_label_state_t ui_select_label = xi_label_state_m (
         .height = 14,
     );
 
-    xui_section_state_t ui_section = xui_section_state_m (
+    xi_section_state_t ui_section = xi_section_state_m (
         .title = "section1",
         .font = font,
         .height = 20,
     );
 
-    xui_section_state_t ui_section2 = xui_section_state_m (
+    xi_section_state_t ui_section2 = xi_section_state_m (
         .title = "section2",
         .font = font,
         .height = 20,
@@ -446,44 +446,44 @@ static void xui_test ( void ) {
             std_str_copy_m ( ui_button_label.text, ui_button.pressed ? "click" : ui_button.down ? "down" : "up" );
             std_str_copy_m ( ui_select_label.text, ui_select.items[ui_select.item_idx] );
 
-            xui_workload_h xui_workload = xui->create_workload();
+            xi_workload_h xi_workload = xi->create_workload();
 
-            xui->begin_update ( &new_window_info, &input_state );
+            xi->begin_update ( &new_window_info, &input_state );
 
-            xui->begin_window ( xui_workload, &ui_window );
-            xui->begin_section ( xui_workload, &ui_section );
-            xui->add_label ( xui_workload, &ui_label );
-            xui->add_label ( xui_workload, &ui_label );
-            xui->newline();
-            xui->add_label ( xui_workload, &ui_label );
-            xui->newline();
-            xui->add_label ( xui_workload, &ui_switch_label );
-            xui->add_switch ( xui_workload, &ui_switch );
-            xui->newline();
-            xui->add_label ( xui_workload, &ui_slider_label );
-            xui->add_slider ( xui_workload, &ui_slider );
-            xui->newline();
-            xui->end_section ( xui_workload );
-            xui->begin_section ( xui_workload, &ui_section2 );
-            xui->add_label ( xui_workload, &ui_button_label );
-            xui->add_button ( xui_workload, &ui_button );
-            xui->newline();
-            xui->add_label ( xui_workload, &ui_select_label );
-            xui->add_select ( xui_workload, &ui_select );
-            xui->end_section ( xui_workload );
-            //xui->newline();
-            //xui->add_label ( xui_workload, &ui_button_label, &label_style );
-            //xui->add_button ( xui_workload, &ui_button, &button_style );
-            xui->end_window ( xui_workload );
+            xi->begin_window ( xi_workload, &ui_window );
+            xi->begin_section ( xi_workload, &ui_section );
+            xi->add_label ( xi_workload, &ui_label );
+            xi->add_label ( xi_workload, &ui_label );
+            xi->newline();
+            xi->add_label ( xi_workload, &ui_label );
+            xi->newline();
+            xi->add_label ( xi_workload, &ui_switch_label );
+            xi->add_switch ( xi_workload, &ui_switch );
+            xi->newline();
+            xi->add_label ( xi_workload, &ui_slider_label );
+            xi->add_slider ( xi_workload, &ui_slider );
+            xi->newline();
+            xi->end_section ( xi_workload );
+            xi->begin_section ( xi_workload, &ui_section2 );
+            xi->add_label ( xi_workload, &ui_button_label );
+            xi->add_button ( xi_workload, &ui_button );
+            xi->newline();
+            xi->add_label ( xi_workload, &ui_select_label );
+            xi->add_select ( xi_workload, &ui_select );
+            xi->end_section ( xi_workload );
+            //xi->newline();
+            //xi->add_label ( xi_workload, &ui_button_label, &label_style );
+            //xi->add_button ( xi_workload, &ui_button, &button_style );
+            xi->end_window ( xi_workload );
 
-            xui->end_update();
+            xi->end_update();
 
             // TODO updating node params like this is only ok when sim and render are serial
             ui_node_args.device = device;
             ui_node_args.xg_workload = workload;
             ui_node_args.resolution_x = 600;
             ui_node_args.resolution_y = 400;
-            ui_node_args.xui_workload = xui_workload;
+            ui_node_args.xi_workload = xi_workload;
         }
 
         xf->execute_graph ( graph, workload );
@@ -495,6 +495,6 @@ static void xui_test ( void ) {
 }
 
 void std_main ( void ) {
-    xui_test();
-    std_log_info_m ( "xui_test COMPLETE!" );
+    xi_test();
+    std_log_info_m ( "xi_test COMPLETE!" );
 }

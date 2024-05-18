@@ -986,7 +986,7 @@ void xf_graph_node_disable ( xf_node_h node_handle ) {
     node->enabled = false;
 }
 
-void xf_graph_debug_ui ( xui_i* xui, xui_workload_h workload, xf_graph_h graph_handle ) {
+void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
     for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
@@ -995,24 +995,24 @@ void xf_graph_debug_ui ( xui_i* xui, xui_workload_h workload, xf_graph_h graph_h
         if ( node->params.passthrough.enable ) {
             bool node_enabled = node->enabled;
 
-            xui_label_state_t label_state = xui_label_state_m (
+            xi_label_state_t label_state = xi_label_state_m (
                 //.text = node->params.debug_name,
                 //.height = labels_style->font_height,
             );
             std_str_copy_m ( label_state.text, node->params.debug_name );
-            xui->add_label ( workload, &label_state );//, labels_style );
+            xi->add_label ( workload, &label_state );//, labels_style );
 
-            xui_switch_state_t switch_state = xui_switch_state_m (
+            xi_switch_state_t switch_state = xi_switch_state_m (
                 .width = 14,
                 .height = 14,
                 .value = node_enabled,
-                .style = xui_style_m (
-                    .horizontal_alignment = xui_horizontal_alignment_right_to_left_m
+                .style = xi_style_m (
+                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
                 ),
             );
-            xui->add_switch ( workload, &switch_state );//, controls_style );
+            xi->add_switch ( workload, &switch_state );//, controls_style );
 
-            xui->newline();
+            xi->newline();
 
             if ( switch_state.value != node_enabled ) {
                 node->enabled = switch_state.value;

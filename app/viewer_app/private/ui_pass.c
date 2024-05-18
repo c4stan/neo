@@ -13,10 +13,10 @@ typedef struct {
 } ui_pass_args_t;
 
 // TODO avoid this
-static xui_workload_h xui_workload;
+static xi_workload_h xi_workload;
 
-void set_ui_pass_xui_workload ( xui_workload_h workload ) {
-    xui_workload = workload;
+void set_ui_pass_xi_workload ( xi_workload_h workload ) {
+    xi_workload = workload;
 }
 
 static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -37,9 +37,9 @@ static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* use
         xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
     }
 
-    xui_i* xui = std_module_get_m ( xui_module_name_m );
+    xi_i* xi = std_module_get_m ( xi_module_name_m );
     {
-        xui_flush_params_t params;
+        xi_flush_params_t params;
         params.device = args->device;
         params.workload = node_args->workload;
         params.cmd_buffer = cmd_buffer;
@@ -49,11 +49,11 @@ static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* use
         params.viewport.width = args->resolution_x;
         params.viewport.height = args->resolution_y;
 
-        xui->flush_workload ( xui_workload, &params );
+        xi->flush_workload ( xi_workload, &params );
     }
 
     std_module_release ( xg );
-    std_module_release ( xui );
+    std_module_release ( xi );
 }
 
 xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {

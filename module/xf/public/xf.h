@@ -3,7 +3,7 @@
 #include <std_module.h>
 
 #include <xg.h>
-#include <xui.h>
+#include <xi.h>
 
 #define xf_module_name_m xf
 std_module_export_m void* xf_load ( void* );
@@ -449,5 +449,5 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
-    void ( *debug_ui_graph ) ( xui_i* xui, xui_workload_h workload, xf_graph_h graph ); // adding a xf->xui dependency here kind of sucks...
+    void ( *debug_ui_graph ) ( xi_i* xi, xi_workload_h workload, xf_graph_h graph ); // adding a xf->xi dependency here kind of sucks...
 } xf_i;

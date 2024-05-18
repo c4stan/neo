@@ -1,4 +1,4 @@
-include xui_render_common.xsi
+include xi_render_common.xsi
 
 begin render_target 0
     format A2B10G10R10_UNORM

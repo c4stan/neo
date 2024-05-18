@@ -1,4 +1,4 @@
-#include "xui_workload.h"
+#include "xi_workload.h"
 
 #include <xg.h>
 #include <xs.h>
@@ -6,55 +6,55 @@
 #include <std_queue.h>
 #include <std_list.h>
 
-static xui_workload_state_t* xui_workload_state;
+static xi_workload_state_t* xi_workload_state;
 
-void xui_workload_load ( xui_workload_state_t* state ) {
-    xui_workload_state = state;
+void xi_workload_load ( xi_workload_state_t* state ) {
+    xi_workload_state = state;
 
-    xui_workload_state->workloads_array = std_virtual_heap_alloc_array_m ( xui_workload_t, xui_workload_max_workloads_m );
-    xui_workload_state->workloads_freelist = std_freelist_m ( xui_workload_state->workloads_array, xui_workload_max_workloads_m );
-    xui_workload_state->workloads_count = 0;
+    xi_workload_state->workloads_array = std_virtual_heap_alloc_array_m ( xi_workload_t, xi_workload_max_workloads_m );
+    xi_workload_state->workloads_freelist = std_freelist_m ( xi_workload_state->workloads_array, xi_workload_max_workloads_m );
+    xi_workload_state->workloads_count = 0;
 
     // TODO have xg provide some default null textures, similar to default samplers
-    xui_workload_state->null_texture = xg_null_handle_m;
+    xi_workload_state->null_texture = xg_null_handle_m;
 }
 
-void xui_workload_reload ( xui_workload_state_t* state ) {
-    xui_workload_state = state;
+void xi_workload_reload ( xi_workload_state_t* state ) {
+    xi_workload_state = state;
 }
 
-void xui_workload_unload ( void ) {
-    std_virtual_heap_free ( xui_workload_state->workloads_array );
+void xi_workload_unload ( void ) {
+    std_virtual_heap_free ( xi_workload_state->workloads_array );
 
     // TODO destroy null_texture
 }
 
-void xui_workload_load_shaders ( xs_i* xs ) {
-    xui_workload_state->render_pipeline_bgra8 = xs->lookup_pipeline_state ( "xui_render_b8g8r8a8" );
-    xui_workload_state->render_pipeline_a2bgr10 = xs->lookup_pipeline_state ( "xui_render_a2b10g10r10" );
+void xi_workload_load_shaders ( xs_i* xs ) {
+    xi_workload_state->render_pipeline_bgra8 = xs->lookup_pipeline_state ( "xi_render_b8g8r8a8" );
+    xi_workload_state->render_pipeline_a2bgr10 = xs->lookup_pipeline_state ( "xi_render_a2b10g10r10" );
 }
 
-void xui_workload_activate_device ( xg_i* xg, xg_device_h device ) {
-
-}
-
-void xui_workload_deactivate_device ( xg_i* xg, xg_device_h device ) {
+void xi_workload_activate_device ( xg_i* xg, xg_device_h device ) {
 
 }
 
-xui_workload_h xui_workload_create ( void ) {
-    xui_workload_t* workload = std_list_pop_m ( &xui_workload_state->workloads_freelist );
+void xi_workload_deactivate_device ( xg_i* xg, xg_device_h device ) {
+
+}
+
+xi_workload_h xi_workload_create ( void ) {
+    xi_workload_t* workload = std_list_pop_m ( &xi_workload_state->workloads_freelist );
     std_assert_m ( workload );
     workload->rect_count = 0;
     workload->vertex_buffer = xg_null_handle_m;
 
-    xui_workload_h handle = ( xui_workload_h ) ( workload - xui_workload_state->workloads_array );
+    xi_workload_h handle = ( xi_workload_h ) ( workload - xi_workload_state->workloads_array );
     return handle;
 }
 
-void xui_workload_cmd_draw ( xui_workload_h workload_handle, const xui_draw_rect_t* rects, uint64_t rect_count ) {
-    xui_workload_t* workload = &xui_workload_state->workloads_array[workload_handle];
-    std_assert_m ( workload->rect_count + rect_count < xui_workload_max_rects_m );
+void xi_workload_cmd_draw ( xi_workload_h workload_handle, const xi_draw_rect_t* rects, uint64_t rect_count ) {
+    xi_workload_t* workload = &xi_workload_state->workloads_array[workload_handle];
+    std_assert_m ( workload->rect_count + rect_count < xi_workload_max_rects_m );
 
     for ( uint64_t i = 0; i < rect_count; ++i ) {
         workload->rect_array[workload->rect_count + i] = rects[i];
@@ -63,9 +63,9 @@ void xui_workload_cmd_draw ( xui_workload_h workload_handle, const xui_draw_rect
     workload->rect_count += rect_count;
 }
 
-void xui_workload_cmd_draw_tri ( xui_workload_h workload_handle, const xui_draw_tri_t* tris, uint64_t tri_count ) {
-    xui_workload_t* workload = &xui_workload_state->workloads_array[workload_handle];
-    std_assert_m ( workload->tri_count + tri_count < xui_workload_max_tris_m );
+void xi_workload_cmd_draw_tri ( xi_workload_h workload_handle, const xi_draw_tri_t* tris, uint64_t tri_count ) {
+    xi_workload_t* workload = &xi_workload_state->workloads_array[workload_handle];
+    std_assert_m ( workload->tri_count + tri_count < xi_workload_max_tris_m );
 
     for ( uint64_t i = 0; i < tri_count; ++i ) {
         workload->tri_array[workload->tri_count + i] = tris[i];
@@ -74,7 +74,13 @@ void xui_workload_cmd_draw_tri ( xui_workload_h workload_handle, const xui_draw_
     workload->tri_count += tri_count;
 }
 
-void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params_t* flush_params ) {
+void xi_workload_cmd_draw_mesh ( xi_workload_h workload, const xi_draw_mesh_t* mesh ) {
+    std_unused_m ( workload );
+    std_unused_m ( mesh );
+    std_not_implemented_m();
+}
+
+void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t* flush_params ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     // try to recycle old workloads
@@ -82,8 +88,8 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     size_t ring_count = std_ring_count ( &device_context->submit_ring );
 
     while ( ring_count > 0 ) {
-        uint64_t ring_idx = std_ring_bot_idx ( &xui_workload_state->submit_ring );
-        xui_workload_submit_context_t* context = &xui_workload_state->submit_contexts[ring_idx];
+        uint64_t ring_idx = std_ring_bot_idx ( &xi_workload_state->submit_ring );
+        xi_workload_submit_context_t* context = &xi_workload_state->submit_contexts[ring_idx];
 
         if ( !xg->is_workload_complete ( context->workload ) ) {
             break;
@@ -96,7 +102,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
 
     // lazy init resources
     // TODO cleanup
-    if ( xui_workload_state->null_texture == xg_null_handle_m ) {
+    if ( xi_workload_state->null_texture == xg_null_handle_m ) {
         xg_texture_h texture;
         {
             xg_texture_params_t params = xg_default_texture_params_m;
@@ -106,7 +112,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
             params.height = 1;
             params.format = xg_format_r8g8b8a8_unorm_m;
             params.allowed_usage = xg_texture_usage_copy_dest_m | xg_texture_usage_resource_m;
-            std_str_copy_m ( params.debug_name, "xui null texture" );
+            std_str_copy_m ( params.debug_name, "xi null texture" );
             texture = xg->create_texture ( &params );
         }
 
@@ -156,7 +162,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
         xg_sampler_h point_sampler;
         {
             xg_sampler_params_t params = xg_sampler_params_m (
-                .debug_name = "xui point sampler",
+                .debug_name = "xi point sampler",
                 .min_filter = xg_sampler_filter_point_m,
                 .mag_filter = xg_sampler_filter_point_m,
                 .mipmap_filter = xg_sampler_filter_point_m,
@@ -167,7 +173,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
         xg_sampler_h linear_sampler;
         {
             xg_sampler_params_t params = xg_sampler_params_m (
-                .debug_name = "xui linear sampler",
+                .debug_name = "xi linear sampler",
                 .min_filter = xg_sampler_filter_linear_m,
                 .mag_filter = xg_sampler_filter_linear_m,
                 .mipmap_filter = xg_sampler_filter_linear_m,
@@ -175,13 +181,13 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
             linear_sampler = xg->create_sampler ( &params );
         }
 
-        xui_workload_state->null_texture = texture;
-        xui_workload_state->point_sampler = xg->get_default_sampler ( flush_params->device, xg_default_sampler_point_clamp_m );
-        xui_workload_state->linear_sampler = xg->get_default_sampler ( flush_params->device, xg_default_sampler_linear_clamp_m );
+        xi_workload_state->null_texture = texture;
+        xi_workload_state->point_sampler = xg->get_default_sampler ( flush_params->device, xg_default_sampler_point_clamp_m );
+        xi_workload_state->linear_sampler = xg->get_default_sampler ( flush_params->device, xg_default_sampler_linear_clamp_m );
     }
 
     // setup new workload
-    xui_workload_t* workload = &xui_workload_state->workloads_array[workload_handle];
+    xi_workload_t* workload = &xi_workload_state->workloads_array[workload_handle];
     workload->xg_workload = flush_params->workload;
 
     // translate rects and tris into vertex data
@@ -189,8 +195,8 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     float viewport_h = ( float ) flush_params->viewport.height;
 
     for ( uint64_t i = 0; i < workload->rect_count; ++i ) {
-        const xui_draw_rect_t* rect = &workload->rect_array[i];
-        xui_workload_vertex_t* vertex;
+        const xi_draw_rect_t* rect = &workload->rect_array[i];
+        xi_workload_vertex_t* vertex;
 
         // the following code remaps position values from <[0, viewport_w], [0, viewport_h]> into <[-1, 1], [-1, 1]>
         // and flips position y axis direction from bottom up to top down
@@ -246,8 +252,8 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     uint64_t tri_base = workload->rect_count * 6;
 
     for ( uint64_t i = 0; i < workload->tri_count; ++i ) {
-        const xui_draw_tri_t* tri = &workload->tri_array[i];
-        xui_workload_vertex_t* vertex;
+        const xi_draw_tri_t* tri = &workload->tri_array[i];
+        xi_workload_vertex_t* vertex;
 
         vertex = &workload->vertex_buffer_data[tri_base + i * 3 + 0];
         vertex->pos[0] = ( tri->xy0[0] / viewport_w ) * 2 - 1;
@@ -284,9 +290,9 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     xg_buffer_params_t vertex_buffer_params = xg_buffer_params_m (
         .allocator = xg->get_default_allocator ( flush_params->device, xg_memory_type_gpu_mappable_m ),
         .device = flush_params->device,
-        .size = sizeof ( xui_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
+        .size = sizeof ( xi_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
         .allowed_usage = xg_buffer_usage_vertex_buffer_m,
-        .debug_name = "xui_vertex_buffer",
+        .debug_name = "xi_vertex_buffer",
     );
     xg_buffer_h vertex_buffer_handle = xg->create_buffer ( &vertex_buffer_params );
     std_assert_m ( vertex_buffer_handle != xg_null_handle_m );
@@ -302,9 +308,9 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     xs_i* xs = std_module_get_m ( xs_module_name_m );
     xg_graphics_pipeline_state_h pipeline_state;
     if ( flush_params->render_target_format == xg_format_b8g8r8a8_unorm_m ) {
-        pipeline_state = xs->get_pipeline_state ( xui_workload_state->render_pipeline_bgra8 );
+        pipeline_state = xs->get_pipeline_state ( xi_workload_state->render_pipeline_bgra8 );
     } else if ( flush_params->render_target_format == xg_format_a2b10g10r10_unorm_pack32_m ) {
-        pipeline_state = xs->get_pipeline_state ( xui_workload_state->render_pipeline_a2bgr10 );
+        pipeline_state = xs->get_pipeline_state ( xi_workload_state->render_pipeline_a2bgr10 );
     } else {
         pipeline_state = xg_null_handle_m;
         std_not_implemented_m();
@@ -321,7 +327,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
     // TODO single draw call?
     // draw rects
     for ( uint32_t i = 0; i < workload->rect_count; ++i ) {
-        const xui_draw_rect_t* rect = &workload->rect_array[i];
+        const xi_draw_rect_t* rect = &workload->rect_array[i];
 
         xg->cmd_set_pipeline_resources (
             flush_params->cmd_buffer,
@@ -331,12 +337,12 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
                 .textures = & xg_texture_resource_binding_m (
                     .shader_register = 0,
                     .layout = xg_texture_layout_shader_read_m,
-                    .texture = rect->texture != xg_null_handle_m ? rect->texture : xui_workload_state->null_texture,
+                    .texture = rect->texture != xg_null_handle_m ? rect->texture : xi_workload_state->null_texture,
                 ),
                 .sampler_count = 1,
                 .samplers = & xg_sampler_resource_binding_m (
                     .shader_register = 1,
-                    .sampler = rect->linear_sampler_filter ? xui_workload_state->linear_sampler : xui_workload_state->point_sampler,
+                    .sampler = rect->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
                 )
             ),
             flush_params->key + rect->sort_order );
@@ -346,7 +352,7 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
 
     // draw tris
     for ( uint32_t i = 0; i < workload->tri_count; ++i ) {
-        const xui_draw_tri_t* tri = &workload->tri_array[i];
+        const xi_draw_tri_t* tri = &workload->tri_array[i];
 
         xg->cmd_set_pipeline_resources (
             flush_params->cmd_buffer,
@@ -356,12 +362,12 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
                 .textures = &xg_texture_resource_binding_m (
                     .shader_register = 0,
                     .layout = xg_texture_layout_shader_read_m,
-                    .texture = tri->texture != xg_null_handle_m ? tri->texture : xui_workload_state->null_texture,
+                    .texture = tri->texture != xg_null_handle_m ? tri->texture : xi_workload_state->null_texture,
                 ),
                 .sampler_count = 1,
                 .samplers = &xg_sampler_resource_binding_m (
                     .shader_register = 1,
-                    .sampler = tri->linear_sampler_filter ? xui_workload_state->linear_sampler : xui_workload_state->point_sampler,
+                    .sampler = tri->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
                 )
             ),
             flush_params->key + tri->sort_order );
@@ -374,12 +380,12 @@ void xui_workload_flush ( xui_workload_h workload_handle, const xui_flush_params
 
     // queue up the workload
 #if 0
-    uint64_t ring_idx = std_ring_top_idx ( &xui_workload_state.submit_ring );
-    std_ring_push ( &xui_workload_state.submit_ring, 1 );
-    xui_workload_submit_context_t* context = &xui_workload_state.submit_contexts[ring_idx];
+    uint64_t ring_idx = std_ring_top_idx ( &xi_workload_state.submit_ring );
+    std_ring_push ( &xi_workload_state.submit_ring, 1 );
+    xi_workload_submit_context_t* context = &xi_workload_state.submit_contexts[ring_idx];
     context->workload = workload_handle;
 #endif
 
     std_mem_zero_m ( workload );
-    std_list_push ( &xui_workload_state->workloads_freelist, workload );
+    std_list_push ( &xi_workload_state->workloads_freelist, workload );
 }

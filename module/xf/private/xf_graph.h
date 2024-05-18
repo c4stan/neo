@@ -1,6 +1,6 @@
 #include <xf.h>
 
-#include <xui.h>
+#include <xi.h>
 
 /*
     Full rebuild every frame vs rebuild on user request/fraph change only?
@@ -107,4 +107,4 @@ void xf_graph_debug_print ( xf_graph_h graph );
 void xf_graph_node_enable ( xf_node_h node );
 void xf_graph_node_disable ( xf_node_h node );
 
-void xf_graph_debug_ui ( xui_i* xui, xui_workload_h workload, xf_graph_h graph );
+void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph );

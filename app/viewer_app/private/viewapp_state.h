@@ -10,7 +10,7 @@
 #include <rv.h>
 #include <wm.h>
 #include <xg.h>
-#include <xui.h>
+#include <xi.h>
 
 // Modules
 typedef struct {
@@ -21,7 +21,7 @@ typedef struct {
     xf_i*  xf;
     se_i*  se;
     rv_i*  rv;
-    xui_i* xui;
+    xi_i* xi;
 } viewapp_modules_state_t;
 
 // Render
@@ -60,16 +60,16 @@ typedef struct {
 // UI
 
 typedef struct {
-    xui_font_h font;
+    xi_font_h font;
 
-    xui_window_state_t window_state;
-    xui_style_t window_style;
+    xi_window_state_t window_state;
+    xi_style_t window_style;
 
-    xui_section_state_t xf_graph_section_state;
-    xui_section_state_t xf_alloc_section_state;
+    xi_section_state_t xf_graph_section_state;
+    xi_section_state_t xf_alloc_section_state;
 
-    xui_style_t graph_label_style;
-    xui_style_t graph_switch_style;
+    xi_style_t graph_label_style;
+    xi_style_t graph_switch_style;
 } viewapp_ui_state_t;
 
 // Components

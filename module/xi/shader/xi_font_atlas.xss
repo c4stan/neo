@@ -1,5 +1,5 @@
 vertex_shader screen_space.vert
-fragment_shader xui_font_atlas.frag
+fragment_shader xi_font_atlas.frag
 
 //begin permutation 0
 //    define outline 0

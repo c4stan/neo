@@ -1,6 +1,6 @@
 #pragma once
 
-#include <xui.h>
+#include <xi.h>
 
 #include <std_time.h>
 
@@ -26,11 +26,11 @@ typedef struct {
     uint32_t line_padding_y;
 
     // copied from the element that creates the layer, gets inherited by the children unless they override it with their own style
-    xui_style_t style;
-} xui_element_layer_t;
+    xi_style_t style;
+} xi_element_layer_t;
 
 typedef struct {
-    // TODO move most of this state into a new xui_external_state_t struct
+    // TODO move most of this state into a new xi_external_state_t struct
     wm_input_state_t input_state;
     int64_t mouse_delta_x;
     int64_t mouse_delta_y;
@@ -54,7 +54,7 @@ typedef struct {
 
     std_tick_t current_tick;
 
-    xui_element_layer_t layers[xui_element_max_layers_m];
+    xi_element_layer_t layers[xi_element_max_layers_m];
     uint32_t layer_count;
 
     // state of the base os window
@@ -68,28 +68,28 @@ typedef struct {
     // TODO support stack of sections, not just one
     bool in_section;
     bool minimized_section;
-} xui_element_state_t;
+} xi_element_state_t;
 
-void xui_element_load ( xui_element_state_t* state );
-void xui_element_reload ( xui_element_state_t* state );
-void xui_element_unload ( void );
+void xi_element_load ( xi_element_state_t* state );
+void xi_element_reload ( xi_element_state_t* state );
+void xi_element_unload ( void );
 
-void xui_element_update ( const wm_window_info_t* window_info, const wm_input_state_t* input_state );
-void xui_element_update_end ( void );
+void xi_element_update ( const wm_window_info_t* window_info, const wm_input_state_t* input_state );
+void xi_element_update_end ( void );
 
-void xui_element_window_begin ( xui_workload_h workload, xui_window_state_t* state );
-void xui_element_window_end ( xui_workload_h workload );
+void xi_element_window_begin ( xi_workload_h workload, xi_window_state_t* state );
+void xi_element_window_end ( xi_workload_h workload );
 
-void xui_element_section_begin ( xui_workload_h workload, xui_section_state_t* state );
-void xui_element_section_end ( xui_workload_h workload );
+void xi_element_section_begin ( xi_workload_h workload, xi_section_state_t* state );
+void xi_element_section_end ( xi_workload_h workload );
 
-void xui_element_label ( xui_workload_h workload, xui_label_state_t* state );
-void xui_element_switch ( xui_workload_h workload, xui_switch_state_t* state );
-void xui_element_slider ( xui_workload_h workload, xui_slider_state_t* state );
-void xui_element_button ( xui_workload_h workload, xui_button_state_t* state );
-void xui_element_select ( xui_workload_h workload, xui_select_state_t* state );
-//void xui_element_text ( xui_workload_h workload, xui_text_state_t* state, const xui_style_t* style );
+void xi_element_label ( xi_workload_h workload, xi_label_state_t* state );
+void xi_element_switch ( xi_workload_h workload, xi_switch_state_t* state );
+void xi_element_slider ( xi_workload_h workload, xi_slider_state_t* state );
+void xi_element_button ( xi_workload_h workload, xi_button_state_t* state );
+void xi_element_select ( xi_workload_h workload, xi_select_state_t* state );
+//void xi_element_text ( xi_workload_h workload, xi_text_state_t* state, const xi_style_t* style );
 
-void xui_element_newline ( void );
+void xi_element_newline ( void );
 
-uint64_t xui_element_get_active_id ( void );
+uint64_t xi_element_get_active_id ( void );

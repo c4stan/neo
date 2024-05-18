@@ -629,12 +629,12 @@ static void viewapp_boot ( void ) {
     m_state->components.camera = camera_entity;
 
     xs_i* xs = m_state->modules.xs;
-    xui_i* xui = m_state->modules.xui;
+    xi_i* xi = m_state->modules.xi;
     {
         xs->add_database_folder ( "shader/" );
         xs->set_output_folder ( "output/shader/" );
 
-        xui->register_shaders ( xs );
+        xi->register_shaders ( xs );
 
         xs_database_build_params_t build_params;
         build_params.viewport_width = resolution_x;
@@ -654,14 +654,14 @@ static void viewapp_boot ( void ) {
         void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
         fs->read_file ( font_data_alloc, font_file_info.size, font_file );
 
-        m_state->ui.font = xui->create_font ( std_buffer ( font_data_alloc, font_file_info.size ),
-                &xui_font_params_m (
+        m_state->ui.font = xi->create_font ( std_buffer ( font_data_alloc, font_file_info.size ),
+                &xi_font_params_m (
                     .xg_device = device,
                     .pixel_height = 16,
                 )
             );
 
-        m_state->ui.window_state = xui_window_state_m (
+        m_state->ui.window_state = xi_window_state_m (
                 .title = "",
                 .x = 50,
                 .y = 100,
@@ -669,17 +669,17 @@ static void viewapp_boot ( void ) {
                 .height = 500,
                 .padding_x = 10,
                 .padding_y = 2,
-                .style = xui_style_m (
+                .style = xi_style_m (
                     .font = m_state->ui.font
                 )
             );
 
-        m_state->ui.xf_graph_section_state = xui_section_state_m (
+        m_state->ui.xf_graph_section_state = xi_section_state_m (
             .title = "xf graph",
             .height = 20,
         );
 
-        m_state->ui.xf_alloc_section_state = xui_section_state_m (
+        m_state->ui.xf_alloc_section_state = xi_section_state_m (
             .title = "xg allocator",
             .height = 20,
         );
@@ -1176,20 +1176,20 @@ static std_app_state_e viewapp_update ( void ) {
     }
 
     // UI
-    xui_i* xui = m_state->modules.xui;
-    xui_workload_h xui_workload = xui->create_workload();
-    set_ui_pass_xui_workload ( xui_workload );
+    xi_i* xi = m_state->modules.xi;
+    xi_workload_h xi_workload = xi->create_workload();
+    set_ui_pass_xi_workload ( xi_workload );
     
-    xui->begin_update ( &new_window_info, &new_input_state );
-    xui->begin_window ( xui_workload, &m_state->ui.window_state );
+    xi->begin_update ( &new_window_info, &new_input_state );
+    xi->begin_window ( xi_workload, &m_state->ui.window_state );
     
-    xui->begin_section ( xui_workload, &m_state->ui.xf_alloc_section_state );
+    xi->begin_section ( xi_workload, &m_state->ui.xf_alloc_section_state );
     if ( !m_state->ui.xf_alloc_section_state.minimized ) {
         for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
             xg_allocator_info_t info;
             xg->get_default_allocator_info ( &info, m_state->render.device, i );
             {
-                xui_label_state_t type_label = xui_label_state_m( .height = 14 );
+                xi_label_state_t type_label = xi_label_state_m( .height = 14 );
                 std_stack_t stack = std_static_stack_m ( type_label.text );
                 const char* memory_type_name;
                 switch ( i ) {
@@ -1199,12 +1199,12 @@ static std_app_state_e viewapp_update ( void ) {
                     case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
                 }
                 std_stack_string_append ( &stack, memory_type_name );
-                xui->add_label ( xui_workload, &type_label );
+                xi->add_label ( xi_workload, &type_label );
             }
             {
-                xui_label_state_t size_label = xui_label_state_m ( 
+                xi_label_state_t size_label = xi_label_state_m ( 
                     .height = 14,
-                    .style.horizontal_alignment = xui_horizontal_alignment_right_to_left_m,
+                    .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
                 );
                 std_stack_t stack = std_static_stack_m ( size_label.text );
                 char buffer[32];
@@ -1216,24 +1216,24 @@ static std_app_state_e viewapp_update ( void ) {
                 std_stack_string_append ( &stack, "/" );
                 std_size_to_str_approx ( buffer, 32, info.system_size );
                 std_stack_string_append ( &stack, buffer );
-                xui->add_label ( xui_workload, &size_label );
+                xi->add_label ( xi_workload, &size_label );
             }
-            xui->newline();
+            xi->newline();
         }
     }
-    xui->end_section ( xui_workload );
+    xi->end_section ( xi_workload );
     
-    xui->begin_section ( xui_workload, &m_state->ui.xf_graph_section_state );
+    xi->begin_section ( xi_workload, &m_state->ui.xf_graph_section_state );
     if ( !m_state->ui.xf_graph_section_state.minimized ) {
-        xf->debug_ui_graph ( xui, xui_workload, m_state->render.graph );
+        xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
     }
-    xui->end_section ( xui_workload );
+    xi->end_section ( xi_workload );
     
-    xui->end_window ( xui_workload );
-    xui->end_update();
+    xi->end_window ( xi_workload );
+    xi->end_update();
 
     // Camera
-    if ( xui->get_active_element_id() == 0 ) {
+    if ( xi->get_active_element_id() == 0 ) {
         rv_i* rv = m_state->modules.rv;
         viewapp_camera_component_t* camera_component = &m_state->components.camera_component;
 
@@ -1343,7 +1343,7 @@ void* viewer_app_load ( void* runtime ) {
     state->modules.xf = std_module_get_m ( xf_module_name_m );
     state->modules.se = std_module_get_m ( se_module_name_m );
     state->modules.rv = std_module_get_m ( rv_module_name_m );
-    state->modules.xui = std_module_get_m ( xui_module_name_m );
+    state->modules.xi = std_module_get_m ( xi_module_name_m );
 
     std_mem_zero_m ( &state->render );
     state->render.frame_id = 0;

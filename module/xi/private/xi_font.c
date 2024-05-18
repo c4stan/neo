@@ -1,4 +1,4 @@
-#include "xui_font.h"
+#include "xi_font.h"
 
 //#include <xg.h>
 
@@ -18,38 +18,38 @@ std_warnings_ignore_m ( "-Wunused-function" )
 
 std_warnings_restore_state_m()
 
-static xui_font_state_t* xui_font_state;
+static xi_font_state_t* xi_font_state;
 
 // TODO
 // https://steamcdn-a.akamaihd.net/apps/valve/2007/SIGGRAPH2007_AlphaTestedMagnification.pdf
 
-void xui_font_load ( xui_font_state_t* state ) {
-    xui_font_state = state;
+void xi_font_load ( xi_font_state_t* state ) {
+    xi_font_state = state;
 
-    xui_font_state->fonts_array = std_virtual_heap_alloc_array_m ( xui_font_t, xui_font_max_fonts_m );
-    xui_font_state->fonts_freelist = std_freelist_m ( xui_font_state->fonts_array, xui_font_max_fonts_m );
-    xui_font_state->uniform_data = NULL;
+    xi_font_state->fonts_array = std_virtual_heap_alloc_array_m ( xi_font_t, xi_font_max_fonts_m );
+    xi_font_state->fonts_freelist = std_freelist_m ( xi_font_state->fonts_array, xi_font_max_fonts_m );
+    xi_font_state->uniform_data = NULL;
 }
 
-void xui_font_load_shaders ( xs_i* xs ) {
-    xs_pipeline_state_h font_atlas_pipeline = xs->lookup_pipeline_state ( "xui_font_atlas" );
+void xi_font_load_shaders ( xs_i* xs ) {
+    xs_pipeline_state_h font_atlas_pipeline = xs->lookup_pipeline_state ( "xi_font_atlas" );
     std_assert_m ( font_atlas_pipeline != xs_null_handle_m );
-    xui_font_state->font_atlas_pipeline = font_atlas_pipeline;
+    xi_font_state->font_atlas_pipeline = font_atlas_pipeline;
 }
 
-void xui_font_reload ( xui_font_state_t* state ) {
-    xui_font_state = state;
+void xi_font_reload ( xi_font_state_t* state ) {
+    xi_font_state = state;
 }
 
-void xui_font_unload ( void ) {
-    std_virtual_heap_free ( xui_font_state->fonts_array );
+void xi_font_unload ( void ) {
+    std_virtual_heap_free ( xi_font_state->fonts_array );
 }
 
-xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t* params ) {
+xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* params ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     // TODO lock
-    xui_font_t* font = std_list_pop_m ( &xui_font_state->fonts_freelist );
+    xi_font_t* font = std_list_pop_m ( &xi_font_state->fonts_freelist );
 
     font->params = *params;
 
@@ -72,7 +72,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     font->scale = stbtt_ScaleForPixelHeight ( &font->font_info, params->pixel_height );
 
     // Atlas
-    size_t atlas_size = xui_font_texture_atlas_width_m * xui_font_texture_atlas_height_m;
+    size_t atlas_size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m;
     void* atlas_alloc = std_virtual_heap_alloc ( atlas_size, 16 );
 #if 0
     std_alloc_t char_info_alloc = std_virtual_heap_alloc ( sizeof ( stbtt_bakedchar ) * params->char_count, 16 );
@@ -84,7 +84,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     stbtt_pack_context pack_context;
     font->char_info = std_virtual_heap_alloc_array_m ( stbtt_packedchar, params->char_count );
 
-    stbtt_PackBegin ( &pack_context, ( unsigned char* ) atlas_alloc, xui_font_texture_atlas_width_m, xui_font_texture_atlas_height_m, 0, 4, NULL );
+    stbtt_PackBegin ( &pack_context, ( unsigned char* ) atlas_alloc, xi_font_texture_atlas_width_m, xi_font_texture_atlas_height_m, 0, 4, NULL );
     stbtt_PackSetOversampling ( &pack_context, 2, 2 );
     stbtt_PackFontRange ( &pack_context, ( unsigned char* ) ttf_data.base, 0, ( float ) params->pixel_height, ( int ) params->first_char_code, ( int ) params->char_count, font->char_info );
     stbtt_PackEnd ( &pack_context );
@@ -101,8 +101,8 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
         xg_texture_params_t texture_params = xg_default_texture_params_m;
         texture_params.allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_only_m );
         texture_params.device = params->xg_device;
-        texture_params.width = xui_font_texture_atlas_width_m;
-        texture_params.height = xui_font_texture_atlas_height_m;
+        texture_params.width = xi_font_texture_atlas_width_m;
+        texture_params.height = xi_font_texture_atlas_height_m;
         texture_params.format = xg_format_r8_uint_m;
         texture_params.allowed_usage = xg_texture_usage_copy_dest_m | xg_texture_usage_resource_m;
         std_str_copy_m ( texture_params.debug_name, "font atlas temp" );
@@ -114,7 +114,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
         xg_buffer_params_t buffer_params = xg_buffer_params_m (
             .allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_upload_m ),
             .device = params->xg_device,
-            .size = xui_font_texture_atlas_width_m * xui_font_texture_atlas_height_m,
+            .size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m,
             .allowed_usage = xg_buffer_usage_copy_source_m,
             .debug_name = "font atlas staging buffer",
         );
@@ -167,8 +167,8 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
         xg_texture_params_t texture_params = xg_default_texture_params_m;
         texture_params.allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_only_m );
         texture_params.device = params->xg_device;
-        texture_params.width = xui_font_texture_atlas_width_m;
-        texture_params.height = xui_font_texture_atlas_height_m;
+        texture_params.width = xi_font_texture_atlas_width_m;
+        texture_params.height = xi_font_texture_atlas_height_m;
         texture_params.format = xg_format_r8g8b8a8_unorm_m;
         texture_params.allowed_usage = xg_texture_usage_render_target_m | xg_texture_usage_resource_m;
         std_str_copy_m ( texture_params.debug_name, "font atlas" );
@@ -210,9 +210,9 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
         xg_buffer_params_t cbuffer_params = xg_buffer_params_m (
             .allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_mappable_m ),
             .device = params->xg_device,
-            .size = sizeof ( xui_font_atlas_uniform_data_t ),
+            .size = sizeof ( xi_font_atlas_uniform_data_t ),
             .allowed_usage = xg_buffer_usage_uniform_m,
-            .debug_name = "xui font cbuffer",
+            .debug_name = "xi font cbuffer",
         );
         uniform_buffer = xg->create_buffer ( &cbuffer_params );
 
@@ -220,7 +220,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
 
         xg_buffer_info_t uniform_buffer_info;
         xg->get_buffer_info ( &uniform_buffer_info, uniform_buffer );
-        xui_font_state->uniform_data = ( xui_font_atlas_uniform_data_t* ) uniform_buffer_info.allocation.mapped_address;
+        xi_font_state->uniform_data = ( xi_font_atlas_uniform_data_t* ) uniform_buffer_info.allocation.mapped_address;
     }
 
     xg->cmd_set_render_textures (
@@ -233,7 +233,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
-    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, xs->get_pipeline_state ( xui_font_state->font_atlas_pipeline ), key );
+    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, xs->get_pipeline_state ( xi_font_state->font_atlas_pipeline ), key );
 
     xg->cmd_set_pipeline_resources (
         cmd_buffer,
@@ -244,7 +244,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
                 {
                     .shader_register = 0,
                     .type = xg_buffer_binding_type_uniform_m,
-                    .range = { .handle = uniform_buffer, .offset = 0, .size = sizeof ( xui_font_atlas_uniform_data_t ) }
+                    .range = { .handle = uniform_buffer, .offset = 0, .size = sizeof ( xi_font_atlas_uniform_data_t ) }
                 }
             },
             .texture_count = 1,
@@ -270,7 +270,7 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
         //buffer_resource.buffer = uniform_buffer;
         buffer_resource.range.handle = uniform_buffer;
         buffer_resource.range.offset = 0;
-        buffer_resource.range.size = sizeof ( xui_font_atlas_uniform_data_t );
+        buffer_resource.range.size = sizeof ( xi_font_atlas_uniform_data_t );
 
         xg_texture_resource_binding_t texture_resource;
         texture_resource.shader_register = 1;
@@ -295,12 +295,12 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     }
 #endif
 
-    xui_font_state->uniform_data->color[0] = 1;
-    xui_font_state->uniform_data->color[1] = 1;
-    xui_font_state->uniform_data->color[2] = 1;
-    xui_font_state->uniform_data->outline = params->outline;
-    xui_font_state->uniform_data->resolution_f32[0] = xui_font_texture_atlas_width_m;
-    xui_font_state->uniform_data->resolution_f32[1] = xui_font_texture_atlas_height_m;
+    xi_font_state->uniform_data->color[0] = 1;
+    xi_font_state->uniform_data->color[1] = 1;
+    xi_font_state->uniform_data->color[2] = 1;
+    xi_font_state->uniform_data->outline = params->outline;
+    xi_font_state->uniform_data->resolution_f32[0] = xi_font_texture_atlas_width_m;
+    xi_font_state->uniform_data->resolution_f32[1] = xi_font_texture_atlas_height_m;
 
     xg->cmd_draw ( cmd_buffer, 3, 0, 0 );
 
@@ -328,31 +328,31 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     font->atlas_texture = atlas_texture;
     font->outline = params->outline;
 
-    xui_font_h font_handle = ( xui_font_h ) ( font - xui_font_state->fonts_array );
+    xi_font_h font_handle = ( xi_font_h ) ( font - xi_font_state->fonts_array );
     return font_handle;
 }
 
-void xui_font_destroy ( xui_font_h font ) {
+void xi_font_destroy ( xi_font_h font ) {
     // TODO
     std_unused_m ( font );
 }
 
-xui_font_char_box_t xui_font_char_box_get ( float* fx, float* fy, xui_font_h font_handle, uint32_t character ) {
-    xui_font_t* font = &xui_font_state->fonts_array[font_handle];
+xi_font_char_box_t xi_font_char_box_get ( float* fx, float* fy, xi_font_h font_handle, uint32_t character ) {
+    xi_font_t* font = &xi_font_state->fonts_array[font_handle];
 
     uint32_t idx = character - font->params.first_char_code;
 
     stbtt_aligned_quad q;
-    stbtt_GetPackedQuad ( font->char_info, xui_font_texture_atlas_width_m, xui_font_texture_atlas_height_m, idx, fx, fy, &q, 0 );
+    stbtt_GetPackedQuad ( font->char_info, xi_font_texture_atlas_width_m, xi_font_texture_atlas_height_m, idx, fx, fy, &q, 0 );
 
     //stbtt_packedchar* char_info = &font->char_info[idx];
 
-    //float inv_width = 1.f / xui_font_texture_atlas_width_m;
-    //float inv_height = 1.f / xui_font_texture_atlas_height_m;
+    //float inv_width = 1.f / xi_font_texture_atlas_width_m;
+    //float inv_height = 1.f / xi_font_texture_atlas_height_m;
 
     //uint32_t outline_pad = font->outline ? 1 : 0;
 
-    xui_font_char_box_t box;
+    xi_font_char_box_t box;
     //box.uv0[0] = ( char_info->x0 - outline_pad ) * inv_width;
     //box.uv0[1] = ( char_info->y0 - outline_pad ) * inv_height;
     //box.uv1[0] = ( char_info->x1 + outline_pad ) * inv_width;
@@ -378,13 +378,13 @@ xui_font_char_box_t xui_font_char_box_get ( float* fx, float* fy, xui_font_h fon
     return box;
 }
 
-xg_texture_h xui_font_atlas_get ( xui_font_h font_handle ) {
-    xui_font_t* font = &xui_font_state->fonts_array[font_handle];
+xg_texture_h xi_font_atlas_get ( xi_font_h font_handle ) {
+    xi_font_t* font = &xi_font_state->fonts_array[font_handle];
     return font->atlas_texture;
 }
 
-void xui_font_get_info ( xui_font_info_t* info, xui_font_h font_handle ) {
-    xui_font_t* font = &xui_font_state->fonts_array[font_handle];
+void xi_font_get_info ( xi_font_info_t* info, xi_font_h font_handle ) {
+    xi_font_t* font = &xi_font_state->fonts_array[font_handle];
     info->pixel_height = font->params.pixel_height;
     info->ascent = font->ascent * font->scale;
     info->descent = font->descent * font->scale;

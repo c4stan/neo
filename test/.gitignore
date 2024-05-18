@@ -24,5 +24,5 @@
 !xg_test/*
 !xs_test
 !xs_test/*
-!xui_test
-!xui_test/*
+!xi_test
+!xi_test/*

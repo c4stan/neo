@@ -1,5 +1,5 @@
-vertex_shader xui_render.vert
-fragment_shader xui_render.frag
+vertex_shader xi_render.vert
+fragment_shader xi_render.frag
 
 begin render_target 0
     blend on
