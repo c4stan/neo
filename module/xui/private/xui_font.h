@@ -4,13 +4,17 @@
 #include <xg.h>
 #include <xs.h>
 
+#include "stb_truetype.h"
+
 typedef struct {
     xui_font_params_t params;
     xg_texture_h atlas_texture;
+    stbtt_fontinfo font_info;
     void* char_info; // stbtt_packedchar*
-    //std_memory_h font_info_handle;
-    //stbtt_fontinfo font_info;
     bool outline;
+    int32_t ascent;
+    int32_t descent;
+    float scale;
 } xui_font_t;
 
 typedef struct {
@@ -49,6 +53,8 @@ typedef struct {
 
 typedef struct {
     uint32_t pixel_height;
+    int32_t ascent;
+    int32_t descent;
 } xui_font_info_t;
 
 void xui_font_get_info ( xui_font_info_t* info, xui_font_h font );

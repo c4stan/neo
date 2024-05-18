@@ -657,7 +657,7 @@ class Project:
         def_cmd = '-Dstd_module_name_m=' + self.name
         def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
         def_cmd += ' -Dstd_solution_module_name_m=' + solution_name
-        def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/build.py\\"'
+        def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/cli.py\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_debug_m=std_on_m'
             def_cmd += ' -Dstd_submodules_path_m=\\"submodules/debug/\\"'
@@ -685,7 +685,7 @@ class Project:
         compiler_defs_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/defines')
         compiler_defs_file.write(def_cmd)
 
-        compiler = COMPILER_GCC
+        compiler = COMPILER_CLANG
 
         if compiler == COMPILER_GCC:
             compiler_name = 'gcc-14'
@@ -1108,8 +1108,10 @@ class Solution:
                     makefile.write('\n\t@printf "\\t$(notdir $@)\\n"\n')
                     if target in project.main_targets:
                         _, pdb_name, _ = parse_path(target.name)
-                        pdb_path = relpath(self.main_project.path + '/build/' + config_path + '/output/' + pdb_name + '.pdb', self.root)
-                        makefile.write('\t@rm -f ' + pdb_path + '\n')
+                        pdb_path = relpath(project.path + '/build/' + config_path + '/output/' + pdb_name + '.pdb', self.root)
+                        # TODO this forces a full pdb rebuild, might be slowing things down
+                        # why is this needed? why is the main exe sometime locking the pdb (e.g. std_launcher for viewer_app)?
+                        makefile.write('\t@rm -f ' + abspath(pdb_path) + '\n')
                     makefile.write(target.cmd)
                     makefile.write('\n\n')
         # --- RELOAD target ---

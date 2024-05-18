@@ -452,25 +452,24 @@ static void xui_test ( void ) {
 
             xui->begin_window ( xui_workload, &ui_window );
             xui->begin_section ( xui_workload, &ui_section );
-            if ( !ui_section.minimized ) {
-                xui->add_label ( xui_workload, &ui_label );
-                xui->newline();
-                xui->add_label ( xui_workload, &ui_switch_label );
-                xui->add_switch ( xui_workload, &ui_switch );
-                xui->newline();
-                xui->add_label ( xui_workload, &ui_slider_label );
-                xui->add_slider ( xui_workload, &ui_slider );
-                xui->newline();
-            }
+            xui->add_label ( xui_workload, &ui_label );
+            xui->add_label ( xui_workload, &ui_label );
+            xui->newline();
+            xui->add_label ( xui_workload, &ui_label );
+            xui->newline();
+            xui->add_label ( xui_workload, &ui_switch_label );
+            xui->add_switch ( xui_workload, &ui_switch );
+            xui->newline();
+            xui->add_label ( xui_workload, &ui_slider_label );
+            xui->add_slider ( xui_workload, &ui_slider );
+            xui->newline();
             xui->end_section ( xui_workload );
             xui->begin_section ( xui_workload, &ui_section2 );
-            if (!ui_section2.minimized) {
-                xui->add_label ( xui_workload, &ui_button_label );
-                xui->add_button ( xui_workload, &ui_button );
-                xui->newline();
-                xui->add_label ( xui_workload, &ui_select_label );
-                xui->add_select ( xui_workload, &ui_select );
-            }
+            xui->add_label ( xui_workload, &ui_button_label );
+            xui->add_button ( xui_workload, &ui_button );
+            xui->newline();
+            xui->add_label ( xui_workload, &ui_select_label );
+            xui->add_select ( xui_workload, &ui_select );
             xui->end_section ( xui_workload );
             //xui->newline();
             //xui->add_label ( xui_workload, &ui_button_label, &label_style );
@@ -492,8 +491,6 @@ static void xui_test ( void ) {
         xg->present_swapchain ( swapchain, workload );
 
         xs->update_pipeline_states ( workload );
-
-        xf->advance_multi_texture ( swapchain_multi_texture );
     }
 }
 

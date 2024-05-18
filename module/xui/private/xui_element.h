@@ -64,6 +64,10 @@ typedef struct {
     //int64_t base_height;
     uint32_t os_window_width;
     uint32_t os_window_height;
+
+    // TODO support stack of sections, not just one
+    bool in_section;
+    bool minimized_section;
 } xui_element_state_t;
 
 void xui_element_load ( xui_element_state_t* state );

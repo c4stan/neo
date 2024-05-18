@@ -319,8 +319,6 @@ static void run_se_test_2 ( void ) {
         xf->execute_graph ( graph, workload );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
-
-        xf->advance_multi_texture ( swapchain_multi_texture );
     }
 }
 

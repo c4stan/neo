@@ -54,8 +54,17 @@ typedef enum {
     xui_horizontal_alignment_left_to_right_m,
     xui_horizontal_alignment_right_to_left_m,
     xui_horizontal_alignment_centered_m, // when using this only one element can fit per line
+    xui_horizontal_alignment_unaligned_m,
     xui_horizontal_alignment_invalid_m,
 } xui_horizontal_alignment_e;
+
+typedef enum {
+    xui_vertical_alignment_top_m,
+    xui_vertical_alignment_centered_m,
+    xui_vertical_alignment_bottom_m,
+    xui_vertical_alignment_unaligned_m,
+    xui_vertical_alignment_invalid_m,
+} xui_vertical_alignment_e;
 
 typedef struct {
     xui_font_h font;
@@ -63,6 +72,7 @@ typedef struct {
     xui_color_t color;
     xui_color_t font_color;
     xui_horizontal_alignment_e horizontal_alignment;
+    xui_vertical_alignment_e vertical_alignment;
 } xui_style_t;
 
 #define xui_style_m( ... ) ( xui_style_t ) { \
@@ -71,15 +81,18 @@ typedef struct {
     .color = xui_color_black_m, \
     .font_color = xui_color_white_m, \
     .horizontal_alignment = xui_horizontal_alignment_left_to_right_m, \
+    .vertical_alignment = xui_vertical_alignment_bottom_m, \
     ##__VA_ARGS__ \
 }
 
-#define xui_null_style_m ( xui_style_t ) { \
+#define xui_null_style_m( ... ) ( xui_style_t ) { \
     .font = xui_null_handle_m, \
     .font_height = 0, \
     .color = xui_color_invalid_m, \
     .font_color = xui_color_invalid_m, \
     .horizontal_alignment = xui_horizontal_alignment_invalid_m, \
+    .vertical_alignment = xui_vertical_alignment_invalid_m, \
+    ##__VA_ARGS__ \
 }
 
 #define xui_default_style_m xui_style_m()
@@ -142,7 +155,7 @@ typedef struct {
     .padding_y = 0, \
     .id = xui_line_id_m(), \
     .sort_order = 0, \
-    .style = xui_null_style_m, \
+    .style = xui_null_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -167,7 +180,7 @@ typedef struct {
     .disabled = false, \
     .id = xui_line_id_m(), \
     .sort_order = 0, \
-    .style = xui_null_style_m, \
+    .style = xui_null_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -190,7 +203,7 @@ typedef struct {
     .value = 0, \
     .id = xui_line_id_m(), \
     .sort_order = 0, \
-    .style = xui_null_style_m, \
+    .style = xui_null_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -232,12 +245,12 @@ typedef struct {
     .height = 0, \
     .id = xui_line_id_m(), \
     .sort_order = 0, \
-    .style = xui_null_style_m, \
+    .style = xui_null_style_m(), \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
-    const char** items; // must be heap allocated for reload to work
+    const char** items;
     uint32_t item_count;
     uint32_t item_idx;
     xui_font_h font;
@@ -257,7 +270,7 @@ typedef struct {
     .height = 0, \
     .id = xui_line_id_m(), \
     .sort_order = 0, \
-    .style = xui_null_style_m, \
+    .style = xui_null_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -276,7 +289,7 @@ typedef struct {
     .value = false, \
     .id = xui_line_id_m(), \
     .sort_order = 0, \
-    .style = xui_null_style_m, \
+    .style = xui_null_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -288,10 +301,13 @@ typedef struct {
     xui_style_t style;
 } xui_gizmo_state_t;
 
-// TODO
 #define xui_gizmo_state_m(...) ( xui_gizmo_state_t ) { \
     .position = { 0, 0, 0 }, \
-    .rotation = { } \
+    .rotation = { 0, 0, 0, 1 } \
+    .id = xui_line_id_m(), \
+    .sort_order = 0, \
+    .style = xui_null_style_m(), \
+    __VA_ARGS__ \
 }
 
 #define xui_line_id_m() ( xui_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )

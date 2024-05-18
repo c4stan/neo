@@ -63,6 +63,14 @@ xui_font_h xui_font_create_ttf ( std_buffer_t ttf_data, const xui_font_params_t*
     //stbtt_GetFontVMetrics ( font_info, &ascent, &descent, &lineGap );
     //float scale = font->params.pixel_height / ( ascent - descent );
 
+    // Info
+    stbtt_InitFont ( &font->font_info, ttf_data.base, 0 );
+    int ascent, descent, lineGap;
+    stbtt_GetFontVMetrics ( &font->font_info, &ascent, &descent, &lineGap );
+    font->ascent = ascent;
+    font->descent = descent;
+    font->scale = stbtt_ScaleForPixelHeight ( &font->font_info, params->pixel_height );
+
     // Atlas
     size_t atlas_size = xui_font_texture_atlas_width_m * xui_font_texture_atlas_height_m;
     void* atlas_alloc = std_virtual_heap_alloc ( atlas_size, 16 );
@@ -378,4 +386,6 @@ xg_texture_h xui_font_atlas_get ( xui_font_h font_handle ) {
 void xui_font_get_info ( xui_font_info_t* info, xui_font_h font_handle ) {
     xui_font_t* font = &xui_font_state->fonts_array[font_handle];
     info->pixel_height = font->params.pixel_height;
+    info->ascent = font->ascent * font->scale;
+    info->descent = font->descent * font->scale;
 }

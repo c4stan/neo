@@ -244,8 +244,6 @@ static void xf_test ( void ) {
         xg->present_swapchain ( swapchain, workload );
 
         xs->update_pipeline_states ( workload );
-
-        xf->advance_multi_texture ( swapchain_multi_texture );
     }
 }
 
