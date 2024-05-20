@@ -1,4 +1,4 @@
-xi_element_max_layers_m 32
+xi_ui_max_layers_m 32
 
 xi_workload_max_rects_m 1024
 xi_workload_max_tris_m 1024
