@@ -20,7 +20,7 @@ typedef struct {
     xg_vk_instance_ext_api_i ext_api;
 } xg_vk_instance_state_t;
 
-void                        xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_f layers );
+void                        xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e layers );
 void                        xg_vk_instance_reload ( xg_vk_instance_state_t* state );
 void  						xg_vk_instance_unload ( void );
 

@@ -3,7 +3,7 @@
 #include <xs.h>
 
 typedef struct {
-    xg_shading_stage_b referenced_stages;
+    xg_shading_stage_bit_e referenced_stages;
     char shaders[xg_shading_stage_count_m][xs_shader_name_max_len_m];
 } xs_parser_shader_references_t;
 
@@ -37,7 +37,7 @@ typedef struct {
 #define xs_shader_permutation_name_max_len_m (xs_shader_definition_name_max_len_m - sizeof ( "permutation_" ) - sizeof ( "_m" ))
 
 typedef struct {
-    xg_shading_stage_b stages;
+    xg_shading_stage_bit_e stages;
     uint32_t value_count;
     char name[xs_shader_permutation_name_max_len_m];
 } xs_parser_shader_permutation_t;

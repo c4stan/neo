@@ -373,7 +373,7 @@ static xg_resource_binding_set_e xs_parser_resource_binding_set_to_enum ( const 
     return xg_resource_binding_set_per_draw_m;
 }
 
-static xg_shading_stage_b xs_parser_shading_stage_to_bit ( const char* stage ) {
+static xg_shading_stage_bit_e xs_parser_shading_stage_to_bit ( const char* stage ) {
     if ( std_str_cmp ( stage, "vertex" ) == 0 ) {
         return xg_shading_stage_bit_vertex_m;
     } else if ( std_str_cmp ( stage, "fragment" ) == 0 || std_str_cmp ( stage, "pixel" ) == 0 ) {
@@ -614,11 +614,11 @@ static void xs_parser_parse_rasterizer ( xs_parser_parsing_context_t* context ) 
 
             // TODO support both, it's a bitflag
             if ( std_str_cmp ( token, "front" ) == 0 ) {
-                context->graphics_pipeline->state.rasterizer_state.cull_mode = xg_cull_mode_front_m;
+                context->graphics_pipeline->state.rasterizer_state.cull_mode = xg_cull_mode_bit_front_m;
             } else if ( std_str_cmp ( token, "back" ) == 0 ) {
-                context->graphics_pipeline->state.rasterizer_state.cull_mode = xg_cull_mode_back_m;
+                context->graphics_pipeline->state.rasterizer_state.cull_mode = xg_cull_mode_bit_back_m;
             } else {
-                context->graphics_pipeline->state.rasterizer_state.cull_mode = xg_cull_mode_none_m;
+                context->graphics_pipeline->state.rasterizer_state.cull_mode = xg_cull_mode_bit_none_m;
             }
         } else if ( std_str_cmp ( token, "front" ) == 0 ) {
             xs_parser_skip_spaces ( context );
@@ -916,7 +916,7 @@ static void xs_parser_parse_constant ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
     struct {
-        xg_shading_stage_b stages;
+        xg_shading_stage_bit_e stages;
         uint32_t size;
         uint32_t id;
     } push_constant;
@@ -977,7 +977,7 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
     struct {
-        xg_shading_stage_b stages;
+        xg_shading_stage_bit_e stages;
         xg_resource_binding_set_e update_set;
         bool is_texel_buffer;
         bool write_access;
@@ -1098,7 +1098,7 @@ static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
     struct {
-        xg_shading_stage_b stages;
+        xg_shading_stage_bit_e stages;
         xg_resource_binding_set_e update_set;
         bool write_access;
     } texture;
@@ -1203,7 +1203,7 @@ static void xs_parser_parse_sampler ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
     struct {
-        xg_shading_stage_b stages;
+        xg_shading_stage_bit_e stages;
         xg_resource_binding_set_e update_set;
         uint32_t shader_register;
     } sampler;
@@ -1402,7 +1402,6 @@ static void xs_parser_parse_include ( xs_parser_parsing_context_t* context ) {
         std_str_copy ( path, fs_path_size_m, context->path );
         len = fs->pop_path ( path );
         fs->append_path ( path, fs_path_size_m - len, token );
-        std_module_release ( fs );
 
         if ( context->pipeline_type == xg_pipeline_graphics_m ) {
             std_auto_m state = ( xs_parser_graphics_pipeline_state_t* ) context->state;
@@ -1573,8 +1572,6 @@ uint32_t xs_parser_parse_graphics_pipeline_variations_from_path ( xs_parser_grap
 
     std_virtual_heap_free ( file_buffer.base );
 
-    std_module_release ( fs );
-
     // TODO remove permutations
     //if ( context.shader_permutations->permutation_count == 0 ) {
     //    context.shader_permutations->permutation_count = 1;
@@ -1600,8 +1597,6 @@ bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipe
 #endif
 
     //state_alloc.buffer.base[pipeline_state_file_info.size] = 0;
-
-    std_module_release ( fs );
 
     xs_parser_parsing_context_t context;
     xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, state, file_buffer, path );

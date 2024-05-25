@@ -345,12 +345,12 @@ typedef struct {
     uint64_t uniform_buffer_alignment;
 } xg_device_info_t;
 
-// TODO make private?
+// see xg_instance_enabled_runtime_layers_m
 typedef enum {
-    xg_runtime_layer_none_m       =      0,
-    xg_runtime_layer_debug_m      = 1 << 0,
-    xg_runtime_layer_renderdoc_m  = 1 << 1,
-} xg_runtime_layer_f;
+    xg_runtime_layer_bit_none_m       =      0,
+    xg_runtime_layer_bit_debug_m      = 1 << 0,
+    xg_runtime_layer_bit_renderdoc_m  = 1 << 1,
+} xg_runtime_layer_bit_e;
 
 // -- Display --
 // TODO is this working?
@@ -457,15 +457,15 @@ typedef struct {
 // All current desktop retail GPUs are also coherent when host-visible. Coherent cached memory is good for readback/staging download from GPU. Coherent only memory is good for staging upload to GPU.
 // TODO does non-coherent memory mean write-combine? e.g. a read after a write on host doesn't return the written value? https://fgiesen.wordpress.com/2013/01/29/write-combining-is-not-your-friend/
 typedef enum {
-    xg_memory_flag_device_m   = 1 << 0,
-    xg_memory_flag_mappable_m = 1 << 1,
-    xg_memory_flag_cached_m   = 1 << 2,
-    xg_memory_flag_coherent_m = 1 << 3,
+    xg_memory_type_bit_device_m   = 1 << 0,
+    xg_memory_type_bit_mappable_m = 1 << 1,
+    xg_memory_type_bit_cached_m   = 1 << 2,
+    xg_memory_type_bit_coherent_m = 1 << 3,
     //xg_memory_type_for_gpu_only_m = xg_memory_type_device_m,
     //xg_memory_type_for_dynamic_data_m = xg_memory_type_device_m | xg_memory_type_mappable_m | xg_memory_type_coherent_m,
     //xg_memory_type_for_upload_m = xg_memory_type_mappable_m | xg_memory_type_coherent_m,
     //xg_memory_type_for_readback_m = xg_memory_type_mappable_m | xg_memory_type_coherent_m | xg_memory_type_cached_m
-} xg_memory_flags_b;
+} xg_memory_flag_bit_e;
 /*
     Handle is internal to the allocator only, it's unique per valid xg_alloc_t but (usually) has no meaning to the backend API
     Base is the base gpu memory address of the allocation
@@ -480,7 +480,7 @@ typedef struct {
     uint64_t offset;
     uint64_t size;
     void* mapped_address;
-    xg_memory_flags_b flags;
+    xg_memory_flag_bit_e flags;
     xg_device_h device;
 } xg_alloc_t;
 
@@ -561,10 +561,10 @@ typedef enum {
 } xg_polygon_mode_e;
 
 typedef enum {
-    xg_cull_mode_none_m   = 0,
-    xg_cull_mode_front_m  = 1 << 0,
-    xg_cull_mode_back_m   = 1 << 1,
-} xg_cull_mode_b;
+    xg_cull_mode_bit_none_m   = 0,
+    xg_cull_mode_bit_front_m  = 1 << 0,
+    xg_cull_mode_bit_back_m   = 1 << 1,
+} xg_cull_mode_bit_e;
 
 typedef enum {
     xg_winding_clockwise_m,
@@ -611,7 +611,7 @@ typedef struct {
 
 typedef struct {
     xg_polygon_mode_e       polygon_mode;
-    xg_cull_mode_b          cull_mode;
+    xg_cull_mode_bit_e      cull_mode;
     xg_winding_mode_e       frontface_winding_mode;
     xg_antialiasing_state_t antialiasing_state;
     xg_depth_bias_state_t   depth_bias_state;
@@ -622,7 +622,7 @@ typedef struct {
 
 #define xg_default_rasterizer_state_m ( xg_rasterizer_state_t ) { \
     .polygon_mode = xg_polygon_mode_fill_m, \
-    .cull_mode = xg_cull_mode_back_m, \
+    .cull_mode = xg_cull_mode_bit_back_m, \
     .frontface_winding_mode = xg_winding_clockwise_m, \
     .antialiasing_state = xg_default_antialiasing_state_m, \
     .depth_bias_state = xg_default_depth_bias_state_m, \
@@ -978,7 +978,7 @@ typedef enum {
     xg_shading_stage_bit_ray_closest_hit_m  = 1 << xg_shading_stage_ray_closest_hit_m,
     //xg_shading_stage_bit_ray_any_hit_m      = 1 << xg_shading_stage_ray_any_hit_m,
     //xg_shading_stage_bit_ray_intersection_m = 1 << xg_shading_stage_ray_intersection_m,
-} xg_shading_stage_b;
+} xg_shading_stage_bit_e;
 
 #define xg_shading_stage_enum_to_bit_m( stage ) ( 1 << ( stage ) )
 
@@ -1010,13 +1010,13 @@ typedef enum {
 
 typedef struct {
     uint32_t shader_register;
-    xg_shading_stage_b stages;
+    xg_shading_stage_bit_e stages;
     xg_resource_binding_e type;
     xg_resource_binding_set_e set;
 } xg_resource_binding_layout_t;
 
 typedef struct {
-    xg_shading_stage_b stages;
+    xg_shading_stage_bit_e stages;
     uint32_t size;
     uint32_t id;
 } xg_constant_binding_layout_t;
@@ -1174,15 +1174,15 @@ typedef enum {
 */
 
 typedef enum {
-    xg_buffer_usage_copy_source_m           = 1 << 0,
-    xg_buffer_usage_copy_dest_m             = 1 << 1,
-    xg_buffer_usage_texel_uniform_m         = 1 << 2,
-    xg_buffer_usage_texel_storage_m         = 1 << 3,
-    xg_buffer_usage_uniform_m               = 1 << 4,
-    xg_buffer_usage_storage_m               = 1 << 5,
-    xg_buffer_usage_index_buffer_m          = 1 << 6,
-    xg_buffer_usage_vertex_buffer_m         = 1 << 7,
-} xg_buffer_usage_f;
+    xg_buffer_usage_bit_copy_source_m   = 1 << 0,
+    xg_buffer_usage_bit_copy_dest_m     = 1 << 1,
+    xg_buffer_usage_bit_texel_uniform_m = 1 << 2,
+    xg_buffer_usage_bit_texel_storage_m = 1 << 3,
+    xg_buffer_usage_bit_uniform_m       = 1 << 4,
+    xg_buffer_usage_bit_storage_m       = 1 << 5,
+    xg_buffer_usage_bit_index_buffer_m  = 1 << 6,
+    xg_buffer_usage_bit_vertex_buffer_m = 1 << 7,
+} xg_buffer_usage_bit_e;
 
 typedef enum {
     xg_texture_layout_undefined_m,                    // UNDEFINED
@@ -1208,13 +1208,13 @@ typedef enum {
 
 // TODO
 typedef enum {
-    xg_texture_usage_copy_source_m          = 1 << 0,
-    xg_texture_usage_copy_dest_m            = 1 << 1,
-    xg_texture_usage_resource_m             = 1 << 2,
-    xg_texture_usage_storage_m              = 1 << 3,
-    xg_texture_usage_render_target_m        = 1 << 4,
-    xg_texture_usage_depth_stencil_m        = 1 << 5,
-} xg_texture_usage_f;
+    xg_texture_usage_bit_copy_source_m      = 1 << 0,
+    xg_texture_usage_bit_copy_dest_m        = 1 << 1,
+    xg_texture_usage_bit_resource_m         = 1 << 2,
+    xg_texture_usage_bit_storage_m          = 1 << 3,
+    xg_texture_usage_bit_render_target_m    = 1 << 4,
+    xg_texture_usage_bit_depth_stencil_m    = 1 << 5,
+} xg_texture_usage_bit_e;
 
 typedef enum {
     xg_texture_aspect_default_m,
@@ -1226,61 +1226,61 @@ typedef enum {
 // -- Barriers --
 // TODO simplify these and group barriers when translating
 typedef enum {
-    xg_pipeline_stage_invalid_m                             = 0,
-    xg_pipeline_stage_top_of_pipe_m                         = 0x00000001,
-    xg_pipeline_stage_draw_m                                = 0x00000002,
-    xg_pipeline_stage_vertex_input_m                        = 0x00000004,
-    xg_pipeline_stage_vertex_shader_m                       = 0x00000008,
+    xg_pipeline_stage_bit_invalid_m                             = 0,
+    xg_pipeline_stage_bit_top_of_pipe_m                         = 0x00000001,
+    xg_pipeline_stage_bit_draw_m                                = 0x00000002,
+    xg_pipeline_stage_bit_vertex_input_m                        = 0x00000004,
+    xg_pipeline_stage_bit_vertex_shader_m                       = 0x00000008,
     // xg_pipeline_stage_tessellation_control_shader_m       = 0x00000010,
     // xg_pipeline_stage_tessellation_evaluation_shader_m    = 0x00000020,
     // xg_pipeline_stage_geometry_shader_m                   = 0x00000040,
-    xg_pipeline_stage_fragment_shader_m                     = 0x00000080,
-    xg_pipeline_stage_early_fragment_test_m                 = 0x00000100,
-    xg_pipeline_stage_late_fragment_test_m                  = 0x00000200,
-    xg_pipeline_stage_color_output_m                        = 0x00000400,
-    xg_pipeline_stage_compute_shader_m                      = 0x00000800,
-    xg_pipeline_stage_transfer_m                            = 0x00001000,
-    xg_pipeline_stage_bottom_of_pipe_m                      = 0x00002000,
-    xg_pipeline_stage_host_m                                = 0x00004000,
-    xg_pipeline_stage_all_graphics_m                        = 0x00008000,
-    xg_pipeline_stage_all_commands_m                        = 0x00010000,
-    xg_pipeline_stage_raytrace_shader_m                     = 0x00200000,
-    xg_pipeline_stage_ray_acceleration_structure_build_m    = 0x02000000,
-} xg_pipeline_stage_f;
+    xg_pipeline_stage_bit_fragment_shader_m                     = 0x00000080,
+    xg_pipeline_stage_bit_early_fragment_test_m                 = 0x00000100,
+    xg_pipeline_stage_bit_late_fragment_test_m                  = 0x00000200,
+    xg_pipeline_stage_bit_color_output_m                        = 0x00000400,
+    xg_pipeline_stage_bit_compute_shader_m                      = 0x00000800,
+    xg_pipeline_stage_bit_transfer_m                            = 0x00001000,
+    xg_pipeline_stage_bit_bottom_of_pipe_m                      = 0x00002000,
+    xg_pipeline_stage_bit_host_m                                = 0x00004000,
+    xg_pipeline_stage_bit_all_graphics_m                        = 0x00008000,
+    xg_pipeline_stage_bit_all_commands_m                        = 0x00010000,
+    xg_pipeline_stage_bit_raytrace_shader_m                     = 0x00200000,
+    xg_pipeline_stage_bit_ray_acceleration_structure_build_m    = 0x02000000,
+} xg_pipeline_stage_bit_e;
 
 /*
 typedef struct {
-    xg_pipeline_stage_f blocker;    // srcStageMask
-    xg_pipeline_stage_f blocked;    // dstStageMask
+    xg_pipeline_stage_bit_e blocker;    // srcStageMask
+    xg_pipeline_stage_bit_e blocked;    // dstStageMask
 } xg_execution_barrier_t;
 */
 
 typedef enum {
-    xg_memory_access_none_m                       = 0,
-    xg_memory_access_command_read_m               = 0x00000001,
-    xg_memory_access_index_read_m                 = 0x00000002,
-    xg_memory_access_vertex_attribute_read_m      = 0x00000004,
-    xg_memory_access_uniform_read_m               = 0x00000008,
-    xg_memory_access_input_render_texture_read_m  = 0x00000010,
-    xg_memory_access_shader_read_m                = 0x00000020,
-    xg_memory_access_shader_write_m               = 0x00000040,
-    xg_memory_access_color_read_m                 = 0x00000080,
-    xg_memory_access_color_write_m                = 0x00000100,
-    xg_memory_access_depth_stencil_read_m         = 0x00000200,
-    xg_memory_access_depth_stencil_write_m        = 0x00000400,
-    xg_memory_access_transfer_read_m              = 0x00000800,
-    xg_memory_access_transfer_write_m             = 0x00001000,
-    xg_memory_access_host_read_m                  = 0x00002000,
-    xg_memory_access_host_write_m                 = 0x00004000,
-    xg_memory_access_memory_read_m                = 0x00008000,
-    xg_memory_access_memory_write_m               = 0x00010000,
-} xg_memory_access_f;
+    xg_memory_access_bit_none_m                       = 0,
+    xg_memory_access_bit_command_read_m               = 0x00000001,
+    xg_memory_access_bit_index_read_m                 = 0x00000002,
+    xg_memory_access_bit_vertex_attribute_read_m      = 0x00000004,
+    xg_memory_access_bit_uniform_read_m               = 0x00000008,
+    xg_memory_access_bit_input_render_texture_read_m  = 0x00000010,
+    xg_memory_access_bit_shader_read_m                = 0x00000020,
+    xg_memory_access_bit_shader_write_m               = 0x00000040,
+    xg_memory_access_bit_color_read_m                 = 0x00000080,
+    xg_memory_access_bit_color_write_m                = 0x00000100,
+    xg_memory_access_bit_depth_stencil_read_m         = 0x00000200,
+    xg_memory_access_bit_depth_stencil_write_m        = 0x00000400,
+    xg_memory_access_bit_transfer_read_m              = 0x00000800,
+    xg_memory_access_bit_transfer_write_m             = 0x00001000,
+    xg_memory_access_bit_host_read_m                  = 0x00002000,
+    xg_memory_access_bit_host_write_m                 = 0x00004000,
+    xg_memory_access_bit_memory_read_m                = 0x00008000,
+    xg_memory_access_bit_memory_write_m               = 0x00010000,
+} xg_memory_access_bit_e;
 
 /*
 typedef struct {
     //xg_execution_barrier_t execution;
-    xg_memory_access_f cache_flushes;           // make any cache that can possibly contain one of these memory accesses flush its content, thus making the changes visible from outside. srcAccessMask
-    xg_memory_access_f cache_invalidations;     // make any cache that can possibly contain one of these memory accesses invalidate its content, thus making it able to see outside changes. dstAccessMask
+    xg_memory_access_bit_e cache_flushes;           // make any cache that can possibly contain one of these memory accesses flush its content, thus making the changes visible from outside. srcAccessMask
+    xg_memory_access_bit_e cache_invalidations;     // make any cache that can possibly contain one of these memory accesses invalidate its content, thus making it able to see outside changes. dstAccessMask
 } xg_memory_barrier_t;
 
 typedef struct {
@@ -1302,23 +1302,23 @@ typedef struct {
 */
 
 typedef struct {
-    xg_pipeline_stage_f blocker; // the stage that needs to complete before blocked can be executed
-    xg_pipeline_stage_f blocked; // the stage that needs to wait for blocker to complete before executing
+    xg_pipeline_stage_bit_e blocker; // the stage that needs to complete before blocked can be executed
+    xg_pipeline_stage_bit_e blocked; // the stage that needs to wait for blocker to complete before executing
 } xg_execution_dependency_t;
 
 #define xg_default_execution_dependency_m ( xg_execution_dependency_t ) { \
-    .blocker = xg_pipeline_stage_invalid_m, \
-    .blocked = xg_pipeline_stage_invalid_m, \
+    .blocker = xg_pipeline_stage_bit_invalid_m, \
+    .blocked = xg_pipeline_stage_bit_invalid_m, \
 }
 
 typedef struct {
-    xg_memory_access_f flushes; // make any cache that can possibly contain one of these memory accesses flush its content, making the changes visible from outside
-    xg_memory_access_f invalidations; // make any cache that can possibly contain one of these memory accesses invalidate its content, making it able to see outside changes
+    xg_memory_access_bit_e flushes; // make any cache that can possibly contain one of these memory accesses flush its content, making the changes visible from outside
+    xg_memory_access_bit_e invalidations; // make any cache that can possibly contain one of these memory accesses invalidate its content, making it able to see outside changes
 } xg_memory_dependency_t;
 
 #define xg_default_memory_dependency_m ( xg_memory_dependency_t ) { \
-    .flushes = xg_memory_access_none_m, \
-    .invalidations = xg_memory_access_none_m, \
+    .flushes = xg_memory_access_bit_none_m, \
+    .invalidations = xg_memory_access_bit_none_m, \
 }
 
 // TODO rename to texture_layout_transition_t? not really a dependency
@@ -1518,7 +1518,7 @@ typedef struct {
 #define xg_default_pipeline_resource_bindings_m xg_pipeline_resource_bindings_m()
 
 typedef struct {
-    xg_shading_stage_b stages;
+    xg_shading_stage_bit_e stages;
     uint32_t write_offset;
     uint32_t size;
     void* base;
@@ -1556,7 +1556,7 @@ typedef struct {
     xg_device_h device;
     size_t size;
     // TODO rename to allowed_gpu_usage?
-    xg_buffer_usage_f allowed_usage;
+    xg_buffer_usage_bit_e allowed_usage;
     char debug_name[xg_debug_name_size_m];
 } xg_buffer_params_t;
 
@@ -1592,7 +1592,7 @@ typedef struct {
     xg_texture_dimension_e dimension;
     xg_format_e format;
     // TODO rename to allowed_gpu_usage?
-    xg_texture_usage_f allowed_usage;
+    xg_texture_usage_bit_e allowed_usage;
     xg_texture_layout_e initial_layout; // TODO remove this, only accepted inital layout by vulkan is undefined
     xg_sample_count_e samples_per_pixel;
     xg_texture_view_access_e view_access;
@@ -1664,7 +1664,7 @@ typedef enum {
     //xg_texture_flag_bit_depth_stencil_texture_m = 1 << 2,
     xg_texture_flag_bit_depth_texture_m = 1 << 2,
     xg_texture_flag_bit_stencil_texture_m = 1 << 3,
-} xg_texture_flags_b;
+} xg_texture_flag_bit_e;
 
 typedef struct {
     // TODO rename to alloc?
@@ -1677,9 +1677,9 @@ typedef struct {
     size_t array_layers;
     xg_texture_dimension_e dimension;
     xg_format_e format;
-    xg_texture_usage_f allowed_usage;
+    xg_texture_usage_bit_e allowed_usage;
     xg_sample_count_e samples_per_pixel;
-    xg_texture_flags_b flags;
+    xg_texture_flag_bit_e flags;
     xg_texture_aspect_e default_aspect;
     uint64_t os_handle; // TODO replace with monotonically increasing resource uid
     char debug_name[xg_debug_name_size_m];
@@ -1692,7 +1692,7 @@ typedef struct {
     xg_alloc_t allocation;
     xg_device_h device;
     size_t size;
-    xg_buffer_usage_f allowed_usage;
+    xg_buffer_usage_bit_e allowed_usage;
     char debug_name[xg_debug_name_size_m];
 } xg_buffer_info_t;
 
@@ -1827,7 +1827,7 @@ typedef enum {
     view.mip_base == 0 && ( view.mip_count == xg_texture_all_mips_m || view.mip_count == _mip_levels ) \
     && view.array_base == 0 && ( view.array_count == xg_texture_whole_array_m || view.array_count == _array_layers ) \
     && ( view.format == xg_texture_view_default_format_m || view.format == _format ) \
-    && ( view.aspect == xg_texture_aspect_default_m || view.aspect == ( _allowed_usage & xg_texture_usage_depth_stencil_m ? xg_texture_aspect_depth_m : xg_texture_aspect_color_m ) ) \
+    && ( view.aspect == xg_texture_aspect_default_m || view.aspect == ( _allowed_usage & xg_texture_usage_bit_depth_stencil_m ? xg_texture_aspect_depth_m : xg_texture_aspect_color_m ) ) \
 )
 
 typedef struct {
@@ -1938,7 +1938,7 @@ typedef struct {
     void                    ( *cmd_copy_buffer )                    ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h src, xg_buffer_h dest, uint64_t key ); // TODO better args
     void                    ( *cmd_copy_buffer_to_texture )         ( xg_cmd_buffer_h cmd_buffer, const xg_buffer_to_texture_copy_params_t* params, uint64_t key );
     // TOOD
-    //void                    ( *cmd_signal_event )                   ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, xg_pipeline_stage_f signal_stages, uint64_t key );
+    //void                    ( *cmd_signal_event )                   ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, xg_pipeline_stage_bit_e signal_stages, uint64_t key );
     //void                    ( *cmd_wait_for_event )                 ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, const xg_barrier_set_t* barrier_set, uint64_t key );
     //void                    ( *cmd_reset_event )                    ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, uint64_t key );
 
@@ -1963,7 +1963,7 @@ typedef struct {
 
 #if 0
     xg_query_pool_h         ( *create_query_pool )                  ( const xg_query_pool_params_t* params );
-    void                    ( *cmd_query_timestamp )                ( xg_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_pipeline_stage_f depenency, uint64_t key );
+    void                    ( *cmd_query_timestamp )                ( xg_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_pipeline_stage_bit_e depenency, uint64_t key );
     void                    ( *cmd_readback_query_pool )            ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h readback_buffer, uint64_t key );
     void                    ( *cmd_reset_query_pool )               ( xg_resource_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_resource_cmd_buffer_time_e time );
     void                    ( *cmd_destroy_query_pool )             ( xg_resource_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_resource_cmd_buffer_time_e time );

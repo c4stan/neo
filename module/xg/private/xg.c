@@ -102,7 +102,7 @@ void* xg_load ( void* std_runtime ) {
 
     xg_state_t* state = xg_state_alloc();
 
-    xg_vk_instance_load ( &state->vk.instance, xg_runtime_layer_debug_m | xg_runtime_layer_renderdoc_m );
+    xg_vk_instance_load ( &state->vk.instance, xg_instance_enabled_runtime_layers_m );
     xg_vk_device_load ( &state->vk.device );
     xg_vk_allocator_load ( &state->vk.allocator );
     xg_vk_cmd_buffer_load ( &state->vk.cmd_buffer );
@@ -151,23 +151,21 @@ void xg_reload ( void* std_runtime, void* api ) {
 }
 
 void xg_unload ( void ) {
-    xg_vk_instance_unload();
-    xg_vk_device_unload();
-    xg_vk_allocator_unload();
-    xg_vk_cmd_buffer_unload();
-    xg_vk_event_unload();
-    xg_vk_texture_unload();
-    xg_vk_buffer_unload();
-    xg_vk_swapchain_unload();
-    xg_vk_sampler_unload();
-    xg_vk_pipeline_unload();
-    xg_vk_workload_unload();
-
-    xg_cmd_buffer_unload();
-    xg_resource_cmd_buffer_unload();
-    //#if defined(std_platform_win32_m)
     xg_debug_capture_unload();
-    //#endif
+    xg_resource_cmd_buffer_unload();
+    xg_cmd_buffer_unload();
+
+    xg_vk_workload_unload();
+    xg_vk_pipeline_unload();
+    xg_vk_sampler_unload();
+    xg_vk_swapchain_unload();
+    xg_vk_buffer_unload();
+    xg_vk_texture_unload();
+    xg_vk_event_unload();
+    xg_vk_cmd_buffer_unload();
+    xg_vk_allocator_unload();
+    xg_vk_device_unload();
+    xg_vk_instance_unload();
 
     xg_state_free();
 }
@@ -175,7 +173,7 @@ void xg_unload ( void ) {
 #if 0
 #if std_enabled_m(xg_backend_vulkan_m)
     // Backend
-    xg_vk_instance_init ( xg_runtime_layer_debug_m | xg_runtime_layer_renderdoc_m );
+    xg_vk_instance_init ( xg_runtime_layer_bit_debug_m | xg_runtime_layer_bit_renderdoc_m );
 
     std_log_info_m ( "xg_vk_instance initialized." );
     xg_vk_cmd_buffer_init();

@@ -9,16 +9,18 @@ std_warnings_ignore_m ( "-Wmissing-noreturn" )
 std_warnings_ignore_m ( "-Wunused-function" )
 
 static void wm_test_run_2 ( void ) {
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
+
     while ( true ) {
-        wm_i* wm = std_module_get_m ( wm_module_name_m );
         wm->print();
-        std_module_release ( wm );
         std_thread_this_sleep ( 1 );
     }
+
+    std_module_unload_m ( wm_module_name_m );
 }
 
 static void wm_test_run ( void ) {
-    wm_i* wm = std_module_get_m ( wm_module_name_m );
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
     std_assert_m ( wm );
 
     wm_display_h displays[8];
@@ -79,6 +81,8 @@ static void wm_test_run ( void ) {
 
         std_thread_this_sleep ( 1 );
     }
+
+    std_module_unload_m ( wm_module_name_m );
 }
 
 void std_main ( void ) {

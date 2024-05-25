@@ -44,24 +44,24 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
 
     // Get memory type index
     uint32_t memory_type_index = device->memory_heaps[type].vk_memory_type_idx;
-    xg_memory_flags_b memory_flags = device->memory_heaps[type].memory_flags;
+    xg_memory_flag_bit_e memory_flags = device->memory_heaps[type].memory_flags;
 
 #if 0
     switch ( type ) {
         case xg_memory_type_gpu_only_m:
-            memory_flags = xg_memory_flag_device_m;
+            memory_flags = xg_memory_type_bit_device_m;
             break;
 
         case xg_memory_type_gpu_mappable_m:
-            memory_flags = xg_memory_flag_device_m | xg_memory_flag_mappable_m | xg_memory_flag_coherent_m;
+            memory_flags = xg_memory_type_bit_device_m | xg_memory_type_bit_mappable_m | xg_memory_type_bit_coherent_m;
             break;
 
         case xg_memory_type_upload_m:
-            memory_flags = xg_memory_flag_coherent_m;
+            memory_flags = xg_memory_type_bit_coherent_m;
             break;
 
         case xg_memory_type_readback_m:
-            memory_flags = xg_memory_flag_coherent_m | xg_memory_flag_cached_m;
+            memory_flags = xg_memory_type_bit_coherent_m | xg_memory_type_bit_cached_m;
             break;
 
         default:
@@ -89,7 +89,7 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
 
     // map if needed
     void* mapped_address = NULL;
-    if ( memory_flags & xg_memory_flag_mappable_m ) {
+    if ( memory_flags & xg_memory_type_bit_mappable_m ) {
         vk_result = vkMapMemory ( device->vk_handle, memory, 0, size, 0, &mapped_address );
         std_assert_m ( vk_result == VK_SUCCESS );
     }

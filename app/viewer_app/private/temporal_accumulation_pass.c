@@ -73,9 +73,6 @@ static void temporal_accumulation_pass ( const xf_node_execute_args_t* node_args
     xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 
 xf_node_h add_temporal_accumulation_pass ( xf_graph_h graph, xf_texture_h accumulation, xf_texture_h color, xf_texture_h history, xf_texture_h depth, xf_texture_h prev_depth, const char* debug_name ) {

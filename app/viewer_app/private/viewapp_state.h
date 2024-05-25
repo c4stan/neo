@@ -14,13 +14,13 @@
 
 // Modules
 typedef struct {
-    fs_i*  fs;
-    wm_i*  wm;
-    xg_i*  xg;
-    xs_i*  xs;
-    xf_i*  xf;
-    se_i*  se;
-    rv_i*  rv;
+    fs_i* fs;
+    wm_i* wm;
+    xg_i* xg;
+    xs_i* xs;
+    xf_i* xf;
+    se_i* se;
+    rv_i* rv;
     xi_i* xi;
 } viewapp_modules_state_t;
 

@@ -52,8 +52,6 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
     copy_params.mip_count = 1;
     copy_params.aspect = xg_texture_aspect_depth_m;
     xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
-
-    std_module_release ( xg );
 }
 #else
 static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -97,9 +95,6 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 #endif
 
@@ -153,9 +148,6 @@ static void hz_gen_pass ( const xf_node_execute_args_t* node_args, void* user_ar
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 
 #if 1
@@ -185,10 +177,6 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
     std_str_copy_m ( params.debug_name, "hiz_gen_mip0" );
     xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &params );
 
-    std_module_release ( xf );
-    std_module_release ( xg );
-    std_module_release ( xs );
-
     return hiz_mip0_gen_node;
 }
 #else
@@ -201,8 +189,6 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
     params.execute_routine = hz_gen_mip0_copy_pass;
     std_str_copy_m ( params.debug_name, "hiz_gen_mip0" );
     xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &params );
-
-    std_module_release ( xf );
 
     return hiz_mip0_gen_node;
 }
@@ -236,10 +222,6 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
     params.user_args = std_buffer_m ( &args );
     std_str_format_m ( params.debug_name, "hiz_gen_mip" std_fmt_u32_m, mip_level );
     xf_node_h hiz_submip_gen_node = xf->create_node ( graph, &params );
-
-    std_module_release ( xf );
-    std_module_release ( xg );
-    std_module_release ( xs );
 
     return hiz_submip_gen_node;
 }

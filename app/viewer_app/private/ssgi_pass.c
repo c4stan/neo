@@ -73,9 +73,6 @@ static void ssgi_raymarch_pass ( const xf_node_execute_args_t* node_args, void* 
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 
 xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_texture_h ssgi_raymarch, xf_texture_h normals, xf_texture_h color, xf_texture_h direct_lighting, xf_texture_h hiz ) {
@@ -118,10 +115,6 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_clear_m;
         ssgi_trace_node = xf->create_node ( graph, &params );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
-    std_module_release ( xf );
 
     return ssgi_trace_node;
 }

@@ -95,7 +95,7 @@ typedef struct {
 
 typedef struct {
     uint32_t shader_register;
-    xg_shading_stage_b stage;
+    xg_shading_stage_bit_e stage;
     xg_resource_binding_e type;
 } xg_vk_desc_layout_key_t;
 

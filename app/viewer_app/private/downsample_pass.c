@@ -68,9 +68,6 @@ static void downsample_pass ( const xf_node_execute_args_t* node_args, void* use
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 
 xf_node_h add_downsample_pass ( xf_graph_h graph, xf_texture_h source, xf_texture_h destination, const char* name ) {
@@ -118,10 +115,6 @@ xf_node_h add_downsample_pass ( xf_graph_h graph, xf_texture_h source, xf_textur
     params.user_args = std_buffer_m ( &pass_args );
     std_str_copy_m ( params.debug_name, name );
     xf_node_h node = xf->create_node ( graph, &params );
-
-    std_module_release ( xg );
-    std_module_release ( xs );
-    std_module_release ( xf );
 
     return node;
 }

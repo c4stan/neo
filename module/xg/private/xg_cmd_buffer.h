@@ -117,7 +117,7 @@ typedef struct {
 } xg_cmd_pipeline_resource_group_bind_t;
 
 typedef struct {
-    xg_shading_stage_b stages;
+    xg_shading_stage_bit_e stages;
     uint32_t offset;
     uint32_t size;
     char data[];
@@ -246,7 +246,7 @@ typedef struct {
 #if 0
 typedef struct {
     xg_query_buffer_h query_buffer;
-    xg_pipeline_stage_f dependency;
+    xg_pipeline_stage_bit_e dependency;
 } xg_cmd_write_timestamp_t;
 #endif
 //

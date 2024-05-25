@@ -78,10 +78,6 @@ xf_node_h add_depth_pass ( xf_graph_h graph, xf_texture_h depth ) {
         depth_node = xf->create_node ( graph, &params );
     }
 
-    std_module_release ( xg );
-    std_module_release ( xs );
-    std_module_release ( xf );
-
     return depth_node;
 }
 #endif

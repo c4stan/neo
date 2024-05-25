@@ -47,7 +47,7 @@ static void test_task ( void* _arg ) {
 }
 
 static void test_tk() {
-    tk = std_module_get_m ( tk_module_name_m );
+    tk = std_module_load_m ( tk_module_name_m );
     std_assert_m ( tk );
 
     size_t core_count = std_platform_logical_cores_info ( NULL, 0 );
@@ -87,7 +87,7 @@ static void test_tk() {
 
     tk->stop();
 
-    std_module_release ( tk );
+    std_module_unload_m ( tk_module_name_m );
 }
 
 void std_main ( void ) {

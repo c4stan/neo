@@ -23,7 +23,6 @@ typedef struct {
     void* api;
     uint64_t handle;
     std_module_name_t name;
-    size_t ref_count;
     // Info read from the PE header when the module gets first load.
     // Data is initialized and contributes directly to disk size.
     // Bss is uninitialized and its contribute to disk is almost zero.

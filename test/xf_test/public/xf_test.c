@@ -83,12 +83,10 @@ static void copy_pass ( const xf_node_execute_args_t* node_args, void* user_args
 
         xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
     }
-
-    std_module_release ( xg );
 }
 
 static void xf_test ( void ) {
-    wm_i* wm = std_module_get_m ( wm_module_name_m );
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
     std_assert_m ( wm );
 
     wm_window_params_t window_params = { .name = "xf_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
@@ -97,7 +95,7 @@ static void xf_test ( void ) {
 
     xg_device_h device;
     xg_swapchain_h swapchain;
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg_i* xg = std_module_load_m ( xg_module_name_m );
     {
         size_t device_count = xg->get_devices_count();
         std_assert_m ( device_count > 0 );
@@ -124,7 +122,7 @@ static void xf_test ( void ) {
     }
 
     xs_pipeline_state_h pipeline_state;
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
+    xs_i* xs = std_module_load_m ( xs_module_name_m );
     {
         xs->add_database_folder ( "shader/" );
         xs->set_output_folder ( "output/shader/" );
@@ -145,7 +143,7 @@ static void xf_test ( void ) {
         std_assert_m ( pipeline_state != xs_null_handle_m );
     }
 
-    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_i* xf = std_module_load_m ( xf_module_name_m );
     xf_graph_h graph = xf->create_graph ( device, swapchain );
 
     xf_texture_h color_texture;
@@ -245,6 +243,11 @@ static void xf_test ( void ) {
 
         xs->update_pipeline_states ( workload );
     }
+
+    std_module_unload_m ( xf_module_name_m );
+    std_module_unload_m ( xs_module_name_m );
+    std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
 }
 
 void std_main ( void ) {

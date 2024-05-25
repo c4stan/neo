@@ -115,55 +115,55 @@ static void xf_graph_node_accumulate_resource_usage ( xf_node_h node ) {
     // Shader resources
     for ( size_t i = 0; i < params->shader_texture_reads_count; ++i ) {
         const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_reads[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_resource_m );
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_resource_m );
     }
 
     for ( size_t i = 0; i < params->shader_texture_writes_count; ++i ) {
         const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_writes[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_resource_m );
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_resource_m );
     }
 
     for ( size_t i = 0; i < params->shader_buffer_reads_count; ++i ) {
         xf_buffer_h buffer = params->shader_buffer_reads[i].buffer;
-        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_uniform_m );
+        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_uniform_m );
     }
 
     for ( size_t i = 0; i < params->shader_buffer_writes_count; ++i ) {
         xf_buffer_h buffer = params->shader_buffer_writes[i].buffer;
-        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_storage_m );
+        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_storage_m );
     }
 
     // Copy resources
     for ( size_t i = 0; i < params->copy_texture_reads_count; ++i ) {
         const xf_node_copy_texture_dependency_t* dep = &params->copy_texture_reads[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_copy_source_m );
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_copy_source_m );
     }
 
     for ( size_t i = 0; i < params->copy_texture_writes_count; ++i ) {
         const xf_node_copy_texture_dependency_t* dep = &params->copy_texture_writes[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_copy_dest_m );
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_copy_dest_m );
     }
 
     for ( size_t i = 0; i < params->copy_buffer_reads_count; ++i ) {
         xf_buffer_h buffer = params->copy_buffer_reads[i];
-        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_copy_source_m );
+        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_copy_source_m );
     }
 
     for ( size_t i = 0; i < params->copy_buffer_writes_count; ++i ) {
         xf_buffer_h buffer = params->copy_buffer_writes[i];
-        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_copy_dest_m );
+        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_copy_dest_m );
     }
 
     // Render targets and depth stencil
     for ( size_t i = 0; i < params->render_targets_count; ++i ) {
         const xf_node_render_target_dependency_t* dep = &params->render_targets[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_render_target_m );
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_render_target_m );
     }
 
     if ( params->depth_stencil_target != xf_null_handle_m ) {
         std_assert_m ( params->depth_stencil_target != xf_null_handle_m );
         xf_texture_h texture = params->depth_stencil_target;
-        xf_resource_texture_add_usage ( texture, xg_texture_usage_depth_stencil_m );
+        xf_resource_texture_add_usage ( texture, xg_texture_usage_bit_depth_stencil_m );
     }
 }
 
@@ -469,12 +469,12 @@ static void xf_graph_build_texture ( xf_graph_t* graph, xf_texture_h texture_han
                 std_str_copy_m ( params.debug_name, texture->params.debug_name );
 
                 // Tag all render tagets as copy src/dest. Matches xg_vk_pipeline framebuffer creation logic
-                if ( texture->required_usage & xg_texture_usage_render_target_m ) {
-                    params.allowed_usage |= xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m;
+                if ( texture->required_usage & xg_texture_usage_bit_render_target_m ) {
+                    params.allowed_usage |= xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m;
                 }
 
-                if ( texture->required_usage & xg_texture_usage_depth_stencil_m ) {
-                    params.allowed_usage |= xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m;
+                if ( texture->required_usage & xg_texture_usage_bit_depth_stencil_m ) {
+                    params.allowed_usage |= xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m;
                 }
 
                 params.initial_layout = xg_texture_layout_undefined_m;
@@ -697,8 +697,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
                         xf_texture_execution_state_t state = xf_texture_execution_state_m (
                             .layout = xg_texture_layout_copy_dest_m,
-                            .stage = xg_pipeline_stage_transfer_m,
-                            .access = xg_memory_access_transfer_write_m
+                            .stage = xg_pipeline_stage_bit_transfer_m,
+                            .access = xg_memory_access_bit_transfer_write_m
                         );
                         xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &state );
 
@@ -725,14 +725,14 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
                         xf_texture_execution_state_t target_state = xf_texture_execution_state_m (
                             .layout = xg_texture_layout_copy_dest_m,
-                            .stage = xg_pipeline_stage_transfer_m,
-                            .access = xg_memory_access_transfer_write_m
+                            .stage = xg_pipeline_stage_bit_transfer_m,
+                            .access = xg_memory_access_bit_transfer_write_m
                         );
                         xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &target_state );
                         xf_texture_execution_state_t source_state = xf_texture_execution_state_m (
                             .layout = xg_texture_layout_copy_source_m,
-                            .stage = xg_pipeline_stage_transfer_m,
-                            .access = xg_memory_access_transfer_read_m
+                            .stage = xg_pipeline_stage_bit_transfer_m,
+                            .access = xg_memory_access_bit_transfer_read_m
                         );
                         xf_resource_texture_state_barrier ( &texture_barriers_stack, source->texture, source->view, &source_state );
 
@@ -772,14 +772,14 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
                 xg_texture_layout_e layout = xg_texture_layout_shader_read_m;
 
-                if ( texture->allowed_usage & xg_texture_usage_depth_stencil_m ) {
+                if ( texture->allowed_usage & xg_texture_usage_bit_depth_stencil_m ) {
                     layout = xg_texture_layout_depth_stencil_read_m;
                 }
 
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = layout,
                     .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
-                    .access = xg_memory_access_shader_read_m
+                    .access = xg_memory_access_bit_shader_read_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
@@ -796,7 +796,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = layout,
                     .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
-                    .access = xg_memory_access_shader_write_m
+                    .access = xg_memory_access_bit_shader_write_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
@@ -811,7 +811,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
                 xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
                     .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
-                    .access = xg_memory_access_shader_read_m
+                    .access = xg_memory_access_bit_shader_read_m
                 );
 
                 xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
@@ -824,7 +824,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
                 xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
                     .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
-                    .access = xg_memory_access_shader_write_m
+                    .access = xg_memory_access_bit_shader_write_m
                 );
 
                 xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
@@ -837,8 +837,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_texture_t* texture = xf_resource_texture_get ( copy->texture );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_copy_source_m,
-                    .stage = xg_pipeline_stage_transfer_m,
-                    .access = xg_memory_access_transfer_read_m
+                    .stage = xg_pipeline_stage_bit_transfer_m,
+                    .access = xg_memory_access_bit_transfer_read_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, copy->texture, copy->view, &state );
@@ -853,8 +853,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_texture_t* texture = xf_resource_texture_get ( copy->texture );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_copy_dest_m,
-                    .stage = xg_pipeline_stage_transfer_m,
-                    .access = xg_memory_access_transfer_write_m
+                    .stage = xg_pipeline_stage_bit_transfer_m,
+                    .access = xg_memory_access_bit_transfer_write_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, copy->texture, copy->view, &state );
@@ -869,8 +869,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_texture_t* texture = xf_resource_texture_get ( target->texture );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_render_target_m,
-                    .stage = xg_pipeline_stage_color_output_m,
-                    .access = xg_memory_access_color_write_m
+                    .stage = xg_pipeline_stage_bit_color_output_m,
+                    .access = xg_memory_access_bit_color_write_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &state );
@@ -885,8 +885,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 const xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_depth_stencil_target_m,
-                    .stage = xg_pipeline_stage_late_fragment_test_m,
-                    .access = xg_memory_access_depth_stencil_write_m
+                    .stage = xg_pipeline_stage_bit_late_fragment_test_m,
+                    .access = xg_memory_access_bit_depth_stencil_write_m
                 );
 
                 // TODO support early fragment test
@@ -927,8 +927,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_present_m,
-                    .stage = xg_pipeline_stage_bottom_of_pipe_m,
-                    .access = xg_memory_access_none_m
+                    .stage = xg_pipeline_stage_bit_bottom_of_pipe_m,
+                    .access = xg_memory_access_bit_none_m
                 );
 
                 xf_resource_texture_state_barrier ( &present_barrier_stack, texture_handle, xg_default_texture_view_m, &state );

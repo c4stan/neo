@@ -8,7 +8,7 @@
 
 typedef struct {
     xi_i api;
-    xi_ui_state_t ui;
+    xi_ui_module_state_t ui;
     xi_font_state_t font;
     xi_workload_state_t workload;
 } xi_state_t;

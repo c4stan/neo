@@ -132,9 +132,9 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     std_assert_m ( texture );
     xg_texture_h texture_handle = ( xg_texture_h ) ( texture - xg_vk_texture_state->textures_array );
 
-    xg_texture_flags_b flags = 0;
+    xg_texture_flag_bit_e flags = 0;
 
-    if ( params->allowed_usage & xg_texture_usage_depth_stencil_m ) {
+    if ( params->allowed_usage & xg_texture_usage_bit_depth_stencil_m ) {
         if ( xg_format_has_depth ( params->format ) ) {
             flags |= xg_texture_flag_bit_depth_texture_m;
         }
@@ -142,7 +142,7 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
         if ( xg_format_has_stencil ( params->format ) ) {
             flags |= xg_texture_flag_bit_stencil_texture_m;
         }
-    } else if ( params->allowed_usage & xg_texture_usage_render_target_m ) {
+    } else if ( params->allowed_usage & xg_texture_usage_bit_render_target_m ) {
         flags = xg_texture_flag_bit_render_target_texture_m;
     }
 
@@ -170,13 +170,13 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     texture->default_aspect = default_aspect;
 
     if ( flags & xg_texture_flag_bit_render_target_texture_m ) {
-        texture->params.allowed_usage |= xg_texture_usage_resource_m;
-        texture->params.allowed_usage |= xg_texture_usage_copy_source_m;
-        texture->params.allowed_usage |= xg_texture_usage_copy_dest_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_resource_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
     } else if ( flags & ( xg_texture_flag_bit_depth_texture_m | xg_texture_flag_bit_stencil_texture_m ) ) {
-        texture->params.allowed_usage |= xg_texture_usage_resource_m;
-        texture->params.allowed_usage |= xg_texture_usage_copy_source_m;
-        texture->params.allowed_usage |= xg_texture_usage_copy_dest_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_resource_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
     }
 
     if ( params->view_access == xg_texture_view_access_default_only_m ) {

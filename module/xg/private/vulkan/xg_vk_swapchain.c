@@ -47,7 +47,6 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     wm_window_info_t window_info;
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     wm->get_window_info ( params->window, &window_info );
-    std_module_release ( wm );
 
     // Get device
     const xg_vk_device_t* device = xg_vk_device_get ( params->device );
@@ -148,9 +147,9 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     uint32_t width = ( uint32_t ) swapchain->width;
     uint32_t height = ( uint32_t ) swapchain->height;
 
-    xg_texture_usage_f allowed_usage = xg_texture_usage_render_target_m | xg_texture_usage_copy_dest_m; // TODO probably need more allowed usages
-    allowed_usage |= xg_texture_usage_copy_source_m; // Looks like this gets added automatically once copy_dest is in? and if it's not accounted for in the attachments info it will cause a warning to spam
-    allowed_usage |= xg_texture_usage_resource_m; // For now defaulting all render targets to render_target/copy_source/copy_dest/shader_resource. TODO create and cache framebuffers on the fly
+    xg_texture_usage_bit_e allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m; // TODO probably need more allowed usages
+    allowed_usage |= xg_texture_usage_bit_copy_source_m; // Looks like this gets added automatically once copy_dest is in? and if it's not accounted for in the attachments info it will cause a warning to spam
+    allowed_usage |= xg_texture_usage_bit_resource_m; // For now defaulting all render targets to render_target/copy_source/copy_dest/shader_resource. TODO create and cache framebuffers on the fly
 
     VkSwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -281,10 +280,10 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     VkPresentModeKHR vk_present_mode = xg_present_mode_to_vk ( swapchain->present_mode );
     uint32_t texture_count = ( uint32_t ) swapchain->texture_count;
 
-    xg_texture_usage_f allowed_usage = xg_texture_usage_render_target_m | xg_texture_usage_copy_dest_m; // TODO probably need more allowed usages
+    xg_texture_usage_bit_e allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m; // TODO probably need more allowed usages
     // see _create
-    allowed_usage |= xg_texture_usage_copy_source_m;
-    allowed_usage |= xg_texture_usage_resource_m;
+    allowed_usage |= xg_texture_usage_bit_copy_source_m;
+    allowed_usage |= xg_texture_usage_bit_resource_m;
 
     VkSwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;

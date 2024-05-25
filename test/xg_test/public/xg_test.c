@@ -31,10 +31,10 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         texture_barrier.texture = texture;
         texture_barrier.layout.old = xg_texture_layout_undefined_m;
         texture_barrier.layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier.memory.flushes = xg_memory_access_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_transfer_write_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_transfer_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -65,10 +65,10 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         texture_barrier.texture = texture;
         texture_barrier.layout.old = xg_texture_layout_copy_dest_m;
         texture_barrier.layout.new = xg_texture_layout_present_m;
-        texture_barrier.memory.flushes = xg_memory_access_transfer_write_m;
-        texture_barrier.memory.invalidations = xg_memory_access_none_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_bottom_of_pipe_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_transfer_write_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_none_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_bottom_of_pipe_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -84,7 +84,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         .height = 400,
         .format = xg_format_b8g8r8a8_unorm_m,
         .debug_name = "temp_texture",
-        .allowed_usage = xg_texture_usage_render_target_m | xg_texture_usage_copy_dest_m,
+        .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m,
     ) );
 
     {
@@ -92,10 +92,10 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         texture_barrier.texture = temp_texture;
         texture_barrier.layout.old = xg_texture_layout_undefined_m;
         texture_barrier.layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier.memory.flushes = xg_memory_access_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_transfer_write_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_transfer_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -132,7 +132,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
 }
 
 static void xg_test2_run ( void ) {
-    wm_i* wm = std_module_get_m ( wm_module_name_m );
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
     wm_window_params_t window_params = wm_window_params_m (
         .name = "xg_test",
         .x = 0,
@@ -146,7 +146,7 @@ static void xg_test2_run ( void ) {
 
     xg_device_h device;
     xg_swapchain_h swapchain;
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg_i* xg = std_module_load_m ( xg_module_name_m );
     {
         size_t device_count = xg->get_devices_count();
         std_assert_m ( device_count > 0 );
@@ -220,11 +220,14 @@ static void xg_test2_run ( void ) {
 
         xg_test2_frame ( device, swapchain, capture );
     }
+
+    std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
 }
 
 #if std_enabled_m(xg_debug_simple_frame_test_m)
 static void xg_test1_run ( void ) {
-    wm_i* wm = std_module_get_m ( wm_module_name_m );
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
     wm_window_params_t window_params;
     window_params.name = "xg_test";
     window_params.x = 0;
@@ -259,6 +262,8 @@ static void xg_test1_run ( void ) {
 
         xg->debug_simple_frame ( window, device );
     }
+    std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
 }
 #endif
 

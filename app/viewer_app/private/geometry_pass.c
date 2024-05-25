@@ -52,8 +52,6 @@ static void clear_pass ( const xf_node_execute_args_t* node_args, void* user_arg
         material_clear.u32[3] = 0;
         xg->cmd_clear_texture ( cmd_buffer, material_target.texture, material_clear, key );
     }
-
-    std_module_release ( xg );
 }
 
 typedef struct {
@@ -200,10 +198,6 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
     }
 
     se->dispose_query_results();
-
-    std_module_release ( xg );
-    std_module_release ( xs );
-    std_module_release ( se );
 }
 
 xf_node_h add_geometry_clear_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth ) {
@@ -217,8 +211,6 @@ xf_node_h add_geometry_clear_node ( xf_graph_h graph, xf_texture_h color, xf_tex
     node_params.execute_routine = clear_pass;
     std_str_copy_m ( node_params.debug_name, "geometry_clear" );
     xf_node_h clear_node = xf->create_node ( graph, &node_params );
-
-    std_module_release ( xf );
 
     return clear_node;
 }
@@ -246,8 +238,6 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
     node_params.passthrough.render_targets[1].mode = xf_node_passthrough_mode_ignore_m;
     node_params.passthrough.render_targets[2].mode = xf_node_passthrough_mode_ignore_m;
     xf_node_h node = xf->create_node ( graph, &node_params );
-
-    std_module_release ( xf );
 
     return node;
 }

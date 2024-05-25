@@ -68,10 +68,10 @@ typedef struct {
     // TODO support stack of sections, not just one
     bool in_section;
     bool minimized_section;
-} xi_ui_state_t;
+} xi_ui_module_state_t;
 
-void xi_ui_load ( xi_ui_state_t* state );
-void xi_ui_reload ( xi_ui_state_t* state );
+void xi_ui_load ( xi_ui_module_state_t* state );
+void xi_ui_reload ( xi_ui_module_state_t* state );
 void xi_ui_unload ( void );
 
 void xi_ui_update ( const wm_window_info_t* window_info, const wm_input_state_t* input_state );

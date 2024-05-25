@@ -29,7 +29,7 @@ static void write_source_wave ( char* buffer, size_t size, uint32_t id ) {
 }
 
 static void run_aud_test ( void ) {
-    aud_i* aud = std_module_get_m ( aud_module_name_m );
+    aud_i* aud = std_module_load_m ( aud_module_name_m );
     std_assert_m ( aud );
 
     size_t device_count = aud->get_devices_count();

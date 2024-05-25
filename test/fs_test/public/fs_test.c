@@ -6,7 +6,7 @@
 #include <fs.h>
 
 static void fs_test_run ( void ) {
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
+    fs_i* fs = std_module_load_m ( fs_module_name_m );
     {
         size_t n = fs->get_volumes_count();
         fs_volume_h volumes[32];
@@ -156,6 +156,7 @@ static void fs_test_run ( void ) {
             }
         }
     }
+    std_module_unload_m ( fs_module_name_m );
 }
 
 void std_main ( void ) {

@@ -89,7 +89,13 @@ void* std_module_get ( const char* module_name );
 #define std_module_get_m( name ) ( std_pp_eval_concat_m( name, _i* ) ) std_module_get ( std_pp_eval_string_m( name ) )
 
 // Decreases the refcount of the module that owns the specified api. When refcount reaches 0 the module DLL gets unloaded.
-void std_module_release ( void* api );
+//void std_module_release ( void* api );
+
+void* std_module_load ( const char* name );
+void std_module_unload ( const char* name );
+//void std_module_unload ( const char* name );
+#define std_module_load_m( name ) ( std_pp_eval_concat_m( name, _i* ) ) std_module_load ( std_pp_eval_string_m( name ) )
+#define std_module_unload_m( name ) std_module_unload ( std_pp_eval_string_m( name ) )
 
 // Unloads a module DLL, recompiles the module code by running neo on it, and loads the new DLL.
 // The new api is loaded in place of the old one (same memory), so all pointers to the module api remain valid.

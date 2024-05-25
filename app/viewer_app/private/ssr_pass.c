@@ -72,9 +72,6 @@ static void xf_ssr_trace_pass ( const xf_node_execute_args_t* node_args, void* u
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 
 xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, xf_texture_h normals, xf_texture_h color, xf_texture_h hiz ) {
@@ -116,10 +113,6 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_clear_m;
         ssr_trace_node = xf->create_node ( graph, &params );
     }
-
-    std_module_release ( xf );
-    std_module_release ( xs );
-    std_module_release ( xg );
 
     return ssr_trace_node;
 }

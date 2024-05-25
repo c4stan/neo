@@ -923,24 +923,24 @@ const char* xg_present_mode_str ( xg_present_mode_e mode ) {
     }
 }
 
-xg_pipeline_stage_f xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
+xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
     switch ( stage ) {
         case xg_shading_stage_vertex_m:
-            return xg_pipeline_stage_vertex_shader_m;
+            return xg_pipeline_stage_bit_vertex_shader_m;
 
         case xg_shading_stage_fragment_m:
-            return xg_pipeline_stage_fragment_shader_m;
+            return xg_pipeline_stage_bit_fragment_shader_m;
 
         case xg_shading_stage_compute_m:
-            return xg_pipeline_stage_compute_shader_m;
+            return xg_pipeline_stage_bit_compute_shader_m;
 
         default:
-            return xg_pipeline_stage_invalid_m;
+            return xg_pipeline_stage_bit_invalid_m;
     }
 }
 
-bool xg_memory_access_is_write ( xg_memory_access_f access ) {
-    uint32_t mask = xg_memory_access_shader_write_m | xg_memory_access_color_write_m | xg_memory_access_depth_stencil_write_m | xg_memory_access_transfer_write_m | xg_memory_access_host_write_m | xg_memory_access_memory_write_m;
+bool xg_memory_access_is_write ( xg_memory_access_bit_e access ) {
+    uint32_t mask = xg_memory_access_bit_shader_write_m | xg_memory_access_bit_color_write_m | xg_memory_access_bit_depth_stencil_write_m | xg_memory_access_bit_transfer_write_m | xg_memory_access_bit_host_write_m | xg_memory_access_bit_memory_write_m;
     return ( ( unsigned int ) access & mask ) != 0;
 }
 

@@ -30,7 +30,7 @@ typedef struct {
     VkImage                 vk_handle;
     xg_alloc_t              allocation;
     xg_texture_params_t     params;
-    xg_texture_flags_b      flags;
+    xg_texture_flag_bit_e      flags;
     //VkImageView             vk_view; // default view
 
     //xg_texture_view_h       default_view;

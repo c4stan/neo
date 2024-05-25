@@ -10,7 +10,7 @@ VkFormat xg_format_to_vk ( xg_format_e format ) {
     return ( VkFormat ) format;
 }
 
-VkShaderStageFlags xg_shader_stage_to_vk ( xg_shading_stage_b stage ) {
+VkShaderStageFlags xg_shader_stage_to_vk ( xg_shading_stage_bit_e stage ) {
     VkShaderStageFlags flags = 0;
 
     if ( stage & xg_shading_stage_bit_vertex_m ) {
@@ -28,14 +28,14 @@ VkShaderStageFlags xg_shader_stage_to_vk ( xg_shading_stage_b stage ) {
     return flags;
 }
 
-VkCullModeFlags xg_cull_mode_to_vk ( xg_cull_mode_b mode ) {
+VkCullModeFlags xg_cull_mode_to_vk ( xg_cull_mode_bit_e mode ) {
     VkCullModeFlags flags = 0;
 
-    if ( mode & xg_cull_mode_front_m ) {
+    if ( mode & xg_cull_mode_bit_front_m ) {
         flags |= VK_CULL_MODE_FRONT_BIT;
     }
 
-    if ( mode & xg_cull_mode_back_m ) {
+    if ( mode & xg_cull_mode_bit_back_m ) {
         flags |= VK_CULL_MODE_BACK_BIT;
     }
 
@@ -321,38 +321,38 @@ VkLogicOp xg_logic_op_to_vk ( xg_blend_logic_op_e op ) {
     }
 }
 
-VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_f usage ) {
+VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_bit_e usage ) {
     VkBufferUsageFlags flags = 0;
 
-    if ( usage & xg_buffer_usage_copy_dest_m ) {
+    if ( usage & xg_buffer_usage_bit_copy_dest_m ) {
         flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
-    if ( usage & xg_buffer_usage_copy_source_m ) {
+    if ( usage & xg_buffer_usage_bit_copy_source_m ) {
         flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     }
 
-    if ( usage & xg_buffer_usage_index_buffer_m ) {
+    if ( usage & xg_buffer_usage_bit_index_buffer_m ) {
         flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     }
 
-    if ( usage & xg_buffer_usage_uniform_m ) {
+    if ( usage & xg_buffer_usage_bit_uniform_m ) {
         flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     }
 
-    if ( usage & xg_buffer_usage_storage_m ) {
+    if ( usage & xg_buffer_usage_bit_storage_m ) {
         flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     }
 
-    if ( usage & xg_buffer_usage_texel_uniform_m ) {
+    if ( usage & xg_buffer_usage_bit_texel_uniform_m ) {
         flags |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
     }
 
-    if ( usage & xg_buffer_usage_texel_storage_m ) {
+    if ( usage & xg_buffer_usage_bit_texel_storage_m ) {
         flags |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
     }
 
-    if ( usage & xg_buffer_usage_vertex_buffer_m ) {
+    if ( usage & xg_buffer_usage_bit_vertex_buffer_m ) {
         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
 
@@ -367,30 +367,30 @@ VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_f usage ) {
     return flags;
 }
 
-VkImageUsageFlags xg_image_usage_to_vk ( xg_texture_usage_f usage ) {
+VkImageUsageFlags xg_image_usage_to_vk ( xg_texture_usage_bit_e usage ) {
     VkImageUsageFlags flags = 0;
 
-    if ( usage & xg_texture_usage_copy_dest_m ) {
+    if ( usage & xg_texture_usage_bit_copy_dest_m ) {
         flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
 
-    if ( usage & xg_texture_usage_copy_source_m ) {
+    if ( usage & xg_texture_usage_bit_copy_source_m ) {
         flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     }
 
-    if ( usage & xg_texture_usage_render_target_m ) {
+    if ( usage & xg_texture_usage_bit_render_target_m ) {
         flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
 
-    if ( usage & xg_texture_usage_depth_stencil_m ) {
+    if ( usage & xg_texture_usage_bit_depth_stencil_m ) {
         flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     }
 
-    if ( usage & xg_texture_usage_resource_m ) {
+    if ( usage & xg_texture_usage_bit_resource_m ) {
         flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
-    if ( usage & xg_texture_usage_storage_m ) {
+    if ( usage & xg_texture_usage_bit_storage_m ) {
         flags |= VK_IMAGE_USAGE_STORAGE_BIT;
     }
 
@@ -495,11 +495,11 @@ VkPresentModeKHR xg_present_mode_to_vk ( xg_present_mode_e present_mode ) {
     }
 }
 
-VkAccessFlags xg_memory_access_to_vk ( xg_memory_access_f memory_access ) {
+VkAccessFlags xg_memory_access_to_vk ( xg_memory_access_bit_e memory_access ) {
     return ( VkAccessFlags ) memory_access;
 }
 
-VkPipelineStageFlags xg_pipeline_stage_to_vk ( xg_pipeline_stage_f pipeline_stage ) {
+VkPipelineStageFlags xg_pipeline_stage_to_vk ( xg_pipeline_stage_bit_e pipeline_stage ) {
     return ( VkPipelineStageFlags ) pipeline_stage;
 }
 
@@ -612,7 +612,7 @@ VkImageAspectFlags xg_texture_aspect_to_vk ( xg_texture_aspect_e aspect ) {
     }
 }
 
-VkImageAspectFlags xg_texture_flags_to_vk_aspect ( xg_texture_flags_b flags ) {
+VkImageAspectFlags xg_texture_flags_to_vk_aspect ( xg_texture_flag_bit_e flags ) {
     VkImageAspectFlags result = 0; // VK_IMAGE_ASPECT_NONE
 
     if ( flags & xg_texture_flag_bit_render_target_texture_m ) {
@@ -630,23 +630,23 @@ VkImageAspectFlags xg_texture_flags_to_vk_aspect ( xg_texture_flags_b flags ) {
     return result;
 }
 
-xg_memory_flags_b xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags ) {
-    xg_memory_flags_b result = 0;
+xg_memory_flag_bit_e xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags ) {
+    xg_memory_flag_bit_e result = 0;
 
     if ( flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
-        result |= xg_memory_flag_device_m;
+        result |= xg_memory_type_bit_device_m;
     }
 
     if ( flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ) {
-        result |= xg_memory_flag_mappable_m;
+        result |= xg_memory_type_bit_mappable_m;
     }
 
     if ( flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) {
-        result |= xg_memory_flag_coherent_m;
+        result |= xg_memory_type_bit_coherent_m;
     }
 
     if ( flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ) {
-        result |= xg_memory_flag_cached_m;
+        result |= xg_memory_type_bit_cached_m;
     }
 
     return result;

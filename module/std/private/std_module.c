@@ -102,7 +102,6 @@ void std_module_fakeload_api ( const char* name, void* api ) {
     std_mutex_lock ( &std_module_state->modules_mutex );
     std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
-    module->ref_count = 1;
     module->name.hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
     std_str_copy ( module->name.string, std_module_name_max_len_m, name );
 #ifdef std_platform_win32_m
@@ -172,14 +171,7 @@ static bool std_module_entrypoint_name ( const char* name, const char* entrypoin
     return true;
 }
 
-void* std_module_get ( const char* name ) {
-    std_module_t* module = std_module_lookup ( name );
-
-    if ( module ) {
-        ++module->ref_count;
-        return module->api;
-    }
-
+static std_module_t* std_module_load_internal ( const char* name ) {
     std_log_info_m ( "Requested module " std_fmt_str_m " is not currently loaded. Looking up the modules library...", name );
     // Build file and entrypoint name
     char module_file_name[std_module_name_max_len_m];
@@ -272,9 +264,8 @@ void* std_module_get ( const char* name ) {
     uint64_t hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
     // Lock, store
     std_mutex_lock ( &std_module_state->modules_mutex );
-    module = std_list_pop_m ( &std_module_state->modules_freelist );
+    std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
-    module->ref_count = 1;
     module->name.hash = hash;
     std_str_copy ( module->name.string, std_module_name_max_len_m, name );
     module->handle = ( uint64_t ) handle;
@@ -282,28 +273,38 @@ void* std_module_get ( const char* name ) {
     std_hash_map_insert ( &std_module_state->modules_name_map, hash, ( uint64_t ) module );
     // Unlock, return
     std_mutex_unlock ( &std_module_state->modules_mutex );
-    return api;
+    
+    return module;
 }
 
-void std_module_release ( void* api ) {
-    // Lock, try to lookup
-    std_mutex_lock ( &std_module_state->modules_mutex );
-    uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_api_map, ( uint64_t ) &api );
+void* std_module_load ( const char* name ) {
+     std_module_t* module = std_module_lookup ( name );
 
-    if ( module_lookup == NULL ) {
-        std_mutex_unlock ( &std_module_state->modules_mutex );
-        return;
+    if ( module ) {
+        std_log_error_m ( "Trying to load already loaded module " std_fmt_str_m, name );
+        return module->api;
     }
 
-    std_module_t* module = * ( std_module_t** ) module_lookup;
+    module = std_module_load_internal ( name );
 
-    // Decrement ref count, return if not zero
-    if ( std_likely_m ( --module->ref_count > 0 ) ) {
-        std_mutex_unlock ( &std_module_state->modules_mutex );
-        return;
+    return module->api;
+}
+
+void* std_module_get ( const char* name ) {
+    std_module_t* module = std_module_lookup ( name );
+
+    if ( !module ) {
+        std_log_error_m ( "Trying to get non loaded module " std_fmt_str_m, name );
+        return NULL;
     }
 
-    std_log_info_m ( "Releasing module " std_fmt_str_m "...", module->name.string );
+    //module = std_module_load_internal ( name );
+
+    return module->api;
+}
+
+static void std_module_unload_internal ( std_module_t* module ) {
+    std_log_info_m ( "Unloading module " std_fmt_str_m "...", module->name.string );
 
     std_assert_m ( module->handle != 0 );
     char module_entrypoint_name[std_module_name_max_len_m];
@@ -349,12 +350,38 @@ void std_module_release ( void* api ) {
 #endif
 
     std_list_push ( &std_module_state->modules_freelist, module );
-    std_hash_map_remove ( &std_module_state->modules_api_map, ( uint64_t ) &api );
 
     std_verify_m ( std_hash_map_remove ( &std_module_state->modules_name_map, module->name.hash ) );
 
     std_mutex_unlock ( &std_module_state->modules_mutex );
-    return;
+}
+
+void std_module_unload ( const char* name ) {
+     std_module_t* module = std_module_lookup ( name );
+
+     if ( !module ) {
+        std_log_error_m ( "Trying to unload module " std_fmt_str_m " that is not currently loaded", name );
+        return;
+    }
+
+    std_module_unload_internal ( module );
+}
+
+void std_module_release ( void* api ) {
+    // Lock, try to lookup
+    std_mutex_lock ( &std_module_state->modules_mutex );
+    uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_api_map, ( uint64_t ) &api );
+
+    if ( module_lookup == NULL ) {
+        std_mutex_unlock ( &std_module_state->modules_mutex );
+        return;
+    }
+
+    std_module_t* module = * ( std_module_t** ) module_lookup;
+    std_module_unload_internal ( module );
+
+    // TODO this should happen inside the mutex...
+    std_hash_map_remove ( &std_module_state->modules_api_map, ( uint64_t ) &api );
 }
 
 size_t std_module_build ( const char* solution_name, void* output, size_t output_size ) {

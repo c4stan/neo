@@ -273,7 +273,7 @@ static void run_se_test_2 ( void ) {
                 .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_mappable_m ),
                 .device = device,
                 .size = sizeof ( vertex_cbuffer_t ),
-                .allowed_usage = xg_buffer_usage_uniform_m,
+                .allowed_usage = xg_buffer_usage_bit_uniform_m,
                 .debug_name = "component_cbuffer",
             );
             vertex_cbuffer = xg->cmd_create_buffer ( resource_cmd_buffer, &buffer_params );

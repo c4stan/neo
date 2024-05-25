@@ -51,14 +51,9 @@ static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* use
 
         xi->flush_workload ( xi_workload, &params );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xi );
 }
 
 xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
     xf_i* xf = std_module_get_m ( xf_module_name_m );
 
     xf_graph_info_t graph_info;
@@ -87,10 +82,6 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
 
         ui_node = xf->create_node ( graph, &params );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xf );
-    std_module_release ( xs );
 
     return ui_node;
 }

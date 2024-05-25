@@ -171,9 +171,5 @@ xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_
         lighting_node = xf->create_node ( graph, &params );
     }
 
-    std_module_release ( xg );
-    std_module_release ( xs );
-    std_module_release ( xf );
-
     return lighting_node;
 }

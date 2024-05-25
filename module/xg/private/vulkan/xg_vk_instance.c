@@ -124,7 +124,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
         } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) {
             std_log_warn_m ( data->pMessage );
         } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) {
-#if xg_crash_on_validation_error_m
+#if xg_instance_crash_on_validation_error_m
             std_log_crash_m ( data->pMessage );
 #else
             std_log_error_m ( data->pMessage );
@@ -148,7 +148,7 @@ static void xg_vk_instance_bind_debug_callback ( void ) {
     xg_vk_instance_state->ext_api.set_debug_callback ( xg_vk_instance_state->vk_handle, &info, NULL, &debug_messenger );
 }
 
-void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_f layers_flags ) {
+void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e layers_flags ) {
     xg_vk_instance_state = state;
 
     /*
@@ -217,11 +217,11 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_f lay
     size_t extensions_count = std_static_array_capacity_m ( base_extensions );
 
     // Compute layers/extensions count
-    if ( layers_flags & xg_runtime_layer_debug_m ) {
+    if ( layers_flags & xg_runtime_layer_bit_debug_m ) {
         layers_count += std_static_array_capacity_m ( debug_layers );
     }
 
-    if ( layers_flags & xg_runtime_layer_renderdoc_m ) {
+    if ( layers_flags & xg_runtime_layer_bit_renderdoc_m ) {
         layers_count += std_static_array_capacity_m ( renderdoc_layers );
     }
 
@@ -244,7 +244,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_f lay
         //++layer_i;
     }
 
-    if ( layers_flags & xg_runtime_layer_debug_m ) {
+    if ( layers_flags & xg_runtime_layer_bit_debug_m ) {
         for ( size_t i = 0; i < std_static_array_capacity_m ( debug_layers ); ++i ) {
             layers[layer_i++] = std_stack_string_copy ( &layers_allocator, debug_layers[i] );
             //size_t size = std_str_len ( debug_layers[i] ) + 1;
@@ -254,7 +254,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_f lay
         }
     }
 
-    if ( layers_flags & xg_runtime_layer_renderdoc_m ) {
+    if ( layers_flags & xg_runtime_layer_bit_renderdoc_m ) {
         for ( size_t i = 0; i < std_static_array_capacity_m ( renderdoc_layers ); ++i ) {
             layers[layer_i++] = std_stack_string_copy ( &layers_allocator, renderdoc_layers[i] );
             //size_t size = std_str_len ( renderdoc_layers[i] ) + 1;

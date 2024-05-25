@@ -94,7 +94,7 @@ xg_raytrace_geometry_h xg_vk_raytrace_create_geometry ( const xg_raytrace_geomet
         .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_only_m ),
         .device = device_handle,
         .size = build_size_info.buildScratchSize,
-        .allowed_usage = xg_buffer_usage_storage_m | xg_vk_buffer_usage_device_addressed_m,
+        .allowed_usage = xg_buffer_usage_bit_storage_m | xg_vk_buffer_usage_device_addressed_m,
         .debug_name = "rt geo build scratch",
     );
     xg_buffer_h scratch_buffer_handle = xg_buffer_create ( &scratch_buffer_params );

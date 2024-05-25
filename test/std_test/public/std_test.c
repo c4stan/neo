@@ -519,7 +519,6 @@ static void test_module ( void ) {
 #if 0
     fs = std_module_get_m ( FS_MODULE_NAME );
     std_module_reload();
-    std_module_release ( fs );
 #endif
 
 #endif

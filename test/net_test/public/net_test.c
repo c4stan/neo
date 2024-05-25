@@ -54,6 +54,9 @@ static void test_udp_msg ( void ) {
         size_t read_size = net->read_socket ( &read_address, buffer, sizeof ( buffer ), s2 );
         std_assert_m ( read_size == msg_size );
         std_log_info_m ( "Received string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, read_address.port );
+
+        net->destroy_socket ( s1 );
+        net->destroy_socket ( s2 );
     }
 }
 
@@ -121,12 +124,32 @@ static void test_tcp_msg ( void ) {
         size_t read_size = net->read_connected_socket ( buffer, sizeof ( buffer ), s2 );
         std_log_info_m ( "Received string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, s1_address.port );
 
+        net->destroy_socket ( s1 );
+        net->destroy_socket ( s2 );
+
         std_assert_m ( std_thread_join ( thread ) );
     }
 }
 
+#if 0
+void test_http_server ( void ) {
+    net_i* net = std_module_get_m ( net_module_name_m );
+
+    net_socket_h server_socket;
+    net_socket_address_t server_address;
+
+    {
+        net_socket_params_t socket_params;
+    }
+}
+#endif
+
 void std_main ( void ) {
+#if 1
     test_udp_msg();
     test_tcp_msg();
+#else
+    test_http_server();
+#endif
     std_log_info_m ( "NET_TEST COMPLETE!" );
 }

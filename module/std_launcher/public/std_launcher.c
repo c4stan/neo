@@ -17,7 +17,7 @@ void std_main ( void ) {
         app_name = process_info.args[0];
     }
 
-    std_auto_m app = ( std_app_i* ) std_module_get ( app_name );
+    std_auto_m app = ( std_app_i* ) std_module_load ( app_name );
 
     for ( ;; ) {
         std_app_state_e state = app->tick();
@@ -25,14 +25,11 @@ void std_main ( void ) {
         if ( std_unlikely_m ( state != std_app_state_tick_m ) ) {
             if ( state == std_app_state_reload_m ) {
                 std_module_reload ( app_name );
-            } else if ( state == std_app_state_reboot_m ) {
-                std_module_release ( app );
-
             } else if ( state == std_app_state_exit_m ) {
                 break;
             }
         }
     }
 
-    std_module_release ( app );
+    std_module_unload ( app_name );
 }

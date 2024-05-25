@@ -8,7 +8,7 @@
 
 typedef struct {
     uint32_t shader_register;
-    xg_shading_stage_b stages;
+    xg_shading_stage_bit_e stages;
     xg_resource_binding_e type;
 } xg_vk_pipeline_resource_binding_point_t;
 

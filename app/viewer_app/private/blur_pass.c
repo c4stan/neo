@@ -102,9 +102,6 @@ static void blur_pass_routine ( const xf_node_execute_args_t* node_args, void* u
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xs );
-    std_module_release ( xg );
 }
 
 xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_texture_h color, xf_texture_h normals, xf_texture_h depth, uint32_t kernel_size, float sigma, blur_pass_direction_e direction, const char* debug_name ) {
@@ -188,10 +185,6 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
         std_str_copy_m ( params.debug_name, debug_name );
         blur_node = xf->create_node ( graph, &params );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xf );
-    std_module_release ( xs );
 
     return blur_node;
 }

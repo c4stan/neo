@@ -95,8 +95,8 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
 }
 
 static void xi_test ( void ) {
-    wm_i* wm = std_module_get_m ( wm_module_name_m );
-    std_assert_m ( wm );
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
+    fs_i* fs = std_module_load_m ( fs_module_name_m );
 
     wm_window_params_t window_params = { .name = "xf_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &window_params );
@@ -104,7 +104,7 @@ static void xi_test ( void ) {
 
     xg_device_h device;
     xg_swapchain_h swapchain;
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg_i* xg = std_module_load_m ( xg_module_name_m );
     {
         size_t device_count = xg->get_devices_count();
         std_assert_m ( device_count > 0 );
@@ -132,8 +132,8 @@ static void xi_test ( void ) {
 
     // let xi register its shaders before building the xs database
     // TODO support dynamic add and rebuild (do we already do that?)
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-    xi_i* xi = std_module_get_m ( xi_module_name_m );
+    xs_i* xs = std_module_load_m ( xs_module_name_m );
+    xi_i* xi = std_module_load_m ( xi_module_name_m );
     xi->register_shaders ( xs );
     {
         xs->set_output_folder ( "output/shader/" );
@@ -152,7 +152,6 @@ static void xi_test ( void ) {
     // create test font
     xi_font_h font;
     {
-        fs_i* fs = std_module_get_m ( fs_module_name_m );
         fs_file_h font_file = fs->open_file ( "assets/ProggyVector-Regular.ttf", fs_file_read_m );
         fs_file_info_t font_file_info;
         fs->get_file_info ( &font_file_info, font_file );
@@ -175,7 +174,7 @@ static void xi_test ( void ) {
     // OR: simply build the xi_workload in here, and provide the workload only to the render pass, and the render
     // pass only calls flush on it.
 
-    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_i* xf = std_module_load_m ( xf_module_name_m );
     xf_graph_h graph = xf->create_graph ( device, swapchain );
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
@@ -492,6 +491,13 @@ static void xi_test ( void ) {
 
         xs->update_pipeline_states ( workload );
     }
+
+    std_module_unload_m ( xi_module_name_m );
+    std_module_unload_m ( fs_module_name_m );
+    std_module_unload_m ( xf_module_name_m );
+    std_module_unload_m ( xs_module_name_m );
+    std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
 }
 
 void std_main ( void ) {

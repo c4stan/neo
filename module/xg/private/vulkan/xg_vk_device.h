@@ -28,7 +28,7 @@ typedef enum {
 typedef struct {
     uint32_t vk_heap_idx;
     uint32_t vk_memory_type_idx;
-    xg_memory_flags_b memory_flags;
+    xg_memory_flag_bit_e memory_flags;
     size_t size;
 } xg_vk_device_memory_heap_t;
 

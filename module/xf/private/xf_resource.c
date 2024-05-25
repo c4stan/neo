@@ -210,7 +210,7 @@ void xf_resource_texture_update_info ( xf_texture_h texture_handle, const xg_tex
     texture->allowed_usage = info->allowed_usage;
 }
 
-void xf_resource_texture_set_allowed_usage ( xf_texture_h texture_handle, xg_texture_usage_f allowed_usage ) {
+void xf_resource_texture_set_allowed_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e allowed_usage ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     texture->allowed_usage = allowed_usage;
 }
@@ -225,7 +225,7 @@ void xf_resource_buffer_map_to_new ( xf_buffer_h buffer_handle, xg_buffer_h xg_h
     buffer->xg_handle = xg_handle;
 }
 
-void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usage_f usage ) {
+void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e usage ) {
     // TODO should this take aliasing into account?
     if ( std_bit_test_64 ( texture_handle, 63 ) ) {
         xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
@@ -242,7 +242,7 @@ void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usa
     }
 }
 
-void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_f usage ) {
+void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_bit_e usage ) {
 
     if ( xf_resource_buffer_is_multi ( buffer_handle ) ) {
         xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[buffer_handle & 0xffff];
@@ -343,7 +343,7 @@ void xf_resource_texture_set_execution_layout ( xf_texture_h texture_handle, xg_
     }
 }
 
-void xf_resource_texture_add_execution_stage ( xf_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_f stage ) {
+void xf_resource_texture_add_execution_stage ( xf_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
     if ( texture->params.view_access == xg_texture_view_access_default_only_m ) {
@@ -370,7 +370,7 @@ void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer_handle, const x
     buffer->state = *state;
 }
 
-void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer_handle, xg_pipeline_stage_f stage ) {
+void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer_handle, xg_pipeline_stage_bit_e stage ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
     buffer->state.stage |= stage;
 }
@@ -423,8 +423,6 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     xg_swapchain_info_t info;
     std_verify_m ( xg->get_swapchain_info ( &info, swapchain ) );
 
-    std_module_release ( xg );
-
     xf_multi_texture_params_t params = xf_default_multi_texture_params_m;
     params.texture.width = info.width;
     params.texture.height = info.height;
@@ -472,8 +470,6 @@ xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h xg_texture
 
     xg_texture_info_t info;
     std_verify_m ( xg->get_texture_info ( &info, xg_texture ) );
-
-    std_module_release ( xg );
 
 #if 0
     xf_texture_params_t params;
@@ -566,9 +562,9 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_texture_h textu
             barrier->array_count = view.array_count;
             barrier->layout.old = prev_state->layout;
             barrier->layout.new = new_state->layout;
-            barrier->memory.flushes = xg_memory_access_none_m;
+            barrier->memory.flushes = xg_memory_access_bit_none_m;
             barrier->memory.invalidations = new_state->access;
-            barrier->execution.blocker = xg_pipeline_stage_top_of_pipe_m;
+            barrier->execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m;
             barrier->execution.blocked = new_state->stage;
 
             xf_resource_texture_set_execution_layout ( texture_handle, view, new_state->layout );

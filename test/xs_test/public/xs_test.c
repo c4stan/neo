@@ -37,7 +37,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
     params.width = swapchain_texture_info.width;
     params.height = swapchain_texture_info.height;
     params.format = swapchain_texture_info.format;
-    params.allowed_usage = xg_texture_usage_copy_source_m | xg_texture_usage_copy_dest_m | xg_texture_usage_storage_m;
+    params.allowed_usage = xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_storage_m;
     params.initial_layout = xg_texture_layout_undefined_m;
     std_str_copy_m ( params.debug_name, "temp_texture" );
     xg_texture_h temp_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params );
@@ -54,10 +54,10 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         texture_barrier.texture = temp_texture;
         texture_barrier.layout.old = xg_texture_layout_undefined_m;
         texture_barrier.layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier.memory.flushes = xg_memory_access_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_none_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_transfer_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_none_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
 
         xg_barrier_set_t barrier_set;
         barrier_set.memory_barriers_count = 0;
@@ -72,10 +72,10 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         texture_barrier.texture = temp_texture;
         texture_barrier.layout.old = xg_texture_layout_undefined_m;
         texture_barrier.layout.new = xg_texture_layout_shader_write_m;
-        texture_barrier.memory.flushes = xg_memory_access_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_none_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_compute_shader_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_none_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_compute_shader_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -123,29 +123,29 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         texture_barrier[0].texture = temp_texture;
         texture_barrier[0].layout.old = xg_texture_layout_copy_dest_m;
         texture_barrier[0].layout.new = xg_texture_layout_copy_source_m;
-        texture_barrier[0].memory.flushes = xg_memory_access_transfer_write_m;
-        texture_barrier[0].memory.invalidations = xg_memory_access_transfer_write_m;
-        texture_barrier[0].execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier[0].execution.blocked = xg_pipeline_stage_transfer_m;
+        texture_barrier[0].memory.flushes = xg_memory_access_bit_transfer_write_m;
+        texture_barrier[0].memory.invalidations = xg_memory_access_bit_transfer_write_m;
+        texture_barrier[0].execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier[0].execution.blocked = xg_pipeline_stage_bit_transfer_m;
 #else
         texture_barrier[0] = xg_default_texture_memory_barrier_m;
         texture_barrier[0].texture = temp_texture;
         texture_barrier[0].layout.old = xg_texture_layout_shader_write_m;
         texture_barrier[0].layout.new = xg_texture_layout_copy_source_m;
-        texture_barrier[0].memory.flushes = xg_memory_access_shader_write_m;
-        texture_barrier[0].memory.invalidations = xg_memory_access_transfer_write_m; // xg_memory_access_transfer_read_m?
-        texture_barrier[0].execution.blocker = xg_pipeline_stage_compute_shader_m;
-        texture_barrier[0].execution.blocked = xg_pipeline_stage_transfer_m;
+        texture_barrier[0].memory.flushes = xg_memory_access_bit_shader_write_m;
+        texture_barrier[0].memory.invalidations = xg_memory_access_bit_transfer_write_m; // xg_memory_access_bit_transfer_read_m?
+        texture_barrier[0].execution.blocker = xg_pipeline_stage_bit_compute_shader_m;
+        texture_barrier[0].execution.blocked = xg_pipeline_stage_bit_transfer_m;
 #endif
         // transition to to copy_dest
         texture_barrier[1] = xg_default_texture_memory_barrier_m;
         texture_barrier[1].texture = swapchain_texture;
         texture_barrier[1].layout.old = xg_texture_layout_undefined_m; //xg_texture_layout_present_m;
         texture_barrier[1].layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier[1].memory.flushes = xg_memory_access_none_m;
-        texture_barrier[1].memory.invalidations = xg_memory_access_none_m;
-        texture_barrier[1].execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier[1].execution.blocked = xg_pipeline_stage_transfer_m;
+        texture_barrier[1].memory.flushes = xg_memory_access_bit_none_m;
+        texture_barrier[1].memory.invalidations = xg_memory_access_bit_none_m;
+        texture_barrier[1].execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier[1].execution.blocked = xg_pipeline_stage_bit_transfer_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 2;
@@ -182,10 +182,10 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         texture_barrier.texture = swapchain_texture;
         texture_barrier.layout.old = xg_texture_layout_copy_dest_m;
         texture_barrier.layout.new = xg_texture_layout_render_target_m;
-        texture_barrier.memory.flushes = xg_memory_access_transfer_write_m;
-        texture_barrier.memory.invalidations = xg_memory_access_color_write_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_color_output_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_transfer_write_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_color_write_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_color_output_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -213,7 +213,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
             .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_mappable_m ),
             .device = device,
             .size = 128,
-            .allowed_usage = xg_buffer_usage_uniform_m,
+            .allowed_usage = xg_buffer_usage_bit_uniform_m,
             .debug_name = "uniform buffer"
         ) );
 
@@ -251,10 +251,10 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         texture_barrier.texture = swapchain_texture;
         texture_barrier.layout.old = xg_texture_layout_render_target_m;
         texture_barrier.layout.new = xg_texture_layout_present_m;
-        texture_barrier.memory.flushes = xg_memory_access_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_none_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_color_output_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_bottom_of_pipe_m;
+        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
+        texture_barrier.memory.invalidations = xg_memory_access_bit_none_m;
+        texture_barrier.execution.blocker = xg_pipeline_stage_bit_color_output_m;
+        texture_barrier.execution.blocked = xg_pipeline_stage_bit_bottom_of_pipe_m;
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -271,7 +271,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
 }
 
 static void xs_test2 ( void ) {
-    wm_i* wm = std_module_get_m ( wm_module_name_m );
+    wm_i* wm = std_module_load_m ( wm_module_name_m );
     std_assert_m ( wm );
 
     wm_window_params_t window_params = { .name = "xs_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
@@ -280,7 +280,7 @@ static void xs_test2 ( void ) {
 
     xg_device_h device;
     xg_swapchain_h swapchain;
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg_i* xg = std_module_load_m ( xg_module_name_m );
     {
         size_t device_count = xg->get_devices_count();
         std_assert_m ( device_count > 0 );
@@ -383,11 +383,14 @@ static void xs_test2 ( void ) {
 
         xs->update_pipeline_states ( workload );
     }
+
+    std_module_unload_m ( xs_module_name_m );
+    std_module_unload_m ( xg_module_name_m );
 }
 
-static void xs_test ( void ) {
+static void xs_test1 ( void ) {
     xg_device_h device;
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg_i* xg = std_module_load_m ( xg_module_name_m );
     {
         size_t device_count = xg->get_devices_count();
         std_assert_m ( device_count > 0 );
@@ -401,7 +404,7 @@ static void xs_test ( void ) {
         std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
     }
 
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
+    xs_i* xs = std_module_load_m ( xs_module_name_m );
     {
         xs->add_database_folder ( "shader/" );
 
@@ -415,6 +418,9 @@ static void xs_test ( void ) {
             std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
         }
     }
+
+    std_module_unload_m ( xs_module_name_m );
+    std_module_unload_m ( xg_module_name_m );
 }
 
 void std_main ( void ) {

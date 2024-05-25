@@ -42,7 +42,7 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
             .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_mappable_m ),
             .device = device_handle,
             .size = xg_vk_workload_uniform_buffer_size_m,
-            .allowed_usage = xg_buffer_usage_uniform_m,
+            .allowed_usage = xg_buffer_usage_bit_uniform_m,
             .debug_name = "workload uniform buffer"
         ) );
 
@@ -131,7 +131,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
         .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_mappable_m ),
         .device = device_handle,
         .size = xg_vk_workload_uniform_buffer_size_m,
-        .allowed_usage = xg_buffer_usage_uniform_m,
+        .allowed_usage = xg_buffer_usage_bit_uniform_m,
         .debug_name = "workload uniform buffer"
     ) );
 

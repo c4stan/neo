@@ -98,8 +98,6 @@ static void frame_setup_pass ( const xf_node_execute_args_t* node_args, void* us
 
         xg->cmd_set_pipeline_resources ( cmd_buffer, &frame_bindings, key );
     }
-
-    std_module_release ( xg );
 }
 
 typedef struct {
@@ -204,8 +202,6 @@ static void copy_pass ( const xf_node_execute_args_t* node_args, void* user_args
 
         xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
     }
-
-    std_module_release ( xg );
 }
 
 typedef struct {
@@ -253,9 +249,6 @@ static void combine_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
         xg->cmd_draw ( cmd_buffer, 3, 0, key );
     }
-
-    std_module_release ( xg );
-    std_module_release ( xs );
 }
 
 // ---
@@ -1336,14 +1329,14 @@ void* viewer_app_load ( void* runtime ) {
 
     state->api.tick = viewapp_tick;
 
-    state->modules.fs = std_module_get_m ( fs_module_name_m );
-    state->modules.wm = std_module_get_m ( wm_module_name_m );
-    state->modules.xg = std_module_get_m ( xg_module_name_m );
-    state->modules.xs = std_module_get_m ( xs_module_name_m );
-    state->modules.xf = std_module_get_m ( xf_module_name_m );
-    state->modules.se = std_module_get_m ( se_module_name_m );
-    state->modules.rv = std_module_get_m ( rv_module_name_m );
-    state->modules.xi = std_module_get_m ( xi_module_name_m );
+    state->modules.fs = std_module_load_m ( fs_module_name_m );
+    state->modules.wm = std_module_load_m ( wm_module_name_m );
+    state->modules.xg = std_module_load_m ( xg_module_name_m );
+    state->modules.xs = std_module_load_m ( xs_module_name_m );
+    state->modules.xf = std_module_load_m ( xf_module_name_m );
+    state->modules.se = std_module_load_m ( se_module_name_m );
+    state->modules.rv = std_module_load_m ( rv_module_name_m );
+    state->modules.xi = std_module_load_m ( xi_module_name_m );
 
     std_mem_zero_m ( &state->render );
     state->render.frame_id = 0;
@@ -1356,7 +1349,18 @@ void* viewer_app_load ( void* runtime ) {
 }
 
 void viewer_app_unload ( void ) {
+    std_module_unload_m ( xi_module_name_m );
+    std_module_unload_m ( rv_module_name_m );
+    std_module_unload_m ( se_module_name_m );
+    std_module_unload_m ( xf_module_name_m );
+    std_module_unload_m ( xs_module_name_m );
+    std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
+    std_module_unload_m ( fs_module_name_m );
+
     viewapp_state_free();
+
+    std_log_info_m ( "viewapp unloaded" );
 }
 
 void viewer_app_reload ( void* runtime, void* api ) {

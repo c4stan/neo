@@ -33,25 +33,25 @@ typedef struct {
 // Updated during graph execution whenever a new memory barrier is queued up for the resource
 typedef struct {
     xg_texture_layout_e layout;
-    xg_pipeline_stage_f stage;
-    xg_memory_access_f access;
+    xg_pipeline_stage_bit_e stage;
+    xg_memory_access_bit_e access;
 } xf_texture_execution_state_t;
 
 #define xf_texture_execution_state_m( ... ) ( xf_texture_execution_state_t ) { \
     .layout = xg_texture_layout_undefined_m, \
-    .stage = xg_pipeline_stage_invalid_m, \
-    .access = xg_memory_access_none_m, \
+    .stage = xg_pipeline_stage_bit_invalid_m, \
+    .access = xg_memory_access_bit_none_m, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
-    xg_pipeline_stage_f stage;
-    xg_memory_access_f access;
+    xg_pipeline_stage_bit_e stage;
+    xg_memory_access_bit_e access;
 } xf_buffer_execution_state_t;
 
 #define xf_buffer_execution_state_m( ... ) ( xf_buffer_execution_state_t ) { \
-    .stage = xg_pipeline_stage_invalid_m, \
-    .access = xg_memory_access_none_m, \
+    .stage = xg_pipeline_stage_bit_invalid_m, \
+    .access = xg_memory_access_bit_none_m, \
     ##__VA_ARGS__ \
 }
 
@@ -86,8 +86,8 @@ typedef struct {
     bool is_dirty;
     bool is_user_bind;
     xg_texture_h xg_handle;
-    xg_texture_usage_f required_usage;
-    xg_texture_usage_f allowed_usage;
+    xg_texture_usage_bit_e required_usage;
+    xg_texture_usage_bit_e allowed_usage;
     xf_texture_params_t params;
 
     union {
@@ -110,8 +110,8 @@ typedef struct {
     xg_buffer_h xg_handle;
     xf_buffer_execution_state_t state;
     xf_resource_dependencies_t deps;
-    xg_buffer_usage_f required_usage;
-    xg_buffer_usage_f allowed_usage;
+    xg_buffer_usage_bit_e required_usage;
+    xg_buffer_usage_bit_e allowed_usage;
     xf_buffer_params_t params;
     xf_buffer_h alias;
 } xf_buffer_t;
@@ -173,10 +173,10 @@ void xf_resource_texture_map_to_new ( xf_texture_h texture, xg_texture_h xg_hand
 void xf_resource_buffer_map_to_new ( xf_buffer_h buffer, xg_buffer_h xg_handle );
 
 void xf_resource_texture_update_info ( xf_texture_h texture, const xg_texture_info_t* info );
-void xf_resource_texture_set_allowed_usage ( xf_texture_h texture, xg_texture_usage_f usage );
+void xf_resource_texture_set_allowed_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
 
-void xf_resource_texture_add_usage ( xf_texture_h texture, xg_texture_usage_f usage );
-void xf_resource_buffer_add_usage ( xf_buffer_h buffer, xg_buffer_usage_f usage );
+void xf_resource_texture_add_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
+void xf_resource_buffer_add_usage ( xf_buffer_h buffer, xg_buffer_usage_bit_e usage );
 
 void xf_resource_texture_add_reader ( xf_texture_h texture, xg_texture_view_t view, xf_node_h reader );
 void xf_resource_texture_add_writer ( xf_texture_h texture, xg_texture_view_t view, xf_node_h writer );
@@ -185,10 +185,10 @@ void xf_resource_buffer_add_writer ( xf_buffer_h buffer, xf_node_h writer );
 
 void xf_resource_texture_set_execution_state ( xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* state );
 void xf_resource_texture_set_execution_layout ( xf_texture_h texture, xg_texture_view_t view, xg_texture_layout_e layout );
-void xf_resource_texture_add_execution_stage ( xf_texture_h texture, xg_texture_view_t view, xg_pipeline_stage_f stage );
+void xf_resource_texture_add_execution_stage ( xf_texture_h texture, xg_texture_view_t view, xg_pipeline_stage_bit_e stage );
 
 void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer, const xf_buffer_execution_state_t* state );
-void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer, xg_pipeline_stage_f stage );
+void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer, xg_pipeline_stage_bit_e stage );
 
 // TODO remove these and nove dirty flag clear into map_to_new?
 void xf_resource_texture_set_dirty ( xf_texture_h texture, bool is_dirty );

@@ -60,18 +60,19 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         xg_vk_device_vendor_name ( device->generic_properties.vendorID ), device->generic_properties.vendorID, device->generic_properties.deviceName,
         xg_vk_device_type_str ( device->generic_properties.deviceType ), device->generic_properties.driverVersion, api_major, api_minor, api_patch );
 
-    uint64_t uniform_buffer_alignment = ( uint64_t ) device->generic_properties.limits.minUniformBufferOffsetAlignment;
-    uint64_t texel_buffer_alignment = ( uint64_t ) device->generic_properties.limits.minTexelBufferOffsetAlignment;
-    uint64_t storage_buffer_alignment = ( uint64_t ) device->generic_properties.limits.minStorageBufferOffsetAlignment;
-    uint64_t max_uniform_range = ( uint64_t ) device->generic_properties.limits.maxUniformBufferRange;
-    uint64_t max_texel_elements = ( uint64_t ) device->generic_properties.limits.maxTexelBufferElements;
-    uint64_t max_storage_range = ( uint64_t ) device->generic_properties.limits.maxStorageBufferRange;
-    uint64_t max_set_bindings = ( uint64_t ) device->generic_properties.limits.maxBoundDescriptorSets;
-    uint64_t max_uniform_buffers_per_stage = ( uint64_t ) device->generic_properties.limits.maxPerStageDescriptorUniformBuffers;
-    uint64_t max_storage_buffers_per_stage = ( uint64_t ) device->generic_properties.limits.maxPerStageDescriptorStorageBuffers;
-    uint64_t max_sampled_images_per_stage = ( uint64_t ) device->generic_properties.limits.maxPerStageDescriptorSampledImages;
-    uint64_t max_vertex_input_attributes = ( uint64_t ) device->generic_properties.limits.maxVertexInputAttributes;
-    uint64_t max_vertex_input_streams = ( uint64_t ) device->generic_properties.limits.maxVertexInputBindings;
+    uint32_t uniform_buffer_alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
+    uint32_t texel_buffer_alignment = device->generic_properties.limits.minTexelBufferOffsetAlignment;
+    uint32_t storage_buffer_alignment = device->generic_properties.limits.minStorageBufferOffsetAlignment;
+    uint32_t max_uniform_range = device->generic_properties.limits.maxUniformBufferRange;
+    uint32_t max_texel_elements = device->generic_properties.limits.maxTexelBufferElements;
+    uint32_t max_storage_range = device->generic_properties.limits.maxStorageBufferRange;
+    uint32_t max_set_bindings = device->generic_properties.limits.maxBoundDescriptorSets;
+    uint32_t max_uniform_buffers_per_stage = device->generic_properties.limits.maxPerStageDescriptorUniformBuffers;
+    uint32_t max_storage_buffers_per_stage = device->generic_properties.limits.maxPerStageDescriptorStorageBuffers;
+    uint32_t max_sampled_images_per_stage = device->generic_properties.limits.maxPerStageDescriptorSampledImages;
+    uint32_t max_resources_per_stage = device->generic_properties.limits.maxPerStageResources;
+    uint32_t max_vertex_input_attributes = device->generic_properties.limits.maxVertexInputAttributes;
+    uint32_t max_vertex_input_streams = device->generic_properties.limits.maxVertexInputBindings;
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     char max_uniform_range_str[32];
     char max_texel_elements_str[32];
@@ -80,18 +81,19 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_count_to_str_approx ( max_texel_elements_str, 32, max_texel_elements );
     std_size_to_str_approx ( max_storage_range_str, 32, max_storage_range );
 #endif
-    std_log_info_m ( "Uniform buffer binding required alignment: " std_fmt_u64_m, uniform_buffer_alignment );
-    std_log_info_m ( "Texel buffer binding required alignment: " std_fmt_u64_m, texel_buffer_alignment );
-    std_log_info_m ( "Storage buffer binding required alignment: " std_fmt_u64_m, storage_buffer_alignment );
-    std_log_info_m ( "Uniform buffer binding maximum range size: " std_fmt_u64_m " (" std_fmt_str_m ")", max_uniform_range, max_uniform_range_str );
-    std_log_info_m ( "Texel buffer binding maximum texel count: " std_fmt_u64_m  " (" std_fmt_str_m ")", max_texel_elements, max_texel_elements_str );
-    std_log_info_m ( "Storage buffer binding maximum range size: " std_fmt_u64_m  " (" std_fmt_str_m ")", max_storage_range, max_storage_range_str );
-    std_log_info_m ( "Max set bindings:" std_fmt_u64_m, max_set_bindings );
-    std_log_info_m ( "Max uniform buffers per stage: " std_fmt_u64_m, max_uniform_buffers_per_stage );
-    std_log_info_m ( "Max storage buffers per stage: " std_fmt_u64_m, max_storage_buffers_per_stage );
-    std_log_info_m ( "Max sampled images per stage: " std_fmt_u64_m, max_sampled_images_per_stage );
-    std_log_info_m ( "Max vertex input attributes: " std_fmt_u64_m, max_vertex_input_attributes );
-    std_log_info_m ( "Max vertex input streams: " std_fmt_u64_m, max_vertex_input_streams );
+    std_log_info_m ( "Uniform buffer binding required alignment: " std_fmt_u32_m, uniform_buffer_alignment );
+    std_log_info_m ( "Texel buffer binding required alignment: " std_fmt_u32_m, texel_buffer_alignment );
+    std_log_info_m ( "Storage buffer binding required alignment: " std_fmt_u32_m, storage_buffer_alignment );
+    std_log_info_m ( "Uniform buffer binding maximum range size: " std_fmt_u32_m " (" std_fmt_str_m ")", max_uniform_range, max_uniform_range_str );
+    std_log_info_m ( "Texel buffer binding maximum texel count: " std_fmt_u32_m  " (" std_fmt_str_m ")", max_texel_elements, max_texel_elements_str );
+    std_log_info_m ( "Storage buffer binding maximum range size: " std_fmt_u32_m  " (" std_fmt_str_m ")", max_storage_range, max_storage_range_str );
+    std_log_info_m ( "Max set bindings:" std_fmt_u32_m, max_set_bindings );
+    std_log_info_m ( "Max uniform buffers per stage: " std_fmt_u32_m, max_uniform_buffers_per_stage );
+    std_log_info_m ( "Max storage buffers per stage: " std_fmt_u32_m, max_storage_buffers_per_stage );
+    std_log_info_m ( "Max sampled images per stage: " std_fmt_u32_m, max_sampled_images_per_stage );
+    std_log_info_m ( "Max resources per stage: " std_fmt_u32_m, max_resources_per_stage );
+    std_log_info_m ( "Max vertex input attributes: " std_fmt_u32_m, max_vertex_input_attributes );
+    std_log_info_m ( "Max vertex input streams: " std_fmt_u32_m, max_vertex_input_streams );
 
     // Print list of formats that support render target
     std_log_info_m ( "Supported render target formats:" );

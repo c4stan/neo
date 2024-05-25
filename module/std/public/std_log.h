@@ -37,6 +37,7 @@
 #define std_fmt_u32_pad_m(X) "%0" std_pp_string_m(X) PRIu32
 #define std_fmt_u64_pad_m(X) "%0" std_pp_string_m(X) PRIu64
 
+// TODO make these bits (1, 2, 4, ...), delete std_log_level_bit_..., and remove bitflag from std_log_enabled_levels_bitflag_m ?
 typedef enum {
     std_log_level_info_m = 0,
     std_log_level_debug_m,

@@ -7,15 +7,15 @@
 
 std_warnings_ignore_m ( "-Wunused-function" )
 
-static xi_ui_state_t* xi_ui_state;
+static xi_ui_module_state_t* xi_ui_state;
 
-void xi_ui_load ( xi_ui_state_t* state ) {
+void xi_ui_load ( xi_ui_module_state_t* state ) {
     xi_ui_state = state;
 
     std_mem_zero_m ( xi_ui_state );
 }
 
-void xi_ui_reload ( xi_ui_state_t* state ) {
+void xi_ui_reload ( xi_ui_module_state_t* state ) {
     xi_ui_state = state;
 }
 

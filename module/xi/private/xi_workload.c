@@ -111,7 +111,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             params.width = 1;
             params.height = 1;
             params.format = xg_format_r8g8b8a8_unorm_m;
-            params.allowed_usage = xg_texture_usage_copy_dest_m | xg_texture_usage_resource_m;
+            params.allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_resource_m;
             std_str_copy_m ( params.debug_name, "xi null texture" );
             texture = xg->create_texture ( &params );
         }
@@ -121,10 +121,10 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             barrier.texture = texture;
             barrier.layout.old = xg_texture_layout_undefined_m;
             barrier.layout.new = xg_texture_layout_copy_dest_m;
-            barrier.memory.flushes = xg_memory_access_none_m;
-            barrier.memory.invalidations = xg_memory_access_transfer_write_m;
-            barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-            barrier.execution.blocked = xg_pipeline_stage_transfer_m;
+            barrier.memory.flushes = xg_memory_access_bit_none_m;
+            barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
+            barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+            barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
 
             xg_barrier_set_t barrier_set = xg_barrier_set_m();
             barrier_set.texture_memory_barriers_count = 1;
@@ -147,10 +147,10 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             barrier.texture = texture;
             barrier.layout.old = xg_texture_layout_copy_dest_m;
             barrier.layout.new = xg_texture_layout_shader_read_m;
-            barrier.memory.flushes = xg_memory_access_transfer_write_m;
-            barrier.memory.invalidations = xg_memory_access_shader_read_m;
-            barrier.execution.blocker = xg_pipeline_stage_transfer_m;
-            barrier.execution.blocked = xg_pipeline_stage_fragment_shader_m;
+            barrier.memory.flushes = xg_memory_access_bit_transfer_write_m;
+            barrier.memory.invalidations = xg_memory_access_bit_shader_read_m;
+            barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
+            barrier.execution.blocked = xg_pipeline_stage_bit_fragment_shader_m;
 
             xg_barrier_set_t barrier_set = xg_barrier_set_m();
             barrier_set.texture_memory_barriers_count = 1;
@@ -291,7 +291,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
         .allocator = xg->get_default_allocator ( flush_params->device, xg_memory_type_gpu_mappable_m ),
         .device = flush_params->device,
         .size = sizeof ( xi_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
-        .allowed_usage = xg_buffer_usage_vertex_buffer_m,
+        .allowed_usage = xg_buffer_usage_bit_vertex_buffer_m,
         .debug_name = "xi_vertex_buffer",
     );
     xg_buffer_h vertex_buffer_handle = xg->create_buffer ( &vertex_buffer_params );
