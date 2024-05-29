@@ -85,6 +85,7 @@ typedef struct {
     xg_buffer_h vertex_buffer;
 } xi_workload_device_context_t;
 
+// TODO embed all ui state in here? at the moment building multiple workloads at the same time is not supported...
 typedef struct {
     xi_workload_t* workloads_array;
     xi_workload_t* workloads_freelist;

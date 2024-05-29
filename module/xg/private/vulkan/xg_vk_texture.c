@@ -263,7 +263,7 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     VkMemoryRequirements vk_memory_requirements = memory_requirements_2.memoryRequirements;
     xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_memory_requirements.size, vk_memory_requirements.alignment );
     VkResult result = vkBindImageMemory ( device->vk_handle, vk_image, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
-    std_assert_m ( result == VK_SUCCESS );
+    std_verify_m ( result == VK_SUCCESS );
 
     texture->vk_handle = vk_image;
     texture->allocation = alloc;

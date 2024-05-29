@@ -11,7 +11,7 @@ fs_list_h fs_volume_get_first ( fs_volume_h* volume ) {
     HANDLE find_handle = FindFirstVolumeW ( t_path_buffer, fs_path_size_m );
     std_assert_m ( find_handle != INVALID_HANDLE_VALUE );
     size_t len = fs_from_path_buffer ( volume->guid, fs_volume_guid_size_m );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     return ( fs_list_h ) find_handle;
 #elif defined(std_platform_linux_m)
     return 0;

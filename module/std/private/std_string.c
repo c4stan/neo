@@ -55,7 +55,9 @@ size_t std_utf8_char_size ( char c ) {
 
 size_t std_utf8_char_size_reverse ( const char* c, size_t back_len ) {
     std_assert_m ( c != NULL );
+#if std_log_assert_enabled_m
     const char* base = c - back_len;
+#endif
     const char* ptr = c;
 
     for ( ;; ) {

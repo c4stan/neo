@@ -29,7 +29,7 @@ fs_file_h fs_file_create ( const char* path, fs_file_access_t access, fs_already
 
     DWORD create = already_existing == fs_already_existing_overwrite_m ? CREATE_ALWAYS : CREATE_NEW;
     size_t len = fs_to_path_buffer ( path );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     HANDLE h = CreateFileW ( t_path_buffer, os_access, 0, NULL, create, FILE_ATTRIBUTE_NORMAL, NULL );
 
     if ( h == INVALID_HANDLE_VALUE ) {
@@ -99,12 +99,12 @@ bool fs_file_delete ( fs_file_h file ) {
 #if defined(std_platform_win32_m)
     HANDLE h = ( HANDLE ) file;
     DWORD len = GetFinalPathNameByHandleW ( h, t_path_buffer, fs_path_size_m, 0 );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     return DeleteFileW ( t_path_buffer ) == TRUE;
 #elif defined(std_platform_linux_m)
     char path[fs_path_size_m];
     size_t len = fs_file_get_path ( path, fs_path_size_m, file );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     return fs_file_path_delete ( path );
 #endif
 }
@@ -114,7 +114,7 @@ bool fs_file_path_delete ( const char* path ) {
     std_assert_m ( path != NULL );
     size_t len;
     len = fs_to_path_buffer ( path );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     return DeleteFileW ( t_path_buffer ) == TRUE;
 #elif defined(std_platform_linux_m)
     int result = remove ( path );

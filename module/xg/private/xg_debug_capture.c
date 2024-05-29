@@ -22,7 +22,7 @@ void xg_debug_capture_load ( xg_debug_capture_state_t* state ) {
     if ( mod ) {
         pRENDERDOC_GetAPI RENDERDOC_GetAPI = ( pRENDERDOC_GetAPI ) GetProcAddress ( mod, "RENDERDOC_GetAPI" );
         int ret = RENDERDOC_GetAPI ( eRENDERDOC_API_Version_1_5_0, ( void** ) &xg_debug_capture_state->renderdoc_api );
-        std_assert_m ( ret == 1 );
+        std_verify_m ( ret == 1 );
     }
 
 #elif defined(std_platform_linux_m)
@@ -31,7 +31,7 @@ void xg_debug_capture_load ( xg_debug_capture_state_t* state ) {
     if ( mod ) {
         pRENDERDOC_GetAPI RENDERDOC_GetAPI = ( pRENDERDOC_GetAPI ) dlsym ( mod, "RENDERDOC_GetAPI" );
         int ret = RENDERDOC_GetAPI ( eRENDERDOC_API_Version_1_5_0, ( void** ) &xg_debug_capture_state->renderdoc_api );
-        std_assert_m ( ret == 1 );
+        std_verify_m ( ret == 1 );
 
         ( ( RENDERDOC_API_1_5_0* ) xg_debug_capture_state->renderdoc_api )->SetCaptureFilePathTemplate ( std_pp_eval_string_m ( std_binding_renderdoc_captures_m ) );
     }

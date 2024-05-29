@@ -36,7 +36,15 @@ typedef struct {
     int64_t mouse_delta_y;
     std_tick_t mouse_down_tick;
     bool mouse_down;
-    bool mouse_double_down;
+    //bool mouse_double_down;
+    std_tick_t current_tick;
+
+    uint32_t os_window_width;
+    uint32_t os_window_height;
+} xi_ui_update_state_t;
+
+typedef struct {
+    xi_ui_update_state_t update;
 
     // mouse is over this element
     uint64_t hovered_id;
@@ -52,8 +60,6 @@ typedef struct {
     bool cleared_hovered;
     bool cleared_active;
 
-    std_tick_t current_tick;
-
     xi_ui_layer_t layers[xi_ui_max_layers_m];
     uint32_t layer_count;
 
@@ -62,16 +68,14 @@ typedef struct {
     //int64_t base_y;
     //int64_t base_width;
     //int64_t base_height;
-    uint32_t os_window_width;
-    uint32_t os_window_height;
 
     // TODO support stack of sections, not just one
     bool in_section;
     bool minimized_section;
-} xi_ui_module_state_t;
+} xi_ui_state_t;
 
-void xi_ui_load ( xi_ui_module_state_t* state );
-void xi_ui_reload ( xi_ui_module_state_t* state );
+void xi_ui_load ( xi_ui_state_t* state );
+void xi_ui_reload ( xi_ui_state_t* state );
 void xi_ui_unload ( void );
 
 void xi_ui_update ( const wm_window_info_t* window_info, const wm_input_state_t* input_state );
@@ -93,3 +97,5 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
 void xi_ui_newline ( void );
 
 uint64_t xi_ui_get_active_id ( void );
+
+const xi_ui_update_state_t* xi_ui_get_update_state ( void );

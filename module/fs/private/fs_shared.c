@@ -13,7 +13,7 @@ size_t fs_path_to_str ( const WCHAR* path, char* str, size_t cap ) {
     std_assert_m ( cap <= INT_MAX );
     int size = WideCharToMultiByte ( CP_UTF8, 0, path, -1, str, ( int ) cap, NULL, NULL );
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
 
     if ( size == 0 ) {
         DWORD error = GetLastError();

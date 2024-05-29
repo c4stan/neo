@@ -109,7 +109,6 @@ void* std_app_test_load ( void* std_runtime ) {
 void std_app_test_unload ( void ) {
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     wm->destroy_window ( m_state->window );
-    std_module_release ( wm );
     std_virtual_heap_free ( m_state );
 }
 

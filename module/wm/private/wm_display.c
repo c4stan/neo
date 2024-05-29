@@ -101,7 +101,7 @@ static bool wm_display_get_devices ( DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* 
         display->cb = sizeof ( *display );
         {
             BOOL result = EnumDisplayDevicesW ( adapter->DeviceName, ( DWORD ) display_index, display, 0 );
-            std_assert_m ( result );
+            std_verify_m ( result );
         }
 
         uint32_t display_key_hash = std_hash_djb2_32 ( display->DeviceKey, 256 );
@@ -142,7 +142,7 @@ bool wm_display_get_info ( wm_display_info_t* info, wm_display_h display_handle 
     {
         DEVMODEW display_settings;
         BOOL result = EnumDisplaySettingsW ( adapter.DeviceName, ENUM_CURRENT_SETTINGS, &display_settings );
-        std_assert_m ( result );
+        std_verify_m ( result );
         info->mode.bits_per_pixel = display_settings.dmBitsPerPel;
         info->mode.width = display_settings.dmPelsWidth;
         info->mode.height = display_settings.dmPelsHeight;

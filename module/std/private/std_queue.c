@@ -38,11 +38,11 @@ void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t s
     char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
-    size_t  bot = queue->bot;
 
-#if std_assert_enabled_m
-    // Test for enough free space
     size_t cap = mask + 1;
+#if std_log_assert_enabled_m
+    // Test for enough free space
+    size_t  bot = queue->bot;
     size_t used_size = top - bot;
     std_assert_m ( cap - used_size >= size );
 #endif
@@ -59,10 +59,10 @@ void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t s
 
 void std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size ) {
     // Load
-    size_t  top = queue->top;
-    size_t  bot = queue->bot;
+    size_t bot = queue->bot;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
+    size_t top = queue->top;
     // Make sure enough allocated space for the data
     size_t used_size = top - bot;
     std_assert_m ( used_size >= size );
@@ -75,10 +75,10 @@ void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t siz
     // Load
     char* base = queue->base;
     size_t  mask = queue->mask;
-    size_t  top = queue->top;
     size_t  bot = queue->bot;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
+    size_t  top = queue->top;
     // Make sure enough allocated space for the data
     size_t used_size = top - bot;
     std_assert_m ( used_size >= size );
@@ -103,7 +103,7 @@ void* std_queue_local_emplace ( std_queue_local_t* queue, size_t size ) {
 
     size_t offset = top & mask;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     // Check space available and no wrap
     size_t cap = mask + 1;
     std_assert_m ( cap > offset + size );
@@ -123,7 +123,7 @@ void std_queue_local_align_push ( std_queue_local_t* queue, size_t align ) {
 
     size_t new_top = std_align ( top, align );
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     // Test for enough free space
     size_t size = new_top - top;
     size_t cap = queue->mask + 1;
@@ -141,7 +141,7 @@ void std_queue_local_align_pop ( std_queue_local_t* queue, size_t align ) {
 
     size_t new_bot = std_align ( bot, align );
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     // Make sure enough allocated space
     size_t top = queue->top;
     size_t size = new_bot - bot;
@@ -186,9 +186,9 @@ uint64_t std_ring_idx ( const std_ring_t* ring, uint64_t virtual_idx ) {
 
 void std_ring_push ( std_ring_t* ring, uint64_t count ) {
     uint64_t top = ring->top;
-    uint64_t mask = ring->mask;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
+    uint64_t mask = ring->mask;
     uint64_t capacity = mask + 1;
     uint64_t used = top - ring->bot;
     std_assert_m ( capacity - used >= count );
@@ -200,7 +200,7 @@ void std_ring_push ( std_ring_t* ring, uint64_t count ) {
 void std_ring_pop ( std_ring_t* ring, uint64_t count ) {
     uint64_t bot = ring->bot;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     size_t used = ring->top - bot;
     std_assert_m ( used >= count );
 #endif
@@ -246,7 +246,7 @@ void* std_circular_pool_push ( std_circular_pool_t* pool ) {
     size_t mask = pool->mask;
     size_t stride = pool->stride;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     // Test for enough free space
     size_t bot = pool->bot;
     size_t cap = mask + 1;
@@ -265,7 +265,7 @@ void* std_circular_pool_push ( std_circular_pool_t* pool ) {
 void std_circular_pool_pop ( std_circular_pool_t* pool ) {
     size_t bot = pool->bot;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     // Test for enough allocated space
     size_t top = pool->top;
     size_t used_size = top - bot;
@@ -296,7 +296,7 @@ void* std_circular_pool_at_buffer ( const std_circular_pool_t* pool, size_t idx 
     char* base = pool->base;
     size_t stride = pool->stride;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     size_t mask = pool->mask;
     size_t cap = mask + 1;
     std_assert_m ( cap > idx );
@@ -311,7 +311,7 @@ void* std_circular_pool_at_pool ( const std_circular_pool_t* pool, size_t idx ) 
     size_t mask = pool->mask;
     size_t stride = pool->stride;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     size_t top = pool->top;
     size_t count = top - bot;
     std_assert_m ( count > idx );
@@ -367,11 +367,11 @@ void std_queue_spsc_push ( std_queue_shared_t* queue, const void* item, size_t s
     char* base = queue->base;
     size_t  mask = queue->mask;
     size_t  top = queue->top;
-    size_t  bot = queue->bot;
 
     size_t cap = mask + 1;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
+    size_t  bot = queue->bot;
     // Test for enough free space
     size_t used_size = top - bot;
     std_assert_m ( cap - used_size >= size );
@@ -390,10 +390,10 @@ void std_queue_spsc_push ( std_queue_shared_t* queue, const void* item, size_t s
 
 void std_queue_spsc_pop_discard ( std_queue_shared_t* queue, size_t size ) {
     // Load
-    size_t top = queue->top;
     size_t bot = queue->bot;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
+    size_t top = queue->top;
     // Test for enough allocated space for the data
     std_assert_m ( top - bot >= size );
 #endif
@@ -406,10 +406,10 @@ void std_queue_spsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t siz
     // Load
     char* base = queue->base;
     size_t  mask = queue->mask;
-    size_t  top = queue->top;
     size_t  bot = queue->bot;
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
+    size_t  top = queue->top;
     // Test for enough allocated space for the data
     std_assert_m ( top - bot >= size );
 #endif
@@ -490,7 +490,7 @@ size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
     // Load
     size_t  mask = queue->mask;
     char* base = queue->base;
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     size_t top = queue->top;
 #endif
     size_t bot = queue->bot;
@@ -504,7 +504,7 @@ size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
         return 0;
     }
 
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     size_t used_size = top - bot;
     std_assert_m ( size % 4 == 0 );
     std_assert_m ( used_size >= size + sizeof ( uint32_t ) );
@@ -678,7 +678,7 @@ bool std_queue_mpmc_push_64 ( std_queue_shared_t* queue, const void* item ) {
     // Load
     size_t  mask = queue->mask;
     char* base = queue->base;
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     //size_t bot = queue->bot;
 #endif
     size_t top = queue->top;

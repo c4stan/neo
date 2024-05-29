@@ -7,15 +7,15 @@
 
 std_warnings_ignore_m ( "-Wunused-function" )
 
-static xi_ui_module_state_t* xi_ui_state;
+static xi_ui_state_t* xi_ui_state;
 
-void xi_ui_load ( xi_ui_module_state_t* state ) {
+void xi_ui_load ( xi_ui_state_t* state ) {
     xi_ui_state = state;
 
     std_mem_zero_m ( xi_ui_state );
 }
 
-void xi_ui_reload ( xi_ui_module_state_t* state ) {
+void xi_ui_reload ( xi_ui_state_t* state ) {
     xi_ui_state = state;
 }
 
@@ -23,8 +23,8 @@ void xi_ui_unload ( void ) {
 }
 
 static bool xi_ui_cursor_test ( int64_t x, int64_t y, int64_t width, int64_t height ) {
-    int64_t cursor_x = xi_ui_state->input_state.cursor_x;
-    int64_t cursor_y = xi_ui_state->input_state.cursor_y;
+    int64_t cursor_x = xi_ui_state->update.input_state.cursor_x;
+    int64_t cursor_y = xi_ui_state->update.input_state.cursor_y;
 
     if ( cursor_x < x || cursor_x > x + width || cursor_y < y || cursor_y > y + height ) {
         return false;
@@ -42,7 +42,7 @@ static bool xi_ui_layer_cursor_test ( int64_t x, int64_t y, int64_t width, int64
 }
 
 static bool xi_ui_cursor_click() {
-    return xi_ui_state->mouse_down && xi_ui_state->mouse_down_tick == xi_ui_state->current_tick;
+    return xi_ui_state->update.mouse_down && xi_ui_state->update.mouse_down_tick == xi_ui_state->update.current_tick;
 }
 
 // x,y coords are expected to be relative to the parent layer
@@ -344,25 +344,27 @@ void xi_ui_update ( const wm_window_info_t* window_info, const wm_input_state_t*
     //xi_ui_state->base_y = -window_info->y - window_info->border_top;
     //xi_ui_state->base_width = window_info->width;
     //xi_ui_state->base_height = window_info->height;
-    xi_ui_state->os_window_width = window_info->width;
-    xi_ui_state->os_window_height = window_info->height;
+    // Update
+    xi_ui_state->update.os_window_width = window_info->width;
+    xi_ui_state->update.os_window_height = window_info->height;
 
-    xi_ui_state->current_tick = std_tick_now();
+    xi_ui_state->update.current_tick = std_tick_now();
 
-    xi_ui_state->mouse_delta_x = input_state->cursor_x - xi_ui_state->input_state.cursor_x;
-    xi_ui_state->mouse_delta_y = input_state->cursor_y - xi_ui_state->input_state.cursor_y;
+    xi_ui_state->update.mouse_delta_x = input_state->cursor_x - xi_ui_state->update.input_state.cursor_x;
+    xi_ui_state->update.mouse_delta_y = input_state->cursor_y - xi_ui_state->update.input_state.cursor_y;
 
-    if ( input_state->mouse[wm_mouse_state_left_m] && !xi_ui_state->mouse_down ) {
-        xi_ui_state->mouse_down_tick = xi_ui_state->current_tick;
+    if ( input_state->mouse[wm_mouse_state_left_m] && !xi_ui_state->update.mouse_down ) {
+        xi_ui_state->update.mouse_down_tick = xi_ui_state->update.current_tick;
     }
 
-    xi_ui_state->mouse_down = input_state->mouse[wm_mouse_state_left_m];
+    xi_ui_state->update.mouse_down = input_state->mouse[wm_mouse_state_left_m];
 
-    xi_ui_state->input_state = *input_state;
+    xi_ui_state->update.input_state = *input_state;
 
+    // Internal
     xi_ui_state->hovered_id = 0;
 
-    if ( !xi_ui_state->mouse_down ) {
+    if ( !xi_ui_state->update.mouse_down ) {
         xi_ui_state->active_layer = 0;
     }
 
@@ -423,30 +425,30 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         //float delta = std_tick_to_milli_f32 ( xi_ui_state.current_tick - xi_ui_state.mouse_down_tick );
 
         //if ( delta > 100.f ) {
-        state->x += xi_ui_state->mouse_delta_x;
-        state->y += xi_ui_state->mouse_delta_y;
+        state->x += xi_ui_state->update.mouse_delta_x;
+        state->y += xi_ui_state->update.mouse_delta_y;
         //}
 
         if ( state->x < 0 ) {
             state->x = 0;
         }
 
-        if ( state->x + state->width > xi_ui_state->os_window_width ) {
-            state->x = xi_ui_state->os_window_width - state->width;
+        if ( state->x + state->width > xi_ui_state->update.os_window_width ) {
+            state->x = xi_ui_state->update.os_window_width - state->width;
         }
 
         if ( state->y < 0 ) {
             state->y = 0;
         }
 
-        if ( state->y + state->height > xi_ui_state->os_window_height ) {
-            state->y = xi_ui_state->os_window_height - state->height;
+        if ( state->y + state->height > xi_ui_state->update.os_window_height ) {
+            state->y = xi_ui_state->update.os_window_height - state->height;
         }
     }
 
     // resize
     if ( xi_ui_layer_cursor_test ( layer->width - 20, layer->height - 20, 20, 20 ) ) {
-        if ( xi_ui_state->mouse_down && xi_ui_state->mouse_down_tick == xi_ui_state->current_tick ) {
+        if ( xi_ui_state->update.mouse_down && xi_ui_state->update.mouse_down_tick == xi_ui_state->update.current_tick ) {
             xi_ui_acquire_active ( state->id, 1 );
         }
     }
@@ -465,19 +467,19 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         int32_t min_height = border_height + corner_size;
 
         if ( width > min_width ) {
-            width += xi_ui_state->mouse_delta_x;
+            width += xi_ui_state->update.mouse_delta_x;
         } else {
-            if ( xi_ui_state->input_state.cursor_x > state->x + min_width ) {
-                uint32_t delta = xi_ui_state->input_state.cursor_x - ( state->x + min_width );
+            if ( xi_ui_state->update.input_state.cursor_x > state->x + min_width ) {
+                uint32_t delta = xi_ui_state->update.input_state.cursor_x - ( state->x + min_width );
                 width += delta;
             }
         }
 
         if ( height > min_height ) {
-            height += xi_ui_state->mouse_delta_y;
+            height += xi_ui_state->update.mouse_delta_y;
         } else {
-            if ( xi_ui_state->input_state.cursor_y > state->y + min_height ) {
-                uint32_t delta = xi_ui_state->input_state.cursor_y - ( state->y + min_height );
+            if ( xi_ui_state->update.input_state.cursor_y > state->y + min_height ) {
+                uint32_t delta = xi_ui_state->update.input_state.cursor_y - ( state->y + min_height );
                 height += delta;
             }
         }
@@ -495,12 +497,12 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         //if ( xi_ui_state->input_state.cursor_y + xi_ui_state->base_y > layer->y + border_height || state->height > border_height ) {
         //}
 
-        if ( state->x + width > xi_ui_state->os_window_width ) {
-            width = xi_ui_state->os_window_width - state->x;
+        if ( state->x + width > xi_ui_state->update.os_window_width ) {
+            width = xi_ui_state->update.os_window_width - state->x;
         }
 
-        if ( state->y + height > xi_ui_state->os_window_height ) {
-            height = xi_ui_state->os_window_height - state->y;
+        if ( state->y + height > xi_ui_state->update.os_window_height ) {
+            height = xi_ui_state->update.os_window_height - state->y;
         }
 
         if ( height < border_height + corner_size ) {
@@ -517,7 +519,7 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         //}
     }
 
-    if ( xi_ui_state->active_id == state->id && !xi_ui_state->mouse_down ) {
+    if ( xi_ui_state->active_id == state->id && !xi_ui_state->update.mouse_down ) {
         xi_ui_release_active ( state->id );
     }
 
@@ -619,7 +621,7 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
 
     bool pressed = false;
 
-    if ( !xi_ui_state->mouse_down && xi_ui_state->active_id == state->id ) {
+    if ( !xi_ui_state->update.mouse_down && xi_ui_state->active_id == state->id ) {
         if ( xi_ui_state->hovered_id == state->id ) {
             pressed = true;
         }
@@ -721,7 +723,7 @@ void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
 
     // state update
     // TODO change value on mouse release (!xi_ui_state->mouse_down seems to cause issues of non-registered clicks?)
-    if ( xi_ui_state->active_id == state->id && xi_ui_state->mouse_down ) {
+    if ( xi_ui_state->active_id == state->id && xi_ui_state->update.mouse_down ) {
         if ( xi_ui_state->hovered_id == state->id ) {
             state->value = ! ( state->value );
         }
@@ -783,7 +785,7 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     uint32_t range = state->width - handle_width - padding * 2;
 
     if ( xi_ui_state->active_id == state->id ) {
-        int32_t value = xi_ui_state->input_state.cursor_x - x - padding - handle_width / 2;
+        int32_t value = xi_ui_state->update.input_state.cursor_x - x - padding - handle_width / 2;
 
         if ( value < 0 ) {
             value = 0;
@@ -795,7 +797,7 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
 
         state->value = ( float ) value / range;
 
-        if ( !xi_ui_state->mouse_down ) {
+        if ( !xi_ui_state->update.mouse_down ) {
             xi_ui_release_active ( state->id );
         }
     }
@@ -837,7 +839,7 @@ void xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
 
     bool pressed = false;
 
-    if ( !xi_ui_state->mouse_down && xi_ui_state->active_id == state->id ) {
+    if ( !xi_ui_state->update.mouse_down && xi_ui_state->active_id == state->id ) {
         if ( xi_ui_state->hovered_id == state->id ) {
             pressed = true;
         }
@@ -885,7 +887,7 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
             xi_ui_acquire_hovered ( state->id, 0 );
 
             if ( xi_ui_cursor_click() ) {
-                uint32_t y_offset = xi_ui_state->input_state.cursor_y - y;
+                uint32_t y_offset = xi_ui_state->update.input_state.cursor_y - y;
 
                 if ( y_offset > height ) {
                     state->item_idx = y_offset / height - 1;
@@ -896,7 +898,7 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
         } else {
             xi_ui_release_hovered ( state->id );
 
-            if ( xi_ui_state->mouse_down ) {
+            if ( xi_ui_state->update.mouse_down ) {
                 xi_ui_release_active ( state->id );
             }
         }

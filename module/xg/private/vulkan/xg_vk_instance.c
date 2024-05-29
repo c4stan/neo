@@ -65,14 +65,16 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
 
     // Create Instance
     {
+    #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
         uint32_t instance_version;
         xg_vk_safecall_m ( vkEnumerateInstanceVersion ( &instance_version ), VK_NULL_HANDLE );
         uint32_t variant = VK_API_VERSION_VARIANT ( instance_version );
         uint32_t major = VK_API_VERSION_MAJOR ( instance_version );
         uint32_t minor = VK_API_VERSION_MINOR ( instance_version );
         uint32_t patch = VK_API_VERSION_PATCH ( instance_version );
-        std_assert_m ( variant == 0 );
+        std_verify_m ( variant == 0 );
         std_log_info_m ( "Using Vulkan API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m, major, minor, patch );
+    #endif
 
         VkApplicationInfo applicationInfo;
         applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;

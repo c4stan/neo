@@ -63,8 +63,10 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
     {
         WCHAR path_buffer[std_process_path_max_len_m];
         DWORD get_retcode = GetModuleFileNameW ( NULL, path_buffer, std_process_path_max_len_m );
+        std_unused_m ( get_retcode );
         std_assert_m ( get_retcode > 0 && get_retcode < std_process_path_max_len_m );
         int result = WideCharToMultiByte ( CP_UTF8, 0, path_buffer, -1, process->executable_path, std_process_path_max_len_m, NULL, NULL );
+        std_unused_m ( result );
         std_assert_m ( result > 0 );
     }
     //std_str_copy ( process->executable, std_process_path_max_len_m, args[0] );
@@ -123,8 +125,10 @@ void std_process_init ( std_process_state_t* state, char** args, size_t args_cou
     {
         WCHAR path_buffer[std_process_path_max_len_m];
         DWORD get_retcode = GetCurrentDirectoryW ( std_process_path_max_len_m, path_buffer );
+        std_unused_m ( get_retcode );
         std_assert_m ( get_retcode > 0 && get_retcode < std_process_path_max_len_m );
         int result = WideCharToMultiByte ( CP_UTF8, 0, path_buffer, -1, state->working_path, std_process_path_max_len_m, NULL, NULL );
+        std_unused_m ( result );
         std_assert_m ( result > 0 );
 
         // convert \ to /. TODO fix std_str_replace?
@@ -232,6 +236,7 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
         //BOOL retval = CreateProcess ( executable, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
         BOOL retval = CreateProcess ( NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
+        std_unused_m ( retval );
         std_assert_m ( retval == TRUE );
 
         os_handle = ( uint64_t ) pi.hProcess;
@@ -469,6 +474,7 @@ bool std_process_io_read ( void* dest, size_t* out_read_size, size_t size, uint6
 
     if ( read_retcode == FALSE ) {
         DWORD error = GetLastError();
+        std_unused_m ( error );
         std_assert_m ( error == ERROR_BROKEN_PIPE );
 
         if ( out_read_size ) {
@@ -570,6 +576,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
 
     if ( handle == INVALID_HANDLE_VALUE ) {
         DWORD error = GetLastError();
+        std_unused_m ( error );
         std_log_error_m ( "Pipe creation failed with error code " std_fmt_int_m, error );
         return std_process_null_handle_m;
     }
@@ -708,6 +715,7 @@ bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, co
 
     if ( write_result == FALSE ) {
         DWORD error = GetLastError();
+        std_unused_m ( error );
         std_log_error_m ( "Pipe write failed with error code " std_fmt_int_m, error );
         return false;
     }

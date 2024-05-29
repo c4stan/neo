@@ -97,6 +97,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         std_assert_m ( result == VK_SUCCESS );
 
         // Print surface formats
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
         if ( surface_format_count == 0 ) {
             std_log_error_m ( "Window doesn't support any surface format?" );
         } else {
@@ -108,6 +109,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
                 std_log_info_m ( "\t" std_fmt_str_m " - " std_fmt_str_m, xg_format_str ( format ), xg_color_space_str ( colorspace ) );
             }
         }
+#endif
     }
 
     // Get surface present modes
@@ -119,6 +121,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         xg_vk_safecall_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, surface_present_modes ), xg_null_handle_m );
 
         // Print surface present modes
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
         if ( surface_present_mode_count == 0 ) {
             std_log_error_m ( "Window doesn't support any present mode?" );
         } else {
@@ -129,6 +132,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
                 std_log_info_m ( "\t" std_fmt_str_m, xg_present_mode_str ( present_mode ) );
             }
         }
+#endif
     }
 
     // Test for present support on given device

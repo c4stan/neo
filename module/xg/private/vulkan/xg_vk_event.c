@@ -86,7 +86,7 @@ xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
     semaphore_create_info.pNext = NULL;
     semaphore_create_info.flags = 0;
     VkResult result = vkCreateSemaphore ( device->vk_handle, &semaphore_create_info, NULL, &event->vk_semaphore );
-    std_assert_m ( result == VK_SUCCESS );
+    std_verify_m ( result == VK_SUCCESS );
 
 #if std_enabled_m(xg_debug_events_log_m)
     std_log_info_m ( "[XG-VK-EVENT] Create " std_fmt_u64_m, event->vk_semaphore );

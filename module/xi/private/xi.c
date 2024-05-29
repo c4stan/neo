@@ -2,12 +2,6 @@
 
 #include "xi_state.h"
 
-/*
-    API is not like that of a typical immediate UI, instead it's split in 2 parts, elements need to be created and deleted explicitly
-    which means that some state is stored per element on xi. On the other hand draw has to be called every frame for the elements
-    to draw and update and each draw call returns the state of the element.
-*/
-
 static void xi_register_shaders ( xs_i* xs ) {
     char path[std_process_path_max_len_m];
     std_stack_t stack = std_static_stack_m ( path );

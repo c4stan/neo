@@ -38,25 +38,36 @@
 #define std_fmt_u64_pad_m(X) "%0" std_pp_string_m(X) PRIu64
 
 // TODO make these bits (1, 2, 4, ...), delete std_log_level_bit_..., and remove bitflag from std_log_enabled_levels_bitflag_m ?
+
 typedef enum {
     std_log_level_info_m = 0,
-    std_log_level_debug_m,
-    std_log_level_warn_m,
-    std_log_level_error_m,
-    std_log_level_crash_m,
+    std_log_level_debug_m = 1,
+    std_log_level_warn_m = 2,
+    std_log_level_error_m = 3,
+    std_log_level_crash_m = 4,
 } std_log_level_e;
 
+#if 0
+typedef enum {
+    std_log_level_bit_info_m = 1 << std_log_level_info_m,
+    std_log_level_bit_debug_m = 1 << std_log_level_debug_m,
+    std_log_level_bit_warn_m = 1 << std_log_level_warn_m,
+    std_log_level_bit_error_m = 1 << std_log_level_error_m,
+    std_log_level_bit_crash_m = 1 << std_log_level_crash_m,
+    std_log_level_bit_all_m = ( std_log_level_bit_info_m | std_log_level_bit_debug_m | std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ),
+} std_log_level_bit_e;
+#else
 #define std_log_level_bit_info_m  ( 1 << std_log_level_info_m )
 #define std_log_level_bit_debug_m ( 1 << std_log_level_debug_m )
 #define std_log_level_bit_warn_m  ( 1 << std_log_level_warn_m )
 #define std_log_level_bit_error_m ( 1 << std_log_level_error_m )
 #define std_log_level_bit_crash_m ( 1 << std_log_level_crash_m )
-#define std_log_level_bit_all_m   ( std_log_level_bit_info_m |  \
-                                    std_log_level_bit_warn_m |  \
+#define std_log_level_bit_all_m   ( std_log_level_bit_info_m  | \
                                     std_log_level_bit_debug_m | \
+                                    std_log_level_bit_warn_m  | \
                                     std_log_level_bit_error_m | \
                                     std_log_level_bit_crash_m )
-
+#endif
 // Boolean values that can be tested for code that should only be executed
 // depending on which logging is enabled.
 #define std_log_info_enabled_m        ( std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m )
@@ -64,7 +75,7 @@ typedef enum {
 #define std_log_debug_enabled_m       ( std_log_enabled_levels_bitflag_m & std_log_level_bit_debug_m )
 #define std_log_error_enabled_m       ( std_log_enabled_levels_bitflag_m & std_log_level_bit_error_m )
 #define std_log_crash_enabled_m       ( std_log_enabled_levels_bitflag_m & std_log_level_bit_crash_m )
-#define std_assert_enabled_m          std_log_error_enabled_m
+#define std_log_assert_enabled_m        std_log_error_enabled_m
 
 typedef struct {
     const char* module;
@@ -90,37 +101,37 @@ void    std_log_print              ( std_log_msg_t msg, ... ); // msg, format
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     #define std_log_info_m(fmt, ...)     std_log_m(std_log_level_info_m, (fmt), ##__VA_ARGS__)
 #else
-    #define std_log_info_m (fmt, ...)
+    #define std_log_info_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_warn_m
     #define std_log_warn_m(fmt, ...)     std_log_m(std_log_level_warn_m, (fmt), ##__VA_ARGS__)
 #else
-    #define std_log_warn_m(fmt, ...)
+    #define std_log_warn_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_debug_m
     #define std_log_debug_m(fmt, ...)     std_log_m(std_log_level_debug_m, (fmt), ##__VA_ARGS__)
 #else
-    #define std_log_debug_m(fmt, ...)
+    #define std_log_debug_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_error_m
     #define std_log_error_m(fmt, ...)     std_log_m(std_log_level_error_m, (fmt), ##__VA_ARGS__)
 #else
-    #define std_log_error_m(fmt, ...)
+    #define std_log_error_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_crash_m
     #define std_log_crash_m(fmt, ...)     std_log_m(std_log_level_crash_m, (fmt), ##__VA_ARGS__)
 
 #else
-    #define std_log_crash_m(fmt, ...)
+    #define std_log_crash_m(...)
 #endif
 
 // Verify is the same as assert when asserts are enabled, and different in the fact that
 // it still executes the condition expression when asserts are disabled
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     #define std_assert_info_m(cond, ...)  if (!(cond)) { std_log_info_m(__VA_ARGS__);  }
     #define std_assert_warn_m(cond, ...)  if (!(cond)) { std_log_warn_m(__VA_ARGS__);  }
     #define std_assert_error_m(cond, ...) if (!(cond)) { std_log_error_m(__VA_ARGS__); }

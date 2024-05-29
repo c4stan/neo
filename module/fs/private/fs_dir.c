@@ -45,7 +45,7 @@ bool fs_dir_create ( const char* path ) {
 
 #if defined(std_platform_win32_m)
     size_t len = fs_to_path_buffer ( path );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
 
     BOOL create_retcode = CreateDirectoryW ( t_path_buffer, NULL );
 
@@ -80,10 +80,10 @@ static int fs_nftw_remove_callback ( const char* path, const struct stat* stat, 
 #endif
 
 bool fs_dir_delete ( const char* path ) {
-    std_assert_m ( path != NULL );
+    std_verify_m ( path != NULL );
 #if defined(std_platform_win32_m)
     size_t len = fs_to_path_buffer ( path );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     BOOL remove_retcode = RemoveDirectoryW ( t_path_buffer );
 
     if ( remove_retcode == FALSE ) {

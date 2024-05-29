@@ -631,7 +631,7 @@ void xg_vk_pipeline_create_pipeline_layout ( xg_vk_pipeline_layout_creation_resu
         layout_info.pushConstantRangeCount = constant_bindings->binding_points_count;
         layout_info.pPushConstantRanges = vk_constant_ranges;
         VkResult result = vkCreatePipelineLayout ( device->vk_handle, &layout_info, NULL, &pipeline_layout );
-        std_assert_m ( result == VK_SUCCESS );
+        std_verify_m ( result == VK_SUCCESS );
 
         if ( debug_name != NULL ) {
             VkDebugUtilsObjectNameInfoEXT debug_name_info;
@@ -722,7 +722,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
             info.basePipelineHandle = VK_NULL_HANDLE;
             info.basePipelineIndex = 0;
             VkResult result = vkCreateComputePipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
-            std_assert_m ( result == VK_SUCCESS );
+            std_verify_m ( result == VK_SUCCESS );
 
             if ( params->debug_name[0] ) {
                 VkDebugUtilsObjectNameInfoEXT debug_name_info;
@@ -1398,7 +1398,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             info.basePipelineHandle = VK_NULL_HANDLE;
             info.basePipelineIndex = 0;
             VkResult result = vkCreateGraphicsPipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
-            std_assert_m ( result == VK_SUCCESS );
+            std_verify_m ( result == VK_SUCCESS );
 
             if ( params->debug_name[0] ) {
                 VkDebugUtilsObjectNameInfoEXT debug_name_info;
@@ -1603,7 +1603,7 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         sizes[xg_resource_binding_buffer_texel_storage_m].descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
         info.pPoolSizes = sizes;
         VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &context->vk_desc_pool );
-        std_assert_m ( result == VK_SUCCESS );
+        std_verify_m ( result == VK_SUCCESS );
     }
 
     context->groups_freelist = std_static_freelist_m ( context->groups_array );
@@ -1642,7 +1642,7 @@ xg_pipeline_resource_group_h xg_vk_pipeline_create_resource_group ( xg_device_h 
     vk_set_alloc_info.descriptorSetCount = 1;
     vk_set_alloc_info.pSetLayouts = &layout->vk_descriptor_set_layout;
     VkResult set_alloc_result = vkAllocateDescriptorSets ( device->vk_handle, &vk_set_alloc_info, &vk_set );
-    std_assert_m ( set_alloc_result == VK_SUCCESS, "Ran out of descriptor pool memory." );
+    std_verify_m ( set_alloc_result == VK_SUCCESS, "Ran out of descriptor pool memory." );
 
     std_mutex_lock ( &context->groups_mutex );
     xg_vk_pipeline_resource_group_t* group = std_list_pop_m ( &context->groups_freelist );
@@ -1770,7 +1770,7 @@ void xg_vk_pipeline_destroy_resource_group ( xg_device_h device_handle, xg_pipel
     VkDescriptorSet vk_set = group->vk_set;
 
     VkResult result = vkFreeDescriptorSets ( device->vk_handle, context->vk_desc_pool, 1, &vk_set );
-    std_assert_m ( result == VK_SUCCESS );
+    std_verify_m ( result == VK_SUCCESS );
 
     std_mutex_lock ( &context->groups_mutex );
     std_list_push ( &context->groups_freelist, group );

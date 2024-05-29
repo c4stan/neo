@@ -71,7 +71,7 @@ xg_buffer_h xg_buffer_create ( const xg_buffer_params_t* params ) {
     return buffer_handle;
 #else
     xg_buffer_h buffer_handle = xg_buffer_reserve ( params );
-    std_assert_m ( xg_buffer_alloc ( buffer_handle ) );
+    std_verify_m ( xg_buffer_alloc ( buffer_handle ) );
 
     return buffer_handle;
 #endif

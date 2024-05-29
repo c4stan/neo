@@ -1180,7 +1180,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             vk_set_alloc_info.descriptorSetCount = 1;
             vk_set_alloc_info.pSetLayouts = &vk_set_layout->vk_descriptor_set_layout;
             VkResult set_alloc_result = vkAllocateDescriptorSets ( device->vk_handle, &vk_set_alloc_info, &vk_set );
-            std_assert_m ( set_alloc_result == VK_SUCCESS, "Ran out of descriptor pool memory." );
+            std_verify_m ( set_alloc_result == VK_SUCCESS, "Ran out of descriptor pool memory." );
 
             set->vk_set = vk_set;
 
@@ -2346,16 +2346,14 @@ static void xg_vk_cmd_buffer_create_workload_resources ( xg_workload_h workload_
                 case xg_resource_cmd_texture_create_m: {
                     std_auto_m args = ( xg_resource_cmd_texture_create_t* ) header->args;
 
-                    bool result = xg_texture_alloc ( args->texture );
-                    std_assert_m ( result );
+                    std_verify_m ( xg_texture_alloc ( args->texture ) );
                 }
                 break;
 
                 case xg_resource_cmd_buffer_create_m: {
                     std_auto_m args = ( xg_resource_cmd_buffer_create_t* ) header->args;
 
-                    bool result = xg_buffer_alloc ( args->buffer );
-                    std_assert_m ( result );
+                    std_verify_m ( xg_buffer_alloc ( args->buffer ) );
                 }
                 break;
             }
@@ -2385,8 +2383,7 @@ static void xg_vk_cmd_buffer_destroy_workload_resources ( xg_workload_h workload
                         continue;
                     }
 
-                    bool result = xg_texture_destroy ( args->texture );
-                    std_assert_m ( result );
+                    std_verify_m ( xg_texture_destroy ( args->texture ) );
                 }
                 break;
 
@@ -2397,8 +2394,7 @@ static void xg_vk_cmd_buffer_destroy_workload_resources ( xg_workload_h workload
                         continue;
                     }
 
-                    bool result = xg_buffer_destroy ( args->buffer );
-                    std_assert_m ( result );
+                    std_verify_m ( xg_buffer_destroy ( args->buffer ) );
                 }
                 break;
 
@@ -2599,7 +2595,7 @@ void xg_vk_cmd_buffer_submit ( xg_workload_h workload_handle ) {
 
         const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
         VkResult result = vkQueueSubmit ( device->graphics_queue.vk_handle, 1, &submit_info, fence->vk_fence );
-        std_assert_m ( result == VK_SUCCESS );
+        std_verify_m ( result == VK_SUCCESS );
 
 #if std_enabled_m(xg_debug_flush_gpu_submissions_m) || std_enabled_m(xg_debug_disable_semaphore_frame_sync_m)
         result = vkQueueWaitIdle ( device->graphics_queue.vk_handle );

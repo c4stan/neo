@@ -21,7 +21,7 @@
 
 #define xg_vk_safecall_return_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); return x; }
 #define xg_vk_safecall_goto_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); goto x; }
-#define xg_vk_assert_m( result ) std_assert_m ( ( result ) == VK_SUCCESS )
+#define xg_vk_assert_m( result ) std_verify_m ( ( result ) == VK_SUCCESS )
 
 /*
 -------------------------------------------------------------------------------

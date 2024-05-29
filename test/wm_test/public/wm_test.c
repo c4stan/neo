@@ -23,6 +23,7 @@ static void wm_test_run ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
     std_assert_m ( wm );
 
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     wm_display_h displays[8];
     size_t display_count = wm->get_displays ( displays, 8 );
 
@@ -45,6 +46,7 @@ static void wm_test_run ( void ) {
         size_t modes_count = wm->get_display_modes_count ( displays[i] );
         std_log_info_m ( std_fmt_tab_m "Display modes: " std_fmt_size_m, modes_count );
     }
+#endif
 
     wm_window_params_t params = { .name = "wm_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &params );

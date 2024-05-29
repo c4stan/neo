@@ -52,6 +52,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_assert_m ( device->supported_features.bufferDeviceAddress );
 #endif
 
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     // Print generic properties
     uint32_t api_major = VK_VERSION_MAJOR ( device->generic_properties.apiVersion );
     uint32_t api_minor = VK_VERSION_MINOR ( device->generic_properties.apiVersion );
@@ -73,6 +74,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     uint32_t max_resources_per_stage = device->generic_properties.limits.maxPerStageResources;
     uint32_t max_vertex_input_attributes = device->generic_properties.limits.maxVertexInputAttributes;
     uint32_t max_vertex_input_streams = device->generic_properties.limits.maxVertexInputBindings;
+    uint32_t max_sampled_images_per_set = device->generic_properties.limits.maxDescriptorSetSampledImages;
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     char max_uniform_range_str[32];
     char max_texel_elements_str[32];
@@ -91,6 +93,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_log_info_m ( "Max uniform buffers per stage: " std_fmt_u32_m, max_uniform_buffers_per_stage );
     std_log_info_m ( "Max storage buffers per stage: " std_fmt_u32_m, max_storage_buffers_per_stage );
     std_log_info_m ( "Max sampled images per stage: " std_fmt_u32_m, max_sampled_images_per_stage );
+    std_log_info_m ( "Max sampled images per set: " std_fmt_u32_m, max_sampled_images_per_set );
     std_log_info_m ( "Max resources per stage: " std_fmt_u32_m, max_resources_per_stage );
     std_log_info_m ( "Max vertex input attributes: " std_fmt_u32_m, max_vertex_input_attributes );
     std_log_info_m ( "Max vertex input streams: " std_fmt_u32_m, max_vertex_input_streams );
@@ -141,6 +144,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
             "," std_fmt_u32_m "," std_fmt_u32_m "> copy granulatity - " std_fmt_u32_m " bits timestamps",
             i, count, desc, copy_granularity.width, copy_granularity.height, copy_granularity.depth, timestap_bits );
     }
+#endif
 
     std_log_info_m ( "Mapping device properties to runtime objects" );
 
@@ -164,7 +168,9 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     // Pass 1. try to look for a good match
     for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
         VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
+#if std_log_enabled_levels_bitflag_m & ( std_log_level_bit_info_m | std_log_level_bit_warn_m )
         uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
+#endif
 
         if ( flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
             flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -230,7 +236,9 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
         VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
 
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
         uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
+#endif
 
         if ( flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
             if ( device_memory_type == UINT32_MAX ) {
@@ -268,6 +276,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     }
 
     // Pass 3. check that we're good to go
+#if std_log_enabled_levels_bitflag_m & std_log_level_bit_warn_m
     for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
         if ( used_memory_types[i] == 0 ) {
             VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
@@ -282,6 +291,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
             std_log_warn_m ( "Device memory type left unmapped: "std_fmt_u32_m": " std_fmt_str_m" - " std_fmt_u32_m, i, desc, heap );
         }
     }
+#endif
 
     if ( device_memory_type == UINT32_MAX ) {
         std_log_error_m ( "Device local memory heap not found!" );
@@ -946,7 +956,7 @@ char* xg_vk_device_map_alloc ( const xg_alloc_t* alloc ) {
     std_assert_m ( device );
     void* data = NULL;
     VkResult result = vkMapMemory ( device->vk_handle, ( VkDeviceMemory ) alloc->base, ( VkDeviceSize ) alloc->offset, ( VkDeviceSize ) alloc->handle.size, 0, &data );
-    std_assert_m ( result == VK_SUCCESS );
+    std_verify_m ( result == VK_SUCCESS );
     std_assert_m ( data != NULL );
     return ( char* ) data;
 }

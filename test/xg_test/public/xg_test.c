@@ -6,6 +6,7 @@
 
 #include <math.h>
 
+std_warnings_ignore_m ( "-Wunused-variable" )
 std_warnings_ignore_m ( "-Wunused-function" )
 
 static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool capture ) {

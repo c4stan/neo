@@ -20,7 +20,7 @@ static xg_vk_workload_state_t* xg_workload_state;
 #define xg_workload_handle_gen_bits_m (64 - xg_workload_handle_idx_bits_m)
 
 static xg_vk_workload_t* get_workload ( xg_workload_h workload_handle ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
@@ -190,7 +190,7 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, voi
 }
 
 xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload_handle ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
@@ -205,7 +205,7 @@ xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload_handle ) {
 }
 
 xg_resource_cmd_buffer_h xg_workload_add_resource_cmd_buffer ( xg_workload_h workload_handle ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
@@ -272,7 +272,7 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
 }
 
 /*void xg_workload_set_swapchain_texture_acquired_event ( xg_workload_h workload_handle, xg_gpu_queue_event_h event_handle ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
@@ -284,7 +284,7 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
 }*/
 
 void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload_handle, xg_gpu_queue_event_h event ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
@@ -295,7 +295,7 @@ void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload_handl
 }
 
 void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workload_handle ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
@@ -306,7 +306,7 @@ void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workl
 }
 
 void xg_vk_workload_queue_debug_capture_stop_on_present ( xg_workload_h workload_handle ) {
-#if std_assert_enabled_m
+#if std_log_assert_enabled_m
     uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
     uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );

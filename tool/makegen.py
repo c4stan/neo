@@ -46,6 +46,7 @@ CORE_WARNINGS_FLAGS = (
     ' -Wno-initializer-overrides'               # allow assigning same member multiple times in initializer lists. Used in constructor macros for optional non-default params
     ' -Wno-unused-but-set-variable'
     ' -Wno-comment'
+    ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
 )
 
 EXTENDED_WARNINGS_FLAGS = (

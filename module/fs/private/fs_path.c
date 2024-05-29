@@ -193,7 +193,7 @@ size_t fs_path_get_name ( char* name, size_t cap, const char* path ) {
 bool fs_path_get_info ( fs_path_info_t* info, const char* path ) {
 #if defined(std_platform_win32_m)
     size_t len = fs_to_path_buffer ( path );
-    std_assert_m ( len > 0 && len < fs_path_size_m );
+    std_verify_m ( len > 0 && len < fs_path_size_m );
     WIN32_FILE_ATTRIBUTE_DATA data;
     BOOL get_retcode = GetFileAttributesExW ( t_path_buffer, GetFileExInfoStandard, &data );
 

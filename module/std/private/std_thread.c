@@ -228,10 +228,10 @@ bool std_thread_join ( std_thread_h thread_handle ) {
     std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
 #if defined(std_platform_win32_m)
     DWORD result = WaitForSingleObject ( ( HANDLE ) thread->os_handle, INFINITE );
-    std_assert_m ( result == WAIT_OBJECT_0 );
+    std_verify_m ( result == WAIT_OBJECT_0 );
 #elif defined(std_platform_linux_m)
     int result = pthread_join ( ( pthread_t ) thread->os_handle, NULL );
-    std_assert_m ( result == 0 );
+    std_verify_m ( result == 0 );
     thread->is_alive = false;
 #endif
     std_mutex_lock ( &std_thread_state->mutex );
