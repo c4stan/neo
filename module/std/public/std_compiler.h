@@ -94,6 +94,8 @@
         #define std_debug_break_m()                                   __builtin_debugtrap()
     #endif
 
+    #define std_div_ceil_m( dividend, divisor )                 ( ( (dividend) + (divisor) - 1 ) / (divisor) )
+
 #elif defined(std_compiler_gcc_m)
 
     #define std_warnings_save_state_m()                           _Pragma ( "GCC diagnostic push" )

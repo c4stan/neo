@@ -25,6 +25,10 @@ void std_list_remove ( void* parent, void* item );
 #define std_list_pop_m(list) ( std_typeof_m(*list) ) std_list_pop ( list )
 #define std_list_next_m(item) ( std_typeof_m(item) ) std_list_next ( item )
 
+bool std_list_push_atomic ( void* head, void* item );
+bool std_list_pop_atomic ( void* list, void** out_head );
+bool std_list_insert_atomic ( void* parent, void* item );
+
 // Doubly linked list
 void std_dlist_push ( void* head, void* item );
 void* std_dlist_pop ( void* list );

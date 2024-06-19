@@ -44,37 +44,67 @@ void std_mutex_deinit ( std_mutex_t* mutex ) {
 void std_rwmutex_init ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
     InitializeSRWLock ( &mutex->os );
+    mutex->write_thread = std_thread_null_handle_m;
+    mutex->write_thread_count = 0;
 #elif defined(std_platform_linux_m)
     pthread_rwlock_init ( &mutex->os, NULL );
 #endif
 }
 
-void std_rwmutex_lock_shared ( std_rwmutex_t* mutex ) {
+void std_rwmutex_lock_read ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
+    std_thread_h thread = std_thread_this();
+
+    if ( thread == std_thread_this() ) {
+        return;
+    }
+
     AcquireSRWLockShared ( &mutex->os );
 #elif defined(std_platform_linux_m)
     pthread_rwlock_rdlock ( &mutex->os );
 #endif
 }
 
-void std_rwmutex_lock_exclusive ( std_rwmutex_t* mutex ) {
+void std_rwmutex_lock_write ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
+    std_thread_h thread = std_thread_this();
+    
+    if ( thread == mutex->write_thread ) {
+        ++mutex->write_thread_count;
+        return;
+    }
+
     AcquireSRWLockExclusive ( &mutex->os );
+
+    mutex->write_thread = thread;
+    mutex->write_thread_count = 1;
 #elif defined(std_platform_linux_m)
     pthread_rwlock_wrlock ( &mutex->os );
 #endif
 }
 
-void std_rwmutex_unlock_shared ( std_rwmutex_t* mutex ) {
+void std_rwmutex_unlock_read ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
+    std_thread_h thread = std_thread_this();
+
+    if ( thread == std_thread_this() ) {
+        return;
+    }
+    
     ReleaseSRWLockShared ( &mutex->os );
 #elif defined(std_platform_linux_m)
     pthread_rwlock_unlock ( &mutex->os );
 #endif
 }
 
-void std_rwmutex_unlock_exclusive ( std_rwmutex_t* mutex ) {
+void std_rwmutex_unlock_write ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
+    if ( --mutex->write_thread_count ) {
+        return;
+    }
+
+    mutex->write_thread = std_thread_null_handle_m;
+
     ReleaseSRWLockExclusive ( &mutex->os );
 #elif defined(std_platform_linux_m)
     pthread_rwlock_unlock ( &mutex->os );

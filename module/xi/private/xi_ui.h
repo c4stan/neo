@@ -41,6 +41,9 @@ typedef struct {
 
     uint32_t os_window_width;
     uint32_t os_window_height;
+
+    float view[16];
+    float proj[16];
 } xi_ui_update_state_t;
 
 typedef struct {

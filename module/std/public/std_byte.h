@@ -12,7 +12,9 @@ void        std_mem_zero ( void* dest, size_t size );
 bool        std_mem_test ( const void* base, size_t size, char value );
 void        std_mem_move ( void* dest, void* source, size_t size );
 
-// note: sizeof(char[32]) == 32, use _T for static arrays (need to pass pointer to it)
+// note: sizeof(char[32]) == 32, use _T for static arrays (need to take its address)
+// TODO split static_array from array from single item
+#define     std_mem_zero_m( item ) std_mem_zero( (item), sizeof ( *(item) ) )
 #define     std_mem_zero_m( item ) std_mem_zero( (item), sizeof ( *(item) ) )
 #define     std_mem_zero_array_m( item, count ) std_mem_zero( (item), sizeof ( *(item) ) * (count) )
 #define     std_mem_copy_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) )
@@ -200,8 +202,12 @@ void std_bitset_set ( const void* bitset, size_t idx );
 bool std_bitset_test ( const void* bitset, size_t idx );
 void std_bitset_clear ( const void* bitset, size_t idx );
 // scans for the first bit set to 1. the bit at location starting_bit_idx is included in the scan
+// u64_blocks_count is to always be specified relative to the very beginning of the bitset, not from the given starting bit
 // returns false if no bit set to 1 was found
-bool std_bitset_scan ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx, size_t u64_blocks_count );
-bool std_bitset_scan_rev ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx );
+bool std_bitset_scan ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx, size_t u64_blocks_count );
+bool std_bitset_scan_rev ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx );
+
+bool std_bitset_set_atomic ( const void* bitset, size_t idx );
+bool std_bitset_clear_atomic ( const void* bitset, size_t idx );
 
 //#include <std_byte.inl>

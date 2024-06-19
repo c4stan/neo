@@ -1,41 +1,55 @@
 #include <se.h>
 
-#include "se_entity.h"
-#include "se_query.h"
+#include "se_state.h"
 
-static se_i s_api;
+static void se_api_init ( se_i* se ) {
+    se->create_entity_family = se_entity_family_create;
+    se->create_entities = se_entity_create;
+    se->query_entities = se_entity_query;
+    #if 0
+    se->create_entity = se_entity_create;
+    se->destroy_entity = se_entity_destroy;
 
-static se_i se_api ( void ) {
-    se_i se = {0};
+    se->add_component = se_entity_component_add;
+    se->remove_component = se_entity_component_remove;
+    se->get_component = se_entity_component_get;
 
-    se.create_entity = se_entity_create;
-    se.destroy_entity = se_entity_destroy;
-
-    se.add_component = se_entity_component_add;
-    se.remove_component = se_entity_component_remove;
-    se.get_component = se_entity_component_get;
-
-    se.create_query = se_query_create;
-    se.resolve_pending_queries = se_query_resolve;
-    se.dispose_query_results = se_query_results_dispose;
-    se.get_query_result = se_query_results_get;
-
-    return se;
+    se->create_query = se_query_create;
+    se->resolve_pending_queries = se_query_resolve;
+    se->dispose_query_results = se_query_results_dispose;
+    se->get_query_result = se_query_results_get;
+    #endif
 }
 
 void* se_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
 
-    se_entity_init();
-    se_query_init();
+    se_state_t* state = se_state_alloc();
 
-    s_api = se_api();
+    se_entity_load ( &state->entity );
+    //se_query_load ( &state->query );
 
-    return &s_api;
+    se_api_init ( &state->api );
+    return &state->api;
+}
+
+void* se_reload ( void* std_runtime, void* api ) {
+    std_runtime_bind ( std_runtime );
+
+    se_state_t* state = ( se_state_t* ) api;
+
+    se_entity_reload ( &state->entity );
+    //se_query_reload ( &state->query );
+
+    se_api_init ( &state->api );
+    return &state->api;
 }
 
 void se_unload ( void ) {
-    std_noop_m;
+    se_entity_unload();
+    //se_query_unload();
+
+    se_state_free();
 }
 
 // https://advances.realtimerendering.com/destiny/gdc_2015/Tatarchuk_GDC_2015__Destiny_Renderer_web.pdf

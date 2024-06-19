@@ -656,7 +656,7 @@ static bool std_virtual_stack_size_check ( std_virtual_stack_t* stack, size_t al
         size_t page_size = std_virtual_page_size();
         void* new_mapped_end = std_align_ptr ( new_top, page_size );
         std_assert_m ( new_mapped_end <= virtual_end );
-        std_virtual_map ( top, new_mapped_end );
+        std_virtual_map ( mapped_end, new_mapped_end );
         stack->mapped.end = new_mapped_end;
         return true;
     }

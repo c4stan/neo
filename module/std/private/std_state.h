@@ -60,7 +60,8 @@ typedef struct {
     std_hash_map_t modules_api_map;
     #endif
 
-    std_mutex_t         modules_mutex;
+    //std_mutex_t         modules_mutex;
+    std_rwmutex_t       modules_mutex;
 } std_module_state_t;
 
 //==============================================================================

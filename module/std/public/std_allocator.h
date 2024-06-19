@@ -143,6 +143,7 @@ bool std_virtual_free ( void* begin, void* end ); // on Win32 this range must ma
 
 /*
     Virtual heap allocator
+    TODO rename to global_heap? heap? ???
 */
 void*   std_virtual_heap_alloc ( size_t size, size_t align );
 bool    std_virtual_heap_free ( void* ptr );
@@ -214,6 +215,9 @@ void        std_virtual_stack_clear ( std_virtual_stack_t* buffer );
 char*       std_virtual_stack_string_copy ( std_virtual_stack_t* buffer, const char* std );
 char*       std_virtual_stack_string_append ( std_virtual_stack_t* buffer, const char* std );
 void        std_virtual_stack_free ( std_virtual_stack_t* buffer, size_t size );
+
+#define std_virtual_stack_alloc_array_m( stack, type, count ) ( type* ) std_virtual_stack_alloc_align ( stack, sizeof ( type ) * (count), std_alignof_m ( type ) )
+#define std_virtual_stack_alloc_m( stack, type ) std_virtual_stack_alloc_array_m ( stack, type, 1 )
 
 /*
     Linear stack allocator

@@ -2,6 +2,7 @@
 
 #include <std_compiler.h>
 #include <std_log.h>
+#include <std_atomic.h>
 
 // ------------------------------------------------------------------------------------------------------
 // Hash
@@ -228,6 +229,7 @@ void std_hash_metro_begin ( std_hash_metro_state_t* state ) {
     state->bytes = 0;
 }
 
+// TODO isn't this slow?
 void std_hash_metro_add ( std_hash_metro_state_t* metro_state, const void* base, size_t length ) {
     static const uint64_t k0 = 0xD6D018F5;
     static const uint64_t k1 = 0xA2AA033B;
@@ -610,6 +612,38 @@ bool std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload 
             ++map->count;
             return true;
         } else if ( hashes[idx] == hash ) {
+            return false;
+        }
+
+        idx = ( idx + 1 ) & mask;
+    }
+
+    std_log_error_m ( "hash map is full!" );
+    return false;
+}
+
+bool std_hash_map_insert_shared ( std_hash_map_t* map, uint64_t hash, uint64_t payload ) {
+    // Load
+    size_t      mask = map->mask;
+    uint64_t*   hashes = map->hashes;
+    uint64_t*   payloads = map->payloads;
+
+    // Compute idx
+    size_t      idx = hash & mask;
+
+    // Try insert until success (linear probing)
+    spin:
+    for ( uint64_t i = 0; i < mask + 1; ++i ) {
+        uint64_t slot = hashes[idx];
+        if ( slot == UINT64_MAX ) {
+            if ( std_compare_and_swap_u64 ( &hashes[idx], &slot, hash ) ) {
+                payloads[idx] = payload;
+                std_atomic_increment_u64 ( &map->count );
+                return true;
+            } else {
+                goto spin;
+            }
+        } else if ( slot == hash) {
             return false;
         }
 

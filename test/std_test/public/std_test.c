@@ -6,6 +6,7 @@
 #include <std_queue.h>
 #include <std_time.h>
 #include <std_hash.h>
+#include <std_sort.h>
 
 // TODO
 #define FS_TEST 0
@@ -1363,6 +1364,44 @@ void std_main ( void ) {
     }
 
     const char* separator = "------------------------------------------";
+
+#if 0
+    uint64_t n = 1024*1024*4;
+
+    uint64_t* vec_a = std_virtual_heap_alloc_array_m ( uint64_t, n );
+    uint64_t* vec_b = std_virtual_heap_alloc_array_m ( uint64_t, n );
+    uint64_t* vec_c = std_virtual_heap_alloc_array_m ( uint64_t, n );
+    uint64_t* vec_d = std_virtual_heap_alloc_array_m ( uint64_t, n );
+    uint64_t* vec_e = std_virtual_heap_alloc_array_m ( uint64_t, n );
+
+    for ( uint64_t i = 0; i < n; ++i ) {
+        vec_a[i] = i;
+    }
+
+    std_xorshift64_state_t rng = std_xorshift64_state();
+    uint64_t tmp;
+    std_sort_shuffle ( &rng, vec_a, sizeof ( uint64_t ), n, &tmp );
+
+    std_tick_t t1 = std_tick_now();
+    
+    for ( uint64_t i = 0; i < n; ++ i ) {
+        vec_b[i] = vec_c[i];
+    }
+
+    std_tick_t t2 = std_tick_now();
+    
+    std_tick_t t3 = std_tick_now();
+    
+    for ( uint64_t i = 0; i < n; ++ i ) {
+        vec_d[vec_a[i]] = vec_e[i];
+    }
+
+    std_tick_t t4 = std_tick_now();
+
+    double d1 = std_tick_to_milli_f64 ( t2 - t1 );
+    double d2 = std_tick_to_milli_f64 ( t4 - t3 );
+    std_log_info_m ( "linear:" std_fmt_f64_m " random:" std_fmt_f64_m, d1, d2 );
+#endif
 
 #if 1
     test_platform();

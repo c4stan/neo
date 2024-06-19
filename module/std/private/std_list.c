@@ -3,12 +3,43 @@
 #include <std_compiler.h>
 #include <std_platform.h>
 #include <std_log.h>
+#include <std_atomic.h>
 
 // =============================================================================
 
 typedef struct std_list_item_i {
     struct std_list_item_i* next;
 } std_list_item_i;
+
+bool std_list_push_atomic ( void* head, void* item ) {
+    return std_list_insert_atomic ( head, item );
+}
+
+bool std_list_pop_atomic ( void* _list, void** out_head ) {
+    std_list_item_i* list = ( std_list_item_i* ) _list;
+    std_assert_m ( list != NULL );
+    std_list_item_i* head = ( std_list_item_i* ) list->next;
+
+    *out_head = head;
+
+    if ( head == NULL ) {
+        return false;
+    }
+
+    return std_compare_and_swap_ptr ( &list->next, &head, head->next );
+}
+
+bool std_list_insert_atomic ( void* _parent, void* _item ) {
+    std_list_item_i* parent = ( std_list_item_i* ) _parent;
+    std_list_item_i* item = ( std_list_item_i* ) _item;
+    std_assert_m ( parent != NULL );
+    std_assert_m ( item != NULL );
+    std_assert_m ( item != parent );
+    std_assert_m ( parent->next != item ); // loop check
+    void* parent_next = parent->next;
+    item->next = parent_next;
+    return std_compare_and_swap_ptr ( &parent->next, &parent_next, item );
+}
 
 void std_list_push ( void* _list, void* _item ) {
     std_list_insert ( _list, _item );

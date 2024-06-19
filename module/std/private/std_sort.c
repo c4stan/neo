@@ -1,8 +1,23 @@
 #include "std_sort.h"
 
 #include <std_byte.h>
+#include <std_time.h>
 
 #include <stdlib.h>
+
+std_xorshift64_state_t std_xorshift64_state ( void ) {
+    std_xorshift64_state_t state;
+    state.a = std_tick_now();
+    return state;
+}
+
+uint64_t std_xorshift64 ( std_xorshift64_state_t* state ) {
+    uint64_t x = state->a;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    return state->a = x;
+}
 
 // https://rosettacode.org/wiki/Sorting_algorithms/Insertion_sort#C
 void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_comp_f* compare, void* tmp ) {
@@ -95,4 +110,18 @@ static void std_sort_quick_rec ( void* _base, size_t stride, size_t a, size_t b,
 // TODO test this
 void std_sort_quick ( void* base, size_t stride, size_t count, std_sort_comp_f* compare, void* tmp ) {
     std_sort_quick_rec ( base, stride, 0, count - 1, compare, tmp );
+}
+
+// Fisher–Yates shuffle
+void std_sort_shuffle ( std_xorshift64_state_t* rng, void* base, size_t stride, size_t count, void* tmp ) {
+    uint64_t i = count;
+
+    while (i != 0) {
+        uint64_t j = std_xorshift64 ( rng ) % i;
+        i--;
+
+        std_mem_copy ( tmp, base + i * stride, stride );
+        std_mem_copy ( base + i * stride, base + j * stride, stride);
+        std_mem_copy ( base + j * stride, tmp, stride );
+    }
 }

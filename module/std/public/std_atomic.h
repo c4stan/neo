@@ -12,6 +12,8 @@ bool                            std_compare_and_swap_i32 ( int32_t* atomic, int3
 bool                            std_compare_and_swap_i64 ( int64_t* atomic, int64_t* expected_read, int64_t conditional_write );
 bool                            std_compare_and_swap_u32 ( uint32_t* atomic, uint32_t* expected_read, uint32_t conditional_write );
 bool                            std_compare_and_swap_u64 ( uint64_t* atomic, uint64_t* expected_read, uint64_t conditional_write );
+bool                            std_compare_and_swap_ptr ( void* atomic, void* expected_read, void* conditional_write );
+//                                                         void**        void**               void*
 
 // Returns the old value
 int32_t                         std_atomic_exchange_i32 ( int32_t* atomic, int32_t write );
@@ -19,7 +21,7 @@ int64_t                         std_atomic_exchange_i64 ( int64_t* atomic, int64
 uint32_t                        std_atomic_exchange_u32 ( uint32_t* atomic, uint32_t write );
 uint64_t                        std_atomic_exchange_u64 ( uint64_t* atomic, uint64_t write );
 
-// Returns the atomic value post-increment
+// Returns the atomic value post-in/decrement
 int32_t                         std_atomic_increment_i32 ( int32_t* atomic );
 int64_t                         std_atomic_increment_i64 ( int64_t* atomic );
 uint32_t                        std_atomic_increment_u32 ( uint32_t* atomic );

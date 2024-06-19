@@ -82,7 +82,7 @@ void std_module_init ( std_module_state_t* state ) {
     state->modules_name_map = std_hash_map ( state->modules_name_map_keys, state->modules_name_map_payloads, std_module_map_slots_m );
 state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
     #endif
-    std_mutex_init ( &state->modules_mutex );
+    std_rwmutex_init ( &state->modules_mutex );
 }
 
 void std_module_attach ( std_module_state_t* state ) {
@@ -90,7 +90,7 @@ void std_module_attach ( std_module_state_t* state ) {
 }
 
 void std_module_shutdown ( void ) {
-    std_mutex_deinit ( &std_module_state->modules_mutex );
+    std_rwmutex_deinit ( &std_module_state->modules_mutex );
 }
 
 // ----------------------------------------------------------------------------
@@ -99,7 +99,7 @@ void std_module_shutdown ( void ) {
 #ifdef std_module_enable_fake_loading_m
 void std_module_fakeload_api ( const char* name, void* api ) {
     // Lock, pop freelist, write to buffer
-    std_mutex_lock ( &std_module_state->modules_mutex );
+    std_rwmutex_lock ( &std_module_state->modules_mutex );
     std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
     module->name.hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
@@ -108,26 +108,22 @@ void std_module_fakeload_api ( const char* name, void* api ) {
     module->handle = 0;
 #endif
     std_hash_map_insert ( &std_module_state->modules_api_map, ( uint64_t ) api, ( uint64_t ) module );
-    std_mutex_unlock ( &std_module_state->modules_mutex );
+    std_rwmutex_unlock ( &std_module_state->modules_mutex );
 }
 #endif
 
 // ----------------------------------------------------------------------------
 
 static std_module_t* std_module_lookup ( const char* name ) {
-    // Lock, try to lookup an already loaded module with this name
     uint64_t name_hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
 
-    std_mutex_lock ( &std_module_state->modules_mutex );
     uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_name_map, name_hash );
 
     if ( module_lookup ) {
-        std_mutex_unlock ( &std_module_state->modules_mutex );
         std_module_t* module = * ( std_module_t** ) module_lookup;
         return module;
     }
 
-    std_mutex_unlock ( &std_module_state->modules_mutex );
     return NULL;
 }
 
@@ -251,19 +247,18 @@ static std_module_t* std_module_load_internal ( const char* name ) {
 
 #endif
 
-    std_log_info_m ( "Loading " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
+    std_log_info_m ( "Loading module " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
     void* api = loader ( std_runtime_state() );
 
     if ( api == NULL ) {
         std_log_error_m ( "Module " std_fmt_str_m " failed to load - load function " std_fmt_str_m " returned NULL.", name, module_entrypoint_name );
         return NULL;
     } else {
-        std_log_info_m ( "Load of " std_fmt_str_m " complete.", name );
+        std_log_info_m ( "Load of module " std_fmt_str_m " complete.", name );
     }
 
     uint64_t hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
-    // Lock, store
-    std_mutex_lock ( &std_module_state->modules_mutex );
+
     std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
     module->name.hash = hash;
@@ -271,34 +266,39 @@ static std_module_t* std_module_load_internal ( const char* name ) {
     module->handle = ( uint64_t ) handle;
     std_hash_map_insert ( &std_module_state->modules_api_map, ( uint64_t ) module->api, ( uint64_t ) module );
     std_hash_map_insert ( &std_module_state->modules_name_map, hash, ( uint64_t ) module );
-    // Unlock, return
-    std_mutex_unlock ( &std_module_state->modules_mutex );
     
     return module;
 }
 
 void* std_module_load ( const char* name ) {
-     std_module_t* module = std_module_lookup ( name );
+    std_rwmutex_lock_write ( &std_module_state->modules_mutex );
+
+    std_module_t* module = std_module_lookup ( name );
 
     if ( module ) {
         std_log_error_m ( "Trying to load already loaded module " std_fmt_str_m, name );
+        std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
         return module->api;
     }
 
     module = std_module_load_internal ( name );
 
+    std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
+
     return module->api;
 }
 
 void* std_module_get ( const char* name ) {
+    std_rwmutex_lock_read ( &std_module_state->modules_mutex );
+
     std_module_t* module = std_module_lookup ( name );
+
+    std_rwmutex_unlock_read ( &std_module_state->modules_mutex );
 
     if ( !module ) {
         std_log_error_m ( "Trying to get non loaded module " std_fmt_str_m, name );
         return NULL;
     }
-
-    //module = std_module_load_internal ( name );
 
     return module->api;
 }
@@ -353,35 +353,23 @@ static void std_module_unload_internal ( std_module_t* module ) {
 
     std_verify_m ( std_hash_map_remove ( &std_module_state->modules_name_map, module->name.hash ) );
 
-    std_mutex_unlock ( &std_module_state->modules_mutex );
+    std_log_info_m ( "Unload of module " std_fmt_str_m " complete.", module->name.string );
 }
 
 void std_module_unload ( const char* name ) {
+    std_rwmutex_lock_write ( &std_module_state->modules_mutex );
+
      std_module_t* module = std_module_lookup ( name );
 
      if ( !module ) {
         std_log_error_m ( "Trying to unload module " std_fmt_str_m " that is not currently loaded", name );
+        std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
         return;
     }
 
     std_module_unload_internal ( module );
-}
-
-void std_module_release ( void* api ) {
-    // Lock, try to lookup
-    std_mutex_lock ( &std_module_state->modules_mutex );
-    uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_api_map, ( uint64_t ) &api );
-
-    if ( module_lookup == NULL ) {
-        std_mutex_unlock ( &std_module_state->modules_mutex );
-        return;
-    }
-
-    std_module_t* module = * ( std_module_t** ) module_lookup;
-    std_module_unload_internal ( module );
-
-    // TODO this should happen inside the mutex...
-    std_hash_map_remove ( &std_module_state->modules_api_map, ( uint64_t ) &api );
+ 
+    std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
 }
 
 size_t std_module_build ( const char* solution_name, void* output, size_t output_size ) {
@@ -445,7 +433,7 @@ void std_module_reload ( const char* solution_name ) {
         const char* p = buffer;
 
         // Lock
-        std_mutex_lock ( &std_module_state->modules_mutex );
+        std_rwmutex_lock_write ( &std_module_state->modules_mutex );
 
         for ( int32_t i = 0; i < updated_modules_count; ++i ) {
 
@@ -528,17 +516,17 @@ void std_module_reload ( const char* solution_name ) {
 
 #endif
 
-            std_log_info_m ( "Reloading " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
+            std_log_info_m ( "Reloading module " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
             reloader ( std_runtime_state(), module->api );
 
             // Update
             module->handle = ( uint64_t ) handle;
 
-            std_log_info_m ( "Reload of " std_fmt_str_m " complete.", name );
+            std_log_info_m ( "Reload of module " std_fmt_str_m " complete.", name );
         }
 
         // Unlock, return
-        std_mutex_unlock ( &std_module_state->modules_mutex );
+        std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
 
     } else if ( updated_modules_count == 0 ) {
         std_log_info_m ( "Module reload skipped, nothing changed." );

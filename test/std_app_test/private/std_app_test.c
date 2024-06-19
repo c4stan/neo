@@ -94,6 +94,8 @@ static void std_app_test_api_init ( std_app_i* app ) {
 void* std_app_test_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
 
+    std_module_load_m ( wm_module_name_m );
+
     std_auto_m state = std_virtual_heap_alloc_m ( std_app_test_state_t );
     state->boot = true;
     state->first_print = true;
@@ -110,6 +112,8 @@ void std_app_test_unload ( void ) {
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     wm->destroy_window ( m_state->window );
     std_virtual_heap_free ( m_state );
+
+    std_module_unload_m ( wm_module_name_m );
 }
 
 void std_app_test_reload ( void* std_runtime, void* api ) {

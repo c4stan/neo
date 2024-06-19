@@ -192,7 +192,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
     const char* renderdoc_layers[] = {  // RenderDoc support
 #if !std_enabled_m(xg_vk_enable_raytracing)
         // RenderDoc layer kills RT device extensions...
-        "VK_LAYER_RENDERDOC_Capture"
+        //"VK_LAYER_RENDERDOC_Capture"
 #endif
     };
 

@@ -67,6 +67,7 @@ typedef struct {
 
     xi_section_state_t xf_graph_section_state;
     xi_section_state_t xf_alloc_section_state;
+    xi_section_state_t entities_section_state;
 
     xi_style_t graph_label_style;
     xi_style_t graph_switch_style;
@@ -76,6 +77,7 @@ typedef struct {
 #define MESH_COMPONENT_ID 0
 #define CAMERA_COMPONENT_ID 1
 #define LIGHT_COMPONENT_ID 2
+#define MODEL_COMPONENT_ID 3
 
 typedef struct {
     float base_color[3];
@@ -145,16 +147,39 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+#define viewapp_render_component_name_size_m 32
+#define viewapp_render_component_meshes_max_count_m 32
+
+typedef struct {
+    char name[viewapp_render_component_name_size_m];
+    se_entity_h meshes[viewapp_render_component_meshes_max_count_m];
+} viewapp_render_component_t;
+
+#define viewapp_render_component_m( ... ) ( viewapp_render_component_t ) { \
+    .name = {0}, \
+    .meshes = {0}, \
+    ##__VA_ARGS__ \
+}
+
+#if 0
 typedef struct {
     se_entity_h camera;
-    se_entity_h sphere;
+    //se_entity_h sphere;
     se_entity_h planes[5];
     se_entity_h light;
 
+    viewapp_render_component_t render_components[32];
+    viewapp_render_component_t* render_components_freelist;
+
     viewapp_mesh_component_t mesh_components[32];
+    viewapp_mesh_component_t* mesh_components_freelist;
+
     viewapp_light_component_t light_components[32];
+    viewapp_light_component_t* light_components_freelist;
+
     viewapp_camera_component_t camera_component;
 } viewapp_components_state_t;
+#endif
 
 // Viewapp
 typedef struct {
@@ -162,7 +187,7 @@ typedef struct {
 
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;
-    viewapp_components_state_t components;
+    //viewapp_components_state_t components;
     viewapp_ui_state_t ui;
 } viewapp_state_t;
 

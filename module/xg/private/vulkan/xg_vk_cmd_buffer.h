@@ -24,6 +24,8 @@ typedef struct {
 
 typedef struct {
     VkDescriptorPool vk_desc_pool;
+    uint32_t set_count;
+    uint32_t descriptor_counts[7]; // indexed by xg_resource_binding_e
     //VkDescriptorSetLayoutBinding bindings[xg_vk_max_total_descriptors_per_pool_m];
     //VkWriteDescriptorSet writes[xg_vk_max_total_descriptors_per_pool_m];
 } xg_vk_desc_allocator_t;

@@ -94,6 +94,12 @@ bool                std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t*
 
 #define std_static_hash_map_m( keys, payloads ) std_hash_map ( std_static_buffer_m ( keys ), std_static_buffer_m ( payloads ) )
 
+// NOTE: This allows atomic insertions form multiple threads but it does NOT support a number of other operations happening in parallel with the insertions:
+//      - Removal of any item in the map is NOT supported
+//      - Lookup is supported ONLY for already existing items. Lookup for the specific item that's being inserted is NOT supported.
+//      - Access to the 'count' field is NOT supported. Reason being that it is NOT updated atomically with the insertion.
+bool    std_hash_map_insert_shared ( std_hash_map_t* map, uint64_t hash, uint64_t payload );
+
 /* template begin
 def <T, S, P>
 typedef struct {

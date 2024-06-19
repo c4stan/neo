@@ -453,7 +453,7 @@ class Project:
                     if skip:
                         log.verbose('SKIP: ' + filepath)
                         continue
-                    if filename.endswith(".h"):
+                    if filename.endswith(".h") or filename.endswith(".inl"):
                         log.verbose('INC: ' + filepath)
                         self.inc.append(filepath)
                     elif filename.endswith(".c"):

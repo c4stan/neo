@@ -4,6 +4,7 @@
 
 #define se_module_name_m se
 std_module_export_m void* se_load ( void* );
+std_module_export_m void* se_reload ( void*, void* );
 std_module_export_m void se_unload ( void );
 
 typedef uint64_t se_entity_h;
@@ -14,57 +15,185 @@ typedef uint64_t se_query_h;
     typedef uint32_t se_component_index_t;
 #endif
 
-typedef uint64_t se_component_e;
+typedef uint32_t se_component_e;
 typedef uint64_t se_component_h;
 
 #define se_null_handle_m UINT64_MAX
 
-typedef uint64_t ( se_component_flags_t ) [se_component_flags_block_count_m];
+//typedef struct {
+//    uint32_t stride;
+//} se_component_stream_layout_t;
 
 typedef struct {
-    uint32_t max_component_count;
-} se_entity_params_t;
+    se_component_e id;
+    uint32_t stream_count;
+    //se_component_stream_layout_t streams[se_component_max_streams_m];
+    uint32_t streams[se_component_max_streams_m];
+} se_component_layout_t;
 
-#define se_entity_params_m( ... ) ( se_entity_params_t ) { \
-    .max_component_count = 8, \
+#define se_component_layout_m( ... ) ( se_component_layout_t ) { \
+    .id = 0, \
+    .stream_count = 0, \
+    .streams = { [0 ... se_component_max_streams_m - 1] = 0 }, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
-    se_component_flags_t request_component_flags;
-    // TODO uint32_t avoid_component_flags ?
-} se_query_params_t;
+    uint32_t component_count;
+    se_component_layout_t components[se_entity_max_components_per_entity_m];
+} se_entity_family_params_t;
 
-#define se_default_query_params_m ( se_query_params_t ) { 0 }
+#define se_entity_family_params_m( ... ) ( se_entity_family_params_t ) { \
+    .component_count = 0, \
+    .components = { [0 ... se_entity_max_components_per_entity_m - 1] = se_component_layout_m() }, \
+    ##__VA_ARGS__ \
+}
+
+#define se_component_mask_block_count_m std_div_ceil_m ( se_max_component_types_m, sizeof ( uint64_t ) )
+typedef struct {
+    uint64_t u64[se_component_mask_block_count_m];
+} se_component_mask_t;
+
+// TODO allow for inlining data instead of providing a pointer to it
+typedef struct {
+    uint8_t has_inline_data;
+    uint8_t id;
+    union {
+        void* data;
+        uint64_t inline_data[];
+    };
+} se_component_stream_update_t;
+
+#define se_component_stream_update_m( ... ) ( se_component_stream_update_t ) { \
+    .id = 0, \
+    .data = NULL, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
-    size_t count;
-    se_entity_h* entities;
+    se_component_e id;
+    uint32_t stream_count;
+    se_component_stream_update_t streams[];
+} se_component_update_t;
+
+#define se_component_update_m( ... ) ( se_component_update_t ) { \
+    .id = 0, \
+    .stream_count = 0, \
+    .streams = { [0 ... se_component_max_streams_m - 1] = se_component_stream_update_m() }, \
+    ##__VA_ARGS__ \
+}
+
+#define se_component_update_monostream_m( _id, _data ) ( se_component_update_t ) { \
+    .id = _id, \
+    .stream_count = 1, \
+    .streams = { se_component_stream_update_m ( .id = 0, .data = _data ) }, \
+}
+
+typedef struct se_entity_update_t {
+    se_component_mask_t mask;
+    uint32_t component_count;
+    struct se_entity_update_t* next;
+    se_component_update_t components[];
+} se_entity_update_t;
+
+#define se_entity_update_m( ... ) ( se_entity_update_t ) { \
+    .component_count = 0, \
+    .components = { [0 ... se_entity_max_components_per_entity_m - 1] = se_component_update_m() }, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint64_t entity_count;
+    se_entity_update_t entities[];
+} se_entity_params_t;
+
+#define se_entity_params_m( ... ) ( se_entity_params_t ) { \
+    .component_mask = { 0 }, \
+    .update = se_entity_update_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+#if 0
+    uint32_t read_components_count;
+    uint32_t read_components[se_entity_max_components_per_entity_m];
+
+    uint32_t write_components_count;
+    uint32_t write_components[se_entity_max_components_per_entity_m];
+#else
+    uint32_t component_count;
+    uint32_t components[se_entity_max_components_per_entity_m];
+#endif
+} se_query_params_t;
+
+#define se_query_params_m( ... ) ( se_query_params_t ) { \
+    .component_count = 0, \
+    .components = { 0 }, \
+    ##__VA_ARGS__ \
+}
+
+// TODO dynamic allocate some of the following instead of using static arrays?
+typedef struct {
+    void* data;
+    uint32_t count;
+} se_component_stream_page_t;
+
+typedef struct {
+    uint32_t page_count;
+    uint32_t page_capacity;
+    uint32_t data_stride;
+    se_component_stream_page_t pages[se_entity_family_max_pages_per_stream_m];
+} se_component_stream_t;
+
+typedef struct {
+    uint32_t stream_count;
+    se_component_stream_t streams[se_component_max_streams_m];
+} se_component_t;
+
+typedef struct {
+    uint32_t entity_count;
+#if 0
+    se_component_t read_components[se_entity_max_components_per_entity_m];
+    se_component_t write_components[se_entity_max_components_per_entity_m];
+#else
+    se_component_t components[se_entity_max_components_per_entity_m];
+#endif
 } se_query_result_t;
 
 typedef struct {
-    se_component_e component;
-    void ( *callback ) ( void* context, se_entity_h entity, se_component_h component );
-} se_component_callback_t;
+    se_component_t* read_components[se_entity_max_components_per_entity_m];
+    se_component_t* write_components[se_entity_max_components_per_entity_m];
+
+    se_entity_h delete_entities[se_max_entities_m];
+    uint64_t delete_count;
+    // entity delete queue
+    // entity create queue
+} se_node_execute_args_t;
+
+typedef void ( se_node_execute_f ) ( se_node_execute_args_t* node_args );
 
 typedef struct {
-    se_entity_h ( *create_entity ) ( const se_entity_params_t* params );
-    bool ( *destroy_entity ) ( se_entity_h entity );
+    uint32_t read_components[se_entity_max_components_per_entity_m];
+    uint32_t read_components_count;
+    uint32_t write_components[se_entity_max_components_per_entity_m];
+    uint32_t write_components_count;
 
-    bool ( *add_component ) ( se_entity_h entity, se_component_e component_type, se_component_h component_handle );
-    bool ( *remove_component ) ( se_entity_h entity, se_component_e component_type );
-    se_component_h ( *get_component ) ( se_entity_h entity, se_component_e component_type );
-    void ( *get_components ) ( se_component_h* out_component_handles, size_t count, const se_entity_h* entities, se_component_e component_type );
+    se_node_execute_f * execute_routine;
 
-    se_query_h ( *create_query ) ( const se_query_params_t* params );
-    void ( *resolve_pending_queries ) ( void );
-    void ( *dispose_query_results ) ( void );
-    // TODO return const ptr
-    const se_query_result_t* ( *get_query_result ) ( se_query_h query );
+    char debug_name[se_debug_name_size_m];
+} se_node_params_t;
 
-    void ( *serialize_entities ) ( se_component_callback_t* callbacks );
-    void ( *deserialize_entities ) ( se_component_callback_t* callbacks );
+typedef struct {
+    void ( *create_entity_family ) ( const se_entity_family_params_t* params );
+    void ( *destroy_entity_family ) ( se_component_mask_t mask );
 
+    void ( *create_entities ) ( const se_entity_params_t* params );
+    void ( *destroy_entities ) ( const se_entity_h* entities, uint64_t count );
+
+    se_entity_h ( *create_entity ) ( const se_entity_update_t* update );
+    void ( *destroy_entity ) ( se_entity_h entity );
+
+    void ( *query_entities ) ( se_query_result_t* result, const se_query_params_t* params );
 #if 0
     // TODO remove individual calls?
     se_entity_h create_entity ( const se_entity_params_t* params );
@@ -93,3 +222,5 @@ typedef struct {
     bool get_query_result ( se_query_result_t* data, se_query_results_h results, se_query_h query );
 #endif
 } se_i;
+
+#include <se.inl>

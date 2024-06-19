@@ -583,11 +583,13 @@ void xg_vk_cmd_buffer_activate_device ( xg_device_h device_handle ) {
 
         // desc pool
         {
+            xg_vk_desc_allocator_t* allocator = &context->submit_contexts[i].desc_allocator;
+
             VkDescriptorPoolCreateInfo info;
             info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
             info.pNext = NULL;
             info.flags = 0;
-            info.maxSets = 512;
+            info.maxSets = xg_vk_max_sets_per_descriptor_pool_m;
             info.poolSizeCount = xg_resource_binding_count_m;
             VkDescriptorPoolSize sizes[xg_resource_binding_count_m];
             sizes[xg_resource_binding_sampler_m].type = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -595,7 +597,6 @@ void xg_vk_cmd_buffer_activate_device ( xg_device_h device_handle ) {
             sizes[xg_resource_binding_texture_to_sample_m].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
             sizes[xg_resource_binding_texture_to_sample_m].descriptorCount = xg_vk_max_sampled_texture_per_descriptor_pool_m;
             //sizes[xg_resource_binding_texture_and_sampler_m].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            //sizes[xg_resource_binding_texture_and_sampler_m].descriptorCount = 128;
             sizes[xg_resource_binding_texture_storage_m].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             sizes[xg_resource_binding_texture_storage_m].descriptorCount = xg_vk_max_storage_texture_per_descriptor_pool_m;
             sizes[xg_resource_binding_buffer_uniform_m].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -607,8 +608,17 @@ void xg_vk_cmd_buffer_activate_device ( xg_device_h device_handle ) {
             sizes[xg_resource_binding_buffer_texel_storage_m].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
             sizes[xg_resource_binding_buffer_texel_storage_m].descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
             info.pPoolSizes = sizes;
-            VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &context->submit_contexts[i].desc_allocator.vk_desc_pool );
+            VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &allocator->vk_desc_pool );
             xg_vk_assert_m ( result );
+
+            allocator->set_count = xg_vk_max_sets_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_sampler_m] = xg_vk_max_samplers_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_texture_to_sample_m] = xg_vk_max_sampled_texture_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_texture_storage_m] = xg_vk_max_storage_texture_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_buffer_uniform_m] = xg_vk_max_uniform_buffer_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_buffer_storage_m] = xg_vk_max_storage_buffer_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_buffer_texel_uniform_m] = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
+            allocator->descriptor_counts[xg_resource_binding_buffer_texel_storage_m] = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
         }
     }
 
@@ -945,7 +955,7 @@ typedef struct {
     xg_vk_translation_dynamic_pipeline_state_cache_t dynamic_state;
 } xg_vk_tranlsation_state_t;
 
-static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* state, const xg_vk_cmd_buffer_submit_context_t* context, xg_device_h device_handle, VkCommandBuffer vk_cmd_buffer ) {
+static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* state, xg_vk_cmd_buffer_submit_context_t* context, xg_device_h device_handle, VkCommandBuffer vk_cmd_buffer ) {
 
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
@@ -1180,7 +1190,58 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             vk_set_alloc_info.descriptorSetCount = 1;
             vk_set_alloc_info.pSetLayouts = &vk_set_layout->vk_descriptor_set_layout;
             VkResult set_alloc_result = vkAllocateDescriptorSets ( device->vk_handle, &vk_set_alloc_info, &vk_set );
-            std_verify_m ( set_alloc_result == VK_SUCCESS, "Ran out of descriptor pool memory." );
+
+            if ( set_alloc_result != VK_SUCCESS ) {
+                std_log_error_m ( "Ran out of descriptor pool memory." );
+                std_log_error_m ( "Remaining pool resources:"
+                    "\n" std_fmt_u32_m " sets" 
+                    "\n" std_fmt_u32_m " samplers" 
+                    "\n" std_fmt_u32_m " sampled textures" 
+                    "\n" std_fmt_u32_m " storage textures" 
+                    "\n" std_fmt_u32_m " uniform buffers" 
+                    "\n" std_fmt_u32_m " storage buffers" 
+                    "\n" std_fmt_u32_m " uniform texel buffers" 
+                    "\n" std_fmt_u32_m " storage texel buffers",
+                    context->desc_allocator.set_count,
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_sampler_m],
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_texture_to_sample_m],
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_texture_storage_m],
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_uniform_m],
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_storage_m],
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_texel_uniform_m],
+                    context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_texel_storage_m]
+                );
+            }
+
+            for ( uint32_t i = 0; i < vk_set_layout->binding_points_count; ++i ) {
+                std_assert_m ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] > 0 );
+                
+                if ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] == 0 ) {
+                    std_log_error_m ( "Remaining pool resources:"
+                        "\n" std_fmt_u32_m " sets" 
+                        "\n" std_fmt_u32_m " samplers" 
+                        "\n" std_fmt_u32_m " sampled textures" 
+                        "\n" std_fmt_u32_m " storage textures" 
+                        "\n" std_fmt_u32_m " uniform buffers" 
+                        "\n" std_fmt_u32_m " storage buffers" 
+                        "\n" std_fmt_u32_m " uniform texel buffers" 
+                        "\n" std_fmt_u32_m " storage texel buffers",
+                        context->desc_allocator.set_count,
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_sampler_m],
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_texture_to_sample_m],
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_texture_storage_m],
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_uniform_m],
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_storage_m],
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_texel_uniform_m],
+                        context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_texel_storage_m]
+                    );
+                }
+
+                context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] -= 1;
+            }
+
+            std_assert_m ( context->desc_allocator.set_count > 0 );
+            context->desc_allocator.set_count -= 1;
 
             set->vk_set = vk_set;
 
@@ -2413,6 +2474,17 @@ static void xg_vk_cmd_buffer_destroy_workload_resources ( xg_workload_h workload
     }
 }
 
+static void xg_vk_cmd_buffer_reset_desc_allocator ( xg_vk_desc_allocator_t* allocator ) {
+    allocator->set_count = xg_vk_max_sets_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_sampler_m] = xg_vk_max_samplers_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_texture_to_sample_m] = xg_vk_max_sampled_texture_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_texture_storage_m] = xg_vk_max_storage_texture_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_uniform_m] = xg_vk_max_uniform_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_storage_m] = xg_vk_max_storage_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_texel_uniform_m] = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_texel_storage_m] = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
+}
+
 static void xg_vk_cmd_buffer_device_context_recycle_submission_contexts ( xg_vk_cmd_buffer_device_context_t* device_context ) {
     size_t count = std_ring_count ( &device_context->submit_ring );
 
@@ -2462,9 +2534,11 @@ static void xg_vk_cmd_buffer_device_context_recycle_submission_contexts ( xg_vk_
         }
 
         // https://arm-software.github.io/vulkan_best_practice_for_mobile_developers/samples/performance/command_buffer_usage/command_buffer_usage_tutorial.html#:~:text=Resetting%20the%20command%20pool,-Resetting%20the%20pool&text=To%20reset%20the%20pool%20the,pool%20thus%20increasing%20memory%20overhead
+        // "To reset the pool the flag RESET_COMMAND_BUFFER_BIT is not required, and it is actually better to avoid it since it prevents it from using a single large allocator for all buffers in the pool thus increasing memory overhead"
         vkResetCommandPool ( device->vk_handle, submit_context->cmd_allocator.vk_cmd_pool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );
         --submit_context->cmd_allocator.cmd_buffers_count;
         vkResetDescriptorPool ( device->vk_handle, submit_context->desc_allocator.vk_desc_pool, 0 );
+        xg_vk_cmd_buffer_reset_desc_allocator ( &submit_context->desc_allocator );
 
         VkResult r = vkResetFences ( device->vk_handle, 1, &fence->vk_fence );
         xg_vk_assert_m ( r );

@@ -353,9 +353,6 @@ typedef struct {
 
     xg_format_e render_target_format;
     xi_viewport_t viewport;
-
-    float view_matrix[4][4];
-    float proj_matrix[4][4];
 } xi_flush_params_t;
 
 // Api

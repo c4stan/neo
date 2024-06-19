@@ -95,6 +95,10 @@ bool std_compare_and_swap_u64 ( uint64_t* atomic, uint64_t* expected_read, uint6
     return retval;
 }
 
+bool std_compare_and_swap_ptr ( void* atomic, void* expected_read, void* conditional_write ) {
+    return std_compare_and_swap_u64 ( ( uint64_t* ) atomic, ( uint64_t* ) expected_read, ( uint64_t ) conditional_write );
+}
+
 // ------------------------------------------------------------------------------------------------------
 // Atomic Exchange
 // ------------------------------------------------------------------------------------------------------

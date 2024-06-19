@@ -1,4 +1,15 @@
-se_component_flags_block_count_m  1
+se_max_component_types_m            32
 # TODO increase to 1M+
-se_max_entities_m                 65536
-se_max_pending_queries_m          128
+se_max_entities_m                   65536
+se_max_pending_queries_m            128
+
+se_entity_max_components_per_entity_m       32
+
+se_entity_max_families_m                    256   
+se_entity_family_max_pages_per_stream_m     32
+se_entity_family_page_size_m                (1024*16)
+se_entity_family_page_count_m               128
+
+se_component_max_streams_m      32
+
+se_debug_name_size_m            32

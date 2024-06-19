@@ -2,6 +2,7 @@
 #include <std_log.h>
 #include <std_time.h>
 #include <std_app.h>
+#include <std_list.h>
 
 #include <viewapp.h>
 
@@ -258,26 +259,27 @@ static void viewapp_scene_cornell_box ( void ) {
     xs_i* xs = m_state->modules.xs;
     rv_i* rv = m_state->modules.rv;
 
-    se_entity_h object_entity;
-    {
-        se_entity_params_t params;
-        params.max_component_count = 8;
-        object_entity = se->create_entity ( &params );
-    }
-    m_state->components.sphere = object_entity;
-
     xs_pipeline_state_h geometry_pipeline_state = xs->lookup_pipeline_state ( "geometry" );
     xs_pipeline_state_h shadow_pipeline_state = xs->lookup_pipeline_state ( "shadow" );
 
     xg_device_h device = m_state->render.device;
-    
+
+    std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
+    se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
+    //se_entity_params_t* entity_params = std_virtual_heap_alloc_array_m ( se_entity_params_t, 128 );
+    //uint32_t entity_count = 0;
+
     // sphere
+    //m_state->components.sphere = sphere_entity;
     {
+        se_entity_params_alloc_entity ( &allocator );
+        //se_entity_h sphere_entity = se->create_entity ( &se_entity_params_m() );
+        
         geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
-        viewapp_mesh_component_t* mesh_component = &m_state->components.mesh_components[0];
-        *mesh_component = viewapp_mesh_component_m (
+        //viewapp_mesh_component_t* mesh_component = &m_state->components.mesh_components[0];
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -297,7 +299,18 @@ static void viewapp_scene_cornell_box ( void ) {
                 .metalness = 0,
             )
         );
-        se->add_component ( object_entity, MESH_COMPONENT_ID, ( se_component_h ) mesh_component );
+        
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_m, &mesh_component );
+        //se->add_component ( sphere_entity, MESH_COMPONENT_ID, ( se_component_h ) mesh_component );
+
+#if 0
+        std_auto_m model_component = std_list_pop_m ( &m_state->components.model_components_freelist );
+        *model_component = viewapp_model_component_m (
+            .name = "sphere",
+            .meshes = { sphere_entity }
+        );
+        se->add_component (  )
+#endif
     }
 
     // planes
@@ -334,16 +347,17 @@ static void viewapp_scene_cornell_box ( void ) {
     };
 
     for ( uint32_t i = 0; i < 5; ++i ) {
-        se_entity_params_t entity_params;
-        entity_params.max_component_count = 8;
-        se_entity_h plane_entity = se->create_entity ( &entity_params );
-        m_state->components.planes[i] = plane_entity;
+        //se_entity_params_t entity_params;
+        //entity_params.max_component_count = 8;
+        //se_entity_h plane_entity = se->create_entity ( &entity_params );
+        //m_state->components.planes[i] = plane_entity;
+        se_entity_params_alloc_entity ( &allocator );
 
         geometry_data_t geo = generate_plane ( 5.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
-        viewapp_mesh_component_t* mesh_component = &m_state->components.mesh_components[2 + i];
-        *mesh_component = viewapp_mesh_component_m (
+        //viewapp_mesh_component_t* mesh_component = &m_state->components.mesh_components[2 + i];
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -377,19 +391,21 @@ static void viewapp_scene_cornell_box ( void ) {
                 .metalness = 0,
             ),
         );
-        se->add_component ( plane_entity, MESH_COMPONENT_ID, ( se_component_h ) mesh_component );
+        //se->add_component ( plane_entity, MESH_COMPONENT_ID, ( se_component_h ) mesh_component );
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_m, &mesh_component );
     }
 
     // light
     se_entity_h light_entity;
     {
-        se_entity_params_t entity_params;
-        entity_params.max_component_count = 8;
-        light_entity = se->create_entity ( &entity_params );
-        m_state->components.light = light_entity;
+        //se_entity_params_t entity_params;
+        //entity_params.max_component_count = 8;
+        //light_entity = se->create_entity ( &entity_params );
+        //m_state->components.light = light_entity;
+        se_entity_params_alloc_entity ( &allocator );
 
-        viewapp_light_component_t* light_component = &m_state->components.light_components[0];
-        *light_component = viewapp_light_component_m (
+        //viewapp_light_component_t* light_component = &m_state->components.light_components[0];
+        viewapp_light_component_t light_component = viewapp_light_component_m (
             .position = { 0, 1.45, 0 },
             .intensity = 5,
             .color = { 1, 1, 1 },
@@ -416,7 +432,8 @@ static void viewapp_scene_cornell_box ( void ) {
         );
         light_component->view = rv->create_view ( &view_params );
 
-        se->add_component ( light_entity, LIGHT_COMPONENT_ID, ( se_component_h ) light_component );
+        //se->add_component ( light_entity, LIGHT_COMPONENT_ID, ( se_component_h ) light_component );
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_light_component_m, &light_component );
     }
 }
 
@@ -667,15 +684,9 @@ static void viewapp_boot ( void ) {
                 )
             );
 
-        m_state->ui.xf_graph_section_state = xi_section_state_m (
-            .title = "xf graph",
-            .height = 20,
-        );
-
-        m_state->ui.xf_alloc_section_state = xi_section_state_m (
-            .title = "xg allocator",
-            .height = 20,
-        );
+        m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
+        m_state->ui.xf_alloc_section_state = xi_section_state_m ( .title = "xg allocator" );
+        m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
     }
 
     rv_i* rv = m_state->modules.rv;
@@ -1177,49 +1188,49 @@ static std_app_state_e viewapp_update ( void ) {
     xi->begin_window ( xi_workload, &m_state->ui.window_state );
     
     xi->begin_section ( xi_workload, &m_state->ui.xf_alloc_section_state );
-    if ( !m_state->ui.xf_alloc_section_state.minimized ) {
-        for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
-            xg_allocator_info_t info;
-            xg->get_default_allocator_info ( &info, m_state->render.device, i );
-            {
-                xi_label_state_t type_label = xi_label_state_m( .height = 14 );
-                std_stack_t stack = std_static_stack_m ( type_label.text );
-                const char* memory_type_name;
-                switch ( i ) {
-                    case xg_memory_type_gpu_only_m:     memory_type_name = "gpu"; break;
-                    case xg_memory_type_gpu_mappable_m: memory_type_name = "mapped"; break;
-                    case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
-                    case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
-                }
-                std_stack_string_append ( &stack, memory_type_name );
-                xi->add_label ( xi_workload, &type_label );
+    for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
+        xg_allocator_info_t info;
+        xg->get_default_allocator_info ( &info, m_state->render.device, i );
+        {
+            xi_label_state_t type_label = xi_label_state_m( .height = 14 );
+            std_stack_t stack = std_static_stack_m ( type_label.text );
+            const char* memory_type_name;
+            switch ( i ) {
+                case xg_memory_type_gpu_only_m:     memory_type_name = "gpu"; break;
+                case xg_memory_type_gpu_mappable_m: memory_type_name = "mapped"; break;
+                case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
+                case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
             }
-            {
-                xi_label_state_t size_label = xi_label_state_m ( 
-                    .height = 14,
-                    .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
-                );
-                std_stack_t stack = std_static_stack_m ( size_label.text );
-                char buffer[32];
-                std_size_to_str_approx ( buffer, 32, info.allocated_size );
-                std_stack_string_append ( &stack, buffer );
-                std_stack_string_append ( &stack, "/" );
-                std_size_to_str_approx ( buffer, 32, info.reserved_size );
-                std_stack_string_append ( &stack, buffer );
-                std_stack_string_append ( &stack, "/" );
-                std_size_to_str_approx ( buffer, 32, info.system_size );
-                std_stack_string_append ( &stack, buffer );
-                xi->add_label ( xi_workload, &size_label );
-            }
-            xi->newline();
+            std_stack_string_append ( &stack, memory_type_name );
+            xi->add_label ( xi_workload, &type_label );
         }
+        {
+            xi_label_state_t size_label = xi_label_state_m ( 
+                .height = 14,
+                .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+            );
+            std_stack_t stack = std_static_stack_m ( size_label.text );
+            char buffer[32];
+            std_size_to_str_approx ( buffer, 32, info.allocated_size );
+            std_stack_string_append ( &stack, buffer );
+            std_stack_string_append ( &stack, "/" );
+            std_size_to_str_approx ( buffer, 32, info.reserved_size );
+            std_stack_string_append ( &stack, buffer );
+            std_stack_string_append ( &stack, "/" );
+            std_size_to_str_approx ( buffer, 32, info.system_size );
+            std_stack_string_append ( &stack, buffer );
+            xi->add_label ( xi_workload, &size_label );
+        }
+        xi->newline();
     }
     xi->end_section ( xi_workload );
     
     xi->begin_section ( xi_workload, &m_state->ui.xf_graph_section_state );
-    if ( !m_state->ui.xf_graph_section_state.minimized ) {
-        xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
-    }
+    xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
+    xi->end_section ( xi_workload );
+
+    xi->begin_section ( xi_workload, &m_state->ui.entities_section_state );
+
     xi->end_section ( xi_workload );
     
     xi->end_window ( xi_workload );
@@ -1342,6 +1353,10 @@ void* viewer_app_load ( void* runtime ) {
     state->render.frame_id = 0;
 
     std_mem_zero_m ( &state->components );
+
+    //state->model_components_freelist = std_static_freelist_m ( state->model_components );
+    //state->mesh_components_freelist = std_static_freelist_m ( state->mesh_components );
+    //state->light_components_freelist = std_static_freelist_m ( state->light_components );
 
     m_state = state;
 

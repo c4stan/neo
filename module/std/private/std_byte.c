@@ -2,6 +2,7 @@
 
 #include <std_platform.h>
 #include <std_log.h>
+#include <std_atomic.h>
 
 #include <stdbool.h>
 #include <string.h>
@@ -522,6 +523,16 @@ void std_bitset_set ( const void* bitset, size_t idx ) {
     blocks[block_idx] = block;
 }
 
+bool std_bitset_set_atomic ( const void* bitset, size_t idx ) {
+    uint64_t* blocks = ( uint64_t* ) bitset;
+    uint64_t block_idx = idx >> 6;
+    uint64_t bit_idx = idx & 0x3f;
+    uint64_t* block = &blocks[block_idx];
+    uint64_t old_block = *block;
+    uint64_t new_block = old_block | ( 1 << bit_idx );
+    return std_compare_and_swap_u64 ( block, &old_block, new_block );
+}
+
 void std_bitset_clear ( const void* bitset, size_t idx ) {
     uint64_t* blocks = ( uint64_t* ) bitset;
     uint64_t block_idx = idx >> 6;
@@ -530,6 +541,17 @@ void std_bitset_clear ( const void* bitset, size_t idx ) {
     uint64_t mask = ~ ( 1 << bit_idx );
     block = block & mask;
     blocks[block_idx] = block;
+}
+
+bool std_bitset_clear_atomic ( const void* bitset, size_t idx ) {
+    uint64_t* blocks = ( uint64_t* ) bitset;
+    uint64_t block_idx = idx >> 6;
+    uint64_t bit_idx = idx & 0x3f;
+    uint64_t* block = &blocks[block_idx];
+    uint64_t old_block = *block;
+    uint64_t mask = ~ ( 1 << bit_idx );
+    uint64_t new_block = old_block & mask;
+    return std_compare_and_swap_u64 ( block, &old_block, new_block );
 }
 
 bool std_bitset_scan ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx, size_t u64_blocks_count ) {

@@ -15,8 +15,8 @@ typedef struct {
 typedef struct {
     VkDescriptorSetLayout vk_descriptor_set_layout;
     uint64_t hash;
-    xg_vk_pipeline_resource_binding_point_t binding_points[xg_pipeline_resource_max_bindings_per_set_m];
     size_t binding_points_count;
+    xg_vk_pipeline_resource_binding_point_t binding_points[xg_pipeline_resource_max_bindings_per_set_m];
 } xg_vk_pipeline_resource_binding_set_layout_t;
 
 typedef struct {
