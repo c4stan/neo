@@ -72,10 +72,8 @@ BUILD_FLAG_RELOAD                   = 32
 BUILD_FLAGS = BUILD_FLAG_NONE
 
 # -- Config
-CONFIG_DEBUG = 1
-CONFIG_RELEASE = 2
-
-DEFAULT_CONFIGS = [CONFIG_DEBUG, CONFIG_RELEASE]
+CONFIG_DEBUG = 1    # default
+CONFIG_RELEASE = 2  # -opt
 
 # -- Custom Make targets
 TARGET_ALL = 1
@@ -350,7 +348,7 @@ def parse_makedef(path, bindings):
                 for x in values:
                     if x.startswith('$'):
                         if not x[1:] in bindings:
-                            log.error("Missing makedef binding for key " + x + ' while parsing makedef ' + path)
+                            log.error("Missing makedef binding for key " + x + ' while parsing makedef ' + path + '. If not already existing, please create a file named makedef_bindings in the same folder as the makedef, and then add line ' + x + '=' + '...' + ' specifying the desired value for that binding.')
 
             if bindings is not None:
                 values = [x if not x.startswith('$') else bindings[x[1:]] for x in values]
@@ -369,7 +367,7 @@ def resolve_bindings(makedef, bindings):
 
     for name in makedef['bindings']:
         if not name in bindings:
-            log.error('Module ' + makedef['name'][0] + ' is missing makedef binding ' + name + '. Please define ' + name + ' for your makedef_bindings')
+            log.error('Module ' + makedef['name'][0] + " is missing makedef binding for key " + name + ' in its makedef. If not already existing, please create a file named makedef_bindings in the same folder as the makedef, and then add line ' + name + '=' + '...' + ' specifying the desired value for that binding.')
         entries[name] = bindings[name]
 
     return entries
@@ -421,6 +419,8 @@ class Project:
         self.module_dependencies = []
         self.external_depencencies = []
         self.bindings = {}
+        self.makedef_path = None
+        self.makedef_bindings_path = None
 
         self.launcher_path = None # only used when output == OUTPUT_APP
 
@@ -613,6 +613,11 @@ class Project:
             path = relpath(define, rootpath + '/' + build_path)
             log.verbose(path)
             defs_macro.value += path + ' '
+        log.verbose(self.makedef_path)
+        defs_macro.value += self.makedef_path + ' '
+        if (self.makedef_bindings_path is not None):
+            log.verbose(self.makedef_bindings_path)
+            defs_macro.value += self.makedef_bindings_path + ' '
         log.pop_verbose()
 
         # Targets are generated for each config. Dependencies are the same but paths and compile flags differ.
@@ -711,6 +716,7 @@ class Project:
                     #main_target.cmd += '\t@clang-cl -Fa -Z7 /entry:mainCRTStartup -o $@ ' + objs_dep
                     main_target.cmd += '\t@clang -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
             elif platform.system() == 'Linux':
+                # -rdynamic preserves code symbols, allows to print callstack
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
                     # removed u flag from win32 version. https://bugzilla.redhat.com/show_bug.cgi?id=1155273
@@ -718,11 +724,11 @@ class Project:
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
                     #main_target.cmd += '\t@clang-cl -Fa -Z7 -LD -o $@ ' + objs_dep
-                    main_target.cmd += '\t@clang -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@clang -rdynamic -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
                     # -lX11 -lvulkan -lpthread -lm -ldl
-                    main_target.cmd += '\t@clang ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
+                    main_target.cmd += '\t@clang -rdynamic ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
         elif compiler == COMPILER_GCC:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
@@ -1148,8 +1154,10 @@ class Generator:
     # TODO scan all workspace for makedef files first instead of assuming they can be looked up recursively in /../dependency/
     def __load_node_rec(self, path):
         # Parse makedef and fill the project with the makedef data and the solution with the project
-        makedef_bindings = parse_makedef_bindings(abspath(path + '/makedef_bindings'))
-        makedef = parse_makedef(abspath(path + '/makedef'), makedef_bindings)
+        makedef_path = abspath(path + '/makedef')
+        makedef_bindings_path = abspath(path + '/makedef_bindings')
+        makedef_bindings = parse_makedef_bindings(makedef_bindings_path)
+        makedef = parse_makedef(makedef_path, makedef_bindings)
 
         name = makedef['name'][0]
 
@@ -1162,6 +1170,9 @@ class Generator:
             def_path = normpath(path + '/' + project_path + '/define')
             if (os.path.exists(def_path)):
                 project.defines.append(def_path)
+        project.makedef_path = makedef_path
+        if (os.path.exists(makedef_bindings_path)):
+            project.makedef_bindings_path = makedef_bindings_path
         #if 'defs' in makedef:
         #    for define in makedef['defs']:
         #        project.defines.append(path + '/' + define)

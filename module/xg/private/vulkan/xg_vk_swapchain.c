@@ -219,6 +219,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain->device = params->device;
     swapchain->window = params->window;
     swapchain->display = xg_null_handle_m;
+    swapchain->acquired = false;
     std_str_copy_m ( swapchain->debug_name, params->debug_name );
 
     //swapchain->texture_acquire_event = xg_gpu_queue_event_create ( params->device );
@@ -356,6 +357,8 @@ bool xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapchain_h swapch
     info->device = swapchain->device;
     info->window = swapchain->window;
     info->display = swapchain->display;
+    info->acquired = swapchain->acquired;
+    info->acquired_texture_idx = swapchain->acquired_texture_idx;
     std_str_copy_m ( info->debug_name, swapchain->debug_name );
 
     for ( uint64_t i = 0; i < swapchain->texture_count; ++i ) {
@@ -371,7 +374,7 @@ xg_texture_h xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain_handle ) {
     std_mutex_unlock ( &xg_vk_swapchain_state->swapchains_mutex );
     std_assert_m ( swapchain );
 
-    return swapchain->textures[swapchain->current_texture_idx];
+    return swapchain->textures[swapchain->acquired_texture_idx];
 }
 
 static bool xg_vk_swapchain_resize_check ( xg_swapchain_h swapchain_handle ) {
@@ -395,7 +398,7 @@ static bool xg_vk_swapchain_resize_check ( xg_swapchain_h swapchain_handle ) {
     }
 }
 
-void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle ) {
+uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle ) {
     std_mutex_lock ( &xg_vk_swapchain_state->swapchains_mutex );
     xg_vk_swapchain_t* swapchain = &xg_vk_swapchain_state->swapchains_array[swapchain_handle];
     std_mutex_unlock ( &xg_vk_swapchain_state->swapchains_mutex );
@@ -422,7 +425,7 @@ void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_
     result = vkWaitForFences ( device->vk_handle, 1, &fence, VK_TRUE, UINT64_MAX );
     std_assert_m ( result == VK_SUCCESS );
     vkDestroyFence ( device->vk_handle, fence, NULL );
-    swapchain->current_texture_idx = texture_idx;
+    swapchain->acquired_texture_idx = texture_idx;
     xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
 #else
     //xg_gpu_queue_event_h vk_acquire_event_handle = xg_gpu_queue_event_create ( swapchain->device );
@@ -445,7 +448,7 @@ void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_
         }
     } else {
         std_assert_msg_m ( result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, result );
-        swapchain->current_texture_idx = texture_idx;
+        swapchain->acquired_texture_idx = texture_idx;
         xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
     }
 
@@ -459,6 +462,9 @@ void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_
     }
 
 #endif
+
+    swapchain->acquired = true;
+    return texture_idx;
 }
 
 void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle ) {
@@ -474,7 +480,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
     xg_gpu_queue_event_log_wait ( workload->execution_complete_gpu_event );
     const xg_vk_gpu_queue_event_t* vk_complete_event = xg_vk_gpu_queue_event_get ( workload->execution_complete_gpu_event );
 
-    uint32_t texture_idx = ( uint32_t ) swapchain->current_texture_idx;
+    uint32_t texture_idx = ( uint32_t ) swapchain->acquired_texture_idx;
 
     uint64_t handles[3];
 
@@ -503,6 +509,8 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
 #if std_enabled_m(xg_debug_disable_semaphore_frame_sync_m)
     present_info.waitSemaphoreCount = 0;
 #endif
+
+    swapchain->acquired = false;
     VkResult result = vkQueuePresentKHR ( device->graphics_queue.vk_handle, &present_info );
 
     if ( result == VK_ERROR_OUT_OF_DATE_KHR ) {

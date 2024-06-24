@@ -5,6 +5,10 @@
 #include <std_string.h>
 #include <std_log.h>
 
+#if defined(std_platform_linux_m)
+#include <mntent.h>
+#endif
+
 fs_list_h fs_volume_get_first ( fs_volume_h* volume ) {
 #if defined(std_platform_win32_m)
     std_assert_m ( volume != NULL );

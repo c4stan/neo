@@ -26,7 +26,8 @@ typedef struct {
     char debug_name[xg_debug_name_size_m];
 
     xg_texture_h textures[xg_swapchain_max_textures_m];
-    size_t current_texture_idx;
+    size_t acquired_texture_idx;
+    bool acquired;
 
     //xg_gpu_queue_event_h texture_acquire_event;
     // Signaled by vkQueueSubmit and waited on by vkQueuePresent
@@ -52,6 +53,6 @@ bool            xg_vk_swapchain_resize ( xg_swapchain_h swapchain, size_t width,
 bool            xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapchain_h swapchain );
 
 //xg_texture_h    xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain, size_t idx );
-void            xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain, xg_workload_h workload );
+uint32_t        xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain, xg_workload_h workload );
 xg_texture_h    xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain );
 void            xg_vk_swapchain_present ( xg_swapchain_h swapchain, xg_workload_h workload );

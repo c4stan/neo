@@ -1,5 +1,3 @@
-#pragma once
-
 #include <std_allocator.h>
 
 typedef struct {
@@ -14,7 +12,7 @@ typedef struct {
     .page_count = 0, \
 }
 
-inline void* se_component_iterator_next ( se_component_iterator_t* iterator ) {
+extern inline void* se_component_iterator_next ( se_component_iterator_t* iterator ) {
     if ( iterator->page_count >= iterator->stream->pages[iterator->page].count ) {
         if ( iterator->page == iterator->stream->page_count - 1 ) { 
             return NULL;
@@ -43,7 +41,7 @@ typedef struct {
     .component = NULL \
 }
 
-inline se_entity_params_allocator_t se_entity_params_allocator ( std_virtual_stack_t* stack ) {
+extern inline se_entity_params_allocator_t se_entity_params_allocator ( std_virtual_stack_t* stack ) {
     se_entity_params_allocator_t allocator;
     allocator.stack = stack;
     allocator.entities = std_virtual_stack_alloc_m ( stack, se_entity_params_t );
@@ -53,7 +51,7 @@ inline se_entity_params_allocator_t se_entity_params_allocator ( std_virtual_sta
     return allocator;
 }
 
-inline void se_entity_params_alloc_entity ( se_entity_params_allocator_t* allocator ) {
+extern inline void se_entity_params_alloc_entity ( se_entity_params_allocator_t* allocator ) {
     allocator->entities->entity_count += 1;
     se_entity_update_t* entity = std_virtual_stack_alloc_m ( allocator->stack, se_entity_update_t );
     entity->component_count = 0;
@@ -64,7 +62,7 @@ inline void se_entity_params_alloc_entity ( se_entity_params_allocator_t* alloca
     allocator->entity = entity;
 }
 
-inline void se_entity_params_alloc_component ( se_entity_params_allocator_t* allocator, uint32_t id ) {
+extern inline void se_entity_params_alloc_component ( se_entity_params_allocator_t* allocator, uint32_t id ) {
     allocator->entity->component_count += 1;
     se_component_update_t* component = std_virtual_stack_alloc_m ( allocator->stack, se_component_update_t );
     component->id = id;
@@ -73,7 +71,7 @@ inline void se_entity_params_alloc_component ( se_entity_params_allocator_t* all
     allocator->component = component;
 }
 
-inline void se_entity_params_alloc_stream ( se_entity_params_allocator_t* allocator, uint32_t id, void* data ) {
+extern inline void se_entity_params_alloc_stream ( se_entity_params_allocator_t* allocator, uint32_t id, void* data ) {
     allocator->component->stream_count += 1;
     se_component_stream_update_t* stream = std_virtual_stack_alloc_m ( allocator->stack, se_component_stream_update_t );
     stream->has_inline_data = 0;
@@ -81,8 +79,9 @@ inline void se_entity_params_alloc_stream ( se_entity_params_allocator_t* alloca
     stream->data = data;
 }
 
-inline void se_entity_params_alloc_stream_inline ( se_entity_params_allocator_t* allocator, uint32_t id, void* data, uint32_t size ) {
+extern inline void se_entity_params_alloc_stream_inline ( se_entity_params_allocator_t* allocator, uint32_t id, void* data, uint32_t size ) {
     allocator->component->stream_count += 1;
+    // This allocates only the first 8 bytes of the stream struct, used for the first 2 u8 fields. The remaining is allocated below and fully used for storing inline_data
     se_component_stream_update_t* stream = ( se_component_stream_update_t* ) std_virtual_stack_alloc_align ( allocator->stack, 8, 8 );
     stream->has_inline_data = 1;
     stream->id = id;
@@ -91,12 +90,12 @@ inline void se_entity_params_alloc_stream_inline ( se_entity_params_allocator_t*
     std_virtual_stack_align ( allocator->stack, 8 );
 }
 
-inline void se_entity_params_alloc_monostream_component ( se_entity_params_allocator_t* allocator, uint32_t component_id, void* data ) {
+extern inline void se_entity_params_alloc_monostream_component ( se_entity_params_allocator_t* allocator, uint32_t component_id, void* data ) {
     se_entity_params_alloc_component ( allocator, component_id );
     se_entity_params_alloc_stream ( allocator, 0, data );
 }
 
-inline void se_entity_params_alloc_monostream_component_inline ( se_entity_params_allocator_t* allocator, uint32_t component_id, void* data, uint32_t size ) {
+extern inline void se_entity_params_alloc_monostream_component_inline ( se_entity_params_allocator_t* allocator, uint32_t component_id, void* data, uint32_t size ) {
     se_entity_params_alloc_component ( allocator, component_id );
     se_entity_params_alloc_stream_inline ( allocator, 0, data, size );
 }

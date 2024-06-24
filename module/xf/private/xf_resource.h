@@ -121,6 +121,8 @@ typedef struct {
     uint32_t index;
     xf_texture_h textures[xf_resource_multi_texture_max_textures_m];
     xf_texture_h alias;
+    //bool swapchain;
+    xg_swapchain_h swapchain;
 } xf_multi_texture_t;
 
 typedef struct {
@@ -214,8 +216,10 @@ void xf_resource_texture_refresh_external ( xf_texture_h texture );
     handle.
 */
 xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t* params );
-void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
 xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h swapchain );
+void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
+void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture, uint32_t index );
+xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h texture );
 
 xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
 

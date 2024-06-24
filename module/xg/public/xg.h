@@ -380,6 +380,8 @@ typedef enum {
 } xg_present_mode_e;
 
 typedef struct {
+    bool acquired;
+    uint32_t acquired_texture_idx;
     size_t texture_count;
     xg_texture_h textures[xg_swapchain_max_textures_m];
     xg_format_e format;
@@ -1886,8 +1888,8 @@ typedef struct {
     xg_swapchain_h          ( *create_virtual_swapchain )           ( const xg_swapchain_virtual_params_t* params );
     bool                    ( *resize_swapchain )                   ( xg_swapchain_h swapchain, size_t width, size_t height );
     bool                    ( *get_swapchain_info )                 ( xg_swapchain_info_t* info, xg_swapchain_h swapchain );
-    // TODO have the option to acquire the swapchain texture this through a resource cmd buffer
-    void                    ( *acquire_next_swapchain_texture )     ( xg_swapchain_h swapchain, xg_workload_h workload );
+    // TODO have the option to acquire the swapchain texture through a resource cmd buffer?
+    uint32_t                ( *acquire_next_swapchain_texture )     ( xg_swapchain_h swapchain, xg_workload_h workload );
     xg_texture_h            ( *get_swapchain_texture )              ( xg_swapchain_h swapchain );
     void                    ( *present_swapchain )                  ( xg_swapchain_h swapchain, xg_workload_h workload );
 

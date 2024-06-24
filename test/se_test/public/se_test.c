@@ -4,6 +4,8 @@
 #include <se.h>
 #include <fs.h>
 
+#include <se.inl>
+
 std_warnings_ignore_m ( "-Wunused-function" )
 std_warnings_ignore_m ( "-Wunused-macros" )
 std_warnings_ignore_m ( "-Wunused-variable" )
@@ -13,7 +15,7 @@ std_warnings_ignore_m ( "-Wunused-variable" )
 #define se_test_component_2_m 2
 #define se_test_component_3_m 3
 
-static void run_se_test ( void ) {
+static void run_se_test_1 ( void ) {
     se_i* se = std_module_load_m ( se_module_name_m );
 
     se->create_entity_family ( &se_entity_family_params_m (

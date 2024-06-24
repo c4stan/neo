@@ -12,6 +12,8 @@ std_module_export_m void fs_reload ( void*, void* );
 
 /*
 TODO
+consider moving basic file and folder manipulation code into std, and leave heremore advanced stuff, like volumes management, or maybe introduce the concept of a virtual FS of some kind
+
 return values/calling 'convention'
     could return an enum at almost every call that returns some sort of info about the result of the operation
     could just use the shared assert mechanism to return to the user any type of info, using the appropriate log level (info/warn/error)
@@ -122,9 +124,11 @@ typedef void ( fs_iterator_callback_f ) ( const char* name, fs_path_flags_t flag
 #define fs_read_error_m UINT64_MAX
 
 typedef struct fs_i {
+    // TODO remove these, leave the _get and _get_count api only
     fs_list_h   ( *get_first_volume ) ( fs_volume_h* volume );
     bool        ( *get_next_volume ) ( fs_list_h* list, fs_volume_h* volume );
     void        ( *close_volume_list ) ( fs_list_h list );
+
     size_t      ( *get_volumes_count ) ( void );
     size_t      ( *get_volumes ) ( fs_volume_h* volumes, size_t cap );
     bool        ( *get_volume_info ) ( fs_volume_info_t* info, const fs_volume_h* volume );

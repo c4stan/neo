@@ -5,6 +5,7 @@
 #include <wm.h>
 #include <xg.h>
 #include <xs.h>
+#include <fs.h>
 
 #include <math.h>
 
@@ -306,9 +307,11 @@ static void xs_test2 ( void ) {
         std_assert_m ( swapchain != xg_null_handle_m );
     }
 
+    std_module_load_m ( fs_module_name_m );
+
     xs_pipeline_state_h graphics_pipeline_state;
     xs_pipeline_state_h compute_pipeline_state;
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
+    xs_i* xs = std_module_load_m ( xs_module_name_m );
     {
         xs->add_database_folder ( "shader/" );
         xs->set_output_folder ( "output/shader/" );

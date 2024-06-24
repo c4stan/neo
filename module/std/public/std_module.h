@@ -94,7 +94,7 @@ void* std_module_get ( const char* module_name );
 void* std_module_load ( const char* name );
 void std_module_unload ( const char* name );
 //void std_module_unload ( const char* name );
-#define std_module_load_m( name ) ( std_pp_eval_concat_m( name, _i* ) ) std_module_load ( std_pp_eval_string_m( name ) )
+#define std_module_load_m( name ) ( std_pp_eval_concat_m ( name, _i* ) ) std_module_load ( std_pp_eval_string_m ( name ) )
 #define std_module_unload_m( name ) std_module_unload ( std_pp_eval_string_m( name ) )
 
 // Unloads a module DLL, recompiles the module code by running neo on it, and loads the new DLL.

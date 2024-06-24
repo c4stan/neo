@@ -99,7 +99,7 @@ typedef struct {
     tk_fiber_h  os_handle;
 #elif defined(std_platform_linux_m)
     ucontext_t  os_context;
-    std_alloc_t stack_alloc;
+    void*       stack;
 #endif
 } tk_fiber_context_t;
 

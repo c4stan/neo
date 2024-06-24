@@ -2,6 +2,7 @@
 
 #include <std_platform.h>
 
+#if 0
 #if defined(__GNUC__)
     #define std_compiler_gcc_m
 #elif defined(__clang__)
@@ -9,8 +10,9 @@
 #elif defined(_MSC_VER)
     #define std_compiler_ms_m
 #endif
-
-//#define std_compiler_clang_m
+#else
+    #define std_compiler_clang_m
+#endif
 
 #if !defined(NULL)
     #define NULL ( ( void * ) 0 )
@@ -47,7 +49,7 @@
     #define std_alignof_m( x )                                    __alignof__ ( x )
     #define std_inline_m                                          __attribute__ (( always_inline ))
     #define std_noinline_m                                        __attribute__ (( noinline ))
-    #define std_noop_m                                            __nop()
+    #define std_noop_m                                            asm("nop")
     //( ( void ) 0 )
 
     // TODO does this work on local scope variables?

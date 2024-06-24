@@ -4,6 +4,7 @@
 
 #include <xs.h>
 #include <xf.h>
+#include <fs.h>
 
 #include <math.h>
 
@@ -111,7 +112,7 @@ static void xf_test ( void ) {
         xg_swapchain_window_params_t swapchain_params = xg_swapchain_window_params_m (
             .window = window,
             .device = device,
-            .texture_count = 3,
+            .texture_count = 1,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
             .present_mode = xg_present_mode_mailbox_m,
@@ -120,6 +121,8 @@ static void xf_test ( void ) {
         swapchain = xg->create_window_swapchain ( &swapchain_params );
         std_assert_m ( swapchain != xg_null_handle_m );
     }
+
+    std_module_load_m ( fs_module_name_m );
 
     xs_pipeline_state_h pipeline_state;
     xs_i* xs = std_module_load_m ( xs_module_name_m );
@@ -235,13 +238,15 @@ static void xf_test ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        xg->acquire_next_swapchain_texture ( swapchain, workload );
+        //xg->acquire_next_swapchain_texture ( swapchain, workload );
 
         xf->execute_graph ( graph, workload );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 
         xs->update_pipeline_states ( workload );
+
+        //xf->advance_multi_texture ( swapchain_multi_texture );
     }
 
     std_module_unload_m ( xf_module_name_m );

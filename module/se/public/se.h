@@ -60,7 +60,7 @@ typedef struct {
     uint8_t id;
     union {
         void* data;
-        uint64_t inline_data[];
+        uint64_t inline_data[0]; // Should be inline_data[] but current clang doesn't like that
     };
 } se_component_stream_update_t;
 
@@ -131,6 +131,8 @@ typedef struct {
     .components = { 0 }, \
     ##__VA_ARGS__ \
 }
+
+#define se_default_query_params_m se_query_params_m()
 
 // TODO dynamic allocate some of the following instead of using static arrays?
 typedef struct {
@@ -222,5 +224,3 @@ typedef struct {
     bool get_query_result ( se_query_result_t* data, se_query_results_h results, se_query_h query );
 #endif
 } se_i;
-
-#include <se.inl>

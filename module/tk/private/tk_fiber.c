@@ -202,10 +202,10 @@ static void tk_fiber_create ( tk_fiber_context_t* context, void ( routine ) ( vo
 #if defined(std_platform_win32_m)
     context->os_handle = ( tk_fiber_h ) ( CreateFiberEx ( 0, 0, FIBER_FLAG_FLOAT_SWITCH, routine, NULL ) );
 #elif defined(std_platform_linux_m)
-    context->stack_alloc = std_virtual_alloc ( std_thread_stack_size_m );
+    context->stack = std_virtual_heap_alloc ( std_thread_stack_size_m, 16 );
     getcontext ( &context->os_context );
-    context->os_context.uc_stack.ss_sp = context->stack_alloc.buffer.base;
-    context->os_context.uc_stack.ss_size = context->stack_alloc.buffer.size;
+    context->os_context.uc_stack.ss_sp = context->stack;
+    context->os_context.uc_stack.ss_size = std_thread_stack_size_m;
     context->os_context.uc_link = 0;
     makecontext ( &context->os_context, ( void ( * ) () ) routine, 1, NULL );
 #endif
@@ -217,7 +217,7 @@ static void tk_fiber_enter_from_thread ( tk_fiber_context_t* context ) {
 #if defined(std_platform_win32_m)
     context->os_handle = ( tk_fiber_h ) ( ConvertThreadToFiberEx ( NULL, FIBER_FLAG_FLOAT_SWITCH ) );
 #elif defined(std_platform_linux_m)
-    context->stack_alloc = std_virtual_alloc ( std_thread_stack_size_m );
+    context->stack = std_virtual_heap_alloc ( std_thread_stack_size_m, 16 );
     getcontext ( &context->os_context );
     context->os_context.uc_stack.ss_size = 0;
     context->os_context.uc_stack.ss_sp = 0;
@@ -235,6 +235,8 @@ static void tk_fiber_exit_to_thread ( void ) {
         tk_fiber_switch ( thread_context->current_fiber, &thread_context->main_fiber );
         //swapcontext ( &thread_context->current_fiber->os_context, &thread_context->main_fiber.os_context );
     }
+
+    // TODO free stack here?
 
 #endif
 }

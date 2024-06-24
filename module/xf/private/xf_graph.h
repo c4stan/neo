@@ -67,6 +67,9 @@ typedef struct xf_node_t {
     //tk_workload_h cpu_workload;
 } xf_node_t;
 
+// TODO move out
+#define xf_graph_max_swapchain_multi_textures_per_graph_m 4
+
 typedef struct {
     xg_device_h device;
     //xf_node_t* nodes[xf_graph_max_nodes_m];

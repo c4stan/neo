@@ -2,6 +2,7 @@
 
 #include <std_compiler.h>
 #include <std_thread.h>
+#include <std_process.h>
 
 #include <stdio.h>
 
@@ -10,6 +11,8 @@
 #if defined(std_platform_linux_m)
     #include <sys/ptrace.h>
     #include <ctype.h>
+
+    #include <execinfo.h> /* backtrace, backtrace_symbols_fd */
 #endif
 
 //==============================================================================
@@ -17,6 +20,18 @@
 static std_log_state_t* std_log_state;
 
 //==============================================================================
+
+#if defined(std_platform_linux_m)
+void std_log_print_stacktrace ( void ) {
+    void* array[1024];
+    size_t size = backtrace ( array, 1024 );
+    backtrace_symbols_fd ( array, size, std_process_get_io ( std_process_this() ).stderr_handle );
+}
+#else
+void std_log_print_stacktrace ( void ) {
+    // TODO
+}
+#endif
 
 #if std_enabled_m(std_log_colored_console_output_m)
     #define std_terminal_color_reset_m    "\x1B[0m"
@@ -75,6 +90,10 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
         type_prefix,
         msg->payload,
         std_terminal_color_reset_m );
+
+    if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
+        std_log_print_stacktrace();
+    }
 
     if ( ( 1 << msg->level ) & ( std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         fflush ( stdout );

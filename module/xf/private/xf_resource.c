@@ -390,6 +390,7 @@ xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t
     multi_texture->params = *params;
     multi_texture->index = 0;
     multi_texture->alias = xf_null_handle_m;
+    multi_texture->swapchain = xg_null_handle_m;
 
     for ( uint32_t i = 0; i < params->multi_texture_count; ++i ) {
         char id[8];
@@ -408,13 +409,6 @@ xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
     std_bit_set_ms_64 ( &handle, 1 );
     return handle;
-}
-
-void xf_resource_multi_texture_advance ( xf_texture_h multi_texture_handle ) {
-    // TODO should this take aliasing into account?
-    std_assert_m ( std_bit_test_64 ( multi_texture_handle, 63 ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
-    multi_texture->index = ( multi_texture->index + 1 ) % multi_texture->params.multi_texture_count;
 }
 
 xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h swapchain ) {
@@ -441,6 +435,7 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     multi_texture->params = params;
     multi_texture->index = 0;
     multi_texture->alias = xf_null_handle_m;
+    multi_texture->swapchain = swapchain;
 
     for ( uint64_t i = 0; i < info.texture_count; ++i ) {
         xf_texture_h texture_handle = xf_resource_texture_declare ( &params.texture );
@@ -463,6 +458,25 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     std_bit_set_ms_64 ( &handle, 1 );
 
     return handle;
+}
+
+void xf_resource_multi_texture_advance ( xf_texture_h multi_texture_handle ) {
+    // TODO should this take aliasing into account?
+    std_assert_m ( std_bit_test_64 ( multi_texture_handle, 63 ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    multi_texture->index = ( multi_texture->index + 1 ) % multi_texture->params.multi_texture_count;
+}
+
+void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture_handle, uint32_t index ) {
+    std_assert_m ( std_bit_test_64 ( multi_texture_handle, 63 ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    multi_texture->index = index % multi_texture->params.multi_texture_count;
+}
+
+xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h multi_texture_handle ) {
+    std_assert_m ( std_bit_test_64 ( multi_texture_handle, 63 ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    return multi_texture->swapchain;
 }
 
 xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h xg_texture ) {

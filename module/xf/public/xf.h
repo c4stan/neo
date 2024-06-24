@@ -440,6 +440,7 @@ typedef struct {
     //void ( *advance_multi_buffer ) ( xf_multi_buffer_h multi_buffer );
     xf_texture_h ( *get_multi_texture ) ( xf_texture_h multi_texture, int32_t offset );
 
+    // TODO prefix declare_ to these
     xf_texture_h ( *multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
     xf_texture_h ( *texture_from_external ) ( xf_texture_h texture );
     void ( *refresh_external_texture ) ( xf_texture_h texture );

@@ -674,6 +674,20 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
     // Build
     xf_graph_build ( graph, xg, cmd_buffer, resource_cmd_buffer );
 
+    // Update swapchain resources
+    // TODO only do this for write-swapchains? Or forbit reads from swapchains completely?
+    for ( uint64_t i = 0; i < graph->multi_textures_count; ++i ) {
+        xg_swapchain_h swapchain = xf_resource_multi_texture_get_swapchain ( graph->multi_textures_array[i] );
+
+        xg_swapchain_info_t info;
+        xg->get_swapchain_info ( &info, swapchain );
+
+        if ( !info.acquired ) {
+            uint32_t idx = xg->acquire_next_swapchain_texture ( swapchain, xg_workload );
+            xf_resource_multi_texture_set_index ( graph->multi_textures_array[i], idx );
+        }
+    }
+
     // Execute
     {
         uint64_t sort_key = 0;
@@ -946,7 +960,10 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
     // Advance multi resources
     for ( uint64_t i = 0; i < graph->multi_textures_count; ++i ) {
-        xf_resource_multi_texture_advance ( graph->multi_textures_array[i] );
+        xg_swapchain_h swapchain = xf_resource_multi_texture_get_swapchain ( graph->multi_textures_array[i] );
+        if ( swapchain == xg_null_handle_m ) {
+            xf_resource_multi_texture_advance ( graph->multi_textures_array[i] );
+        }
     }
 }
 

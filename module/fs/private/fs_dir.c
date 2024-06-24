@@ -193,7 +193,7 @@ size_t fs_dir_iterate ( const char* path, fs_iterator_callback_f callback, void*
     struct dirent* item = readdir ( dir );
 
     while ( item ) {
-        std_ignore_warning_m ( fs_path_flags_t flags = 0, " -Wassign-enum" )
+        std_ignore_warning_m ( fs_path_flags_t flags = 0, "-Wassign-enum" )
 
         if ( item->d_type == DT_DIR ) {
             flags |= fs_path_is_dir_m;
