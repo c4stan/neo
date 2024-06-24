@@ -410,6 +410,7 @@ static void xs_test1 ( void ) {
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     {
         xs->add_database_folder ( "shader/" );
+        xs->set_output_folder ( "output/shader/" );
 
         xs_database_build_params_t build_params;
         build_params.viewport_width = 600;
