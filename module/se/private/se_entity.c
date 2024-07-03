@@ -343,10 +343,10 @@ static void* se_entity_family_get_component ( se_entity_family_t* family, uint32
 }
 #endif
 
-static const void* se_entity_update ( se_entity_h entity_handle, const se_entity_update_t* update ) {
+static const void* se_entity_update ( const se_entity_update_t* update ) {
     //for ( uint64_t update_it = 0; update_it < update_count; ++update_it ) {
     //se_entity_update_t* update = &updates[update_it];
-    se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
+    se_entity_t* entity = &se_entity_state->entity_array[update->entity];
     //se_entity_family_t* family = se_entity_family_get ( entity->mask );
     se_entity_family_t* family = &se_entity_state->family_array[entity->family];
     uint32_t family_idx = entity->idx;
@@ -398,19 +398,10 @@ static const void* se_entity_update ( se_entity_h entity_handle, const se_entity
     //}
 }
 
-se_entity_h se_entity_reserve ( se_component_mask_t mask ) {
-    // make sure entity faimly exists
-    //se_entity_family_t* family = se_entity_family_get ( mask );
+void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t mask ) {
+    se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
     se_entity_family_t* family = se_entity_family_get ( mask );
-    if ( !family ) {
-        std_log_error_m ( "Trying to add entity to non-existing entity family" );
-        return se_null_handle_m;
-    }
-
-    // allocate entity
-
-    se_entity_t* entity = std_list_pop_m ( &se_entity_state->entity_freelist );
-    uint64_t entity_idx = entity - se_entity_state->entity_array;
+    std_assert_m ( family );
 
     //entity->mask = mask;
     entity->family = family - se_entity_state->family_array;
@@ -439,10 +430,37 @@ se_entity_h se_entity_reserve ( se_component_mask_t mask ) {
             std_mem_zero ( stream->pages[page_idx] + stride * page_sub_idx, stride );
         }
     }
+}
 
-    // move component data
+se_entity_h se_entity_alloc ( se_component_mask_t mask ) {
+    // make sure entity faimly exists
+    //se_entity_family_t* family = se_entity_family_get ( mask );
+    se_entity_family_t* family = se_entity_family_get ( mask );
+    if ( !family ) {
+        std_log_error_m ( "Trying to add entity to non-existing entity family" );
+        return se_null_handle_m;
+    }
+
+    // allocate entity
+
+    se_entity_t* entity = std_list_pop_m ( &se_entity_state->entity_freelist );
+    uint64_t entity_idx = entity - se_entity_state->entity_array;
     se_entity_h entity_handle = entity_idx;
+
+    se_entity_alloc_components ( entity_handle, mask );
+
     return entity_handle;
+}
+
+se_entity_h se_entity_reserve ( void ) {
+    se_entity_t* entity = std_list_pop_m ( &se_entity_state->entity_freelist );
+
+    if ( !entity ) {
+        return se_null_handle_m;
+    }
+
+    uint64_t entity_idx = entity - se_entity_state->entity_array;
+    return  ( se_entity_h ) entity_idx;
 }
 
 void se_entity_create ( const se_entity_params_t* params ) {
@@ -450,8 +468,9 @@ void se_entity_create ( const se_entity_params_t* params ) {
     const se_entity_update_t* entity_update = params->entities;
 
     for ( uint64_t entity_it = 0; entity_it < count; ++entity_it ) {
-        se_entity_h entity_handle = se_entity_reserve ( entity_update->mask );
-        entity_update = ( se_entity_update_t* ) se_entity_update ( entity_handle, entity_update );
+        //se_entity_h entity_handle = se_entity_alloc ( entity_update->mask );
+        se_entity_alloc_components ( entity_update->entity, entity_update->mask );
+        entity_update = ( se_entity_update_t* ) se_entity_update ( entity_update );
     }
 }
 
@@ -462,6 +481,7 @@ void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count ) {
 }
 
 void se_entity_query ( se_query_result_t* result, const se_query_params_t* params ) {
+#if 1
     // fill query mask from query components
     se_component_mask_t query_mask;
     std_mem_zero_m ( &query_mask );
@@ -469,14 +489,17 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
     for ( uint32_t i = 0; i < params->component_count; ++i ) {
         std_bitset_set ( query_mask.u64, params->components[i] );
     }
+#else
+    se_component_mask_t query_mask = params->mask;
+#endif
 
     // clear result
     std_mem_zero_m ( result );
 
     // iterate entity families
-    uint64_t idx = 0;
-    while ( std_bitset_scan ( &idx, se_entity_state->family_bitset, idx, std_entity_family_bitset_block_count_m ) ) {
-        se_component_mask_t mask = se_entity_state->family_mask_array[idx];
+    uint64_t family_idx = 0;
+    while ( std_bitset_scan ( &family_idx, se_entity_state->family_bitset, family_idx, std_entity_family_bitset_block_count_m ) ) {
+        se_component_mask_t mask = se_entity_state->family_mask_array[family_idx];
         bool skip = false;
 
         for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
@@ -487,15 +510,22 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
         }
 
         if ( skip ) {
-            ++idx;
+            ++family_idx;
             continue;
         }
 
-        se_entity_family_t* family = &se_entity_state->family_array[idx];
+        se_entity_family_t* family = &se_entity_state->family_array[family_idx];
         uint32_t entity_count = family->entity_count;
 
+#if 1
         for ( uint32_t i = 0; i < params->component_count; ++i ) {
             uint32_t component_id = params->components[i];
+#else
+        uint64_t component_idx = 0;
+        uint32_t i = 0;
+        while ( std_bitset_scan ( &component_idx, query_mask.u64, component_idx, se_component_mask_block_count_m ) ) {
+            uint32_t component_id = component_idx;
+#endif
             uint8_t family_slot = family->component_slots[component_id];
             std_assert_m ( family_slot != 0xff );
             se_entity_family_component_t* component = &family->components[family_slot];
@@ -529,7 +559,7 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
 
         result->entity_count += entity_count;
     
-        ++idx;
+        ++family_idx;
     }
 }
 

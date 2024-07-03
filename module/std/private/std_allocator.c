@@ -1092,6 +1092,51 @@ uint64_t std_allocator_tlsf_heap_size_roundup ( uint64_t size ) {
     return size;
 }
 
+std_ignore_unused_warning_m()
+static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
+    char buffer[1024];
+    std_log_info_m ( "-- TLSF heap state --" );
+
+    std_size_to_str_approx ( buffer, 1024, heap->stack.end - heap->stack.begin );
+    std_log_info_m ( "Total: " std_fmt_str_m, buffer );
+    std_size_to_str_approx ( buffer, 1024, heap->allocated_size );
+    std_log_info_m ( "Used: " std_fmt_str_m, buffer );
+
+    std_log_info_m ( "Free:" );
+    for ( uint32_t x = 0; x < std_allocator_tlsf_x_size_m; ++x ) {
+        char stack_buffer[1024] = {0};
+        std_stack_t stack = std_static_stack_m ( stack_buffer );
+
+        std_size_to_str_approx ( buffer, 1024, 1ull << ( x + std_allocator_tlsf_min_x_level_m ) );
+        std_stack_string_append ( &stack, buffer );
+        std_stack_string_append ( &stack, std_fmt_tab_m );
+
+        //std_str_format_m ( buffer, std_fmt_u32_m, heap->available_rows & ( 1ull << x ) ? 1 : 0 );
+        //uint32_t idx = std_bit_scan_64 ( heap->available_rows );
+        std_str_format_m ( buffer, std_fmt_u64_pad_m ( 2 ), x );
+        std_stack_string_append ( &stack, buffer );
+        std_stack_string_append ( &stack, " | " );
+
+        for ( uint32_t y = 0; y < std_allocator_tlsf_y_size_m; ++y ) {
+            bool available = heap->available_freelists[x] & ( 1ull << y );
+            std_assert_m ( ( !available && heap->freelists[x][y] == NULL ) || ( available && heap->freelists[x][y] ) );
+            uint32_t count = 0;
+            if ( available ) {
+                void* item = heap->freelists[x][y];
+                while ( item ) {
+                    ++count;
+                    std_allocator_tlsf_header_t* header = item - std_allocator_tlsf_header_size_m;
+                    item = header->next;
+                }
+            }
+            std_str_format_m ( buffer, std_fmt_u32_m, count );
+            std_stack_string_append ( &stack, buffer );
+            std_stack_string_append ( &stack, "  " );
+        }
+        std_log_info_m ( std_fmt_str_m, stack_buffer );
+    }
+}
+
 std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx_first_available ( std_allocator_tlsf_heap_t* heap, uint64_t size, std_allocator_tlsf_freelist_idx_t base ) {
     std_allocator_tlsf_freelist_idx_t idx;
 
@@ -1200,6 +1245,8 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
         footer->size = size;
 
         std_allocator_tlsf_add_to_freelist ( heap, header, size );
+
+        std_allocator_tlsf_print_state ( heap );
 
         std_noop_m;
     }

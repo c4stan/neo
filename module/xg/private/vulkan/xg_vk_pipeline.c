@@ -751,7 +751,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         xg_vk_pipeline->common.push_constants_hash = pipeline_layout_results.constant_bindings_hash;
 
         if ( params->debug_name[0] ) {
-            std_str_copy_m ( xg_vk_pipeline->common.debug_name, params->debug_name );
+            std_str_copy_static_m ( xg_vk_pipeline->common.debug_name, params->debug_name );
         }
 
         xg_vk_pipeline->common.vk_handle = pipeline;

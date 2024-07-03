@@ -166,7 +166,7 @@ static void xg_test2_run ( void ) {
             .texture_count = 3,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
-            .present_mode = xg_present_mode_mailbox_m,
+            .present_mode = xg_present_mode_fifo_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );

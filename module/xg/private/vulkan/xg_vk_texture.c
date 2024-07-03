@@ -306,7 +306,7 @@ bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle 
     info->flags = texture->flags;
     info->default_aspect = texture->default_aspect;
     info->os_handle = ( uint64_t ) texture->vk_handle;
-    std_str_copy_m ( info->debug_name, texture->params.debug_name );
+    std_str_copy_static_m ( info->debug_name, texture->params.debug_name );
 
     return true;
 }

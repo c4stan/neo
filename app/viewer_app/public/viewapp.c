@@ -25,6 +25,8 @@
 #include <geometry.h>
 #include <viewapp_state.h>
 
+#include <se.inl>
+
 std_warnings_ignore_m ( "-Wunused-function" )
 std_warnings_ignore_m ( "-Wunused-variable" )
 
@@ -120,6 +122,7 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
     se_i* se = m_state->modules.se;
     xf_i* xf = m_state->modules.xf;
 
+#if 0
     se_query_h camera_query;
     {
         se_query_params_t query_params = se_default_query_params_m;
@@ -129,13 +132,24 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 
     se->resolve_pending_queries();
     const se_query_result_t* camera_query_result = se->get_query_result ( camera_query );
+    std_assert_m ( camera_query_result->count == 1 );
+#else
+    se_query_result_t camera_query_result;
+    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { CAMERA_COMPONENT_ID } ) );
+    std_assert_m ( camera_query_result.entity_count == 1 );
+
+    se_component_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+#endif
 
     rv_i* rv = std_module_get_m ( rv_module_name_m );
-    std_assert_m ( camera_query_result->count == 1 );
     {
+#if 0
         se_entity_h entity = camera_query_result->entities[0];
         se_component_h component = se->get_component ( entity, CAMERA_COMPONENT_ID );
         std_auto_m camera_component = ( viewapp_camera_component_t* ) component;
+#else
+        viewapp_camera_component_t* camera_component = se_component_iterator_next ( &camera_iterator );
+#endif
 
         xg_buffer_range_t view_buffer_range;
         {
@@ -179,7 +193,9 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
         }
     }
 
+#if 0
     se->dispose_query_results();
+#endif
 }
 
 typedef struct {
@@ -271,8 +287,9 @@ static void viewapp_scene_cornell_box ( void ) {
 
     // sphere
     //m_state->components.sphere = sphere_entity;
+    m_state->entities.sphere = se->create_entity();
     {
-        se_entity_params_alloc_entity ( &allocator );
+        se_entity_params_alloc_entity ( &allocator, m_state->entities.sphere );
         //se_entity_h sphere_entity = se->create_entity ( &se_entity_params_m() );
         
         geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
@@ -300,7 +317,7 @@ static void viewapp_scene_cornell_box ( void ) {
             )
         );
         
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_m, &mesh_component );
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, MESH_COMPONENT_ID, &mesh_component );
         //se->add_component ( sphere_entity, MESH_COMPONENT_ID, ( se_component_h ) mesh_component );
 
 #if 0
@@ -351,7 +368,10 @@ static void viewapp_scene_cornell_box ( void ) {
         //entity_params.max_component_count = 8;
         //se_entity_h plane_entity = se->create_entity ( &entity_params );
         //m_state->components.planes[i] = plane_entity;
-        se_entity_params_alloc_entity ( &allocator );
+
+        m_state->entities.planes[i] = se->create_entity();
+
+        se_entity_params_alloc_entity ( &allocator, m_state->entities.planes[i] );
 
         geometry_data_t geo = generate_plane ( 5.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
@@ -392,7 +412,7 @@ static void viewapp_scene_cornell_box ( void ) {
             ),
         );
         //se->add_component ( plane_entity, MESH_COMPONENT_ID, ( se_component_h ) mesh_component );
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_m, &mesh_component );
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, MESH_COMPONENT_ID, &mesh_component );
     }
 
     // light
@@ -402,7 +422,9 @@ static void viewapp_scene_cornell_box ( void ) {
         //entity_params.max_component_count = 8;
         //light_entity = se->create_entity ( &entity_params );
         //m_state->components.light = light_entity;
-        se_entity_params_alloc_entity ( &allocator );
+
+        m_state->entities.light = se->create_entity();
+        se_entity_params_alloc_entity ( &allocator, m_state->entities.light );
 
         //viewapp_light_component_t* light_component = &m_state->components.light_components[0];
         viewapp_light_component_t light_component = viewapp_light_component_m (
@@ -414,9 +436,9 @@ static void viewapp_scene_cornell_box ( void ) {
 
         rv_view_params_t view_params = rv_view_params_m (
             .position = {
-                light_component->position[0],
-                light_component->position[1],
-                light_component->position[2],
+                light_component.position[0],
+                light_component.position[1],
+                light_component.position[2],
             },
             .focus_point = {
                 view_params.position[0],
@@ -430,13 +452,16 @@ static void viewapp_scene_cornell_box ( void ) {
                 .reverse_z = false,
             ),
         );
-        light_component->view = rv->create_view ( &view_params );
+        light_component.view = rv->create_view ( &view_params );
 
         //se->add_component ( light_entity, LIGHT_COMPONENT_ID, ( se_component_h ) light_component );
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_light_component_m, &light_component );
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, LIGHT_COMPONENT_ID, &light_component );
     }
+
+    se->init_entities ( allocator.entities );
 }
 
+#if 0
 static void viewapp_scene_field ( void ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
@@ -575,6 +600,8 @@ static void viewapp_scene_field ( void ) {
         se->add_component ( entity, LIGHT_COMPONENT_ID, ( se_component_h ) light_component );
     }
 }
+#endif
+
 //#include <stdio.h>
 static void viewapp_boot ( void ) {
     //{
@@ -635,8 +662,34 @@ static void viewapp_boot ( void ) {
     m_state->render.swapchain = swapchain;
 
     se_i* se = m_state->modules.se;
-    se_entity_h camera_entity = se->create_entity ( &se_entity_params_m() );
-    m_state->components.camera = camera_entity;
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 1,
+        .components = { se_component_layout_m (
+            .id = CAMERA_COMPONENT_ID,
+            .stream_count = 1,
+            .streams = { sizeof ( viewapp_camera_component_t ) }
+        ) }
+    ) );
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 1,
+        .components = { se_component_layout_m (
+            .id = MESH_COMPONENT_ID,
+            .stream_count = 1,
+            .streams = { sizeof ( viewapp_mesh_component_t ) }
+        ) }
+    ) );
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 1,
+        .components = { se_component_layout_m (
+            .id = LIGHT_COMPONENT_ID,
+            .stream_count = 1,
+            .streams = { sizeof ( viewapp_light_component_t ) }
+        ) }
+    ) );
+
+    se_entity_h camera_entity = se->create_entity();
+    m_state->entities.camera = camera_entity;
 
     xs_i* xs = m_state->modules.xs;
     xi_i* xi = m_state->modules.xi;
@@ -690,8 +743,10 @@ static void viewapp_boot ( void ) {
     }
 
     rv_i* rv = m_state->modules.rv;
-    viewapp_camera_component_t* camera_component = &m_state->components.camera_component;
+    //viewapp_camera_component_t* camera_component = &m_state->components.camera_component;
     {
+        viewapp_camera_component_t camera_component;
+
         // view
         rv_view_params_t view_params = rv_view_params_m (
             .position = { 0, 0, -8 },
@@ -704,11 +759,20 @@ static void viewapp_boot ( void ) {
                 .reverse_z = false,
             ),
         );
-        rv_view_h view = rv->create_view ( &view_params );
+        camera_component.view = rv->create_view ( &view_params );
 
         // camera
-        camera_component->view = view;
-        se->add_component ( camera_entity, CAMERA_COMPONENT_ID, ( se_component_h ) camera_component );
+        //camera_component->view = view;
+        //se->add_component ( camera_entity, CAMERA_COMPONENT_ID, ( se_component_h ) camera_component );
+
+        m_state->entities.camera = se->create_entity();
+
+        std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
+        se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
+        se_entity_params_alloc_entity ( &allocator, m_state->entities.camera );
+        se_entity_params_alloc_monostream_component_inline_m ( &allocator, CAMERA_COMPONENT_ID, &camera_component );
+
+        se->init_entities ( allocator.entities );
     }
 
     viewapp_scene_cornell_box();
@@ -723,7 +787,7 @@ static void viewapp_boot ( void ) {
     {
         xf_node_params_t params = xf_default_node_params_m;
         params.execute_routine = frame_setup_pass;
-        std_str_copy_m ( params.debug_name, "frame_setup" );
+        std_str_copy_static_m ( params.debug_name, "frame_setup" );
         frame_setup_node = xf->create_node ( graph, &params );
     }
 
@@ -733,7 +797,7 @@ static void viewapp_boot ( void ) {
         params.width = 1024;
         params.height = 1024;
         params.format = xg_format_d16_unorm_m;
-        std_str_copy_m ( params.debug_name, "shadow_texture" );
+        std_str_copy_static_m ( params.debug_name, "shadow_texture" );
         shadow_texture = xf->declare_texture ( &params );
     }
 
@@ -753,7 +817,7 @@ static void viewapp_boot ( void ) {
     {
         xf_node_params_t params = xf_default_node_params_m;
         params.execute_routine = view_setup_pass;
-        std_str_copy_m ( params.debug_name, "view_setup" );
+        std_str_copy_static_m ( params.debug_name, "view_setup" );
         view_setup_node = xf->create_node ( graph, &params );
     }
 
@@ -1237,6 +1301,7 @@ static std_app_state_e viewapp_update ( void ) {
     xi->end_update();
 
     // Camera
+    #if 0
     if ( xi->get_active_element_id() == 0 ) {
         rv_i* rv = m_state->modules.rv;
         viewapp_camera_component_t* camera_component = &m_state->components.camera_component;
@@ -1309,16 +1374,17 @@ static std_app_state_e viewapp_update ( void ) {
             rv->update_view_transform ( camera_component->view, &xform );
         }
     }
+    #endif
 
     m_state->render.window_info = new_window_info;
     m_state->render.input_state = new_input_state;
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
-    xg->acquire_next_swapchain_texture ( m_state->render.swapchain, workload );
+    //xg->acquire_next_swapchain_texture ( m_state->render.swapchain, workload );
     xf->execute_graph ( m_state->render.graph, workload );
     xg->submit_workload ( workload );
-    xg->present_swapchain ( m_state->render.swapchain, workload );
+    //xg->present_swapchain ( m_state->render.swapchain, workload );
 
     xs->update_pipeline_states ( workload );
 
@@ -1352,7 +1418,7 @@ void* viewer_app_load ( void* runtime ) {
     std_mem_zero_m ( &state->render );
     state->render.frame_id = 0;
 
-    std_mem_zero_m ( &state->components );
+    std_mem_zero_m ( &state->entities );
 
     //state->model_components_freelist = std_static_freelist_m ( state->model_components );
     //state->mesh_components_freelist = std_static_freelist_m ( state->mesh_components );

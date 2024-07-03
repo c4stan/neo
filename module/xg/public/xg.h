@@ -409,7 +409,7 @@ typedef struct {
     .texture_count = 0, \
     .format = xg_format_undefined_m, \
     .color_space = xg_colorspace_srgb_m, \
-    .present_mode = xg_present_mode_immediate_m, \
+    .present_mode = xg_present_mode_fifo_m, \
     .debug_name = "swapchain", \
     .device = xg_null_handle_m, \
     .window = wm_null_handle_m, \

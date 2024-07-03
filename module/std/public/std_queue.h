@@ -11,6 +11,8 @@
         would allow to use the same struct/api for queue and circular pool
 */
 
+// TODO do the virtual mem trick where 2 adjacent logical pages are mapped to the same phyisical page, to avoid having to manually wrap-around the memcpy at the end
+
 typedef struct {
     char* base;
     size_t top;

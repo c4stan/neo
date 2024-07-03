@@ -3,6 +3,7 @@
 #include <viewapp_state.h>
 
 #include <sm_matrix.h>
+#include <se.inl>
 
 typedef struct {
     xs_pipeline_state_h pipeline_state;
@@ -42,6 +43,7 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
     }
 
+#if 0
     se_query_h light_query;
     {
         se_query_params_t query_params = se_default_query_params_m;
@@ -61,11 +63,30 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
     const se_query_result_t* mesh_query_result = se->get_query_result ( mesh_query );
     uint64_t light_count = light_query_result->count;
     uint64_t mesh_count = mesh_query_result->count;
+#else
+    se_query_result_t light_query_result;
+    se->query_entities ( &light_query_result, &se_query_params_m (
+        .component_count = 1,
+        .components = { LIGHT_COMPONENT_ID }
+    ) );
 
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m (
+        .component_count = 1,
+        .components = { MESH_COMPONENT_ID }
+    ) );
+
+    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+    uint64_t light_count = light_query_result.entity_count;
+#endif
     for ( uint64_t i = 0; i < light_count; ++i ) {
+#if 0
         se_entity_h light_entity = light_query_result->entities[i];
         se_component_h light_component_handle = se->get_component ( light_entity, LIGHT_COMPONENT_ID );
         std_auto_m light_component = ( viewapp_light_component_t* ) light_component_handle;
+#else
+        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+#endif
 
         xg_buffer_range_t view_buffer_range;
         {
@@ -105,11 +126,17 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         viewport.height = 1024;
         xg->cmd_set_pipeline_viewport ( node_args->cmd_buffer, &viewport, key );
 
+#if 0
         for ( uint64_t j = 0; j < mesh_count; ++j ) {
             se_entity_h mesh_entity = mesh_query_result->entities[j];
             se_component_h mesh_component_handle = se->get_component ( mesh_entity, MESH_COMPONENT_ID );
             std_auto_m mesh_component = ( viewapp_mesh_component_t* ) mesh_component_handle;
-
+#else
+        se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+        uint64_t mesh_count = mesh_query_result.entity_count;
+        for ( uint64_t j = 0; j < mesh_count; ++j ) {
+            viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+#endif
             xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->shadow_pipeline );
             xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
@@ -172,7 +199,9 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         }
     }
 
+#if 0
     se->dispose_query_results();
+#endif
 }
 
 xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
@@ -191,7 +220,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
         params.passthrough.enable = true;
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_clear_m;
         params.execute_routine = shadow_pass_routine;
-        std_str_copy_m ( params.debug_name, "shadows" );
+        std_str_copy_static_m ( params.debug_name, "shadows" );
         node = xf->create_node ( graph, &params );
     }
 

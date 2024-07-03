@@ -7,7 +7,6 @@
 std_module_export_m void* tk_load ( void* );
 std_module_export_m void tk_unload ( void );
 
-// TODO rename this to tk_task_h? workload seems too big of a word
 typedef uint64_t tk_workload_h;
 
 typedef void ( tk_task_routine_f ) ( void* );

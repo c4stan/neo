@@ -42,7 +42,7 @@ CORE_WARNINGS_FLAGS = (
     ' -Wfatal-errors'                           # Stop after first error
     ' -Wno-disabled-macro-expansion'
     ' -Wno-gnu-designator'                      # allow for int array[100] = { [0...99] = 1 };
-    ' -Wno-void-pointer-to-enum-cast'           # allow casting void* to enum
+    #' -Wno-void-pointer-to-enum-cast'           # allow casting void* to enum
     ' -Wno-initializer-overrides'               # allow assigning same member multiple times in initializer lists. Used in constructor macros for optional non-default params
     ' -Wno-unused-but-set-variable'
     ' -Wno-comment'

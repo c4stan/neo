@@ -40,7 +40,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
     params.format = swapchain_texture_info.format;
     params.allowed_usage = xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_storage_m;
     params.initial_layout = xg_texture_layout_undefined_m;
-    std_str_copy_m ( params.debug_name, "temp_texture" );
+    std_str_copy_static_m ( params.debug_name, "temp_texture" );
     xg_texture_h temp_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params );
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, temp_texture, xg_resource_cmd_buffer_time_workload_complete_m );
@@ -300,7 +300,7 @@ static void xs_test2 ( void ) {
             .texture_count = 3,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m
             .color_space = xg_colorspace_srgb_m,
-            .present_mode = xg_present_mode_mailbox_m,
+            .present_mode = xg_present_mode_fifo_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );

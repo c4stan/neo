@@ -272,7 +272,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         switch ( pipeline_state->type ) {
             case xg_pipeline_graphics_m:
                 parsed_pipeline_state.graphics.params = xg_default_graphics_pipeline_params_m;
-                std_str_copy_m ( parsed_pipeline_state.graphics.params.debug_name, pipeline_state->name );
+                std_str_copy_static_m ( parsed_pipeline_state.graphics.params.debug_name, pipeline_state->name );
 
                 // Initialize viewport size with param values, the xss can override it if desired
                 parsed_pipeline_state.graphics.params.state.viewport_state.width = ( uint32_t ) build_params->viewport_width;
@@ -287,7 +287,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
 
             case xg_pipeline_compute_m:
                 parsed_pipeline_state.compute.params = xg_default_compute_pipeline_params_m;
-                std_str_copy_m ( parsed_pipeline_state.compute.params.debug_name, pipeline_state->name );
+                std_str_copy_static_m ( parsed_pipeline_state.compute.params.debug_name, pipeline_state->name );
 
                 state_parse_result = xs_parser_parse_compute_pipeline_state_from_path ( &parsed_pipeline_state.compute, pipeline_state->path );
 

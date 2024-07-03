@@ -106,7 +106,7 @@ xf_node_h add_temporal_accumulation_pass ( xf_graph_h graph, xf_texture_h accumu
         params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( prev_depth, xg_shading_stage_fragment_m );
         params.execute_routine = temporal_accumulation_pass;
         params.user_args = std_buffer_m ( &args );
-        std_str_copy_m ( params.debug_name, debug_name );
+        std_str_copy_static_m ( params.debug_name, debug_name );
         params.passthrough.enable = true;
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_alias_m;
         params.passthrough.render_targets[0].alias = color;

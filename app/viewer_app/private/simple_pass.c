@@ -109,7 +109,7 @@ xf_node_h add_simple_screen_pass ( xf_graph_h graph, const char* name, const sim
         node_params.execute_routine = simple_screen_pass_routine;
         node_params.user_args = std_buffer_m ( &args );
         node_params.passthrough = params->passthrough;
-        std_str_copy_m ( node_params.debug_name, name );
+        std_str_copy_static_m ( node_params.debug_name, name );
         node = xf->create_node ( graph, &node_params );
     }
 
@@ -165,7 +165,7 @@ xf_node_h add_simple_clear_pass ( xf_graph_h graph, const char* name, const simp
 
         node_params.execute_routine = simple_clear_pass;
         node_params.user_args = std_buffer_m ( &args );
-        std_str_copy_m ( node_params.debug_name, name );
+        std_str_copy_static_m ( node_params.debug_name, name );
         node = xf->create_node ( graph, &node_params );
     }
 

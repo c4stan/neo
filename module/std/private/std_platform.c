@@ -13,7 +13,7 @@ static std_platform_state_t* std_platform_state;
     #include <dirent.h>
 #endif
 
-void std_platform_init ( std_platform_state_t* state ) {
+void std_platform_load_state_info ( std_platform_state_t* state ) {
 #if defined(std_platform_win32_m)
     std_mem_zero_m ( state );
     //state->logical_cores_mask = 0;
@@ -232,11 +232,19 @@ void std_platform_init ( std_platform_state_t* state ) {
 #endif
 }
 
+void std_platform_init ( std_platform_state_t* state ) {
+    std_platform_load_state_info ( state );
+}
+
 void std_platform_attach ( std_platform_state_t* state ) {
     std_platform_state = state;
 }
 
 //==============================================================================
+
+void std_platform_refresh_info ( void ) {
+    std_platform_load_state_info ( std_platform_state );
+}
 
 size_t std_platform_caches_info ( std_platform_cache_info_t* info, size_t cap ) {
     size_t count = std_platform_state->caches_count;
@@ -258,7 +266,7 @@ size_t std_platform_physical_cores_info ( std_platform_physical_core_info_t* inf
     size_t count = std_platform_state->physical_cores_count;
 
     if ( info == NULL ) {
-        return count;;
+        return count;
     }
 
     size_t min_cap = std_min ( cap, count );

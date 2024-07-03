@@ -110,7 +110,7 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
         params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( hiz, xg_shading_stage_fragment_m );
         params.execute_routine = ssgi_raymarch_pass;
         params.user_args = std_buffer_m ( &ssgi_pass_args );
-        std_str_copy_m ( params.debug_name, name );
+        std_str_copy_static_m ( params.debug_name, name );
         params.passthrough.enable = true;
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_clear_m;
         ssgi_trace_node = xf->create_node ( graph, &params );

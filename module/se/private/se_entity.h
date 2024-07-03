@@ -90,6 +90,8 @@ void se_entity_unload ( void );
 void se_entity_family_create ( const se_entity_family_params_t* params );
 void se_entity_family_destroy ( se_component_mask_t mask );
 
+se_entity_h se_entity_reserve ( void );
+
 void se_entity_create ( const se_entity_params_t* params );
 void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count );
 

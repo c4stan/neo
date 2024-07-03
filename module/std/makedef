@@ -5,3 +5,4 @@ code = public, private
 if linux
     libs = m #, dl, pthread
 endif
+#ignores = std_file.c

@@ -9,6 +9,7 @@ std_module_export_m void se_unload ( void );
 
 typedef uint64_t se_entity_h;
 typedef uint64_t se_query_h;
+typedef uint64_t se_entity_group_h;
 
 #if 0
     typedef uint32_t se_component_e;
@@ -89,7 +90,19 @@ typedef struct {
     .streams = { se_component_stream_update_m ( .id = 0, .data = _data ) }, \
 }
 
+/*
+    entity handle
+    component count
+    component[]
+        id
+        stream count
+        streams[]
+            id
+            data
+
+*/
 typedef struct se_entity_update_t {
+    se_entity_h entity;
     se_component_mask_t mask;
     uint32_t component_count;
     struct se_entity_update_t* next;
@@ -121,8 +134,13 @@ typedef struct {
     uint32_t write_components_count;
     uint32_t write_components[se_entity_max_components_per_entity_m];
 #else
+#if 1
+    // Take component list instead of mask so that the user can define the components ordering to expect in the result
     uint32_t component_count;
     uint32_t components[se_entity_max_components_per_entity_m];
+#else
+    se_component_mask_t mask;
+#endif
 #endif
 } se_query_params_t;
 
@@ -189,11 +207,18 @@ typedef struct {
     void ( *create_entity_family ) ( const se_entity_family_params_t* params );
     void ( *destroy_entity_family ) ( se_component_mask_t mask );
 
-    void ( *create_entities ) ( const se_entity_params_t* params );
+    se_entity_h ( *create_entity ) ( void );
+
+    void ( *init_entities ) ( const se_entity_params_t* params );
+
     void ( *destroy_entities ) ( const se_entity_h* entities, uint64_t count );
 
-    se_entity_h ( *create_entity ) ( const se_entity_update_t* update );
-    void ( *destroy_entity ) ( se_entity_h entity );
+    //se_entity_h ( *create_entity ) ( const se_entity_update_t* update );
+    //void ( *destroy_entity ) ( se_entity_h entity );
+
+    // TODO is this a good idea?
+    //se_entity_group_h ( *create_entity_group ) ( void );
+    //void ( *destroy_entity_group ) ( se_entity_group_h group );
 
     void ( *query_entities ) ( se_query_result_t* result, const se_query_params_t* params );
 #if 0
@@ -224,3 +249,5 @@ typedef struct {
     bool get_query_result ( se_query_result_t* data, se_query_results_h results, se_query_h query );
 #endif
 } se_i;
+
+#include <se.inl>

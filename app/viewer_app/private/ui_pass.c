@@ -75,7 +75,7 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
         xf_node_params_t params = xf_default_node_params_m;
         params.render_targets[params.render_targets_count++] = xf_render_target_dependency_m ( color, xg_default_texture_view_m );
         params.execute_routine = ui_pass_routine;
-        std_str_copy_m ( params.debug_name, "ui" );
+        std_str_copy_static_m ( params.debug_name, "ui" );
         params.debug_color = xg_debug_region_color_green_m;
         params.key_space_size = 128;
         params.user_args = std_buffer_m ( &args );

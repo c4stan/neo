@@ -43,7 +43,7 @@ xf_node_h add_depth_clear_pass ( xf_graph_h graph, xf_texture_h depth, const cha
         xf_node_params_t params = xf_default_node_params_m;
         params.copy_texture_writes[params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m );
         params.execute_routine = clear_pass;
-        std_str_copy_m ( params.debug_name, name );
+        std_str_copy_static_m ( params.debug_name, name );
         node = xf->create_node ( graph, &params );
     }
 
@@ -74,7 +74,7 @@ xf_node_h add_depth_pass ( xf_graph_h graph, xf_texture_h depth ) {
         params.user_args = &args;
         params.user_args_allocator = std_virtual_heap_allocator();
         params.user_args_alloc_size = sizeof ( args );
-        std_str_copy_m ( params.debug_name, "depth" );
+        std_str_copy_static_m ( params.debug_name, "depth" );
         depth_node = xf->create_node ( graph, &params );
     }
 

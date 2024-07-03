@@ -31,7 +31,6 @@ void fs_filetime_to_timestamp ( uint64_t filetime, std_timestamp_t* timestamp );
 #include <dirent.h>
 #include <ftw.h>
 #include <limits.h>
-#include <errno.h> // TODO move to std_platform?
 
 void fs_filetime_to_timestamp ( struct timespec ts, std_timestamp_t* timestamp );
 

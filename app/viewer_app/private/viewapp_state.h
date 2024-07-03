@@ -179,6 +179,13 @@ typedef struct {
 
     viewapp_camera_component_t camera_component;
 } viewapp_components_state_t;
+#else
+typedef struct {
+    se_entity_h camera;
+    se_entity_h sphere;
+    se_entity_h planes[5];
+    se_entity_h light;
+} viewapp_entity_state_t;
 #endif
 
 // Viewapp
@@ -188,6 +195,7 @@ typedef struct {
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;
     //viewapp_components_state_t components;
+    viewapp_entity_state_t entities;
     viewapp_ui_state_t ui;
 } viewapp_state_t;
 

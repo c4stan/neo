@@ -1303,7 +1303,7 @@ static void xs_parser_parse_permutation ( xs_parser_parsing_context_t* context )
     xs_parser_skip_spaces ( context );
     size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
     std_assert_m ( len < xs_shader_permutation_name_max_len_m && len > 0 );
-    std_str_copy_m ( permutation->name, token );
+    std_str_copy_static_m ( permutation->name, token );
 
     xs_parser_skip_spaces ( context );
     uint32_t bit_start;

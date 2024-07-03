@@ -147,12 +147,45 @@ typedef enum {
     std_platform_core_relationship_error_m
 } std_platform_core_relationship_e;
 
+// TODO add here info about storage volumes? displays?
+typedef enum {
+    std_volume_supports_compression_m   = 1 << 0,
+    std_volume_read_only_m              = 1 << 1,
+    std_volume_supports_encryption_m    = 1 << 2,
+    std_volume_is_compressed_m          = 1 << 3,
+} std_volume_flags_t;
+
+typedef struct {
+    uint64_t total_size;
+    uint64_t free_size;
+    uint64_t available_free_size; // Can vary from free_size if per-user quotas are being used
+    uint64_t serial_number;
+    std_volume_flags_t flags;
+    char name[std_volume_name_size_m];
+    char file_system[std_volume_filesystem_name_size_m];
+} std_platform_volume_info_t;
+
+typedef struct {
+    size_t processor_count;
+    size_t volume_count;
+    // TODO add something else?
+} std_platform_info_t;
+
+typedef struct {
+    size_t physical_core_count;
+    size_t virtual_core_count;
+    // TODO add something else? frequency? name?
+} std_processor_info_t;
+
 //==============================================================================
 
 size_t                          std_platform_caches_info ( std_platform_cache_info_t* info, size_t cap );
 size_t                          std_platform_physical_cores_info ( std_platform_physical_core_info_t* info, size_t cap );
 size_t                          std_platform_logical_cores_info ( std_platform_logical_core_info_t* info, size_t cap );
 std_platform_memory_info_t      std_platform_memory_info ( void );
+std_platform_info_t             std_platform_info ( void );
+
+void                            std_platform_refresh_info ( void );
 
 // Utility to query relationship between two logical cores.
 // TODO Should this exist? Getting this info out of the cores info buffers is pretty easy already.

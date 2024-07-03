@@ -466,7 +466,7 @@ static void xf_graph_build_texture ( xf_graph_t* graph, xf_texture_h texture_han
                 params.samples_per_pixel = texture->params.samples_per_pixel;
                 params.allowed_usage = texture->required_usage;
                 params.view_access = texture->params.view_access;
-                std_str_copy_m ( params.debug_name, texture->params.debug_name );
+                std_str_copy_static_m ( params.debug_name, texture->params.debug_name );
 
                 // Tag all render tagets as copy src/dest. Matches xg_vk_pipeline framebuffer creation logic
                 if ( texture->required_usage & xg_texture_usage_bit_render_target_m ) {
@@ -679,12 +679,14 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
     for ( uint64_t i = 0; i < graph->multi_textures_count; ++i ) {
         xg_swapchain_h swapchain = xf_resource_multi_texture_get_swapchain ( graph->multi_textures_array[i] );
 
-        xg_swapchain_info_t info;
-        xg->get_swapchain_info ( &info, swapchain );
+        if ( swapchain != xg_null_handle_m ) {
+            xg_swapchain_info_t info;
+            xg->get_swapchain_info ( &info, swapchain );
 
-        if ( !info.acquired ) {
-            uint32_t idx = xg->acquire_next_swapchain_texture ( swapchain, xg_workload );
-            xf_resource_multi_texture_set_index ( graph->multi_textures_array[i], idx );
+            if ( !info.acquired ) {
+                uint32_t idx = xg->acquire_next_swapchain_texture ( swapchain, xg_workload );
+                xf_resource_multi_texture_set_index ( graph->multi_textures_array[i], idx );
+            }
         }
     }
 
@@ -1016,7 +1018,7 @@ void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph_hand
                 //.text = node->params.debug_name,
                 //.height = labels_style->font_height,
             );
-            std_str_copy_m ( label_state.text, node->params.debug_name );
+            std_str_copy_static_m ( label_state.text, node->params.debug_name );
             xi->add_label ( workload, &label_state );//, labels_style );
 
             xi_switch_state_t switch_state = xi_switch_state_m (

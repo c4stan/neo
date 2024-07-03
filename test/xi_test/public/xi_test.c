@@ -123,7 +123,7 @@ static void xi_test ( void ) {
             .texture_count = 3,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
-            .present_mode = xg_present_mode_mailbox_m,
+            .present_mode = xg_present_mode_fifo_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );
@@ -184,7 +184,7 @@ static void xi_test ( void ) {
         xf_node_params_t node_params = xf_default_node_params_m;
         node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
         node_params.execute_routine = clear_pass;
-        std_str_copy_m ( node_params.debug_name, "clear" );
+        std_str_copy_static_m ( node_params.debug_name, "clear" );
         node_params.debug_color = xg_debug_region_color_red_m;
 
         clear_node = xf->create_node ( graph, &node_params );
@@ -199,7 +199,7 @@ static void xi_test ( void ) {
         node_params.execute_routine = ui_pass;
         node_params.user_args = std_buffer_m ( &ui_node_args );
         node_params.copy_args = false;
-        std_str_copy_m ( node_params.debug_name, "ui" );
+        std_str_copy_static_m ( node_params.debug_name, "ui" );
         node_params.debug_color = xg_debug_region_color_green_m;
         node_params.key_space_size = 128;
 
@@ -343,9 +343,9 @@ static void xi_test ( void ) {
         char* s1 = std_stack_alloc_array_m ( &stack, char, 8 );
         char* s2 = std_stack_alloc_array_m ( &stack, char, 8 );
         char* s3 = std_stack_alloc_array_m ( &stack, char, 8 );
-        std_str_copy_m ( s1, "qwe" );
-        std_str_copy_m ( s2, "asd" );
-        std_str_copy_m ( s3, "zxc" );
+        std_str_copy_static_m ( s1, "qwe" );
+        std_str_copy_static_m ( s2, "asd" );
+        std_str_copy_static_m ( s3, "zxc" );
         *p1 = s1;
         *p2 = s2;
         *p3 = s3;
@@ -441,9 +441,9 @@ static void xi_test ( void ) {
         // build ui
         {
             std_f32_to_str ( ui_slider.value, ui_slider_label.text, 32 );
-            std_str_copy_m ( ui_switch_label.text, ui_switch.value ? "on" : "off" );
-            std_str_copy_m ( ui_button_label.text, ui_button.pressed ? "click" : ui_button.down ? "down" : "up" );
-            std_str_copy_m ( ui_select_label.text, ui_select.items[ui_select.item_idx] );
+            std_str_copy_static_m ( ui_switch_label.text, ui_switch.value ? "on" : "off" );
+            std_str_copy_static_m ( ui_button_label.text, ui_button.pressed ? "click" : ui_button.down ? "down" : "up" );
+            std_str_copy_static_m ( ui_select_label.text, ui_select.items[ui_select.item_idx] );
 
             xi_workload_h xi_workload = xi->create_workload();
 

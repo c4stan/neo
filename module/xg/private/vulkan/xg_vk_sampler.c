@@ -80,7 +80,7 @@ static xg_sampler_h xg_sampler_create_default ( xg_device_h device, xg_default_s
             params.mag_filter = xg_sampler_filter_point_m;
             params.mipmap_filter = xg_sampler_filter_point_m;
             params.address_mode = xg_sampler_address_mode_clamp_m;
-            std_str_copy_m ( params.debug_name, "xg::default_sampler::point_clamp" );
+            std_str_copy_static_m ( params.debug_name, "xg::default_sampler::point_clamp" );
             break;
 
         case xg_default_sampler_linear_clamp_m:
@@ -88,7 +88,7 @@ static xg_sampler_h xg_sampler_create_default ( xg_device_h device, xg_default_s
             params.mag_filter = xg_sampler_filter_linear_m;
             params.mipmap_filter = xg_sampler_filter_linear_m;
             params.address_mode = xg_sampler_address_mode_clamp_m;
-            std_str_copy_m ( params.debug_name, "xg::default_sampler::linear_clamp" );
+            std_str_copy_static_m ( params.debug_name, "xg::default_sampler::linear_clamp" );
             break;
 
         default:
@@ -124,7 +124,7 @@ bool xg_sampler_get_info ( xg_sampler_h sampler_handle, xg_sampler_info_t* info 
     info->max_mip = sampler->params.max_mip;
     info->mip_bias = sampler->params.mip_bias;
     info->address_mode = sampler->params.address_mode;
-    std_str_copy_m ( info->debug_name, sampler->params.debug_name );
+    std_str_copy_static_m ( info->debug_name, sampler->params.debug_name );
 
     return true;
 }

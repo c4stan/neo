@@ -132,11 +132,15 @@ void std_process_init ( std_process_state_t* state, char** args, size_t args_cou
         std_assert_m ( result > 0 );
 
         // convert \ to /. TODO fix std_str_replace?
+        #if 0
         for ( int i = 0; i < result; ++i ) {
             if ( state->working_path[i] == '\\' ) {
                 state->working_path[i] = '/';
             }
         }
+        #else
+        std_str_replace ( state->working_path, '\\', '/' );
+        #endif
 
         state->working_path[result - 1] = '/';
         state->working_path[result] = '\0';

@@ -115,7 +115,7 @@ static void xf_test ( void ) {
             .texture_count = 1,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
-            .present_mode = xg_present_mode_mailbox_m,
+            .present_mode = xg_present_mode_fifo_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );
@@ -155,7 +155,7 @@ static void xf_test ( void ) {
         color_texture_params.width = 400;
         color_texture_params.height = 200;
         color_texture_params.format = xg_format_r8g8b8a8_unorm_m;
-        std_str_copy_m ( color_texture_params.debug_name, "color_texture" );
+        std_str_copy_static_m ( color_texture_params.debug_name, "color_texture" );
         color_texture = xf->declare_texture ( &color_texture_params );
     }
 
@@ -164,7 +164,7 @@ static void xf_test ( void ) {
         xf_node_params_t node_params = xf_default_node_params_m;
         node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( color_texture, xg_texture_view_m() );
         node_params.execute_routine = xf_clear_pass;
-        std_str_copy_m ( node_params.debug_name, "clear" );
+        std_str_copy_static_m ( node_params.debug_name, "clear" );
         node_params.debug_color = xg_debug_region_color_red_m;
 
         clear_pass = xf->create_node ( graph, &node_params );
@@ -178,7 +178,7 @@ static void xf_test ( void ) {
         node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( color_texture, xg_texture_view_m() );
         node_params.execute_routine = xf_triangle_pass;
         node_params.user_args = std_buffer_m ( &triangle_pass_args );
-        std_str_copy_m ( node_params.debug_name, "triangle" );
+        std_str_copy_static_m ( node_params.debug_name, "triangle" );
         node_params.debug_color = xg_debug_region_color_green_m;
 
         triangle_pass = xf->create_node ( graph, &node_params );
@@ -192,7 +192,7 @@ static void xf_test ( void ) {
         node_params.copy_texture_reads[node_params.copy_texture_reads_count++] = xf_copy_texture_dependency_m ( color_texture, xg_default_texture_view_m );
         node_params.presentable_texture = swapchain_multi_texture;
         node_params.execute_routine = copy_pass;
-        std_str_copy_m ( node_params.debug_name, "present" );
+        std_str_copy_static_m ( node_params.debug_name, "present" );
         present_pass = xf->create_node ( graph, &node_params );
     }
 

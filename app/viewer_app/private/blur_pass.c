@@ -182,7 +182,7 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
         params.passthrough.enable = true;
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_alias_m;
         params.passthrough.render_targets[0].alias = color;
-        std_str_copy_m ( params.debug_name, debug_name );
+        std_str_copy_static_m ( params.debug_name, debug_name );
         blur_node = xf->create_node ( graph, &params );
     }
 

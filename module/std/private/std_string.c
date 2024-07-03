@@ -402,6 +402,44 @@ size_t std_str_count ( const char* str, const char* token ) {
     return count;
 }
 
+size_t std_str_replace ( char* str, const char* token, const char* new_token ) {
+    size_t token_len = std_str_len ( token );
+    size_t new_token_len = std_str_len ( new_token );
+
+    if ( token_len != new_token_len ) {
+        return 0;
+    }
+
+    size_t count = 0;
+    size_t i = 0;
+
+    while ( ( i = std_str_find ( str + i, token ) ) != std_str_find_null_m ) {
+        std_str_copy ( str + i, token_len, new_token );
+        i += token_len;
+    }
+
+    return count;
+}
+
+#if 0
+// TODO
+size_t std_str_copy_replace ( char* new_str, size_t cap, const char* str, const char* token, const char* new_token ) {
+    size_t token_len = std_str_len ( token );
+    size_t new_token_len = std_str_len ( new_token );
+    size_t count = 0;
+    size_t find_idx = 0;
+    size_t str_idx = 0;
+    size_t new_str_idx = 0;
+
+    while ( ( find_idx = std_str_find ( str + find_idx, token ) ) != std_str_find_null_m ) {
+        std_mem_copy ( new_str + new_str_idx, cap - new_str_idx,  );
+        i += token_len;
+    }
+
+    return count;
+}
+#endif
+
 static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint32_t token_count, const char** tokens, const uint64_t u64_max ) {
     uint64_t multiplier = u64_max;
 

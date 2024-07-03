@@ -3,6 +3,7 @@
 #include <std_log.h>
 
 #include <se.h>
+#include <se.inl>
 #include <rv.h>
 #include <sm_matrix.h>
 
@@ -92,6 +93,7 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     se_i* se = std_module_get_m ( se_module_name_m );
 
+#if 0
     se_query_h mesh_query;
     {
         se_query_params_t query_params = se_default_query_params_m;
@@ -101,6 +103,13 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     se->resolve_pending_queries();
     const se_query_result_t* mesh_query_result = se->get_query_result ( mesh_query );
+    uint64_t mesh_count = mesh_query_result->count;
+#else
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { MESH_COMPONENT_ID } ) );
+    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    uint64_t mesh_count = mesh_query_result.entity_count;
+#endif
 
     xg_viewport_state_t viewport = xg_default_viewport_state_m;
     viewport.width = pass_args->width;
@@ -109,10 +118,14 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
-    for ( uint64_t i = 0; i < mesh_query_result->count; ++i ) {
+    for ( uint64_t i = 0; i < mesh_count; ++i ) {
+#if 0
         se_entity_h entity = mesh_query_result->entities[i];
         se_component_h component = se->get_component ( entity, MESH_COMPONENT_ID );
         std_auto_m mesh_component = ( viewapp_mesh_component_t* ) component;
+#else
+        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+#endif
 
         // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->geometry_pipeline );
@@ -197,7 +210,9 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
         xg->cmd_draw_indexed ( cmd_buffer, mesh_component->idx_buffer, mesh_component->index_count, 0, key );
     }
 
+#if 0
     se->dispose_query_results();
+#endif
 }
 
 xf_node_h add_geometry_clear_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth ) {
@@ -209,7 +224,7 @@ xf_node_h add_geometry_clear_node ( xf_graph_h graph, xf_texture_h color, xf_tex
     node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( normal, xg_default_texture_view_m );
     node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( material, xg_default_texture_view_m );
     node_params.execute_routine = clear_pass;
-    std_str_copy_m ( node_params.debug_name, "geometry_clear" );
+    std_str_copy_static_m ( node_params.debug_name, "geometry_clear" );
     xf_node_h clear_node = xf->create_node ( graph, &node_params );
 
     return clear_node;
@@ -232,7 +247,7 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
     node_params.depth_stencil_target = depth;
     node_params.execute_routine = geometry_pass;
     node_params.user_args = std_buffer_m ( &pass_args );
-    std_str_copy_m ( node_params.debug_name, "geometry" );
+    std_str_copy_static_m ( node_params.debug_name, "geometry" );
     node_params.passthrough.enable = true;
     node_params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_ignore_m;
     node_params.passthrough.render_targets[1].mode = xf_node_passthrough_mode_ignore_m;

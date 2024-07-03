@@ -4,8 +4,6 @@
 #include <se.h>
 #include <fs.h>
 
-#include <se.inl>
-
 std_warnings_ignore_m ( "-Wunused-function" )
 std_warnings_ignore_m ( "-Wunused-macros" )
 std_warnings_ignore_m ( "-Wunused-variable" )
@@ -40,7 +38,9 @@ static void run_se_test_1 ( void ) {
     std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 16 );
     se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
 
-    se_entity_params_alloc_entity ( &allocator );
+    se_entity_h entity = se->create_entity();
+
+    se_entity_params_alloc_entity ( &allocator, entity );
     se_entity_params_alloc_monostream_component_inline ( &allocator, se_test_component_0_m, &c0, sizeof ( se_component_h ) );
     se_entity_params_alloc_monostream_component_inline ( &allocator, se_test_component_1_m, &c1, sizeof ( se_component_h ) );
 
@@ -58,7 +58,7 @@ static void run_se_test_1 ( void ) {
     //std_bitset_set ( entity_params.mask.u64, se_test_component_1_m );
 #endif
 
-    se->create_entities ( allocator.entities );
+    se->init_entities ( allocator.entities );
 
     se_query_result_t query_result;
     se->query_entities ( &query_result, &se_query_params_m (
@@ -237,7 +237,7 @@ static void run_se_test_2 ( void ) {
             .texture_count = 3,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
-            .present_mode = xg_present_mode_mailbox_m,
+            .present_mode = xg_present_mode_fifo_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );
@@ -274,7 +274,7 @@ static void run_se_test_2 ( void ) {
             node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
             node_params.execute_routine = se_clear_pass;
             node_params.user_args = std_null_buffer_m;
-            std_str_copy_m ( node_params.debug_name, "clear_pass" );
+            std_str_copy_static_m ( node_params.debug_name, "clear_pass" );
 
             clear_pass = xf->create_node ( graph, &node_params );
         }
@@ -286,7 +286,7 @@ static void run_se_test_2 ( void ) {
             node_params.presentable_texture = swapchain_multi_texture;
             node_params.execute_routine = se_test_pass;
             node_params.user_args = std_null_buffer_m;
-            std_str_copy_m ( node_params.debug_name, "se_pass" );
+            std_str_copy_static_m ( node_params.debug_name, "se_pass" );
 
             test_pass = xf->create_node ( graph, &node_params );
         }
@@ -315,11 +315,13 @@ static void run_se_test_2 ( void ) {
         component_data.vertex_cbuffer_data.scale = 0.2f;
         component_data.pipeline_state = pipeline_state;
 
-        se_entity_params_alloc_entity ( &allocator );
+        se_entity_h entity = se->create_entity();
+
+        se_entity_params_alloc_entity ( &allocator, entity );
         se_entity_params_alloc_monostream_component_inline_m ( &allocator, se_test_pass_component_m, &component_data );
     }
 
-    se->create_entities ( allocator.entities );
+    se->init_entities ( allocator.entities );
     std_virtual_stack_destroy ( &stack );
 
 #undef N
@@ -342,7 +344,7 @@ static void run_se_test_2 ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        xg->acquire_next_swapchain_texture ( swapchain, workload );
+        //xg->acquire_next_swapchain_texture ( swapchain, workload );
 
         xf->execute_graph ( graph, workload );
         xg->submit_workload ( workload );

@@ -418,14 +418,27 @@ def debug_app(name, flags):
     os.system(cmd)
     pop_path()
 
-def fixup_debug_app(name):
+def fixup_debug_app(name, flags):
     if not validate_workspace(name):
         print(Color.FAIL + name + ' is not a registered app workspace.' + Color.ENDC)
         return False
     path = get_workspace_path(name)
     push_path(path)
 
+    makedef_path = makegen.normpath(path + '/' + 'makedef')
+    makedef = makegen.parse_makedef(makedef_path, None)
+
+    config = 'debug'
+    if ('-opt' in flags):
+        config = 'release'
     if platform.system() == 'Linux':
+        if makedef['output'] == ['app']:
+            program_path = 'submodules/' + config + '/' + 'std_launcher.exe'
+            args = name
+        else:
+            program_path = 'build/debug/output/' + name + '.exe'
+            args = ''
+
         launch_json = '{'\
     '"version": "0.2.0",'\
     '"configurations": ['\
@@ -433,8 +446,8 @@ def fixup_debug_app(name):
             '"name": "(gdb) Launch",'\
             '"type": "cppdbg",'\
             '"request": "launch",'\
-            '"program": "${workspaceRoot}/build/debug/output/' + name + '.exe",'\
-            '"args": [],'\
+            '"program": "' + program_path + '",'\
+            '"args": ["' + args + '"],'\
             '"stopAtEntry": false,'\
             '"cwd": "${workspaceFolder}",'\
             '"environment": [],'\
@@ -712,7 +725,7 @@ def parse(string):
     elif cmd == 'makegen':
         makegen_workspace(tokens[1], tokens[2:])
     elif cmd == 'debug-fixup':
-        fixup_debug_app(tokens[1])
+        fixup_debug_app(tokens[1], tokens[2:])
     elif cmd == '':
         pass
     else:

@@ -195,7 +195,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain_texture_params.allowed_usage = allowed_usage;
     swapchain_texture_params.initial_layout = xg_texture_layout_undefined_m; // ?
     swapchain_texture_params.samples_per_pixel = xg_sample_count_1_m;
-    std_str_copy_m ( swapchain_texture_params.debug_name, params->debug_name );
+    std_str_copy_static_m ( swapchain_texture_params.debug_name, params->debug_name );
 
     std_log_info_m ( "Swapchain created with " std_fmt_size_m " backbuffer textures", acquired_texture_count );
 
@@ -220,7 +220,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain->window = params->window;
     swapchain->display = xg_null_handle_m;
     swapchain->acquired = false;
-    std_str_copy_m ( swapchain->debug_name, params->debug_name );
+    std_str_copy_static_m ( swapchain->debug_name, params->debug_name );
 
     //swapchain->texture_acquire_event = xg_gpu_queue_event_create ( params->device );
     for ( size_t i = 0; i < texture_count; ++i ) {
@@ -330,7 +330,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     swapchain_texture_params.allowed_usage = allowed_usage;
     swapchain_texture_params.initial_layout = xg_texture_layout_undefined_m; // ?
     swapchain_texture_params.samples_per_pixel = 1;
-    std_str_copy_m ( swapchain_texture_params.debug_name, swapchain->debug_name );
+    std_str_copy_static_m ( swapchain_texture_params.debug_name, swapchain->debug_name );
 
     // TODO update info.texture_count
 
@@ -359,7 +359,7 @@ bool xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapchain_h swapch
     info->display = swapchain->display;
     info->acquired = swapchain->acquired;
     info->acquired_texture_idx = swapchain->acquired_texture_idx;
-    std_str_copy_m ( info->debug_name, swapchain->debug_name );
+    std_str_copy_static_m ( info->debug_name, swapchain->debug_name );
 
     for ( uint64_t i = 0; i < swapchain->texture_count; ++i ) {
         info->textures[i] = swapchain->textures[i];

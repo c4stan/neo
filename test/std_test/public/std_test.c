@@ -7,6 +7,7 @@
 #include <std_time.h>
 #include <std_hash.h>
 #include <std_sort.h>
+#include <std_file.h>
 
 // TODO
 #define FS_TEST 0
@@ -1330,6 +1331,111 @@ static void test_byte ( void ) {
     std_log_info_m ( "std_byte test complete." );
 }
 
+static void test_file ( void ) {
+    std_log_info_m ( "testing std_file..." );
+
+    std_process_info_t process_info;
+    std_process_info ( &process_info, std_process_this() );
+
+    {
+        char path[256];
+        std_str_copy ( path, 256, process_info.working_path );
+        size_t len = std_path_pop ( path );
+        size_t len2 = std_str_len ( path );
+        std_assert_m ( len == len2 );
+        std_log_info_m ( std_fmt_str_m, path );
+        len = std_path_pop ( path );
+        len2 = std_str_len ( path );
+        std_assert_m ( len == len2 );
+        std_log_info_m ( std_fmt_str_m, path );
+        len = std_path_pop ( path );
+        len2 = std_str_len ( path );
+        std_assert_m ( len == len2 );
+        std_log_info_m ( std_fmt_str_m, path );
+        len = std_path_append ( path, 256, "neo/" );
+        len2 = std_str_len ( path );
+        std_assert_m ( len == len2 );
+        std_log_info_m ( std_fmt_str_m, path );
+        char path2[256];
+        len = std_path_normalize ( path2, 256, path );
+        std_log_info_m ( std_fmt_str_m, path2 );
+    }
+    {
+        char path[256];
+        {
+            char path2[256];
+            std_str_copy ( path2, 256, process_info.executable_path );
+            std_path_normalize ( path, 256, path2 );
+        }
+        std_log_info_m ( std_fmt_str_m, path );
+        {
+            std_file_info_t info;
+            std_file_path_info ( &info, path );
+            std_calendar_time_t creation_time = std_timestamp_to_calendar ( info.creation_time );
+            std_calendar_time_t last_write_time = std_timestamp_to_calendar ( info.last_write_time );
+            std_calendar_time_t last_access_time = std_timestamp_to_calendar ( info.last_access_time );
+            char time[64];
+            std_calendar_to_string ( creation_time, time, 64 );
+            std_log_info_m ( std_fmt_tab_m"Creation time: "std_fmt_tab_m std_fmt_tab_m std_fmt_str_m, time );
+            std_calendar_to_string ( last_access_time, time, 64 );
+            std_log_info_m ( std_fmt_tab_m"Last access time: "std_fmt_tab_m std_fmt_str_m, time );
+            std_calendar_to_string ( last_write_time, time, 64 );
+            std_log_info_m ( std_fmt_tab_m"Last write time: "std_fmt_tab_m std_fmt_str_m, time );
+        }
+        std_path_pop ( path );
+        std_log_info_m ( std_fmt_str_m, path );
+        {
+            std_directory_info_t info;
+            std_directory_info ( &info, path );
+            std_calendar_time_t creation_time = std_timestamp_to_calendar ( info.creation_time );
+            std_calendar_time_t last_write_time = std_timestamp_to_calendar ( info.last_write_time );
+            std_calendar_time_t last_access_time = std_timestamp_to_calendar ( info.last_access_time );
+            char time[64];
+            std_calendar_to_string ( creation_time, time, 64 );
+            std_log_info_m ( std_fmt_tab_m"Creation time: "std_fmt_tab_m std_fmt_tab_m std_fmt_str_m, time );
+            std_calendar_to_string ( last_access_time, time, 64 );
+            std_log_info_m ( std_fmt_tab_m"Last access time: "std_fmt_tab_m std_fmt_str_m, time );
+            std_calendar_to_string ( last_write_time, time, 64 );
+            std_log_info_m ( std_fmt_tab_m"Last write time: "std_fmt_tab_m std_fmt_str_m, time );
+        }
+    }
+
+    {
+        char path[256];
+        std_str_copy ( path, 256, process_info.working_path );
+        std_log_info_m ( std_fmt_str_m, path );
+        {
+            char subdirs_buffer[256][32];
+            char* subdirs[32];
+
+            for ( size_t i = 0; i < 32; ++i ) {
+                subdirs[i] = subdirs_buffer[i];
+            }
+
+            size_t n = std_directory_subdirs ( subdirs, 32, 256, path );
+            for ( size_t i = 0; i < n; ++i ) {
+                std_log_info_m ( std_fmt_tab_m std_fmt_str_m std_fmt_str_m, subdirs[i], "/" );
+            }
+        }
+
+        {
+            char files_buffer[256][32];
+            char* files[32];
+
+            for ( size_t i = 0; i < 32; ++i ) {
+                files[i] = files_buffer[i];
+            }
+
+            size_t n = std_directory_files ( files, 32, 256, path );
+            for ( size_t i = 0; i < n; ++i ) {
+                std_log_info_m ( std_fmt_tab_m std_fmt_str_m, files[i] );
+            }
+        }
+    }
+
+    std_log_info_m ( "std_file test complete" );
+}
+
 #if defined ( std_compiler_gcc_m )
 static void test_array_fun ( std_array_decl_m ( int )* int_array ) {
     int_array->data[int_array->count++] = 2;
@@ -1423,6 +1529,8 @@ void std_main ( void ) {
     std_log_info_m ( separator );
     test_array();
 #endif
+    std_log_info_m ( separator );
+    test_file();
     std_log_info_m ( separator );
     test_queue();
 #else

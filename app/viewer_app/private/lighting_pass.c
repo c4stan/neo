@@ -7,6 +7,7 @@
 
 #include <xs.h>
 #include <se.h>
+#include <se.inl>
 
 typedef struct {
     xs_pipeline_state_h pipeline_state;
@@ -58,6 +59,7 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
     std_mem_zero_m ( &cbuffer );
 
     {
+        #if 0
         se_query_h lights_query;
         {
             se_query_params_t query_params = se_default_query_params_m;
@@ -68,14 +70,25 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
         se->resolve_pending_queries();
         const se_query_result_t* lights_query_result = se->get_query_result ( lights_query );
         uint64_t light_count = lights_query_result->count;
+        #else
+        se_query_result_t light_query_result;
+        se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { LIGHT_COMPONENT_ID } ) );
+        uint64_t light_count = light_query_result.entity_count;
+
+        se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+        #endif
         std_assert_m ( light_count <= MAX_LIGHTS_COUNT );
 
         cbuffer.light_count = light_count;
 
         for ( uint64_t i = 0; i < light_count; ++i ) {
+#if 0
             se_entity_h entity = lights_query_result->entities[i];
             se_component_h component = se->get_component ( entity, LIGHT_COMPONENT_ID );
             std_auto_m light_component = ( viewapp_light_component_t* ) component;
+#else
+            viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+#endif
 
             rv_view_info_t view_info;
             rv->get_view_info ( &view_info, light_component->view );
@@ -91,7 +104,9 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
             cbuffer.lights[i].view_from_world = view_info.view_matrix;
         }
 
+#if 0
         se->dispose_query_results();
+#endif
     }
 
     xg_buffer_range_t cbuffer_range = xg->write_workload_uniform ( node_args->workload, &cbuffer, sizeof ( cbuffer ) );
@@ -164,7 +179,7 @@ xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_
         params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( shadows, xg_shading_stage_fragment_m );
         params.execute_routine = lighting_pass;
         params.user_args = std_buffer_m ( &args );
-        std_str_copy_m ( params.debug_name, "lighting" );
+        std_str_copy_static_m ( params.debug_name, "lighting" );
         params.passthrough.enable = true;
         params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_alias_m;
         params.passthrough.render_targets[0].alias = color;

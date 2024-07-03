@@ -163,6 +163,7 @@ std_buffer_t std_buffer ( void* base, size_t size );
 #define std_buffer_m( item ) std_buffer ( item, sizeof ( *item ) )
 #define std_null_buffer_m ( std_buffer_t ) { NULL, 0 }
 
+// TODO split the stacks out to new file std_stack?
 // Linear fixed size allocator. Can be manually resized by cloning to a bigger separate stack and freeing the old one. 
 typedef struct {
     void* begin;

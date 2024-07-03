@@ -113,11 +113,12 @@ typedef struct {
 
 typedef struct {
     std_mutex_t mutex;
-    std_virtual_stack_t stack;
-    void* freelists[std_allocator_tlsf_x_size_m][std_allocator_tlsf_y_size_m];
-    uint16_t available_freelists[std_allocator_tlsf_x_size_m];
-    uint64_t available_rows;
+    std_virtual_stack_t stack; // raw memory
+    void* freelists[std_allocator_tlsf_x_size_m][std_allocator_tlsf_y_size_m]; // table of freelists
+    uint16_t available_freelists[std_allocator_tlsf_x_size_m]; // one bit per table entry. uint16_t because y_size is 16
+    uint64_t available_rows; // one bit per table row (x dimension). 1 if at least one freelist on that row is available, 0 otherwise
     size_t allocated_size;
+    size_t total_size;
 } std_allocator_tlsf_heap_t;
 
 typedef struct {

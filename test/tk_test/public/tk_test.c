@@ -7,9 +7,9 @@
 
 static tk_i* tk = NULL;
 
-#define PARALLEL 0
+#define PARALLEL 1
 
-#define N_DATA 500000000
+#define N_DATA 50000000
 #define TASKS_T1 100
 #define TASKS_T2 100
 #define COUNT_T1 ( N_DATA / TASKS_T1 )
@@ -123,17 +123,10 @@ static void test_tk() {
     #endif
     }
 
-#if 1
-
 #if PARALLEL
     tk_workload_h workload = tk->schedule_work ( tasks, TASKS_T1 );
-    // TODO do better than just spinning when waiting idle?
-    tk->wait_for_workload_idle ( workload );
-#endif
-
-#else
-    tk_release_condition_b release_cause = tk->acquire_this_thread ( tk_release_condition_all_workloads_done_m, NULL );
-    std_assert_m ( release_cause == tk_release_condition_all_workloads_done_m );
+    tk->acquire_this_thread ( tk_release_condition_all_workloads_done_m, NULL );
+    //tk->wait_for_workload_idle ( workload );
 #endif
 
     uint64_t sum = 0;

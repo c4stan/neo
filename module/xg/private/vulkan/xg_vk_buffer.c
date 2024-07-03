@@ -170,7 +170,7 @@ bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
     info->device = buffer->params.device;
     info->size = buffer->params.size;
     info->allowed_usage = buffer->params.allowed_usage;
-    std_str_copy_m ( info->debug_name, buffer->params.debug_name );
+    std_str_copy_static_m ( info->debug_name, buffer->params.debug_name );
 
     return true;
 }

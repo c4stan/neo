@@ -174,7 +174,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
     params.shader_texture_reads[params.shader_texture_reads_count++] = xf_shader_texture_dependency_m ( depth, xg_default_texture_view_m, xg_shading_stage_fragment_m );
     params.execute_routine = hz_gen_mip0_copy_pass;
     params.user_args = std_buffer_m ( &args );
-    std_str_copy_m ( params.debug_name, "hiz_gen_mip0" );
+    std_str_copy_static_m ( params.debug_name, "hiz_gen_mip0" );
     xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &params );
 
     return hiz_mip0_gen_node;
@@ -187,7 +187,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
     params.copy_texture_reads[params.copy_texture_reads_count++] = xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m );
     params.copy_texture_writes[params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( hiz, xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) );
     params.execute_routine = hz_gen_mip0_copy_pass;
-    std_str_copy_m ( params.debug_name, "hiz_gen_mip0" );
+    std_str_copy_static_m ( params.debug_name, "hiz_gen_mip0" );
     xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &params );
 
     return hiz_mip0_gen_node;

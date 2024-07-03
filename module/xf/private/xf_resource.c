@@ -206,7 +206,7 @@ void xf_resource_texture_update_info ( xf_texture_h texture_handle, const xg_tex
     texture->params.dimension = info->dimension;
     texture->params.format = info->format;
     texture->params.samples_per_pixel = info->samples_per_pixel;
-    std_str_copy_m ( texture->params.debug_name, info->debug_name );
+    std_str_copy_static_m ( texture->params.debug_name, info->debug_name );
     texture->allowed_usage = info->allowed_usage;
 }
 
@@ -429,7 +429,7 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     params.texture.allow_aliasing = false;
     params.texture.view_access = xg_texture_view_access_default_only_m;
     params.multi_texture_count = ( uint32_t ) info.texture_count;
-    std_str_copy_m ( params.texture.debug_name, info.debug_name );
+    std_str_copy_static_m ( params.texture.debug_name, info.debug_name );
 
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
     multi_texture->params = params;

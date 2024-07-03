@@ -34,15 +34,13 @@ size_t std_str_count_utf8  ( const char* str );
 size_t std_str_len ( const char* str );
 // returns the length of source. can be used to test for success by comparing the result with dest_cap.
 size_t std_str_copy ( char* dest, size_t dest_cap, const char* source );
-//size_t std_str_append  ( char* dest, size_t dest_cap, const char* source );
 int std_str_cmp ( const char* a, const char* b );
 int std_str_cmp_part ( const char* a, const char* b, size_t size );
 size_t std_str_format ( char* dest, size_t dest_cap, const char* source, ... );
 size_t std_str_format_valist ( char* dest, size_t dest_cap, const char* source, va_list valist );
 bool std_str_starts_with ( const char* str, const char* token );
 
-// TODO rename this to make it clear that it expects dst to be a static char array
-#define std_str_copy_m( _dst, _src ) std_str_copy ( _dst, sizeof ( _dst ), _src )
+#define std_str_copy_static_m( _dst, _src ) std_str_copy ( _dst, sizeof ( _dst ), _src )
 #define std_str_format_m( _dst, _src, ... ) std_str_format ( _dst, sizeof ( _dst ), _src, __VA_ARGS__ )
 
 size_t std_u32_to_str ( uint32_t u32, char* str, size_t cap );
@@ -66,8 +64,9 @@ size_t std_str_find_reverse ( const char* str, size_t len, const char* token ); 
 
 size_t std_str_count ( const char* str, const char* token );
 
-//size_t std_str_replace ( const char* str, const char* token, const char* new_str );
-//size_t std_str_replace_inplace ( char* str, size_t cap, const char* token );
+size_t std_str_replace ( char* str, const char* token, const char* new_token );
+// TODO
+//size_t std_str_copy_replace ( char* new_str, size_t cap, const char* str, const char* token, const char* new_token );
 
 size_t std_size_to_str_approx ( char* dest, size_t cap, size_t size_value );
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value );

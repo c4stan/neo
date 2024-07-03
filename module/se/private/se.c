@@ -4,8 +4,9 @@
 
 static void se_api_init ( se_i* se ) {
     se->create_entity_family = se_entity_family_create;
-    se->create_entities = se_entity_create;
+    se->init_entities = se_entity_create;
     se->query_entities = se_entity_query;
+    se->create_entity = se_entity_reserve;
     #if 0
     se->create_entity = se_entity_create;
     se->destroy_entity = se_entity_destroy;
@@ -61,3 +62,14 @@ ideas
     optimize for static vs dynamic component layout
     optimize all the way starting from scene layout (e.g. allocate static layout entities together so that potentially when queried for a component only a base and a count needs to be returned)
 */
+
+#if 0
+extern inline void* se_component_iterator_next ( se_component_iterator_t* iterator );
+extern inline se_entity_params_allocator_t se_entity_params_allocator ( std_virtual_stack_t* stack );
+extern inline void se_entity_params_alloc_entity ( se_entity_params_allocator_t* allocator, se_entity_h entity_handle );
+extern inline void se_entity_params_alloc_component ( se_entity_params_allocator_t* allocator, uint32_t id );
+extern inline void se_entity_params_alloc_stream ( se_entity_params_allocator_t* allocator, uint32_t id, void* data );
+extern inline void se_entity_params_alloc_stream_inline ( se_entity_params_allocator_t* allocator, uint32_t id, void* data, uint32_t size );
+extern inline void se_entity_params_alloc_monostream_component ( se_entity_params_allocator_t* allocator, uint32_t component_id, void* data );
+extern inline void se_entity_params_alloc_monostream_component_inline ( se_entity_params_allocator_t* allocator, uint32_t component_id, void* data, uint32_t size );
+#endif
