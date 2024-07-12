@@ -146,7 +146,7 @@ uint64_t xg_vk_allocator_tlsf_heap_size_roundup ( uint64_t size ) {
     return size;
 }
 
-xg_vk_allocator_tlsf_freelist_idx_t xg_vk_allocator_tlsf_freelist_idx_first_available ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t size, xg_vk_allocator_tlsf_freelist_idx_t base ) {
+xg_vk_allocator_tlsf_freelist_idx_t xg_vk_allocator_tlsf_freelist_idx_first_available ( xg_vk_allocator_tlsf_heap_t* heap, xg_vk_allocator_tlsf_freelist_idx_t base ) {
     xg_vk_allocator_tlsf_freelist_idx_t idx;
 
     uint32_t mask = ( 1 << xg_vk_allocator_tlsf_y_size_m ) - 1;
@@ -191,7 +191,7 @@ void xg_vk_allocator_tlsf_remove_from_freelist ( xg_vk_allocator_tlsf_heap_t* he
 
 xg_vk_allocator_tlsf_segment_t* xg_vk_allocator_tlsf_pop_from_freelist ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t size ) {
     xg_vk_allocator_tlsf_freelist_idx_t start_idx = xg_vk_allocator_tlsf_freelist_idx ( size );
-    xg_vk_allocator_tlsf_freelist_idx_t idx = xg_vk_allocator_tlsf_freelist_idx_first_available ( heap, size, start_idx );
+    xg_vk_allocator_tlsf_freelist_idx_t idx = xg_vk_allocator_tlsf_freelist_idx_first_available ( heap, start_idx );
     void* list_ptr = std_dlist_pop ( &heap->freelists[idx.x][idx.y] );
     xg_vk_allocator_tlsf_segment_t* segment = xg_vk_allocator_tlsf_get_segment_m ( list_ptr, next );
 
@@ -260,6 +260,7 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
 
 void xg_vk_allocator_tlsf_heap_deinit ( xg_vk_allocator_tlsf_heap_t* heap, xg_device_h device ) {
     // TODO
+    std_unused_m ( device );
     xg_vk_allocator_simple_free ( heap->gpu_alloc.handle );
     std_mutex_deinit ( &heap->mutex );
     heap->gpu_alloc = xg_null_alloc_m;
@@ -467,6 +468,7 @@ xg_allocator_i xg_allocator_default ( xg_memory_type_e type ) {
 }
 #else
 static xg_alloc_t xg_vk_allocator_default_alloc ( void* allocator, xg_device_h device_handle, size_t size, size_t align ) {
+    std_unused_m ( device_handle );
     std_unused_m ( align );
     std_auto_m heap = ( xg_vk_allocator_tlsf_heap_t* ) allocator;
     return xg_vk_tlsf_heap_alloc ( heap, size, align );

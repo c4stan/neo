@@ -31,6 +31,8 @@ typedef struct wm_window_t {
 #endif
 
     uint32_t gen;
+
+    wm_input_buffer_t input_buffer;
 } wm_window_t;
 
 typedef struct wm_window_state_t {
@@ -64,3 +66,5 @@ void wm_window_update ( wm_window_h window );
     bool wm_window_get_input_state ( wm_window_h window, wm_input_state_t* state );
     void wm_window_debug_print_input_state ( wm_window_h window, bool overwrite_console );
 #endif
+
+void wm_window_input_buffer_get ( wm_window_h window, wm_input_buffer_t* buffer );

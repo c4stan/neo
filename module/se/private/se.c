@@ -7,6 +7,14 @@ static void se_api_init ( se_i* se ) {
     se->init_entities = se_entity_create;
     se->query_entities = se_entity_query;
     se->create_entity = se_entity_reserve;
+
+    se->get_entity_component = se_entity_get_component;
+
+    se->get_entity_name = se_entity_name;
+    se->set_entity_name = se_entity_set_name;
+    se->set_component_properties = se_entity_set_component_properties;
+    se->get_entity_list = se_entity_list;
+    se->get_entity_properties = se_entity_property_get;
     #if 0
     se->create_entity = se_entity_create;
     se->destroy_entity = se_entity_destroy;

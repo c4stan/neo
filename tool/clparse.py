@@ -386,12 +386,16 @@ def run_app(name, flags, params):
     if ('-opt' in flags):
         config = 'release'
 
+    env_vars = os.environ.copy()
+    if ('-rd' in flags):
+        env_vars["ENABLE_VULKAN_RENDERDOC_CAPTURE"] = "1"
+
     if makedef['output'] == ['app']:
         cmd = './submodules/' + config + '/std_launcher.exe'
-        SUBPROCESS = subprocess.Popen([cmd, name])
+        SUBPROCESS = subprocess.Popen([cmd, name], env = env_vars)
     else:
         cmd = './build/' + config + '/output/' + name + '.exe'
-        SUBPROCESS = subprocess.Popen([cmd] + params)
+        SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars)
     pop_path()
 
 def debug_app(name, flags):

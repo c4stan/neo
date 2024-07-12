@@ -110,6 +110,8 @@ typedef struct {
     bool minimized;
     bool resizable;
     bool movable;
+    bool scrollable;
+    float scroll; 
     xi_id_t id;
     uint64_t sort_order;
     xi_style_t style;
@@ -126,6 +128,8 @@ typedef struct {
     .minimized = false, \
     .resizable = true, \
     .movable = true, \
+    .scrollable = true, \
+    .scroll = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
@@ -231,6 +235,26 @@ typedef struct {
 #endif
 
 typedef struct {
+    char text[xi_textfield_text_size_m];
+    xi_font_h font;
+    uint32_t width;
+    uint32_t height;
+    xi_id_t id;
+    uint64_t sort_order;
+    xi_style_t style;
+} xi_textfield_state_t;
+
+#define xi_textfield_state_m( ... ) ( xi_textfield_state_t ) { \
+    .text = "", \
+    .font = xi_null_handle_m, \
+    .height = 0, \
+    .id = xi_line_id_m(), \
+    .sort_order = 0, \
+    .style = xi_null_style_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     char text[xi_label_text_size];
     xi_font_h font;
     uint32_t height;
@@ -293,6 +317,45 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    xi_property_f32_m,
+    xi_property_u32_m,
+    xi_property_i32_m,
+    xi_property_u64_m,
+    xi_property_i64_m,
+    xi_property_2f32_m,
+    xi_property_3f32_m,
+    xi_property_4f32_m,
+    xi_property_string_m,
+    xi_property_normal_m,
+    xi_property_quat_m,
+    xi_property_invalid_m,
+} xi_property_e;
+
+typedef struct {
+    xi_property_e type;
+    void* data;
+    uint32_t property_idx;
+    xi_font_h font;
+    uint32_t property_width;
+    uint32_t property_height;
+    uint64_t id;
+    uint64_t sort_order;
+    xi_style_t style;
+} xi_property_editor_state_t;
+
+#define xi_property_editor_state_m( ... ) ( xi_property_editor_state_t ) { \
+    .type = xi_property_invalid_m, \
+    .data = NULL, \
+    .font = xi_null_handle_m, \
+    .property_width = 0, \
+    .property_height = 0, \
+    .id = xi_line_id_m(), \
+    .sort_order = 0, \
+    .style = xi_null_style_m(), \
+    ##__VA_ARGS__ \
+}
+
 typedef struct {
     float position[3];
     float rotation[4];
@@ -310,6 +373,7 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+// TODO XOR instead of + ?
 #define xi_line_id_m() ( xi_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )
 
 // Font
@@ -355,6 +419,15 @@ typedef struct {
     xi_viewport_t viewport;
 } xi_flush_params_t;
 
+// TODO remove and move property editors inside xi
+typedef enum {
+    xi_textfield_event_none_m,
+    xi_textfield_event_focus_acquire_m,
+    xi_textfield_event_focus_release_m,
+    xi_textfield_event_text_edit_m,
+    xi_textfield_event_text_commit_m,
+} xi_textfield_event_e;
+
 // Api
 
 typedef struct {
@@ -362,9 +435,10 @@ typedef struct {
     void ( *activate_device ) ( xg_device_h device );
     void ( *deactivate_device ) ( xg_device_h device );
 
-    void ( *begin_update ) ( const wm_window_info_t* window_info, const wm_input_state_t* input_state );
+    void ( *begin_update ) ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer );
 
     uint64_t ( *get_active_element_id ) ( void );
+    uint64_t ( *get_hovered_element_id ) ( void );
 
     xi_font_h ( *create_font ) ( std_buffer_t ttf_data, const xi_font_params_t* params );
     void ( *destroy_font ) ( xi_font_h font );
@@ -386,12 +460,15 @@ typedef struct {
     void ( *begin_section ) ( xi_workload_h workload, xi_section_state_t* state );
     void ( *end_section )   ( xi_workload_h workload );
 
+    // TODO rename these, remove add_ and leave just element name? replace with draW?
     void ( *add_button )    ( xi_workload_h workload, xi_button_state_t* state );
     void ( *add_slider )    ( xi_workload_h workload, xi_slider_state_t* state );
     //void ( *add_text )     ( xi_workload_h workload, xi_text_state_t*   state );
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );
     void ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
     void ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
+    xi_textfield_event_e ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
+    void ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
 
     void ( *draw_gizmo )    ( xi_workload_h workload, xi_gizmo_state_t* state );
 } xi_i;

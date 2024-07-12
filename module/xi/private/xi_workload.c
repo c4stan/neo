@@ -35,11 +35,13 @@ void xi_workload_load_shaders ( xs_i* xs ) {
 }
 
 void xi_workload_activate_device ( xg_i* xg, xg_device_h device ) {
-
+    std_unused_m ( xg );
+    std_unused_m ( device );
 }
 
 void xi_workload_deactivate_device ( xg_i* xg, xg_device_h device ) {
-
+    std_unused_m ( xg );
+    std_unused_m ( device );
 }
 
 xi_workload_h xi_workload_create ( void ) {

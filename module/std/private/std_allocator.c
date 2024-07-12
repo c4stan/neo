@@ -610,6 +610,23 @@ char* std_stack_string_append ( std_stack_t* stack, const char* str ) {
     return std_stack_string_copy ( stack, str );
 }
 
+char* std_stack_string_append_char ( std_stack_t* stack, char c ) {
+    std_stack_string_pop_terminator ( stack );
+    char buffer[2] = { c, '\0' };
+    return std_stack_string_copy ( stack, buffer );
+}
+
+void std_stack_string_pop ( std_stack_t* stack ) {
+    char* begin = ( char* ) stack->begin;
+    char* top = ( char* ) stack->top;
+
+    if ( top - begin >= 2 ) {
+        top -= 2;
+        *top = '\0';
+        stack->top = top;
+    }
+}
+
 void std_stack_free ( std_stack_t* stack, size_t size ) {
     void* top = stack->top - size;
     void* begin = stack->begin;
@@ -1137,7 +1154,7 @@ static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
     }
 }
 
-std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx_first_available ( std_allocator_tlsf_heap_t* heap, uint64_t size, std_allocator_tlsf_freelist_idx_t base ) {
+std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx_first_available ( std_allocator_tlsf_heap_t* heap, std_allocator_tlsf_freelist_idx_t base ) {
     std_allocator_tlsf_freelist_idx_t idx;
 
     uint32_t mask = ( 1 << std_allocator_tlsf_y_size_m ) - 1;
@@ -1180,7 +1197,7 @@ void std_allocator_tlsf_remove_from_freelist ( std_allocator_tlsf_heap_t* heap, 
 
 char* std_allocator_tlsf_pop_from_freelist ( std_allocator_tlsf_heap_t* heap, uint64_t size ) {
     std_allocator_tlsf_freelist_idx_t start_idx = std_allocator_tlsf_freelist_idx ( size );
-    std_allocator_tlsf_freelist_idx_t idx = std_allocator_tlsf_freelist_idx_first_available ( heap, size, start_idx );
+    std_allocator_tlsf_freelist_idx_t idx = std_allocator_tlsf_freelist_idx_first_available ( heap, start_idx );
     std_auto_m segment = std_dlist_pop ( &heap->freelists[idx.x][idx.y] ) - std_allocator_tlsf_header_size_m;
 
     if ( heap->freelists[idx.x][idx.y] == NULL ) {

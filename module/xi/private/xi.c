@@ -30,11 +30,13 @@ static void xi_api_init ( xi_i* xi ) {
     xi->add_slider = xi_ui_slider;
     xi->add_button = xi_ui_button;
     xi->add_select = xi_ui_select;
-    //xi->add_text  = xi_ui_text;
+    xi->add_textfield  = xi_ui_textfield;
+    xi->add_property_editor = xi_ui_property_editor;
 
     xi->newline = xi_ui_newline;
 
     xi->get_active_element_id = xi_ui_get_active_id;
+    xi->get_hovered_element_id = xi_ui_get_hovered_id;
 }
 
 void* xi_load ( void* std_runtime ) {

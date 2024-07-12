@@ -120,7 +120,7 @@ void NAME##_state_bind ( NAME##_state_t* state );
     static NAME##_state_t* NAME##_state; \
 \
 NAME##_state_t* NAME##_state_alloc ( void ) { \
-    std_assert_m ( !NAME##_state ); \
+    std_assert_m ( ! NAME##_state ); \
     NAME##_state = std_virtual_heap_alloc_m ( NAME##_state_t ); \
     return NAME##_state; \
 } \

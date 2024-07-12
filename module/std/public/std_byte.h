@@ -15,11 +15,11 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 // note: sizeof(char[32]) == 32, use _T for static arrays (need to take its address)
 // TODO split static_array from array from single item
 #define     std_mem_zero_m( item ) std_mem_zero( (item), sizeof ( *(item) ) )
-#define     std_mem_zero_m( item ) std_mem_zero( (item), sizeof ( *(item) ) )
 #define     std_mem_zero_array_m( item, count ) std_mem_zero( (item), sizeof ( *(item) ) * (count) )
 #define     std_mem_copy_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) )
 #define     std_mem_copy_array_m( dest, source, count ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) * (count) )
 #define     std_mem_cmp_array_m(a, b, count) std_mem_cmp( (a), (b), sizeof ( std_typeof_m ( *(a) ) ) * (count) )
+#define     std_mem_set_m( dest, value ) std_mem_set_m ( dest, sizeof ( *dest ), value )
 
 // Bit indexing starts from 0.
 // ls/ms suffixed routines operate on count bits starting from ls/ms

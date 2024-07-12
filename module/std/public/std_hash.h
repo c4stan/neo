@@ -86,6 +86,7 @@ typedef struct {
     size_t mask;
 } std_hash_map_t;
 
+// Clears keys, doesn't touch values
 std_hash_map_t      std_hash_map ( uint64_t* keys, uint64_t* values, size_t capacity );
 bool                std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload );
 bool                std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ); // TODO rename std_hash_map_remove_hash

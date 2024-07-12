@@ -139,7 +139,7 @@ void std_process_init ( std_process_state_t* state, char** args, size_t args_cou
             }
         }
         #else
-        std_str_replace ( state->working_path, '\\', '/' );
+        std_str_replace ( state->working_path, "\\", "/" );
         #endif
 
         state->working_path[result - 1] = '/';

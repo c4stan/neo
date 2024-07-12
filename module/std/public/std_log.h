@@ -24,6 +24,7 @@
 #define std_fmt_i64_m     "%"PRId64
 #define std_fmt_f32_m     "%f"
 #define std_fmt_f64_m     "%f"
+#define std_fmt_char_m    "%c"
 #define std_fmt_str_m     "%s"
 #define std_fmt_ptr_m     "%p"
 #define std_fmt_tick_m    std_fmt_u64_m

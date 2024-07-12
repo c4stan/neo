@@ -90,6 +90,13 @@ typedef enum {
     wm_keyboard_state_7_m,
     wm_keyboard_state_8_m,
     wm_keyboard_state_9_m,
+    wm_keyboard_state_period_m, // TODO state
+    wm_keyboard_state_plus_m, // TODO state
+    wm_keyboard_state_minus_m, // TODO state
+    wm_keyboard_state_space_m,
+    wm_keyboard_state_tab_m,
+    wm_keyboard_state_enter_m,
+    wm_keyboard_state_backspace_m,
     wm_keyboard_state_f1_m,
     wm_keyboard_state_f2_m,
     wm_keyboard_state_f3_m,
@@ -109,14 +116,10 @@ typedef enum {
     wm_keyboard_state_ctrl_right_m,
     wm_keyboard_state_alt_left_m,
     wm_keyboard_state_alt_right_m,
-    wm_keyboard_state_space_m,
-    wm_keyboard_state_enter_m,
-    wm_keyboard_state_backspace_m,
     wm_keyboard_state_up_m,
     wm_keyboard_state_left_m,
     wm_keyboard_state_down_m,
     wm_keyboard_state_right_m,
-    wm_keyboard_state_tab_m,
 
     wm_keyboard_state_count_m
 } wm_keyboard_state_e;
@@ -173,13 +176,59 @@ typedef enum {
     wm_event_lose_focus_m     = 1 << 14,
 
     wm_event_all_m            = 0xffff,
+} wm_input_event_e;
+
+typedef struct {
+    uint32_t keycode;
+    uint32_t flags;
+    uint32_t character;
+} wm_keyboard_event_args_t;
+
+typedef struct {
+    uint32_t button;
+    int32_t x;
+    int32_t y;
+    uint32_t flags;
+} wm_mouse_event_args_t;
+
+typedef struct {
+    uint32_t new_width;
+    uint32_t new_height;
+    uint32_t prev_width;
+    uint32_t prev_height;
+} wm_window_resize_event_args_t;
+
+typedef struct {
+    int32_t new_x;
+    int32_t new_y;
+    int32_t prev_x;
+    int32_t prev_y;
+} wm_window_move_event_args_t;
+
+typedef struct {
+    union {
+        wm_keyboard_event_args_t keyboard;
+        wm_mouse_event_args_t mouse;
+        wm_window_move_event_args_t window_move;
+        wm_window_resize_event_args_t window_resize;
+    };
+} wm_input_event_args_t;
+
+typedef struct {
+    wm_input_event_e type;
+    wm_input_event_args_t args;
 } wm_input_event_t;
 
+typedef struct {
+    wm_input_event_t events[wm_input_buffer_max_events_m];
+    uint32_t count;
+} wm_input_buffer_t;
+
 // Return true to trap the message, false to feed it to the system default handler
-typedef bool ( wm_input_event_handler_f ) ( wm_window_h window, wm_input_event_t event_id,
+typedef bool ( wm_input_event_handler_f ) ( wm_window_h window, wm_input_event_e event_id,
     uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4 );
 typedef struct {
-    wm_input_event_t event_mask;
+    wm_input_event_e event_mask;
     wm_input_event_handler_f* callback;
 } wm_input_event_handler_t;
 
@@ -265,6 +314,8 @@ typedef struct {
     bool ( *get_window_input_state ) ( wm_window_h window, wm_input_state_t* state );
     void ( *debug_print_window_input_state ) ( wm_window_h window, bool overwrite_console );
 #endif
+
+    void ( *get_window_input_buffer ) ( wm_window_h window, wm_input_buffer_t* buffer );
 
     size_t ( *get_displays_count ) ( void );
     size_t ( *get_displays ) ( wm_display_h* displays, size_t cap );

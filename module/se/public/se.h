@@ -19,7 +19,16 @@ typedef uint64_t se_entity_group_h;
 typedef uint32_t se_component_e;
 typedef uint64_t se_component_h;
 
+typedef struct {
+    /*const*/ uint64_t entity;
+    // TODO limit these to uint16_t and make the handle a u64?
+    /*const*/ uint32_t component;
+    /*const*/ uint32_t property;
+} se_property_h;
+
 #define se_null_handle_m UINT64_MAX
+
+#define se_null_property_handle_m( component_id ) ( ( uint64_t ) component_id )
 
 //typedef struct {
 //    uint32_t stride;
@@ -180,6 +189,8 @@ typedef struct {
 #endif
 } se_query_result_t;
 
+// TODO
+#if 0
 typedef struct {
     se_component_t* read_components[se_entity_max_components_per_entity_m];
     se_component_t* write_components[se_entity_max_components_per_entity_m];
@@ -202,12 +213,67 @@ typedef struct {
 
     char debug_name[se_debug_name_size_m];
 } se_node_params_t;
+#endif
+
+typedef enum {
+    se_property_f32_m,
+    se_property_u32_m,
+    se_property_i32_m,
+    se_property_u64_m,
+    se_property_i64_m,
+    se_property_2f32_m,
+    se_property_3f32_m,
+    se_property_4f32_m,
+    se_property_string_m,
+    se_property_normal_m,
+    se_property_quat_m,
+} se_property_e;
+
+typedef struct {
+    uint8_t stream;
+    uint16_t offset;
+    se_property_e type;
+    char name[se_debug_name_size_m];
+} se_property_t;
+
+#define se_field_property_m( _stream, datatype, field, property ) ( se_property_t ) { \
+    .stream = _stream, \
+    .offset = std_field_offset_m ( datatype, field ), \
+    .type = property, \
+    .name = std_pp_string_m ( field ), \
+}
+
+typedef struct {
+    uint32_t count;
+    se_property_t properties[se_component_max_properties_m];
+} se_component_properties_params_t;
+
+#define se_component_properties_params_m(...) ( se_component_properties_params_t ) { \
+    .count = 0, \
+    .properties = {0}, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t id;
+    uint32_t property_count;
+    char name[se_debug_name_size_m];
+    se_property_t properties[se_component_max_properties_m];
+    se_property_h handles[se_component_max_properties_m];
+} se_component_properties_t;
+
+typedef struct {
+    uint32_t component_count;
+    char name[se_debug_name_size_m];
+    se_component_properties_t components[se_entity_max_components_per_entity_m];
+} se_entity_properties_t;
 
 typedef struct {
     void ( *create_entity_family ) ( const se_entity_family_params_t* params );
     void ( *destroy_entity_family ) ( se_component_mask_t mask );
 
     se_entity_h ( *create_entity ) ( void );
+    const char* ( *get_entity_name ) ( se_entity_h entity );
 
     void ( *init_entities ) ( const se_entity_params_t* params );
 
@@ -221,6 +287,14 @@ typedef struct {
     //void ( *destroy_entity_group ) ( se_entity_group_h group );
 
     void ( *query_entities ) ( se_query_result_t* result, const se_query_params_t* params );
+
+    void* ( *get_entity_component ) ( se_entity_h entity, se_component_e component, uint8_t stream );
+
+    void ( *set_entity_name ) ( se_entity_h entity, const char* name );
+    void ( *set_component_properties ) ( se_component_e component, const char* name, const se_component_properties_params_t* params );
+    size_t ( *get_entity_list ) ( se_entity_h* out_entities, size_t cap );
+    void ( *get_entity_properties ) ( se_entity_h entity_handle, se_entity_properties_t* out_props );
+
 #if 0
     // TODO remove individual calls?
     se_entity_h create_entity ( const se_entity_params_t* params );

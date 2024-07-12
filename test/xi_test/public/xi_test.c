@@ -98,7 +98,7 @@ static void xi_test ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
     fs_i* fs = std_module_load_m ( fs_module_name_m );
 
-    wm_window_params_t window_params = { .name = "xf_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
+    wm_window_params_t window_params = { .name = "xi_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &window_params );
     std_log_info_m ( "Creating window "std_fmt_str_m std_fmt_newline_m, window_params.name );
 
@@ -379,6 +379,24 @@ static void xi_test ( void ) {
         .height = 20,
     );
 
+    float p[3] = {1, 2, 3};
+    xi_property_editor_state_t ui_property_editor_3f32 = xi_property_editor_state_m ( 
+        .type = xi_property_3f32_m,
+        .data = p,
+        .property_width = 64,
+        .id = xi_line_id_m(),
+        .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
+    );
+
+    float q[3] = {4, 5, 6};
+    xi_property_editor_state_t ui_property_editor_3f32_2 = xi_property_editor_state_m ( 
+        .type = xi_property_3f32_m,
+        .data = q,
+        .property_width = 64,
+        .id = xi_line_id_m(),
+        .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
+    );
+
     float target_fps = 30.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = std_tick_now();
@@ -434,7 +452,7 @@ static void xi_test ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        xg->acquire_next_swapchain_texture ( swapchain, workload );
+        //xg->acquire_next_swapchain_texture ( swapchain, workload );
         //xg_texture_h xg_swapchain_texture = xg->get_swapchain_texture ( swapchain );
         //xf->bind_texture ( swapchain_texture, xg_swapchain_texture );
 
@@ -447,7 +465,10 @@ static void xi_test ( void ) {
 
             xi_workload_h xi_workload = xi->create_workload();
 
-            xi->begin_update ( &new_window_info, &input_state );
+            wm_input_buffer_t input_buffer;
+            wm->get_window_input_buffer ( window, &input_buffer );
+
+            xi->begin_update ( &new_window_info, &input_state, &input_buffer );
 
             xi->begin_window ( xi_workload, &ui_window );
             xi->begin_section ( xi_workload, &ui_section );
@@ -469,6 +490,10 @@ static void xi_test ( void ) {
             xi->newline();
             xi->add_label ( xi_workload, &ui_select_label );
             xi->add_select ( xi_workload, &ui_select );
+            xi->newline();
+            xi->add_property_editor ( xi_workload, &ui_property_editor_3f32 );
+            xi->newline();
+            xi->add_property_editor ( xi_workload, &ui_property_editor_3f32_2 );
             xi->end_section ( xi_workload );
             //xi->newline();
             //xi->add_label ( xi_workload, &ui_button_label, &label_style );

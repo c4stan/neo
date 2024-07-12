@@ -30,6 +30,7 @@ static xg_vk_workload_t* get_workload ( xg_workload_h workload_handle ) {
 }
 
 void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
+    std_unused_m ( device_handle );
 #if 0
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
 
@@ -60,6 +61,7 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
 }
 
 void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
+    std_unused_m ( device_handle );
 #if 0
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
 

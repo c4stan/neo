@@ -4,3 +4,4 @@ wm_input_state_m  std_on_m
 
 # wm_window
 wm_window_name_size 32
+wm_input_buffer_max_events_m 128

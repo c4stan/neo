@@ -10,8 +10,14 @@ std_warnings_ignore_m ( "-Wunused-variable" )
 
 #define se_test_component_0_m 0
 #define se_test_component_1_m 1
-#define se_test_component_2_m 2
-#define se_test_component_3_m 3
+
+typedef struct {
+    uint64_t u64;
+} se_test_component_0_t;
+
+typedef struct {
+    uint64_t u64;
+} se_test_component_1_t;
 
 static void run_se_test_1 ( void ) {
     se_i* se = std_module_load_m ( se_module_name_m );
@@ -29,6 +35,13 @@ static void run_se_test_1 ( void ) {
                 .stream_count = 1,
                 .streams = { sizeof ( se_component_h ) }
             )
+        }
+    ) );
+
+    se->set_component_properties ( se_test_component_0_m, "Test component 0", &se_component_properties_params_m (
+        .count = 1,
+        .properties = {
+            se_field_property_m ( 0, se_test_component_0_t, u64, se_property_u64_m ),
         }
     ) );
     
@@ -299,6 +312,14 @@ static void run_se_test_2 ( void ) {
             .stream_count = 1, 
             .streams = { sizeof ( se_test_pass_component_t ) } 
         ) }
+    ) );
+
+    se->set_component_properties ( se_test_pass_component_m, "Test pass component", &se_component_properties_params_m (
+        .count = 2,
+        .properties = {
+            se_field_property_m ( 0, se_test_pass_component_t, pipeline_state, se_property_u64_m ),
+            se_field_property_m ( 0, se_test_pass_component_t, vertex_cbuffer_data, se_property_3f32_m ),
+        }
     ) );
 
 #define N (1024*4)

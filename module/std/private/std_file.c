@@ -41,9 +41,9 @@ void std_filetime_to_timestamp ( struct timespec ts, std_timestamp_t* timestamp 
 // impl
 
 #if defined(std_platform_win32_m)
-std_thread_local_m char  t_char_buffer[std_path_size_m];
-std_thread_local_m WCHAR t_path_buffer[std_path_size_m];
-std_thread_local_m WCHAR t_path_buffer_2[std_path_size_m];
+static std_thread_local_m char  t_char_buffer[std_path_size_m];
+static std_thread_local_m WCHAR t_path_buffer[std_path_size_m];
+static std_thread_local_m WCHAR t_path_buffer_2[std_path_size_m];
 
 size_t std_path_to_str ( const WCHAR* path, char* str, size_t cap ) {
     std_assert_m ( cap <= INT_MAX );
@@ -838,19 +838,19 @@ bool std_directory_info ( std_directory_info_t* info, const char* path ) {
     std_ignore_warning_m ( info->flags = 0, "-Wassign-enum" )
 
     if ( data.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED ) {
-        info->flags |= std_dir_compressed_m;
+        info->flags |= std_file_compressed_m;
     }
 
     if ( data.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED ) {
-        info->flags |= std_dir_encrypted_m;
+        info->flags |= std_file_encrypted_m;
     }
 
     if ( data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN ) {
-        info->flags |= std_dir_hidden_m;
+        info->flags |= std_file_hidden_m;
     }
 
     if ( data.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM ) {
-        info->flags |= std_dir_os_use_m;
+        info->flags |= std_file_os_use_m;
     }
 
     return true;

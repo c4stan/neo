@@ -270,6 +270,7 @@ static void combine_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
 // ---
 
+#if 1
 static void viewapp_scene_cornell_box ( void ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
@@ -287,9 +288,11 @@ static void viewapp_scene_cornell_box ( void ) {
 
     // sphere
     //m_state->components.sphere = sphere_entity;
-    m_state->entities.sphere = se->create_entity();
+    //m_state->entities.sphere = se->create_entity();
     {
-        se_entity_params_alloc_entity ( &allocator, m_state->entities.sphere );
+        se_entity_h sphere = se->create_entity();
+        se->set_entity_name ( sphere, "sphere" );
+        se_entity_params_alloc_entity ( &allocator, sphere );
         //se_entity_h sphere_entity = se->create_entity ( &se_entity_params_m() );
         
         geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
@@ -369,9 +372,11 @@ static void viewapp_scene_cornell_box ( void ) {
         //se_entity_h plane_entity = se->create_entity ( &entity_params );
         //m_state->components.planes[i] = plane_entity;
 
-        m_state->entities.planes[i] = se->create_entity();
+        //m_state->entities.planes[i] = se->create_entity();
 
-        se_entity_params_alloc_entity ( &allocator, m_state->entities.planes[i] );
+        se_entity_h plane = se->create_entity();
+        se->set_entity_name ( plane, "plane" );
+        se_entity_params_alloc_entity ( &allocator, plane );
 
         geometry_data_t geo = generate_plane ( 5.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
@@ -423,8 +428,10 @@ static void viewapp_scene_cornell_box ( void ) {
         //light_entity = se->create_entity ( &entity_params );
         //m_state->components.light = light_entity;
 
-        m_state->entities.light = se->create_entity();
-        se_entity_params_alloc_entity ( &allocator, m_state->entities.light );
+        //m_state->entities.light = se->create_entity();
+        se_entity_h light = se->create_entity();
+        se->set_entity_name ( light, "light" );
+        se_entity_params_alloc_entity ( &allocator, light );
 
         //viewapp_light_component_t* light_component = &m_state->components.light_components[0];
         viewapp_light_component_t light_component = viewapp_light_component_m (
@@ -460,6 +467,7 @@ static void viewapp_scene_cornell_box ( void ) {
 
     se->init_entities ( allocator.entities );
 }
+#endif
 
 #if 0
 static void viewapp_scene_field ( void ) {
@@ -611,8 +619,8 @@ static void viewapp_boot ( void ) {
     //    } while ((c != '\n') && (c != EOF));
     //}
 
-    uint32_t resolution_x = 1920;
-    uint32_t resolution_y = 1024;
+    uint32_t resolution_x = 1024;//1920;
+    uint32_t resolution_y = 768;//1024;
 
     m_state->render.resolution_x = resolution_x;
     m_state->render.resolution_y = resolution_y;
@@ -671,6 +679,7 @@ static void viewapp_boot ( void ) {
             .streams = { sizeof ( viewapp_camera_component_t ) }
         ) }
     ) );
+
     se->create_entity_family ( &se_entity_family_params_m (
         .component_count = 1,
         .components = { se_component_layout_m (
@@ -679,6 +688,33 @@ static void viewapp_boot ( void ) {
             .streams = { sizeof ( viewapp_mesh_component_t ) }
         ) }
     ) );
+
+#if 1
+    se->set_component_properties ( MESH_COMPONENT_ID, "Mesh component", &se_component_properties_params_m (
+        .count = 3,
+        .properties = {
+            se_field_property_m ( 0, viewapp_mesh_component_t, position, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, orientation, se_property_normal_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, up, se_property_normal_m ),
+        }
+    ) );
+
+    se->set_component_properties ( LIGHT_COMPONENT_ID, "Light component", &se_component_properties_params_m (
+        .count = 3,
+        .properties = {
+            se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, intensity, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, color, se_property_3f32_m ),
+        }
+    ) );
+
+    se->set_component_properties ( CAMERA_COMPONENT_ID, "Camera component", &se_component_properties_params_m (
+        .count = 0,
+        .properties = {
+        }
+    ) );
+#endif
+
     se->create_entity_family ( &se_entity_family_params_m (
         .component_count = 1,
         .components = { se_component_layout_m (
@@ -687,9 +723,6 @@ static void viewapp_boot ( void ) {
             .streams = { sizeof ( viewapp_light_component_t ) }
         ) }
     ) );
-
-    se_entity_h camera_entity = se->create_entity();
-    m_state->entities.camera = camera_entity;
 
     xs_i* xs = m_state->modules.xs;
     xi_i* xi = m_state->modules.xi;
@@ -765,11 +798,13 @@ static void viewapp_boot ( void ) {
         //camera_component->view = view;
         //se->add_component ( camera_entity, CAMERA_COMPONENT_ID, ( se_component_h ) camera_component );
 
-        m_state->entities.camera = se->create_entity();
+        //m_state->entities.camera = se->create_entity();
+        se_entity_h camera_entity = se->create_entity();
+        se->set_entity_name ( camera_entity, "camera" );
 
         std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
         se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-        se_entity_params_alloc_entity ( &allocator, m_state->entities.camera );
+        se_entity_params_alloc_entity ( &allocator, camera_entity );
         se_entity_params_alloc_monostream_component_inline_m ( &allocator, CAMERA_COMPONENT_ID, &camera_component );
 
         se->init_entities ( allocator.entities );
@@ -1135,7 +1170,7 @@ static void viewapp_boot ( void ) {
         .render_targets_count = 1,
         .render_targets = { tonemap_texture },
         .texture_reads_count = 1,
-        .texture_reads = { taa_accumulation_texture },
+        .texture_reads = { taa_accumulation_texture }, // taa_accumulation_texture
         .samplers_count = 1,
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
@@ -1165,6 +1200,7 @@ static void viewapp_boot ( void ) {
 
     xf->debug_print_graph ( graph );
 
+#if 1
     m_state->render.swapchain_multi_texture = swapchain_multi_texture;
     m_state->render.ssgi_raymarch_texture = ssgi_raymarch_texture;
     m_state->render.ssgi_accumulation_texture = ssgi_accumulation_texture;
@@ -1172,6 +1208,155 @@ static void viewapp_boot ( void ) {
     m_state->render.ssgi_2_raymarch_texture = ssgi_2_raymarch_texture;
     m_state->render.ssgi_2_accumulation_texture = ssgi_2_accumulation_texture;
     m_state->render.taa_accumulation_texture = taa_accumulation_texture;
+#endif
+}
+
+static void update_cameras ( wm_input_state_t* input_state, wm_input_state_t* new_input_state ) {
+    se_i* se = m_state->modules.se;
+    xi_i* xi = m_state->modules.xi;
+    rv_i* rv = m_state->modules.rv;
+
+    if ( xi->get_active_element_id() != 0 ) {
+        return;
+    }
+
+    se_query_result_t camera_query_result;
+    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { CAMERA_COMPONENT_ID } ) );
+
+    se_component_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
+        viewapp_camera_component_t* camera_component = se_component_iterator_next ( &camera_iterator );
+
+        rv->update_prev_frame_data ( camera_component->view );
+        // TODO need to account for jitter (and thus de-jitter) in a bunch of places. shadows look flickery when light is very close to object possibly because of this
+        rv->update_proj_jitter ( camera_component->view, m_state->render.frame_id );
+
+        rv_view_info_t view_info;
+        rv->get_view_info ( &view_info, camera_component->view );
+        rv_view_transform_t xform = view_info.transform;
+        bool dirty_xform = false;
+
+        if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
+            float drag_scale = -1.f / 400;
+            sm_vec_3f_t v;
+            v.x = xform.position[0] - xform.focus_point[0];
+            v.y = xform.position[1] - xform.focus_point[1];
+            v.z = xform.position[2] - xform.focus_point[2];
+
+            int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
+            int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
+
+            if ( delta_x != 0 ) {
+                sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
+                sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
+
+                v = sm_matrix_4x4f_transform_f3 ( mat, v );
+            }
+
+            if ( delta_y != 0 ) {
+                sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
+                sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
+                axis = sm_vec_3f_norm ( axis );
+
+                sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( axis, -delta_y * drag_scale );
+                v = sm_matrix_4x4f_transform_f3 ( mat, v );
+            }
+
+            if ( delta_x != 0 || delta_y != 0 ) {
+                xform.position[0] = view_info.transform.focus_point[0] + v.x;
+                xform.position[1] = view_info.transform.focus_point[1] + v.y;
+                xform.position[2] = view_info.transform.focus_point[2] + v.z;
+
+                dirty_xform = true;
+            }
+        }
+
+        if ( xi->get_hovered_element_id() == 0 ) {
+            if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] || new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
+                int8_t wheel = ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_up_m] - ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_down_m];
+                float zoom_step = -0.1;
+                float zoom_min = 0.001;
+
+                sm_vec_3f_t v;
+                v.x = xform.position[0] - xform.focus_point[0];
+                v.y = xform.position[1] - xform.focus_point[1];
+                v.z = xform.position[2] - xform.focus_point[2];
+
+                float dist = sm_vec_3f_len ( v );
+                float new_dist = fmaxf ( zoom_min, dist + ( zoom_step * wheel ) * dist );
+                v = sm_vec_3f_mul ( v, new_dist / dist );
+
+                xform.position[0] = view_info.transform.focus_point[0] + v.x;
+                xform.position[1] = view_info.transform.focus_point[1] + v.y;
+                xform.position[2] = view_info.transform.focus_point[2] + v.z;
+
+                dirty_xform = true;
+            }
+        }
+
+        if ( dirty_xform ) {
+            rv->update_view_transform ( camera_component->view, &xform );
+        }
+    }
+}
+
+static char property_edit_buffer[128];
+static uint64_t property_edit_id;
+
+static bool property_editor_f32 ( void* data, xi_workload_h xi_workload, uint64_t xi_id ) {
+    xi_i* xi = m_state->modules.xi;
+
+    xi_id = xi_line_id_m() ^ xi_id;
+    xi_textfield_state_t textfield = xi_textfield_state_m (
+        .width = 64,
+        .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
+        .id = xi_id,
+    );
+
+    if ( property_edit_id != xi_id ) {
+        std_f32_to_str ( *( float* ) data, textfield.text, xi_textfield_text_size_m );
+    } else {
+        std_str_copy_static_m ( textfield.text, property_edit_buffer );
+    }
+
+    xi_textfield_event_e event = xi->add_textfield ( xi_workload, &textfield );
+
+    if ( event == xi_textfield_event_focus_acquire_m ) {
+        //std_assert_m ( property_edit_id == 0 );
+        property_edit_id = xi_id;
+        std_log_info_m ( "acquire " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
+        std_str_copy_static_m ( property_edit_buffer, textfield.text );
+        return false;
+    } else if ( event == xi_textfield_event_focus_release_m ) {
+        std_log_info_m ( "release " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
+        property_edit_id = 0;
+        float f32 = std_str_to_f32 ( textfield.text );
+        *( float* ) data = f32;
+        return true;
+    } else if ( event == xi_textfield_event_text_commit_m ) {
+        std_log_info_m ( "commit " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
+        float f32 = std_str_to_f32 ( textfield.text );
+        *( float* ) data = f32;
+        return true;
+    } else if ( event == xi_textfield_event_text_edit_m ) {
+        std_log_info_m ( "edit " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
+        std_str_copy_static_m ( property_edit_buffer, textfield.text );
+        return false;
+    }
+
+    return false;
+}
+
+static void property_editor ( xi_workload_h xi_workload, uint64_t xi_id, se_entity_h entity, se_component_e component, se_property_t* property, se_property_h property_handle ) {
+    se_i* se = m_state->modules.se;
+
+    void* data = se->get_entity_component ( entity, component, property->stream );
+
+    if ( property->type == se_property_3f32_m ) {
+        property_editor_f32 ( data + property->offset + 0, xi_workload, xi_id ^ xi_line_id_m() );
+        property_editor_f32 ( data + property->offset + 4, xi_workload, xi_id ^ xi_line_id_m() );
+        property_editor_f32 ( data + property->offset + 8, xi_workload, xi_id ^ xi_line_id_m() );
+    }
 }
 
 static std_app_state_e viewapp_update ( void ) {
@@ -1247,8 +1432,11 @@ static std_app_state_e viewapp_update ( void ) {
     xi_i* xi = m_state->modules.xi;
     xi_workload_h xi_workload = xi->create_workload();
     set_ui_pass_xi_workload ( xi_workload );
+
+    wm_input_buffer_t input_buffer;
+    wm->get_window_input_buffer ( window, &input_buffer );
     
-    xi->begin_update ( &new_window_info, &new_input_state );
+    xi->begin_update ( &new_window_info, &new_input_state, &input_buffer );
     xi->begin_window ( xi_workload, &m_state->ui.window_state );
     
     xi->begin_section ( xi_workload, &m_state->ui.xf_alloc_section_state );
@@ -1293,98 +1481,100 @@ static std_app_state_e viewapp_update ( void ) {
     xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
     xi->end_section ( xi_workload );
 
+#if 1
     xi->begin_section ( xi_workload, &m_state->ui.entities_section_state );
+    {
+        se_i* se = m_state->modules.se;
+
+        se_entity_h entity_list[se_max_entities_m];
+        size_t entity_count = se->get_entity_list ( entity_list, se_max_entities_m );
+        
+        for ( uint32_t i = 0; i < entity_count; ++i ) {
+            se_entity_properties_t props;
+            se->get_entity_properties ( entity_list[i], &props );
+
+            // entity label
+            xi_label_state_t label = xi_label_state_m();
+            std_str_copy_static_m ( label.text, props.name );
+            xi->add_label ( xi_workload, &label );
+            xi->newline();
+
+            char buffer[1024];
+            std_stack_t stack = std_static_stack_m ( buffer );
+
+            for ( uint32_t j = 0; j < props.component_count; ++j ) {
+                se_component_properties_t* component = &props.components[j];
+
+                // component label
+                std_stack_string_append ( &stack, "  " );
+                std_stack_string_append ( &stack, component->name );
+                std_str_copy_static_m ( label.text, buffer );
+                std_stack_clear ( &stack );
+                xi->add_label ( xi_workload, &label );
+                xi->newline();
+
+                for ( uint32_t k = 0; k < component->property_count; ++k ) {
+                    se_property_t* property = &component->properties[k];
+
+                    // property label
+                    std_stack_string_append ( &stack, "  " );
+                    std_stack_string_append ( &stack, "  " );
+                    std_stack_string_append ( &stack, property->name );
+                    std_str_copy_static_m ( label.text, buffer );
+                    std_stack_clear ( &stack );
+                    xi->add_label ( xi_workload, &label );
+
+                    #if 0
+                    // property edit
+                    xi_textfield_state_t textfield = xi_textfield_state_m (
+                        .text = "textfield",
+                        .width = 128,
+                        .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
+                        .id = xi_line_id_m() + ( uint64_t ) i << 32 + ( uint64_t ) j << 16 + ( uint64_t ) k,
+                    );
+                    if ( xi->add_textfield ( xi_workload, &textfield ) ) {
+                        // TODO update property
+                    }
+                    #else
+                    //uint64_t xi_id = ( uint64_t ) i << 32 + ( uint64_t ) j << 16 + ( uint64_t ) k;
+                    //property_editor ( xi_workload, xi_id, entity_list[i], component->id, property, component->handles[k] );
+                    if ( property->type == se_property_3f32_m ) {
+                        void* data = se->get_entity_component ( entity_list[i], component->id, property->stream );
+                        
+                        xi_property_editor_state_t property_editor_state = xi_property_editor_state_m ( 
+                            .type = xi_property_3f32_m,
+                            .data = data + property->offset,
+                            .property_width = 64,
+                            .id = ( uint64_t ) i << 32 + ( uint64_t ) j << 16 + ( uint64_t ) k,
+                            .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
+                        );
+
+                        xi->add_property_editor ( xi_workload, &property_editor_state );
+                    }
+                    #endif
+
+                    xi->newline();
+                }
+            }
+        }
+    }
+#endif
 
     xi->end_section ( xi_workload );
     
     xi->end_window ( xi_workload );
     xi->end_update();
 
-    // Camera
-    #if 0
-    if ( xi->get_active_element_id() == 0 ) {
-        rv_i* rv = m_state->modules.rv;
-        viewapp_camera_component_t* camera_component = &m_state->components.camera_component;
-
-        rv->update_prev_frame_data ( camera_component->view );
-        rv->update_proj_jitter ( camera_component->view, m_state->render.frame_id );
-
-        rv_view_info_t view_info;
-        rv->get_view_info ( &view_info, camera_component->view );
-        rv_view_transform_t xform = view_info.transform;
-        bool dirty_xform = false;
-
-        if ( new_input_state.mouse[wm_mouse_state_left_m] ) {
-            float drag_scale = -1.f / 400;
-            sm_vec_3f_t v;
-            v.x = xform.position[0] - xform.focus_point[0];
-            v.y = xform.position[1] - xform.focus_point[1];
-            v.z = xform.position[2] - xform.focus_point[2];
-
-            int64_t delta_x = ( int64_t ) new_input_state.cursor_x - ( int64_t ) input_state->cursor_x;
-            int64_t delta_y = ( int64_t ) new_input_state.cursor_y - ( int64_t ) input_state->cursor_y;
-
-            if ( delta_x != 0 ) {
-                sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
-                sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
-
-                v = sm_matrix_4x4f_transform_f3 ( mat, v );
-            }
-
-            if ( delta_y != 0 ) {
-                sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
-                sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
-                axis = sm_vec_3f_norm ( axis );
-
-                sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( axis, -delta_y * drag_scale );
-                v = sm_matrix_4x4f_transform_f3 ( mat, v );
-            }
-
-            if ( delta_x != 0 || delta_y != 0 ) {
-                xform.position[0] = view_info.transform.focus_point[0] + v.x;
-                xform.position[1] = view_info.transform.focus_point[1] + v.y;
-                xform.position[2] = view_info.transform.focus_point[2] + v.z;
-
-                dirty_xform = true;
-            }
-        }
-
-        if ( new_input_state.mouse[wm_mouse_state_wheel_up_m] || new_input_state.mouse[wm_mouse_state_wheel_down_m] ) {
-            int8_t wheel = ( int8_t ) new_input_state.mouse[wm_mouse_state_wheel_up_m] - ( int8_t ) new_input_state.mouse[wm_mouse_state_wheel_down_m];
-            float zoom_step = -0.1;
-            float zoom_min = 0.001;
-
-            sm_vec_3f_t v;
-            v.x = xform.position[0] - xform.focus_point[0];
-            v.y = xform.position[1] - xform.focus_point[1];
-            v.z = xform.position[2] - xform.focus_point[2];
-
-            float dist = sm_vec_3f_len ( v );
-            float new_dist = fmaxf ( zoom_min, dist + ( zoom_step * wheel ) * dist );
-            v = sm_vec_3f_mul ( v, new_dist / dist );
-
-            xform.position[0] = view_info.transform.focus_point[0] + v.x;
-            xform.position[1] = view_info.transform.focus_point[1] + v.y;
-            xform.position[2] = view_info.transform.focus_point[2] + v.z;
-
-            dirty_xform = true;
-        }
-
-        if ( dirty_xform ) {
-            rv->update_view_transform ( camera_component->view, &xform );
-        }
-    }
-    #endif
+    update_cameras ( input_state, &new_input_state );
 
     m_state->render.window_info = new_window_info;
     m_state->render.input_state = new_input_state;
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
-    //xg->acquire_next_swapchain_texture ( m_state->render.swapchain, workload );
     xf->execute_graph ( m_state->render.graph, workload );
     xg->submit_workload ( workload );
-    //xg->present_swapchain ( m_state->render.swapchain, workload );
+    xg->present_swapchain ( m_state->render.swapchain, workload );
 
     xs->update_pipeline_states ( workload );
 
@@ -1418,7 +1608,7 @@ void* viewer_app_load ( void* runtime ) {
     std_mem_zero_m ( &state->render );
     state->render.frame_id = 0;
 
-    std_mem_zero_m ( &state->entities );
+    //std_mem_zero_m ( &state->entities );
 
     //state->model_components_freelist = std_static_freelist_m ( state->model_components );
     //state->mesh_components_freelist = std_static_freelist_m ( state->mesh_components );

@@ -482,6 +482,8 @@ void xg_vk_device_unload ( void ) {
 
         if ( device->flags & xg_vk_device_active_m ) {
             vkDeviceWaitIdle ( device->vk_handle );
+
+            xg_vk_device_deactivate ( i );
         }
     }
 

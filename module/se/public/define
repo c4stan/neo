@@ -13,3 +13,6 @@ se_entity_family_page_count_m               128
 se_component_max_streams_m      32
 
 se_debug_name_size_m            32
+
+se_component_max_properties_m   32
+se_property_string_max_size_m   64

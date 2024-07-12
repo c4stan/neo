@@ -8,3 +8,5 @@ xi_workload_max_submitted_workloads_m 4
 xi_font_max_fonts_m 32
 xi_font_texture_atlas_width_m 512
 xi_font_texture_atlas_height_m 512
+
+xi_ui_max_focusable_elements_m 1024

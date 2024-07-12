@@ -15,7 +15,8 @@ typedef struct {
 
 typedef struct {
     se_component_e id;
-    uint32_t stream_count;
+    // The implementation assumes that streams don't have gaps, e.g. if count is declared as n then all streams from 0 to n-1 are assumed to be in use
+    uint32_t stream_count; 
     se_entity_family_stream_t streams[se_component_max_streams_m];
 } se_entity_family_component_t;
 
@@ -26,7 +27,7 @@ typedef struct {
     //se_component_mask_t component_mask;
     uint32_t entity_count; // count of total entities alive for this family. Each entity has a set of components associated to it.
     uint32_t component_count; // count of component types used by this entity family. set at family creation time.
-    se_entity_family_stream_t entity_stream;
+    se_entity_family_stream_t entity_stream; // stores handles to the entities that own the components
     uint8_t component_slots[se_max_component_types_m]; // component type id -> idx in components array. TODO replace with hash_map?
     se_entity_family_component_t components[se_entity_max_components_per_entity_m];
 } se_entity_family_t;
@@ -62,6 +63,37 @@ typedef struct {
 
 #define std_entity_family_bitset_block_count_m ( std_div_ceil_m(se_entity_max_families_m, 64) )
 
+// TODO make this debug/tool only
+#if 0
+typedef struct {
+    uint32_t property_count;
+    se_property_t properties[se_component_max_properties_m];
+} se_entity_stream_properties_t;
+
+typedef struct {
+    se_entity_stream_properties_t streams[se_component_max_streams_m];
+} se_entity_component_properties_t;
+#endif
+typedef struct {
+    char string[se_debug_name_size_m];
+} se_entity_name_t;
+
+typedef struct {
+    uint32_t property_count;
+    char name[se_debug_name_size_m];
+    se_property_t properties[se_component_max_properties_m];
+} se_entity_component_properties_t;
+
+typedef struct {
+    // TODO freelist + map? dynamic grow?
+    se_entity_component_properties_t property_array[se_max_component_types_m];
+} se_entity_component_metadata_t;
+
+typedef struct {
+    uint64_t used_entities[ std_div_ceil_m ( se_max_entities_m, 64 ) ];    
+    se_entity_name_t names[se_max_entities_m];
+} se_entity_metadata_t;
+
 typedef struct {
     std_mutex_t mutex;
 
@@ -81,6 +113,9 @@ typedef struct {
 
     se_entity_h* entity_destroy_array;
     uint64_t entity_destroy_count;
+
+    se_entity_metadata_t* entity_meta;
+    se_entity_component_metadata_t* component_meta;
 } se_entity_state_t;
 
 void se_entity_load ( se_entity_state_t* state );
@@ -96,6 +131,14 @@ void se_entity_create ( const se_entity_params_t* params );
 void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count );
 
 void se_entity_query ( se_query_result_t* result, const se_query_params_t* params );
+
+void* se_entity_get_component ( se_entity_h entity_handle, se_component_e component, uint8_t stream );
+
+const char* se_entity_name ( se_entity_h entity_handle );
+void se_entity_set_name ( se_entity_h entity, const char* name );
+void se_entity_set_component_properties ( se_component_e component, const char* name, const se_component_properties_params_t* params );
+size_t se_entity_list ( se_entity_h* out_entities, size_t cap );
+void se_entity_property_get ( se_entity_h entity_handle, se_entity_properties_t* out_props );
 
 #if 0
 se_entity_h se_entity_create ( const se_entity_params_t* params );

@@ -1014,12 +1014,9 @@ void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph_hand
         if ( node->params.passthrough.enable ) {
             bool node_enabled = node->enabled;
 
-            xi_label_state_t label_state = xi_label_state_m (
-                //.text = node->params.debug_name,
-                //.height = labels_style->font_height,
-            );
+            xi_label_state_t label_state = xi_label_state_m ();
             std_str_copy_static_m ( label_state.text, node->params.debug_name );
-            xi->add_label ( workload, &label_state );//, labels_style );
+            xi->add_label ( workload, &label_state );
 
             xi_switch_state_t switch_state = xi_switch_state_m (
                 .width = 14,
@@ -1029,7 +1026,7 @@ void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph_hand
                     .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
                 ),
             );
-            xi->add_switch ( workload, &switch_state );//, controls_style );
+            xi->add_switch ( workload, &switch_state );
 
             xi->newline();
 

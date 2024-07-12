@@ -9,8 +9,8 @@ layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_depth;
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_prev_depth;
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 4 ) uniform texture2D tex_normal_roughness;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 5 ) uniform texture2D tex_id;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 6 ) uniform texture2D tex_prev_id;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 5 ) uniform utexture2D tex_id;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 6 ) uniform utexture2D tex_prev_id;
 
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 7 ) uniform sampler sampler_point;
 
@@ -94,10 +94,10 @@ void main ( void ) {
     //out_color = vec4 ( abs ( d1 - d2 ) * 100000000, 0, 0, 1 );
     //return;
 
-    vec4 object_id_sample = texture ( sampler2D ( tex_id, sampler_point ), screen_uv.xy );
-    vec4 prev_object_id_sample = texture ( sampler2D ( tex_prev_id, sampler_point ), prev_screen.xy );
-    uint object_id = floatBitsToUint ( object_id_sample.x );
-    uint prev_object_id = floatBitsToUint ( prev_object_id_sample.x );
+    uvec4 object_id_sample = texture ( usampler2D ( tex_id, sampler_point ), screen_uv.xy );
+    uvec4 prev_object_id_sample = texture ( usampler2D ( tex_prev_id, sampler_point ), prev_screen.xy );
+    uint object_id = object_id_sample.x;//floatBitsToUint ( object_id_sample.x );
+    uint prev_object_id = prev_object_id_sample.x;//floatBitsToUint ( prev_object_id_sample.x );
 
     if ( object_id != prev_object_id ) {
         out_color = vec4 ( color, 1 );

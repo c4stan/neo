@@ -49,7 +49,7 @@
     #define std_alignof_m( x )                                    __alignof__ ( x )
     #define std_inline_m                                          __attribute__ (( always_inline ))
     #define std_noinline_m                                        __attribute__ (( noinline ))
-    #define std_noop_m                                            asm("nop")
+    #define std_noop_m                                            __asm__ ( "nop" )
     //( ( void ) 0 )
 
     // TODO does this work on local scope variables?

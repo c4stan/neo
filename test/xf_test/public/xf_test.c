@@ -112,7 +112,7 @@ static void xf_test ( void ) {
         xg_swapchain_window_params_t swapchain_params = xg_swapchain_window_params_m (
             .window = window,
             .device = device,
-            .texture_count = 1,
+            .texture_count = 3,
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
             .present_mode = xg_present_mode_fifo_m,

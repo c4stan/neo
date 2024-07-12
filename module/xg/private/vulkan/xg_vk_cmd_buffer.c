@@ -1163,7 +1163,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
         bool is_active = set->is_active;
         bool is_compatible = set->layout == set_layout_handle;
 
-        // One of these 2 conditions needs to match for the resource binding to be propagated
+        // One of these 2 conditions needs to match for the resource binding to be executed
         // 1. set is dirty
         //      in this case the new bind cmd needs to be processed and flushed
         // 2. set is not active, but it is compatible with the current pipeline
@@ -1216,16 +1216,16 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             for ( uint32_t i = 0; i < vk_set_layout->binding_points_count; ++i ) {
                 std_assert_m ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] > 0 );
                 
-                if ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] == 0 ) {
+                if ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] <= 0 ) {
                     std_log_error_m ( "Remaining pool resources:"
                         "\n" std_fmt_u32_m " sets" 
-                        "\n" std_fmt_u32_m " samplers" 
-                        "\n" std_fmt_u32_m " sampled textures" 
-                        "\n" std_fmt_u32_m " storage textures" 
-                        "\n" std_fmt_u32_m " uniform buffers" 
-                        "\n" std_fmt_u32_m " storage buffers" 
-                        "\n" std_fmt_u32_m " uniform texel buffers" 
-                        "\n" std_fmt_u32_m " storage texel buffers",
+                        "\n" std_fmt_i32_m " samplers" 
+                        "\n" std_fmt_i32_m " sampled textures" 
+                        "\n" std_fmt_i32_m " storage textures" 
+                        "\n" std_fmt_i32_m " uniform buffers" 
+                        "\n" std_fmt_i32_m " storage buffers" 
+                        "\n" std_fmt_i32_m " uniform texel buffers" 
+                        "\n" std_fmt_i32_m " storage texel buffers",
                         context->desc_allocator.set_count,
                         context->desc_allocator.descriptor_counts[xg_resource_binding_sampler_m],
                         context->desc_allocator.descriptor_counts[xg_resource_binding_texture_to_sample_m],
@@ -1236,7 +1236,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                         context->desc_allocator.descriptor_counts[xg_resource_binding_buffer_texel_storage_m]
                     );
                 }
-
+                
                 context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] -= 1;
             }
 

@@ -195,7 +195,7 @@ typedef struct {
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;
     //viewapp_components_state_t components;
-    viewapp_entity_state_t entities;
+    //viewapp_entity_state_t entities;
     viewapp_ui_state_t ui;
 } viewapp_state_t;
 

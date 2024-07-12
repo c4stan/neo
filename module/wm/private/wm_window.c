@@ -106,17 +106,248 @@ void wm_window_unload ( void ) {
 #endif
 }
 
+static uint32_t wm_window_keycode ( uint64_t os_keycode ) {
+    #if defined ( std_platform_win32_m ) 
+    switch ( os_keycode ) {
+    case VK_BACK:
+        return wm_keyboard_state_backspace_m;
+    case VK_RETURN:
+        return wm_keyboard_state_enter_m;
+    case VK_OEM_PERIOD:
+        return wm_keyboard_state_period_m;
+    case VK_OEM_PLUS:
+        return wm_keyboard_state_plus_m;
+    case VK_OEM_MINUS:
+        return wm_keyboard_state_minus_m;
+    case VK_TAB:
+        return wm_keyboard_state_tab_m;
+    case VK_LSHIFT:
+        return wm_keyboard_state_shift_left_m;
+    case VK_RSHIFT:
+        return wm_keyboard_state_shift_right_m;
+    case VK_LCONTROL:
+        return wm_keyboard_state_ctrl_left_m;
+    case VK_RCONTROL:
+        return wm_keyboard_state_ctrl_right_m;
+    case VK_LMENU:
+        return wm_keyboard_state_alt_left_m;
+    case VK_RMENU:
+        return wm_keyboard_state_alt_right_m;
+    case VK_SPACE:
+        return wm_keyboard_state_space_m;
+    case VK_LEFT:
+        return wm_keyboard_state_left_m;
+    case VK_UP:
+        return wm_keyboard_state_up_m;
+    case VK_RIGHT:
+        return wm_keyboard_state_right_m;
+    case VK_DOWN:
+        return wm_keyboard_state_down_m;
+    case 0x30:
+        return wm_keyboard_state_0_m;
+    case 0x31:
+        return wm_keyboard_state_1_m;
+    case 0x32:
+        return wm_keyboard_state_2_m;
+    case 0x33:
+        return wm_keyboard_state_3_m;
+    case 0x34:
+        return wm_keyboard_state_4_m;
+    case 0x35:
+        return wm_keyboard_state_5_m;
+    case 0x36:
+        return wm_keyboard_state_6_m;
+    case 0x37:
+        return wm_keyboard_state_7_m;
+    case 0x38:
+        return wm_keyboard_state_8_m;
+    case 0x39:
+        return wm_keyboard_state_9_m;
+    case 0x41:
+        return wm_keyboard_state_a_m;
+    case 0x42:
+        return wm_keyboard_state_b_m;
+    case 0x43:
+        return wm_keyboard_state_c_m;
+    case 0x44:
+        return wm_keyboard_state_d_m;
+    case 0x45:
+        return wm_keyboard_state_e_m;
+    case 0x46:
+        return wm_keyboard_state_f_m;
+    case 0x47:
+        return wm_keyboard_state_g_m;
+    case 0x48:
+        return wm_keyboard_state_h_m;
+    case 0x49:
+        return wm_keyboard_state_i_m;
+    case 0x4a:
+        return wm_keyboard_state_j_m;
+    case 0x4b:
+        return wm_keyboard_state_k_m;
+    case 0x4c:
+        return wm_keyboard_state_l_m;
+    case 0x4d:
+        return wm_keyboard_state_m_m;
+    case 0x4e:
+        return wm_keyboard_state_n_m;
+    case 0x4f:
+        return wm_keyboard_state_o_m;
+    case 0x50:
+        return wm_keyboard_state_p_m;
+    case 0x51:
+        return wm_keyboard_state_q_m;
+    case 0x52:
+        return wm_keyboard_state_r_m;
+    case 0x53:
+        return wm_keyboard_state_s_m;
+    case 0x54:
+        return wm_keyboard_state_t_m;
+    case 0x55:
+        return wm_keyboard_state_u_m;
+    case 0x56:
+        return wm_keyboard_state_v_m;
+    case 0x57:
+        return wm_keyboard_state_w_m;
+    case 0x58:
+        return wm_keyboard_state_x_m;
+    case 0x59:
+        return wm_keyboard_state_y_m;
+    case 0x5a:
+        return wm_keyboard_state_z_m;
+    case 0x70:
+        return wm_keyboard_state_f1_m;
+    case 0x71:
+        return wm_keyboard_state_f2_m;
+    case 0x72:
+        return wm_keyboard_state_f3_m;
+    case 0x73:
+        return wm_keyboard_state_f4_m;
+    case 0x74:
+        return wm_keyboard_state_f5_m;
+    case 0x75:
+        return wm_keyboard_state_f6_m;
+    case 0x76:
+        return wm_keyboard_state_f7_m;
+    case 0x77:
+        return wm_keyboard_state_f8_m;
+    case 0x78:
+        return wm_keyboard_state_f9_m;
+    case 0x79:
+        return wm_keyboard_state_f10_m;
+    case 0x7a:
+        return wm_keyboard_state_f11_m;
+    case 0x7b:
+        return wm_keyboard_state_f12_m;
+    default:
+        return wm_keyboard_state_count_m;
+    }
+    #endif
+}
+
+// TODO factor in flags (shift, capslock, ...)
+static uint32_t wm_input_keycode_to_character ( uint32_t keycode ) {
+    switch ( keycode ) {
+    case wm_keyboard_state_a_m:
+        return 'a';
+    case wm_keyboard_state_b_m:
+        return 'b';
+    case wm_keyboard_state_c_m:
+        return 'c';
+    case wm_keyboard_state_d_m:
+        return 'd';
+    case wm_keyboard_state_e_m:
+        return 'e';
+    case wm_keyboard_state_f_m:
+        return 'f';
+    case wm_keyboard_state_g_m:
+        return 'g';
+    case wm_keyboard_state_h_m:
+        return 'h';
+    case wm_keyboard_state_i_m:
+        return 'i';
+    case wm_keyboard_state_j_m:
+        return 'j';
+    case wm_keyboard_state_k_m:
+        return 'k';
+    case wm_keyboard_state_l_m:
+        return 'l';
+    case wm_keyboard_state_m_m:
+        return 'm';
+    case wm_keyboard_state_n_m:
+        return 'n';
+    case wm_keyboard_state_o_m:
+        return 'o';
+    case wm_keyboard_state_p_m:
+        return 'p';
+    case wm_keyboard_state_q_m:
+        return 'q';
+    case wm_keyboard_state_r_m:
+        return 'r';
+    case wm_keyboard_state_s_m:
+        return 's';
+    case wm_keyboard_state_t_m:
+        return 't';
+    case wm_keyboard_state_u_m:
+        return 'u';
+    case wm_keyboard_state_v_m:
+        return 'v';
+    case wm_keyboard_state_w_m:
+        return 'w';
+    case wm_keyboard_state_x_m:
+        return 'x';
+    case wm_keyboard_state_y_m:
+        return 'y';
+    case wm_keyboard_state_z_m:
+        return 'z';
+    case wm_keyboard_state_0_m:
+        return '0';
+    case wm_keyboard_state_1_m:
+        return '1';
+    case wm_keyboard_state_2_m:
+        return '2';
+    case wm_keyboard_state_3_m:
+        return '3';
+    case wm_keyboard_state_4_m:
+        return '4';
+    case wm_keyboard_state_5_m:
+        return '5';
+    case wm_keyboard_state_6_m:
+        return '6';
+    case wm_keyboard_state_7_m:
+        return '7';
+    case wm_keyboard_state_8_m:
+        return '8';
+    case wm_keyboard_state_9_m:
+        return '9';
+    case wm_keyboard_state_space_m:
+        return ' ';
+    case wm_keyboard_state_tab_m:
+        return '\t';
+    case wm_keyboard_state_period_m:
+        return '.';
+    case wm_keyboard_state_plus_m:
+        return '+';
+    case wm_keyboard_state_minus_m:
+        return '-';
+    default:
+        return '\0';
+    }
+}
+
 #if std_enabled_m(wm_input_events_m)
 #if defined(std_platform_win32_m)
 static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, int64_t* retcode ) {
     // Process msg
-    wm_input_event_t event;
+    wm_input_event_e event;
     uint64_t args[4] = { 0, 0, 0, 0 };
 
     // TODO
     //      test for std_enabled_m(wm_input_buffer_m)
     //      if enabled store all event input received during this frame in a buffer
     //      allow user to read from it (makes implementing a text box possible)
+
+    // TODO cleanup this, replace old even scheme with new one, allow for event callback update, ...
 
     if ( msg == WM_CLOSE ) {
         event = wm_event_close_m;
@@ -140,15 +371,26 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HW
         // TODO
         int64_t on_handle;
         int64_t on_pass;
+        wm_input_event_t* buffer_event;
 
         switch ( msg ) {
             case WM_KEYDOWN:
                 // TODO standardize keydown/up flags, don't just pass lparam
                 event = wm_event_key_down_m;
-                args[0] = ( uint64_t ) wparam; // key
+                args[0] = ( uint64_t ) ( wparam );
                 args[1] = ( uint64_t ) lparam; // flags - todo use wm_input_key_modifier_f
                 on_handle = 0;
                 on_pass = 1;
+
+                // TODO check bounds
+                uint64_t keycode = wm_window_keycode ( wparam );
+                if ( keycode != wm_keyboard_state_count_m ) {
+                    buffer_event = &window->input_buffer.events[window->input_buffer.count++];
+                    buffer_event->type = event;
+                    buffer_event->args.keyboard.keycode = keycode;
+                    buffer_event->args.keyboard.character = wm_input_keycode_to_character ( keycode );
+                    buffer_event->args.keyboard.flags = lparam; // TODO
+                }
                 break;
 
             case WM_KEYUP:
@@ -167,6 +409,13 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HW
                 args[3] = wparam;   // TODO
                 on_handle = 0;
                 on_pass = 1;
+
+                buffer_event = &window->input_buffer.events[window->input_buffer.count++];
+                buffer_event->type = event;
+                buffer_event->args.mouse.button = wm_mouse_state_left_m;
+                buffer_event->args.mouse.x = GET_X_LPARAM ( lparam );
+                buffer_event->args.mouse.y = GET_Y_LPARAM ( lparam );
+                buffer_event->args.mouse.flags = wparam;
                 break;
 
             case WM_LBUTTONUP:
@@ -187,6 +436,13 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HW
                 args[3] = wparam;   // TODO
                 on_handle = 0;
                 on_pass = 1;
+
+                buffer_event = &window->input_buffer.events[window->input_buffer.count++];
+                buffer_event->type = event;
+                buffer_event->args.mouse.button = wm_mouse_state_right_m;
+                buffer_event->args.mouse.x = GET_X_LPARAM ( lparam );
+                buffer_event->args.mouse.y = GET_Y_LPARAM ( lparam );
+                buffer_event->args.mouse.flags = wparam;
                 break;
 
             case WM_RBUTTONUP:
@@ -213,6 +469,13 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HW
                 } else {
                     window->pending_wheel_down += 1;
                 }
+
+                buffer_event = &window->input_buffer.events[window->input_buffer.count++];
+                buffer_event->type = event;
+                buffer_event->args.mouse.button = GET_WHEEL_DELTA_WPARAM ( wparam ) > 0 ? wm_mouse_state_wheel_up_m : wm_mouse_state_wheel_down_m;
+                buffer_event->args.mouse.x = GET_X_LPARAM ( lparam );
+                buffer_event->args.mouse.y = GET_Y_LPARAM ( lparam );
+                buffer_event->args.mouse.flags = wparam;
 
                 break;
 
@@ -373,7 +636,7 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HW
 }
 #elif defined(std_platform_linux_m)
 static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XEvent* x_event ) {
-    wm_input_event_t event;
+    wm_input_event_e event;
     uint64_t args[4] = { 0, 0, 0, 0 };
 
     if ( x_event->type == ClientMessage && x_event->xclient.data.l[0] == window->exit_message_id ) {
@@ -557,6 +820,7 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
 
 #if std_enabled_m(wm_input_state_m)
 void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_console ) {
+    return;
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
     char* kb = window->input_state.keyboard;
     char* mouse = window->input_state.mouse;
@@ -987,6 +1251,8 @@ void wm_window_update ( wm_window_h handle ) {
     wm_clear_input_state ( handle );
 #endif
 
+    window->input_buffer.count = 0;
+
 #if defined(std_platform_win32_m)
     MSG msg;
 
@@ -1310,4 +1576,9 @@ bool wm_window_get_info ( wm_window_h handle, wm_window_info_t* info ) {
     *info = window->info;
     std_mutex_unlock ( &wm_window_state->mutex );
     return true;
+}
+
+void wm_window_input_buffer_get ( wm_window_h handle, wm_input_buffer_t* buffer ) {
+    wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
+    *buffer = window->input_buffer;
 }

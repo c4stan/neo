@@ -72,11 +72,11 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
         uint32_t major = VK_API_VERSION_MAJOR ( instance_version );
         uint32_t minor = VK_API_VERSION_MINOR ( instance_version );
         uint32_t patch = VK_API_VERSION_PATCH ( instance_version );
-        std_verify_m ( variant == 0 );
+        std_assert_m ( variant == 0 );
         std_log_info_m ( "Using Vulkan API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m, major, minor, patch );
     #endif
 
-        VkApplicationInfo applicationInfo;
+        VkApplicationInfo applicationInfo = {};
         applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         applicationInfo.pNext = NULL;
         applicationInfo.pApplicationName = "XG";
@@ -84,7 +84,7 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
         applicationInfo.pEngineName = "XG";
         applicationInfo.engineVersion = 1;
         applicationInfo.apiVersion = VK_API_VERSION_1_2;//instance_version;
-        VkInstanceCreateInfo instanceInfo;
+        VkInstanceCreateInfo instanceInfo = {};
         instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instanceInfo.pNext = NULL;
         instanceInfo.flags = 0;
@@ -93,7 +93,8 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
         instanceInfo.ppEnabledLayerNames = enabled_layers;
         instanceInfo.enabledExtensionCount = enabled_extensions_count;
         instanceInfo.ppEnabledExtensionNames = enabled_extensions;
-        xg_vk_safecall_m ( vkCreateInstance ( &instanceInfo, NULL, &instance ), VK_NULL_HANDLE );
+        VkResult result = vkCreateInstance ( &instanceInfo, NULL, &instance );
+        std_verify_m ( result == VK_SUCCESS );
     }
     return instance;
 }
@@ -185,7 +186,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
 
     const char* debug_layers[] = {      // Additional debug info/warning/error reporting
 #if std_enabled_m(std_debug_m)
-//        "VK_LAYER_KHRONOS_validation",
+        "VK_LAYER_KHRONOS_validation",
 #endif
     };
 
@@ -193,6 +194,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
 #if !std_enabled_m(xg_vk_enable_raytracing)
         // RenderDoc layer kills RT device extensions...
         //"VK_LAYER_RENDERDOC_Capture"
+        //"VK_LAYER_NV_nsight"
 #endif
     };
 
