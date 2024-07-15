@@ -2,6 +2,7 @@ xs_shader_permutation_max_defines_m     64
 xs_shader_permutation_define_name_max_len_m   64
 xs_shader_max_permutations_m            64
 xs_shader_max_variations_m              2
+xs_shader_max_defines_m                 64
 xs_shader_name_max_len_m                64
 
 xs_shader_definition_name_max_len_m     64

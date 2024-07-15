@@ -73,6 +73,7 @@ typedef struct {
     xi_color_t font_color;
     xi_horizontal_alignment_e horizontal_alignment;
     xi_vertical_alignment_e vertical_alignment;
+    // TODO add padding/margin here
 } xi_style_t;
 
 #define xi_style_m( ... ) ( xi_style_t ) { \
@@ -327,8 +328,6 @@ typedef enum {
     xi_property_3f32_m,
     xi_property_4f32_m,
     xi_property_string_m,
-    xi_property_normal_m,
-    xi_property_quat_m,
     xi_property_invalid_m,
 } xi_property_e;
 
@@ -461,7 +460,7 @@ typedef struct {
     void ( *end_section )   ( xi_workload_h workload );
 
     // TODO rename these, remove add_ and leave just element name? replace with draW?
-    void ( *add_button )    ( xi_workload_h workload, xi_button_state_t* state );
+    bool ( *add_button )    ( xi_workload_h workload, xi_button_state_t* state );
     void ( *add_slider )    ( xi_workload_h workload, xi_slider_state_t* state );
     //void ( *add_text )     ( xi_workload_h workload, xi_text_state_t*   state );
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );

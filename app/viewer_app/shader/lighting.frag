@@ -35,6 +35,7 @@ layout ( location = 0 ) out vec4 out_color;
 
 void main ( void ) {
     vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    screen_uv = dejitter_uv ( screen_uv );
 
     vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
     vec3 base_color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
@@ -42,6 +43,7 @@ void main ( void ) {
     float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
 
     vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
+    view_geo_pos += view_normal * 0.01; // Normal Offset Shadows, helps with acne
     vec4 world_geo_pos = view_cbuffer.world_from_view * vec4 ( view_geo_pos, 1.f );
 
     vec3 irradiance = vec3 ( 0, 0, 0 );
@@ -57,6 +59,7 @@ void main ( void ) {
         vec3 shadow_screen = vec3 ( shadow_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, shadow_proj.z );
 
         float shadow = 0;
+    #if 1
         int pcf_radius = 3;
 
         for ( int x = -pcf_radius; x <= pcf_radius; ++x ) {
@@ -80,6 +83,15 @@ void main ( void ) {
         }
 
         shadow /= ( pcf_radius * 2 + 1 ) * ( pcf_radius * 2 + 1 );
+    #else
+        float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_point ), shadow_screen.xy ).x;
+        float shadow_bias = 0.03;
+        if ( shadow_screen.z > 1.f ) {
+            shadow = 0;
+        } else {
+            shadow = shadow_proj.z - shadow_bias > shadow_depth ? 1.f : 0.f;
+        }
+    #endif
 
         float shadow_occlusion = 1.f - shadow;
         //float shadow_occlusion = shadow_depth + 0.001 > shadow_proj.z ? 1.f : 0.f;

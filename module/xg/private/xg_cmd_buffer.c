@@ -171,8 +171,11 @@ static void* xg_cmd_buffer_record_cmd ( xg_cmd_buffer_t* cmd_buffer, xg_cmd_type
 
     return cmd_args;
 }
-#define xg_cmd_buffer_record_cmd_m( cmd_buffer, cmd_type, key, args_type ) (args_type*) xg_cmd_buffer_record_cmd(cmd_buffer, cmd_type, key, sizeof(args_type))
-#define xg_cmd_buffer_record_cmd_noargs_m( cmd_buffer, cmd_type, key )                  xg_cmd_buffer_record_cmd(cmd_buffer, cmd_type, key, 0)
+#define xg_cmd_buffer_record_cmd_m( cmd_buffer, cmd_type, key, args_type ) \
+    ( args_type* ) xg_cmd_buffer_record_cmd ( cmd_buffer, cmd_type, key, sizeof ( args_type ) )
+
+#define xg_cmd_buffer_record_cmd_noargs_m( cmd_buffer, cmd_type, key ) \
+    xg_cmd_buffer_record_cmd ( cmd_buffer, cmd_type, key, 0 )
 
 // Graphics pipeline
 

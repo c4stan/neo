@@ -1109,7 +1109,7 @@ uint64_t std_allocator_tlsf_heap_size_roundup ( uint64_t size ) {
     return size;
 }
 
-std_ignore_unused_warning_m()
+std_unused_function_m()
 static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
     char buffer[1024];
     std_log_info_m ( "-- TLSF heap state --" );

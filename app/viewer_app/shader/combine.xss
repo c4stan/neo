@@ -3,18 +3,6 @@ fragment_shader combine.frag
 
 include common_graphics.xsi
 
-begin permutation
-    name ssgi
-    count 2
-    stage fragment
-end
-
-begin permutation
-    name ssr
-    count 2
-    stage fragment
-end    
-
 begin render_target 0
     format B10G11R11_UFLOAT
 end

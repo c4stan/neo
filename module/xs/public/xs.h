@@ -147,7 +147,7 @@ typedef uint64_t xs_database_h;
 typedef uint64_t xs_pipeline_state_h;
 
 typedef struct {
-    uint32_t value;
+    int32_t value;
     char name[xs_shader_definition_name_max_len_m];
 } xs_shader_definition_t;
 

@@ -1,4 +1,5 @@
 #define PI 3.1415f
+#define REVERSE_Z 1
 
 // ======================================================================================= //
 //                              U N I F O R M   B U F F E R S
@@ -54,6 +55,30 @@ mat3 tnb_from_normal ( vec3 n ) {
     return mat3 ( t, n, b );
 }
 
+bool proj_depth_cmp_ge ( float a, float b ) {
+#if reverse_depth_m
+    return a <= b;
+#else
+    return a >= b;
+#endif
+}
+
+bool proj_depth_cmp_gt ( float a, float b ) {
+#if reverse_depth_m
+    return a < b;
+#else
+    return a > b;
+#endif
+}
+
+float proj_depth_diff ( float a, float b ) {
+#if reverse_depth_m
+    return a - b;
+#else
+    return b - a;
+#endif
+}
+
 // ======================================================================================= //
 //                             T R A N S F O R M   S P A C E S
 // ======================================================================================= //
@@ -91,6 +116,27 @@ vec3 prev_screen_from_world ( vec3 world ) {
     return screen;
 }
 
+// takes in post-divide by w coords, before moving from NDC to screen
+vec2 dejitter_ndc ( vec2 ndc ) {
+    vec2 jitter = vec2 ( view_cbuffer.jittered_proj_from_view[2][0], view_cbuffer.jittered_proj_from_view[2][1] );
+    return ndc - jitter;
+}
+
+vec2 dejitter_uv ( vec2 screen_uv ) {
+    float proj_x = screen_uv.x * 2 - 1;
+    float proj_y = ( 1 - screen_uv.y ) * 2 - 1;
+    vec2 ndc = vec2 ( proj_x, proj_y );
+    vec2 dejittered_ndc = dejitter_ndc ( ndc );
+    vec2 dejittered_uv = dejittered_ndc * vec2 ( 0.5, -0.5 ) + 0.5;
+    return dejittered_uv;
+}
+
+//vec2 dejittered_screen_uv() { 
+//    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+//    screen_uv = dejitter_uv ( screen_uv );
+//    return screen_uv;
+//}
+
 // ======================================================================================= //
 //                                 C O L O R   S P A C E S
 // ======================================================================================= //
@@ -101,6 +147,60 @@ vec3 linear_to_srgb ( vec3 color ) {
 
 float rgb_to_luma ( vec3 color ) {
     return dot ( color, vec3 ( 0.2126f, 0.7152f, 0.0722f ) );
+}
+
+// ======================================================================================= //
+//                              T E X T U R E   F I L T E R S
+// ======================================================================================= //
+// https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
+vec4 sample_catmull_rom ( texture2D tex2d, sampler sampler_linear, vec2 uv, vec2 tex_size )
+{
+    // We're going to sample a a 4x4 grid of texels surrounding the target UV coordinate. We'll do this by rounding
+    // down the sample location to get the exact center of our "starting" texel. The starting texel will be at
+    // location [1, 1] in the grid, where [0, 0] is the top left corner.
+    vec2 uv_tex = uv * tex_size;
+    vec2 tex1 = floor ( uv_tex - 0.5f ) + 0.5f;
+
+    // Compute the fractional offset from our starting texel to our original sample location, which we'll
+    // feed into the Catmull-Rom spline function to get our filter weights.
+    vec2 f = uv_tex - tex1;
+
+    // Compute the Catmull-Rom weights using the fractional offset that we calculated earlier.
+    // These equations are pre-expanded based on our knowledge of where the texels will be located,
+    // which lets us avoid having to evaluate a piece-wise function.
+    vec2 w0 = f * ( -0.5f + f * ( 1.0f - 0.5f * f ) );
+    vec2 w1 = 1.0f + f * f * ( -2.5f + 1.5f * f );
+    vec2 w2 = f * ( 0.5f + f * ( 2.0f - 1.5f * f ) );
+    vec2 w3 = f * f * ( -0.5f + 0.5f * f );
+
+    // Work out weighting factors and sampling offsets that will let us use bilinear filtering to
+    // simultaneously evaluate the middle 2 samples from the 4x4 grid.
+    vec2 w12 = w1 + w2;
+    vec2 offset12 = w2 / ( w1 + w2 );
+
+    // Compute the final UV coordinates we'll use for sampling the texture
+    vec2 tex0 = tex1 - 1;
+    vec2 tex3 = tex1 + 2;
+    vec2 tex12 = tex1 + offset12;
+
+    tex0 /= tex_size;
+    tex3 /= tex_size;
+    tex12 /= tex_size;
+
+    vec4 result = vec4 ( 0.0f );
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex0.x, tex0.y ) ) * w0.x * w0.y;
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex12.x, tex0.y ) ) * w12.x * w0.y;
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex3.x, tex0.y ) ) * w3.x * w0.y;
+
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex0.x, tex12.y ) ) * w0.x * w12.y;
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex12.x, tex12.y ) ) * w12.x * w12.y;
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex3.x, tex12.y ) ) * w3.x * w12.y;
+
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex0.x, tex3.y ) ) * w0.x * w3.y;
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex12.x, tex3.y ) ) * w12.x * w3.y;
+    result += texture ( sampler2D ( tex2d, sampler_linear ), vec2 ( tex3.x, tex3.y ) ) * w3.x * w3.y;
+
+    return result;
 }
 
 // ======================================================================================= //

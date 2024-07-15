@@ -456,7 +456,7 @@ static void viewapp_scene_cornell_box ( void ) {
                 .aspect_ratio = 1,
                 .near_z = 0.1,
                 .far_z = 100,
-                .reverse_z = false,
+                .reverse_z = false, // TODO ?
             ),
         );
         light_component.view = rv->create_view ( &view_params );
@@ -694,8 +694,8 @@ static void viewapp_boot ( void ) {
         .count = 3,
         .properties = {
             se_field_property_m ( 0, viewapp_mesh_component_t, position, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, orientation, se_property_normal_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, up, se_property_normal_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, orientation, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, up, se_property_3f32_m ),
         }
     ) );
 
@@ -1374,7 +1374,7 @@ static std_app_state_e viewapp_update ( void ) {
     wm_window_info_t* window_info = &m_state->render.window_info;
     wm_input_state_t* input_state = &m_state->render.input_state;
 
-    float target_fps = 0.f;
+    float target_fps = 60.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;
@@ -1383,7 +1383,9 @@ static std_app_state_e viewapp_update ( void ) {
     float delta_ms = std_tick_to_milli_f32 ( new_tick - frame_tick );
 
     if ( delta_ms < target_frame_period ) {
-        std_log_info_m ( "pass" );
+        //std_log_info_m ( "pass" );
+        //std_thread_yield();
+        std_thread_this_sleep( 1 );
         return std_app_state_tick_m;
     }
 
@@ -1479,6 +1481,30 @@ static std_app_state_e viewapp_update ( void ) {
     
     xi->begin_section ( xi_workload, &m_state->ui.xf_graph_section_state );
     xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
+    if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
+        .text = "Disable all",
+        .height = 20, 
+        .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
+    ) ) ) {
+        xf_graph_info_t info;
+        xf->get_graph_info ( &info, m_state->render.graph );
+
+        for ( uint32_t i = 0; i < info.node_count; ++i ) {
+            xf->disable_node ( info.nodes[i] );
+        }
+    }
+    if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
+        .text = "Enable all", 
+        .height = 20,
+        .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
+    ) ) ) {
+        xf_graph_info_t info;
+        xf->get_graph_info ( &info, m_state->render.graph );
+
+        for ( uint32_t i = 0; i < info.node_count; ++i ) {
+            xf->enable_node ( info.nodes[i] );
+        }
+    }
     xi->end_section ( xi_workload );
 
 #if 1
@@ -1524,35 +1550,16 @@ static std_app_state_e viewapp_update ( void ) {
                     std_stack_clear ( &stack );
                     xi->add_label ( xi_workload, &label );
 
-                    #if 0
-                    // property edit
-                    xi_textfield_state_t textfield = xi_textfield_state_m (
-                        .text = "textfield",
-                        .width = 128,
+                    // property editor
+                    void* component_data = se->get_entity_component ( entity_list[i], component->id, property->stream );
+                    xi_property_editor_state_t property_editor_state = xi_property_editor_state_m ( 
+                        .type = ( xi_property_e ) property->type,
+                        .data = component_data + property->offset,
+                        .property_width = 64,
+                        .id = ( ( ( uint64_t ) i ) << 32 ) + ( ( ( uint64_t ) j ) << 16 ) + ( ( uint64_t ) k ),
                         .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
-                        .id = xi_line_id_m() + ( uint64_t ) i << 32 + ( uint64_t ) j << 16 + ( uint64_t ) k,
                     );
-                    if ( xi->add_textfield ( xi_workload, &textfield ) ) {
-                        // TODO update property
-                    }
-                    #else
-                    //uint64_t xi_id = ( uint64_t ) i << 32 + ( uint64_t ) j << 16 + ( uint64_t ) k;
-                    //property_editor ( xi_workload, xi_id, entity_list[i], component->id, property, component->handles[k] );
-                    if ( property->type == se_property_3f32_m ) {
-                        void* data = se->get_entity_component ( entity_list[i], component->id, property->stream );
-                        
-                        xi_property_editor_state_t property_editor_state = xi_property_editor_state_m ( 
-                            .type = xi_property_3f32_m,
-                            .data = data + property->offset,
-                            .property_width = 64,
-                            .id = ( uint64_t ) i << 32 + ( uint64_t ) j << 16 + ( uint64_t ) k,
-                            .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
-                        );
-
-                        xi->add_property_editor ( xi_workload, &property_editor_state );
-                    }
-                    #endif
-
+                    xi->add_property_editor ( xi_workload, &property_editor_state );
                     xi->newline();
                 }
             }

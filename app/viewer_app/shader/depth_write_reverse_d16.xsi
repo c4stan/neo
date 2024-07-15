@@ -8,3 +8,5 @@ begin depth_stencil
     depth_test_op greater
     stencil_test off
 end
+
+define reverse_depth_m 1

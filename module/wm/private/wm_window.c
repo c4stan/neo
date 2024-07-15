@@ -239,6 +239,8 @@ static uint32_t wm_window_keycode ( uint64_t os_keycode ) {
         return wm_keyboard_state_f11_m;
     case 0x7b:
         return wm_keyboard_state_f12_m;
+    case VK_CAPITAL:
+        return wm_keyboard_state_capslock_m;
     default:
         return wm_keyboard_state_count_m;
     }
@@ -335,6 +337,85 @@ static uint32_t wm_input_keycode_to_character ( uint32_t keycode ) {
     }
 }
 
+static void wm_window_update_modifier_keydown ( wm_window_t* window, uint32_t keycode ) {
+    switch ( keycode ) {
+    case wm_keyboard_state_shift_left_m:
+        window->input_flags |= wm_input_flag_bit_shift_left_m;
+        return;
+    case wm_keyboard_state_shift_right_m:
+        window->input_flags |= wm_input_flag_bit_shift_right_m;
+        return;
+    case wm_keyboard_state_alt_left_m:
+        window->input_flags |= wm_input_flag_bit_alt_left_m;
+        return;
+    case wm_keyboard_state_alt_right_m:
+        window->input_flags |= wm_input_flag_bit_alt_right_m;
+        return;
+    case wm_keyboard_state_ctrl_left_m:
+        window->input_flags |= wm_input_flag_bit_ctrl_left_m;
+        return;
+    case wm_keyboard_state_ctrl_right_m:
+        window->input_flags |= wm_input_flag_bit_ctrl_right_m;
+        return;
+    case wm_keyboard_state_capslock_m:
+        window->input_flags |= wm_input_flag_bit_capslock_m;
+        return;
+    }
+}
+
+static void wm_window_update_modifier_keyup ( wm_window_t* window, uint32_t keycode ) {
+    switch ( keycode ) {
+    case wm_keyboard_state_shift_left_m:
+        window->input_flags &= ~wm_input_flag_bit_shift_left_m;
+        return;
+    case wm_keyboard_state_shift_right_m:
+        window->input_flags &= ~wm_input_flag_bit_shift_right_m;
+        return;
+    case wm_keyboard_state_alt_left_m:
+        window->input_flags &= ~wm_input_flag_bit_alt_left_m;
+        return;
+    case wm_keyboard_state_alt_right_m:
+        window->input_flags &= ~wm_input_flag_bit_alt_right_m;
+        return;
+    case wm_keyboard_state_ctrl_left_m:
+        window->input_flags &= ~wm_input_flag_bit_ctrl_left_m;
+        return;
+    case wm_keyboard_state_ctrl_right_m:
+        window->input_flags &= ~wm_input_flag_bit_ctrl_right_m;
+        return;
+    case wm_keyboard_state_capslock_m:
+        window->input_flags &= ~wm_input_flag_bit_capslock_m;
+        return;
+    }
+}
+
+// https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
+static WPARAM wm_window_map_left_right_key ( WPARAM vk, LPARAM lParam )
+{
+    WPARAM new_vk = vk;
+    UINT scancode = (lParam & 0x00ff0000) >> 16;
+    int extended  = (lParam & 0x01000000) != 0;
+
+    switch (vk) {
+    case VK_SHIFT:
+        new_vk = MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+        break;
+    case VK_CONTROL:
+        new_vk = extended ? VK_RCONTROL : VK_LCONTROL;
+        break;
+    case VK_MENU:
+        new_vk = extended ? VK_RMENU : VK_LMENU;
+        break;
+    default:
+        // not a key we map from generic to left/right specialized
+        //  just return it.
+        new_vk = vk;
+        break;    
+    }
+
+    return new_vk;
+}
+
 #if std_enabled_m(wm_input_events_m)
 #if defined(std_platform_win32_m)
 static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, int64_t* retcode ) {
@@ -372,33 +453,40 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HW
         int64_t on_handle;
         int64_t on_pass;
         wm_input_event_t* buffer_event;
+        uint64_t keycode;
 
         switch ( msg ) {
             case WM_KEYDOWN:
                 // TODO standardize keydown/up flags, don't just pass lparam
                 event = wm_event_key_down_m;
+                wparam = wm_window_map_left_right_key ( wparam, lparam );
                 args[0] = ( uint64_t ) ( wparam );
                 args[1] = ( uint64_t ) lparam; // flags - todo use wm_input_key_modifier_f
                 on_handle = 0;
                 on_pass = 1;
 
                 // TODO check bounds
-                uint64_t keycode = wm_window_keycode ( wparam );
+                keycode = wm_window_keycode ( wparam );
+                wm_window_update_modifier_keydown ( window, keycode );
                 if ( keycode != wm_keyboard_state_count_m ) {
                     buffer_event = &window->input_buffer.events[window->input_buffer.count++];
                     buffer_event->type = event;
                     buffer_event->args.keyboard.keycode = keycode;
                     buffer_event->args.keyboard.character = wm_input_keycode_to_character ( keycode );
-                    buffer_event->args.keyboard.flags = lparam; // TODO
+                    buffer_event->args.keyboard.flags = window->input_flags;
                 }
                 break;
 
             case WM_KEYUP:
                 event = wm_event_key_up_m;
+                wparam = wm_window_map_left_right_key ( wparam, lparam );
                 args[0] = ( uint64_t ) wparam; // key
                 args[1] = ( uint64_t ) lparam;  // flags
                 on_handle = 0;
                 on_pass = 1;
+
+                keycode = wm_window_keycode ( wparam );
+                wm_window_update_modifier_keyup ( window, keycode );
                 break;
 
             case WM_LBUTTONDOWN:

@@ -414,6 +414,8 @@ typedef struct {
 typedef struct {
     xg_device_h device;
     xg_swapchain_h swapchain;
+    uint32_t node_count;
+    xf_node_h nodes[xf_graph_max_nodes_m];
 } xf_graph_info_t;
 
 typedef struct {

@@ -86,13 +86,13 @@ void main ( void ) {
     vec2 reprojected_uv = screen_uv + screen_offset;
 
     // history sample
+#if 1
     vec3 history = texture ( sampler2D ( tex_history, sampler_point ), prev_screen.xy ).xyz;
     float prev_depth = texture ( sampler2D ( tex_prev_depth, sampler_point ), prev_screen.xy ).x;
-
-    //float d1 =  ( depth );
-    //float d2 =  ( prev_depth );
-    //out_color = vec4 ( abs ( d1 - d2 ) * 100000000, 0, 0, 1 );
-    //return;
+#else
+    vec3 history = sample_catmull_rom ( tex_history, sampler_point, prev_screen.xy, frame_cbuffer.resolution_f32 ).xyz;
+    float prev_depth = sample_catmull_rom ( tex_prev_depth, sampler_point, prev_screen.xy, frame_cbuffer.resolution_f32 ).x;
+#endif
 
     uvec4 object_id_sample = texture ( usampler2D ( tex_id, sampler_point ), screen_uv.xy );
     uvec4 prev_object_id_sample = texture ( usampler2D ( tex_prev_id, sampler_point ), prev_screen.xy );

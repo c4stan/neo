@@ -267,8 +267,8 @@ static void rv_view_jittered_perspective_proj_matrix ( rv_matrix_4x4_t* m, const
     };
 
     uint64_t idx = frame_id % 8;
-    float offset_x = ( halton[idx][0] - 0.5f ) * 2 * params->jitter[0];
-    float offset_y = ( halton[idx][1] - 0.5f ) * 2 * params->jitter[1];
+    float offset_x = ( halton[idx][0] - 0.5f ) * 1 * params->jitter[0];
+    float offset_y = ( halton[idx][1] - 0.5f ) * 1 * params->jitter[1];
 
     m->f[2] = offset_x;
     m->f[6] = offset_y;
@@ -373,11 +373,19 @@ void rv_view_get_info ( rv_view_info_t* info, rv_view_h view_handle ) {
         0,   0,   1/d, -c/(d*e)
     */
     std_mem_zero_m ( &info->inverse_proj_matrix );
+#if 1
     info->inverse_proj_matrix.f[0] = 1.f / info->proj_matrix.f[0];
     info->inverse_proj_matrix.f[5] = 1.f / info->proj_matrix.f[5];
     info->inverse_proj_matrix.f[11] = 1.f / info->proj_matrix.f[14];
     info->inverse_proj_matrix.f[14] = 1.f / info->proj_matrix.f[11];
     info->inverse_proj_matrix.f[15] = -info->proj_matrix.f[10] / ( info->proj_matrix.f[11] * info->proj_matrix.f[14] );
+#else
+    info->inverse_proj_matrix.f[0] = 1.f / info->jittered_proj_matrix.f[0];
+    info->inverse_proj_matrix.f[5] = 1.f / info->jittered_proj_matrix.f[5];
+    info->inverse_proj_matrix.f[11] = 1.f / info->jittered_proj_matrix.f[14];
+    info->inverse_proj_matrix.f[14] = 1.f / info->jittered_proj_matrix.f[11];
+    info->inverse_proj_matrix.f[15] = -info->jittered_proj_matrix.f[10] / ( info->jittered_proj_matrix.f[11] * info->jittered_proj_matrix.f[14] );
+#endif
 }
 
 void rv_view_update_transform ( rv_view_h view_handle, const rv_view_transform_t* transform ) {

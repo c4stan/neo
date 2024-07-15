@@ -12,6 +12,7 @@ typedef struct {
     rv_matrix_4x4_t jittered_proj_matrix;
     rv_matrix_4x4_t prev_frame_view_matrix;
     rv_matrix_4x4_t prev_frame_proj_matrix;
+    //rv_matrix_4x4_t prev_frame_jittered_proj_matrix; // TODO add this
     uint32_t layer_mask;
 
     rv_view_params_t params;

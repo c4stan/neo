@@ -4,6 +4,7 @@
 
 #define rv_module_name_m rv
 std_module_export_m void* rv_load ( void* );
+std_module_export_m void rv_reload ( void*, void* );
 std_module_export_m void rv_unload ( void );
 
 typedef uint64_t rv_view_h;
@@ -32,6 +33,7 @@ typedef struct {
     uint32_t _pad0;         // freelist alignment
 } rv_projection_params_t;
 
+// TODO just take in resolution and compute aspect ration and jitter from that
 #define rv_projection_params_m(...) ( rv_projection_params_t ) { \
     .type = rv_projection_perspective_m, \
     .aspect_ratio = ( 16.f / 9.f ), \

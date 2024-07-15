@@ -9,5 +9,7 @@
 // NOTE: remember that in glsl
 // - mat4x3 is a matrix with 4 columns and 3 rows
 // - matrix constructors take in values in column major order
+// - matrix[c] identifies the matrix column vector c
+// - matrix[c][r] identifies the element in column c and row r
 // and changing default storage layout to row major doesn't change these things.
 layout ( row_major ) uniform;

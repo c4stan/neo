@@ -33,6 +33,7 @@ typedef struct wm_window_t {
     uint32_t gen;
 
     wm_input_buffer_t input_buffer;
+    uint32_t input_flags;
 } wm_window_t;
 
 typedef struct wm_window_state_t {

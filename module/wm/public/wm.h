@@ -120,6 +120,7 @@ typedef enum {
     wm_keyboard_state_left_m,
     wm_keyboard_state_down_m,
     wm_keyboard_state_right_m,
+    wm_keyboard_state_capslock_m,
 
     wm_keyboard_state_count_m
 } wm_keyboard_state_e;
@@ -133,14 +134,6 @@ typedef enum {
 
     wm_mouse_state_count_m
 } wm_mouse_state_e;
-
-typedef enum {
-    wm_event_key_modifier_shift_m     = 1 << 0,
-    wm_event_key_modifier_alt_m       = 1 << 1,
-    wm_event_key_modifier_ctrl_m      = 1 << 2,
-    wm_event_key_modifier_capslock_m  = 1 << 3,
-} wm_input_key_modifier_f;
-
 #endif
 
 #if std_enabled_m ( wm_input_events_m )
@@ -178,9 +171,24 @@ typedef enum {
     wm_event_all_m            = 0xffff,
 } wm_input_event_e;
 
+typedef enum {
+    wm_input_flag_bit_shift_left_m = 1 << 0,
+    wm_input_flag_bit_shift_right_m = 1 << 1,
+    wm_input_flag_bit_alt_left_m = 1 << 2,
+    wm_input_flag_bit_alt_right_m = 1 << 3,
+    wm_input_flag_bit_ctrl_left_m = 1 << 4,
+    wm_input_flag_bit_ctrl_right_m = 1 << 5,
+    wm_input_flag_bit_capslock_m = 1 << 6,
+
+    wm_input_flag_bits_shift_m = ( wm_input_flag_bit_shift_left_m | wm_input_flag_bit_shift_right_m ),
+    wm_input_flag_bits_alt_m = ( wm_input_flag_bit_shift_left_m | wm_input_flag_bit_shift_right_m ),
+    wm_input_flag_bits_ctrl_m = ( wm_input_flag_bit_shift_left_m | wm_input_flag_bit_shift_right_m ),
+    wm_input_flag_bits_uppercase_m = ( wm_input_flag_bit_shift_left_m | wm_input_flag_bit_shift_right_m | wm_input_flag_bit_capslock_m ),
+} wm_input_flags_bit_e;
+
 typedef struct {
     uint32_t keycode;
-    uint32_t flags;
+    uint32_t flags; // wm_input_flags_bit_e
     uint32_t character;
 } wm_keyboard_event_args_t;
 
@@ -188,7 +196,7 @@ typedef struct {
     uint32_t button;
     int32_t x;
     int32_t y;
-    uint32_t flags;
+    uint32_t flags; // wm_input_flags_bit_e
 } wm_mouse_event_args_t;
 
 typedef struct {

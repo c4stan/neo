@@ -53,7 +53,7 @@
     //( ( void ) 0 )
 
     // TODO does this work on local scope variables?
-    #define std_ignore_unused_warning_m()                         __attribute__ (( used ))
+    #define std_unused_function_m()                               __attribute__ (( used ))
 
     #if defined(std_platform_win32_m)
         #define std_module_export_m                               __attribute__ (( dllexport ))
@@ -122,7 +122,7 @@
     //( ( void ) 0 )
 
     // TODO does this work on local scope variables?
-    #define std_ignore_unused_warning_m()                       __attribute__ (( used ))
+    #define std_unused_function_m()                               __attribute__ (( used ))
 
     #if defined(std_platform_win32_m)
         #define std_module_export_m                               __attribute__ (( dllexport ))

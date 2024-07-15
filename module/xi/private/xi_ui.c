@@ -462,7 +462,12 @@ void xi_ui_update_end ( void ) {
         if ( event->type == wm_event_key_down_m ) {
             wm_keyboard_event_args_t args = event->args.keyboard;
             if ( args.keycode == wm_keyboard_state_tab_m ) {
-                uint32_t idx = ( xi_ui_state->focus_stack_idx + 1 ) % xi_ui_state->focus_stack_count;
+                uint32_t idx;
+                if ( args.flags & wm_input_flag_bits_shift_m ) {
+                    idx = ( xi_ui_state->focus_stack_idx - 1 ) % xi_ui_state->focus_stack_count;
+                } else {
+                    idx = ( xi_ui_state->focus_stack_idx + 1 ) % xi_ui_state->focus_stack_count;
+                }
                 xi_ui_acquire_focus ( xi_ui_state->focus_stack_ids[idx], xi_ui_state->focus_stack_sub_ids[idx] );
                 xi_ui_state->focus_stack_idx = idx;
                 xi_ui_state->focus_stack_change = true;
@@ -489,6 +494,8 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
     return result;
 }
 
+// TODO allow minimizing whole windows, similar to sections
+// TODO fix window scroll range, add side scrollbar?
 void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
@@ -991,9 +998,11 @@ static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_edit
 
 void xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state ) {
     if ( state->type == xi_property_3f32_m ) {
-        xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
-        xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
         xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
+        xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
+        xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
+    } else if ( state->type == xi_property_f32_m ) {
+        xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
     } else {
         std_not_implemented_m();
     }
@@ -1110,7 +1119,7 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     xi_ui_draw_rect ( workload, style.color, x + x_offset, y + padding, handle_width, state->height - padding * 2, state->sort_order );
 }
 
-void xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
+bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     xi_style_t style =  xi_ui_inherit_style ( &state->style );
 
     xi_font_info_t font_info;
@@ -1123,7 +1132,7 @@ void xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     uint32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
-        return;
+        return false;
     }
 
     // --
@@ -1163,9 +1172,11 @@ void xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     }
 
     // draw
-    float color_scale = xi_ui_state->active_id == state->id ? 0.35f : 1.f;
+    float color_scale = xi_ui_state->active_id == state->id ? 0.35f : 0.5f;
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, color_scale ), x, y, width, height, state->sort_order );
     xi_ui_draw_string ( workload, style.font, state->text, x + ( width - text_width ) / 2, y, state->sort_order );
+
+    return pressed;
 }
 
 void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {

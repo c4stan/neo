@@ -35,7 +35,7 @@ typedef struct {
     };
 
     xs_parser_shader_references_t* shader_references;
-    xs_parser_shader_permutations_t* shader_permutations;
+    xs_parser_shader_definitions_t* shader_definitions;
 #endif
 } xs_parser_parsing_context_t;
 
@@ -105,6 +105,7 @@ static size_t xs_parser_skip_comment_block ( xs_parser_parsing_context_t* contex
     return ( size_t ) ( context->head - begin );
 }
 
+std_unused_function_m()
 static size_t xs_parser_skip_block ( xs_parser_parsing_context_t* context ) {
     const char* begin = context->head;
 
@@ -167,7 +168,7 @@ static size_t xs_parser_read_i32 ( xs_parser_parsing_context_t* context, int32_t
         ++context->head;
     }
 
-    std_assert_m ( *context->head == ' ' || *context->head == '\n' );
+    std_assert_m ( *context->head == ' ' || *context->head == '\n' || *context->head == '\r' );
 
     *out = result * sign;
 
@@ -965,6 +966,25 @@ static void xs_parser_parse_constant ( xs_parser_parsing_context_t* context ) {
     binding_point->id = push_constant.id;
 }
 
+static void xs_parser_parse_define ( xs_parser_parsing_context_t* context ) {
+    char token[xs_shader_parser_max_token_size_m];
+    
+    if ( context->head < context->eof ) {
+        xs_parser_skip_to_text ( context );
+        size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+        std_assert_m ( len > 0 );
+        std_str_copy ( context->shader_definitions->array[context->shader_definitions->count].name, xs_shader_definition_name_max_len_m, token );
+
+        xs_parser_skip_spaces ( context );
+        int32_t value;
+        len = xs_parser_read_i32 ( context, &value );
+        std_assert_m ( len > 0 );
+        context->shader_definitions->array[context->shader_definitions->count].value = value;
+
+        context->shader_definitions->count += 1;
+    }
+}
+
 static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
     uint32_t shader_register = 0;
     {
@@ -1259,64 +1279,6 @@ static void xs_parser_parse_sampler ( xs_parser_parsing_context_t* context ) {
     binding_point->set = sampler.update_set;
 }
 
-static void xs_parser_parse_permutation ( xs_parser_parsing_context_t* context ) {
-#if 1
-    char token[xs_shader_parser_max_token_size_m];
-
-    xs_parser_shader_permutation_t* permutation = &context->shader_permutations->permutations[context->shader_permutations->permutation_count++];
-    permutation->name[0] = 0;
-    permutation->value_count = 0;
-    permutation->stages = 0;
-
-    while ( context->head < context->eof ) {
-        xs_parser_skip_to_text ( context );
-        size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
-        std_assert_m ( len > 0 );
-
-        if ( std_str_cmp ( token, "name" ) == 0 ) {
-            xs_parser_skip_spaces ( context );
-            len = xs_parser_read_word ( context, permutation->name, xs_shader_permutation_name_max_len_m );
-            std_assert_m ( len > 0 );
-        } else if ( std_str_cmp ( token, "count" ) == 0 ) {
-            xs_parser_skip_spaces ( context );
-            len = xs_parser_read_u32 ( context, &permutation->value_count );
-            std_assert_m ( len > 0 );
-        } else if ( std_str_cmp ( token, "stage" ) == 0 ) {
-            xs_parser_skip_spaces ( context );
-            len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
-            std_assert_m ( len > 0 );
-            permutation->stages |= xs_parser_shading_stage_to_bit ( token );
-        } else {
-            std_assert_m ( std_str_cmp ( token, "end" ) == 0 );
-            break;
-        }
-    }
-
-    std_assert_m ( permutation->name[0] != 0 );
-    std_assert_m ( permutation->value_count != 0 );
-    std_assert_m ( permutation->stages != 0 );
-
-#else
-    xs_parser_shader_permutation_t* permutation = &context->shader_permutations->permutations[context->shader_permutations->permutation_count++];
-
-    char token[xs_shader_parser_max_token_size_m];
-    xs_parser_skip_spaces ( context );
-    size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
-    std_assert_m ( len < xs_shader_permutation_name_max_len_m && len > 0 );
-    std_str_copy_static_m ( permutation->name, token );
-
-    xs_parser_skip_spaces ( context );
-    uint32_t bit_start;
-    uint32_t bit_count;
-    len = xs_parser_read_u32 ( context, &bit_start );
-    std_assert_m ( len > 0 );
-    len = xs_parser_read_u32 ( context, &bit_count );
-    std_assert_m ( len > 0 );
-    permutation->bit_start = bit_start;
-    permutation->bit_count = bit_count;
-#endif
-}
-
 #if 0
 static bool xs_parser_parse_if ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
@@ -1363,16 +1325,15 @@ static void xs_parser_parsing_context_init ( xs_parser_parsing_context_t* contex
         std_auto_m graphics_state = ( xs_parser_graphics_pipeline_state_t* ) state;
         context->graphics_pipeline = &graphics_state->params;
         context->shader_references = &graphics_state->shader_references;
-        context->shader_permutations = &graphics_state->shader_permutations;
+        context->shader_definitions = &graphics_state->shader_definitions;
     } else if ( pipeline_type == xg_pipeline_compute_m ) {
         std_auto_m compute_state = ( xs_parser_compute_pipeline_state_t* ) state;
         context->compute_pipeline = &compute_state->params;
         context->shader_references = &compute_state->shader_references;
-        context->shader_permutations = &compute_state->shader_permutations;
+        context->shader_definitions = &compute_state->shader_definitions;
     } else {
         std_assert_m ( false );
     }
-
 
     context->begin = ( const char* ) buffer.base;
     context->eof = ( const char* ) ( buffer.base + buffer.size );
@@ -1457,15 +1418,9 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
                 xs_parser_parse_sampler ( context );
             } else if ( std_str_cmp ( token, "constant" ) == 0 ) {
                 xs_parser_parse_constant ( context );
-            } else if ( std_str_cmp ( token, "permutation" ) == 0 ) {
-                xs_parser_parse_permutation ( context );
-            } else if ( std_str_cmp ( token, "variation" ) == 0 ) {
-                xs_parser_skip_block ( context );
             } else {
                 std_log_error_m ( "Unknown token" );
             }
-        } else if ( std_str_cmp ( token, "permutation" ) == 0 ) {
-            xs_parser_parse_permutation ( context );
         } else if ( std_str_cmp ( token, "vertex_shader" ) == 0 ) {
             xs_parser_parse_shader ( context, xg_shading_stage_vertex_m );
         } else if ( std_str_cmp ( token, "fragment_shader" ) == 0 ) {
@@ -1490,6 +1445,8 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
 #endif
         } else if ( std_str_cmp ( token, "include" ) == 0 ) {
             xs_parser_parse_include ( context );
+        } else if ( std_str_cmp ( token, "define" ) == 0 ) {
+            xs_parser_parse_define ( context );
         } else if ( std_str_starts_with ( token, xs_parser_line_comment_token_m ) ) {
             xs_parser_skip_line ( context );
         } else if ( std_str_starts_with ( token, xs_parser_multiline_comment_begin_token_m ) ) {
@@ -1500,85 +1457,6 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
             std_log_error_m ( "Unknown token" );
         }
     }
-}
-
-static void xs_parser_parse_variation ( xs_parser_parsing_context_t* context, const void* base, void* variation ) {
-    xg_pipeline_e pipeline_type = context->pipeline_type;
-
-    if ( pipeline_type == xg_pipeline_graphics_m ) {
-        std_auto_m graphics_base = ( const xs_parser_graphics_pipeline_state_t* ) base;
-        std_auto_m graphics_variation = ( xs_parser_graphics_pipeline_state_t* ) variation;
-
-        *graphics_variation = *graphics_base;
-
-        context->graphics_pipeline = &graphics_variation->params;
-        context->shader_references = &graphics_variation->shader_references;
-        context->shader_permutations = &graphics_variation->shader_permutations;
-
-        xs_parser_parse_graphics_pipeline_state ( context );
-    } else {
-        std_assert_m ( false );
-    }
-}
-
-uint32_t xs_parser_parse_graphics_pipeline_variations_from_path ( xs_parser_graphics_pipeline_state_t* variations, const xs_parser_graphics_pipeline_state_t* base_state, const char* path ) {
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
-
-#if 0
-    fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
-    std_assert_m ( pipeline_state_file != fs_null_handle_m );
-    fs_file_info_t pipeline_state_file_info;
-    std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
-    void* file_buffer = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
-    std_verify_m ( fs->read_file ( state_alloc, pipeline_state_file_info.size, pipeline_state_file ) );
-    fs->close_file ( pipeline_state_file );
-#else
-    std_buffer_t file_buffer = fs->read_file_path_to_heap ( path );
-#endif
-
-    xs_parser_parsing_context_t context;
-    xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, ( void* ) base_state, file_buffer, path );
-
-    char token[xs_shader_parser_max_token_size_m];
-    //size_t branch_depth = 0;
-
-    uint32_t variation_count = 0;
-
-    while ( context.head < context.eof ) {
-        xs_parser_skip_to_text ( &context );
-        xs_parser_read_word ( &context, token, xs_shader_parser_max_token_size_m );
-
-        if ( context.head == context.eof ) {
-            break;
-        }
-
-        if ( std_str_cmp ( token, "begin" ) == 0 ) {
-            {
-                xs_parser_skip_to_text ( &context );
-                size_t len = xs_parser_read_word ( &context, token, xs_shader_parser_max_token_size_m );
-                std_assert_m ( len > 0 );
-            }
-
-            if ( std_str_cmp ( token, "variation" ) == 0 ) {
-                std_assert_m ( variation_count < xs_shader_max_variations_m );
-                xs_parser_parse_variation ( &context, base_state, &variations[variation_count++] );
-            } else {
-                xs_parser_skip_block ( &context );
-            }
-        } else {
-            xs_parser_skip_line ( &context );
-        }
-    }
-
-    std_virtual_heap_free ( file_buffer.base );
-
-    // TODO remove permutations
-    //if ( context.shader_permutations->permutation_count == 0 ) {
-    //    context.shader_permutations->permutation_count = 1;
-    //    context.shader_permutations->permutations[0].define_count = 0;
-    //}
-
-    return variation_count;
 }
 
 bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipeline_state_t* state, const char* path ) {
@@ -1604,12 +1482,6 @@ bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipe
     xs_parser_parse_graphics_pipeline_state ( &context );
 
     std_virtual_heap_free ( file_buffer.base );
-
-    // TODO remove permutations
-    //if ( context.shader_permutations->permutation_count == 0 ) {
-    //    context.shader_permutations->permutation_count = 1;
-    //    context.shader_permutations->permutations[0].define_count = 0;
-    //}
 
     return true;
 }
@@ -1665,6 +1537,8 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
 #endif
         } else if ( std_str_cmp ( token, "include" ) == 0 ) {
             xs_parser_parse_include ( context );
+        } else if ( std_str_cmp ( token, "define" ) == 0 ) {
+            xs_parser_parse_define ( context );
         } else if ( std_str_starts_with ( token, xs_parser_line_comment_token_m ) ) {
             xs_parser_skip_line ( context );
         } else if ( std_str_starts_with ( token, xs_parser_multiline_comment_begin_token_m ) ) {
@@ -1696,11 +1570,6 @@ bool xs_parser_parse_compute_pipeline_state_from_path ( xs_parser_compute_pipeli
     xs_parser_parse_compute_pipeline_state ( &context );
 
     std_virtual_heap_free ( file_buffer.base );
-
-    //if ( context.shader_permutations->permutation_count == 0 ) {
-    //    context.shader_permutations->permutation_count = 1;
-    //    context.shader_permutations->permutations[0].define_count = 0;
-    //}
 
     return true;
 }

@@ -971,9 +971,13 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
 void xf_graph_get_info ( xf_graph_info_t* info, xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-
     info->device = graph->device;
     info->swapchain = graph->swapchain;
+    info->node_count = graph->nodes_count;
+
+    for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
+        info->nodes[i] = graph->nodes[i];
+    }
 }
 
 void xf_graph_get_node_info ( xf_node_info_t* info, xf_node_h node_handle ) {
@@ -1002,7 +1006,9 @@ void xf_graph_node_enable ( xf_node_h node_handle ) {
 
 void xf_graph_node_disable ( xf_node_h node_handle ) {
     xf_node_t* node = &xf_graph_state->nodes_array[node_handle];
-    node->enabled = false;
+    if ( node->params.passthrough.enable ) {
+        node->enabled = false;
+    }
 }
 
 void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph_handle ) {

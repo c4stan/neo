@@ -22,6 +22,7 @@ layout ( location = 0 ) out vec4 out_color;
 void main ( void ) {
     // Compute screen uv
     vec2 screen_uv = vec2 ( gl_FragCoord.xy / draw_cbuffer.resolution_f32 );
+    //screen_uv = dejitter_uv ( screen_uv );
 
     // Sample
     // TODO pass prev frame camera data and account for movement when sampling prev frame textures

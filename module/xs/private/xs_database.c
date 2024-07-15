@@ -267,7 +267,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         std_mem_zero_m ( &parsed_pipeline_state );
 
         xs_parser_shader_references_t* shader_references;
-        xs_parser_shader_permutations_t* shader_permutations;
+        xs_parser_shader_definitions_t* shader_definitions;
 
         switch ( pipeline_state->type ) {
             case xg_pipeline_graphics_m:
@@ -281,7 +281,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                 state_parse_result = xs_parser_parse_graphics_pipeline_state_from_path ( &parsed_pipeline_state.graphics, pipeline_state->path );
 
                 shader_references = &parsed_pipeline_state.graphics.shader_references;
-                shader_permutations = &parsed_pipeline_state.graphics.shader_permutations;
+                shader_definitions = &parsed_pipeline_state.graphics.shader_definitions;
 
                 break;
 
@@ -292,26 +292,8 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                 state_parse_result = xs_parser_parse_compute_pipeline_state_from_path ( &parsed_pipeline_state.compute, pipeline_state->path );
 
                 shader_references = &parsed_pipeline_state.compute.shader_references;
-                shader_permutations = &parsed_pipeline_state.compute.shader_permutations;
+                shader_definitions = &parsed_pipeline_state.compute.shader_definitions;
 
-                break;
-        }
-
-        // TODO heap alloc this, too big for the stack
-        uint32_t variation_count = 0;
-        union {
-            xs_parser_graphics_pipeline_state_t graphics[xs_shader_max_variations_m];
-            xs_parser_compute_pipeline_state_t compute[xs_shader_max_variations_m];
-        } parsed_pipeline_variations;
-        std_mem_zero_m ( &parsed_pipeline_variations );
-
-        switch ( pipeline_state->type ) {
-            case xg_pipeline_graphics_m:
-                //variation_count = xs_parser_parse_graphics_pipeline_variations_from_path ( parsed_pipeline_variations.graphics, &parsed_pipeline_state.graphics, pipeline_state->path );
-                break;
-
-            case xg_pipeline_compute_m:
-                //std_not_implemented_m();
                 break;
         }
 
@@ -369,23 +351,9 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
             continue;
         }
 
-        // TODO all of the following up to the bump to successful builds count should go into a for loop that iterates over variations (including the base variation)
-        for ( uint32_t variation_it = 0; variation_it < variation_count + 1; ++variation_it ) {
-            xs_parser_graphics_pipeline_state_t* graphics_state;
-            xs_parser_compute_pipeline_state_t* compute_state;
-
-            if ( variation_it == 0 ) {
-                graphics_state = &parsed_pipeline_state.graphics;
-                compute_state = &parsed_pipeline_state.compute;
-            } else {
-                if ( pipeline_state->type == xg_pipeline_graphics_m ) {
-                    graphics_state = &parsed_pipeline_variations.graphics[variation_it - 1];
-                    compute_state = &parsed_pipeline_variations.compute[variation_it - 1];
-                } else {
-                    graphics_state = &parsed_pipeline_variations.graphics[variation_it - 1];
-                    compute_state = &parsed_pipeline_variations.compute[variation_it - 1];
-                }
-            }
+        {
+            xs_parser_graphics_pipeline_state_t* graphics_state = &parsed_pipeline_state.graphics;
+            xs_parser_compute_pipeline_state_t* compute_state = &parsed_pipeline_state.compute;
 
             size_t shader_success = 0;
             size_t shader_fail = 0;
@@ -393,25 +361,6 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
 
             for ( xg_shading_stage_e stage = 0; stage < xg_shading_stage_count_m; ++stage ) {
                 if ( shader_references->referenced_stages & xg_shading_stage_enum_to_bit_m ( stage ) ) {
-
-                    // TODO compile all shader permutations here
-                    //xs_parser_shader_permutation_t* permutation = &shader_permutations->permutations[permutation_it];
-
-                    // TODO
-                    // generate permutations
-                    //std_stack_t stack;
-                    //bool default_permutation = false;
-
-                    //if ( shader_permutations->permutation_count > 0 ) {
-                    //    std_assert_m ( 1 << shader_permutations->permutation_count < 1024 );
-                    //    uint32_t permutation_buffer[1024];
-                    //    stack = std_stack ( std_static_buffer_m ( permutation_buffer ) );
-                    //} else {
-                    //    default_permutation = true;
-                    //}
-
-                    // TODO iterate over permutations, adjust output file name based on permutation id, pass proper defines to compiler,
-                    //      store each permutation separetely in the db and combine pipeline name and permutation hashes
 
                     // prepare shader code input path
                     std_str_copy ( shader_path, fs_path_size_m, input_path );
@@ -468,7 +417,8 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                         params.binary_path = binary_path;
                         params.shader_path = shader_path;
                         params.global_definitions = NULL;
-                        params.shader_definition_count = 0; // TODO
+                        params.shader_definitions = shader_definitions->array;
+                        params.shader_definition_count = shader_definitions->count;
 
                         bool compile_result = xs_shader_compiler_compile ( &params );
 

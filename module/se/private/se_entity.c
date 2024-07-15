@@ -689,10 +689,8 @@ static uint32_t se_entity_property_stride ( se_property_e property ) {
     case se_property_2f32_m:
         return 8;
     case se_property_3f32_m:
-    case se_property_normal_m:
         return 12;
     case se_property_4f32_m:
-    case se_property_quat_m:
         return 16;
     case se_property_string_m:
         return se_property_string_max_size_m;

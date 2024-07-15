@@ -66,6 +66,7 @@ vec3 generate_tangent ( vec3 normal ) {
 
 void main ( void ) {
     vec2 screen_uv = vec2 ( gl_FragCoord.xy / draw_cbuffer.resolution_f32 );
+    screen_uv = dejitter_uv ( screen_uv );
 
     // sample
     vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
