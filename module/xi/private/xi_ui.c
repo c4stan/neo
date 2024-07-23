@@ -122,6 +122,10 @@ void xi_ui_newline ( void ) {
 static bool xi_ui_layer_add_section ( uint32_t width, uint32_t height ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
+    if ( xi_ui_state->minimized_window ) {
+        return false;
+    }
+
     if ( xi_ui_state->in_section && xi_ui_state->minimized_section ) {
         return false;
     }
@@ -177,6 +181,14 @@ static void xi_ui_layer_align ( uint32_t* x, uint32_t* y, uint32_t width, uint32
 // elements get appended horizontally on the current line, from left to right
 static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+
+    if ( xi_ui_state->minimized_window ) {
+        return false;
+    }
+
+    if ( xi_ui_state->culled_section ) {
+        return false;
+    }
 
     if ( xi_ui_state->in_section && xi_ui_state->minimized_section ) {
         return false;
@@ -503,23 +515,41 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     xi_font_get_info ( &font_info, style.font );
 
     uint32_t title_pad_x = 10;
-    uint32_t title_pad_y = 5;
-    uint32_t border_height = font_info.pixel_height + title_pad_y * 2;
+    uint32_t title_pad_y = 0;
+    uint32_t header_height = std_max_u32 ( state->header_height, font_info.pixel_height ) + title_pad_y * 2;
 
-    xi_ui_layer_t* layer = xi_ui_layer_add ( state->x, state->y, state->width, state->height, state->padding_x, state->padding_y, &style );
-    layer->line_y = border_height;
+    uint32_t x = 0, y = 0;
+    uint32_t triangle_width = header_height  * 0.8;
+    uint32_t triangle_height = header_height * 0.8;
 
-    // drag
-    if ( xi_ui_layer_cursor_test ( 0, 0, layer->width, border_height ) ) {
+    uint32_t window_height = state->minimized ? header_height : state->height;
+
+    xi_ui_layer_t* layer = xi_ui_layer_add ( state->x, state->y, state->width, window_height, state->padding_x, state->padding_y, &style );
+    layer->line_y = header_height;
+
+    // acquire active
+    if ( xi_ui_layer_cursor_test ( x + title_pad_x, y + title_pad_y, triangle_width, triangle_height ) ) {
+        xi_ui_acquire_hovered ( state->id, 2 );
+        std_log_info_m ( "hit" );
+
+        if ( xi_ui_cursor_click() ) {
+            xi_ui_acquire_active ( state->id, 2 );
+        }
+    } else if ( xi_ui_layer_cursor_test ( x, y, layer->width, header_height ) ) {
         xi_ui_acquire_hovered ( state->id, 0 );
 
         if ( xi_ui_cursor_click() ) {
             xi_ui_acquire_active ( state->id, 0 );
         }
+    } else if ( xi_ui_layer_cursor_test ( layer->width - 20, layer->height - 20, 20, 20 ) ) {
+        if ( xi_ui_cursor_click() ) {
+            xi_ui_acquire_active ( state->id, 1 );
+        }
     } else {
         xi_ui_release_hovered ( state->id );
     }
 
+    // drag
     if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 0 ) {
         //float delta = std_tick_to_milli_f32 ( xi_ui_state.current_tick - xi_ui_state.mouse_down_tick );
 
@@ -539,10 +569,10 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         if ( state->y < 0 ) {
             state->y = 0;
         }
+    }
 
-        if ( state->y + state->height > xi_ui_state->update.os_window_height ) {
-            state->y = xi_ui_state->update.os_window_height - state->height;
-        }
+    if ( state->y + window_height > xi_ui_state->update.os_window_height ) {
+        state->y = xi_ui_state->update.os_window_height - window_height;
     }
 
     // scroll
@@ -565,12 +595,6 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     }
 
     // resize
-    if ( xi_ui_layer_cursor_test ( layer->width - 20, layer->height - 20, 20, 20 ) ) {
-        if ( xi_ui_state->update.mouse_down && xi_ui_state->update.mouse_down_tick == xi_ui_state->update.current_tick ) {
-            xi_ui_acquire_active ( state->id, 1 );
-        }
-    }
-
     uint32_t corner_size = 15;
 
     if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 1 ) {
@@ -582,7 +606,7 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         int32_t height = state->height;
 
         int32_t min_width = title_pad_x + 10;
-        int32_t min_height = border_height + corner_size;
+        int32_t min_height = header_height + corner_size;
 
         if ( width > min_width ) {
             width += xi_ui_state->update.mouse_delta_x;
@@ -602,19 +626,6 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
             }
         }
 
-        //if ( width > min_width || xi_ui_state->input_state.cursor_x > state->x + min_width ) {
-        //    width += xi_ui_state->mouse_delta_x;
-        //}
-
-        //if ( height > min_height || xi_ui_state->input_state.cursor_y > state->y + min_height ) {
-        //    height += xi_ui_state->mouse_delta_y;
-        //}
-
-        //}
-
-        //if ( xi_ui_state->input_state.cursor_y + xi_ui_state->base_y > layer->y + border_height || state->height > border_height ) {
-        //}
-
         if ( state->x + width > xi_ui_state->update.os_window_width ) {
             width = xi_ui_state->update.os_window_width - state->x;
         }
@@ -623,8 +634,8 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
             height = xi_ui_state->update.os_window_height - state->y;
         }
 
-        if ( height < border_height + corner_size ) {
-            height = border_height + corner_size;
+        if ( height < header_height + corner_size ) {
+            height = header_height + corner_size;
         }
 
         if ( width < ( int32_t ) title_pad_x + 10 ) {
@@ -637,19 +648,55 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         //}
     }
 
+    // minimize
+    bool minimize_pressed = false;
+
+    if ( !xi_ui_state->update.mouse_down && xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 2 ) {
+        if ( xi_ui_state->hovered_id == state->id ) {
+            minimize_pressed = true;
+        }
+
+        xi_ui_release_active ( state->id );
+    }
+
+    if ( minimize_pressed ) {
+        std_log_info_m ( "flip" );
+        state->minimized = !state->minimized;
+    }
+
+    xi_ui_state->minimized_window = state->minimized;
+
+    // release active
     if ( xi_ui_state->active_id == state->id && !xi_ui_state->update.mouse_down ) {
         xi_ui_release_active ( state->id );
     }
 
     // draw
     //  base background
-    xi_ui_draw_rect ( workload, style.color, layer->x, layer->y, layer->width, layer->height, state->sort_order );
+    if ( !state->minimized ) {
+        xi_ui_draw_rect ( workload, style.color, layer->x, layer->y, layer->width, layer->height, state->sort_order );
+    }
 
     //  title bar
-    xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.3 ), layer->x, layer->y, layer->width, font_info.pixel_height + title_pad_y * 2, state->sort_order );
+    xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.3 ), layer->x, layer->y, layer->width, header_height, state->sort_order );
+
+    // title triangle
+    if ( !state->minimized ) {
+        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 1 ),
+            layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2,
+            layer->x + x + title_pad_x + triangle_width,        layer->y + y + ( header_height - triangle_height ) / 2,
+            layer->x + x + title_pad_x + triangle_width / 2,    layer->y + y + ( header_height - triangle_height ) / 2 + triangle_height,
+            state->sort_order );
+    } else {
+        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 1 ),
+            layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2,
+            layer->x + x + title_pad_x + triangle_width,        layer->y + y + header_height / 2,
+            layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2 + triangle_height,
+            state->sort_order );
+    }
 
     //  title text
-    xi_ui_draw_string ( workload, style.font, state->title, layer->x + title_pad_x, layer->y + title_pad_y / 2, state->sort_order );
+    xi_ui_draw_string ( workload, style.font, state->title, layer->x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
 
 #if 0
 
@@ -691,11 +738,13 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
 #endif
 
     //  resize corner
-    xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
-        layer->x + layer->width, layer->y + layer->height - corner_size,
-        layer->x + layer->width, layer->y + layer->height,
-        layer->x + layer->width - corner_size, layer->y + layer->height,
-        state->sort_order  );
+    if ( !state->minimized ) {
+        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
+            layer->x + layer->width, layer->y + layer->height - corner_size,
+            layer->x + layer->width, layer->y + layer->height,
+            layer->x + layer->width - corner_size, layer->y + layer->height,
+            state->sort_order  );
+    }
 }
 
 void xi_ui_window_end ( xi_workload_h workload ) {
@@ -724,8 +773,11 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
     uint32_t title_width = xi_ui_string_width ( state->title, style.font ) + triangle_width;
 
     if ( !xi_ui_layer_add_section ( title_width, header_height ) ) {
+        xi_ui_state->culled_section = true;
         return;
     }
+
+    xi_ui_state->culled_section = false;
 
     // state
     if ( xi_ui_layer_cursor_test ( x, y, layer->width, header_height ) ) {
@@ -786,6 +838,8 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
 void xi_ui_section_end ( xi_workload_h workload ) {
     std_unused_m ( workload );
 
+    xi_ui_state->culled_section = false;
+
     if ( !xi_ui_state->in_section ) {
         return;
     }
@@ -798,6 +852,8 @@ void xi_ui_section_end ( xi_workload_h workload ) {
 
     if ( !xi_ui_state->minimized_section ) {
         xi_ui_newline();
+        xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+        layer->line_y += layer->line_padding_y * 2;
     }
 
     xi_ui_state->in_section = false;
@@ -819,7 +875,7 @@ void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state ) {
     }
 }
 
-xi_textfield_event_e xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* state, uint32_t sub_id ) {
+bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* state, uint32_t sub_id ) {
     xi_style_t style =  xi_ui_inherit_style ( &state->style );
 
     xi_font_info_t font_info;
@@ -832,10 +888,10 @@ xi_textfield_event_e xi_ui_textfield_internal ( xi_workload_h workload, xi_textf
     uint32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
-        return xi_textfield_event_none_m;
+        return false;
     }
 
-    xi_textfield_event_e result = xi_textfield_event_none_m;
+    bool result = false;
 
     xi_ui_focus_stack_push ( state->id, sub_id );
 
@@ -859,7 +915,7 @@ xi_textfield_event_e xi_ui_textfield_internal ( xi_workload_h workload, xi_textf
     }
 
     // string update
-    bool changed = false;
+    //bool changed = false;
     char buffer[xi_textfield_text_size_m + 1];
     std_stack_t stack = std_static_stack_m ( buffer );
     std_stack_string_append ( &stack, state->text );
@@ -877,18 +933,13 @@ xi_textfield_event_e xi_ui_textfield_internal ( xi_workload_h workload, xi_textf
                 if ( args.keycode == wm_keyboard_state_backspace_m ) {
                     std_stack_string_pop ( &stack );
                 } else if ( args.keycode == wm_keyboard_state_enter_m ) {
-                    //if ( xi_ui_release_keyboard ( state->id ) ) {
-                    //    changed = false;
-                    //    result = xi_textfield_event_focus_release_m;
-                    //    break;
-                    //}
-                    changed = false;
-                    result = xi_textfield_event_text_commit_m;
+                    //changed = false;
+                    result = true;
                     xi_ui_release_focus ( state->id, sub_id );
                     break;
                 } else if ( args.keycode == wm_keyboard_state_tab_m ) {
-                    changed = false;
-                    result = xi_textfield_event_text_commit_m;
+                    //changed = false;
+                    result = true;
                     break;
                 } else {
                     if ( args.keycode >= wm_keyboard_state_a_m && args.keycode <= wm_keyboard_state_space_m ) {
@@ -896,14 +947,13 @@ xi_textfield_event_e xi_ui_textfield_internal ( xi_workload_h workload, xi_textf
                     }
                 }
 
-                changed = true;
+                //changed = true;
             }
         }
 
-        if ( changed ) {
-            result = xi_textfield_event_text_edit_m;
-            std_str_copy_static_m ( state->text, buffer );
-        }
+        //if ( changed ) {
+        std_str_copy_static_m ( state->text, buffer );
+        //}
 
         // blinking cursor
         if ( ! ( ( ( uint64_t ) ( std_tick_to_milli_f32 ( xi_ui_state->focus_time ) ) >> 9 ) & 0x1 ) ) {
@@ -919,7 +969,7 @@ xi_textfield_event_e xi_ui_textfield_internal ( xi_workload_h workload, xi_textf
     return result;
 }
 
-xi_textfield_event_e xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state ) {
+bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state ) {
     return xi_ui_textfield_internal ( workload, state, 0 );
 }
 
@@ -943,7 +993,7 @@ static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_edit
         std_f32_to_str ( *( float* ) ( state->data + data_offset ), textfield.text, xi_textfield_text_size_m );
     }
     
-    bool enter = xi_ui_textfield_internal ( workload, &textfield, sub_id ) == xi_textfield_event_text_commit_m;
+    bool enter = xi_ui_textfield_internal ( workload, &textfield, sub_id );
 
     bool has_focus = xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id;// && xi_ui_state->focus_stack_prev_id == 0;
     

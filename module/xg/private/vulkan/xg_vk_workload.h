@@ -38,9 +38,10 @@ typedef struct {
 
     xg_gpu_queue_event_h swapchain_texture_acquired_event; // wait on before starting the workload. part of VkSubmitInfo
     xg_gpu_queue_event_h execution_complete_gpu_event; // signal at the very end of the workload. part of VkSubmitInfo
-    xg_cpu_queue_event_h execution_complete_cpu_event; // for cpu to check workload completion
+    xg_cpu_queue_event_h execution_complete_cpu_event; // for cpu to check workload completion. TODO currently never used
 
     bool stop_debug_capture_on_present;
+    bool submitted;
 
     xg_vk_workload_uniform_buffer_t uniform_buffer;
 
@@ -57,6 +58,7 @@ typedef struct {
 typedef struct {
     xg_vk_workload_t* workloads_array;
     xg_vk_workload_t* workloads_freelist;
+    uint64_t* workload_bitset;
     std_mutex_t workloads_mutex;
     uint64_t workloads_uid;
 
@@ -68,6 +70,7 @@ void xg_vk_workload_reload ( xg_vk_workload_state_t* state );
 void xg_vk_workload_unload ( void );
 
 xg_workload_h xg_workload_create ( xg_device_h device );
+// Called on workload completion
 void xg_workload_destroy ( xg_workload_h workload );
 
 xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload );
@@ -91,6 +94,7 @@ void xg_vk_workload_queue_debug_capture_stop_on_present ( xg_workload_h workload
 //void xg_workload_set_swapchain_texture_acquired_event ( xg_workload_h workload, xg_gpu_queue_event_h event );
 void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload, xg_gpu_queue_event_h event );
 void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workload );
+void xg_vk_workload_on_submit ( xg_workload_h workload );
 
 void xg_vk_workload_activate_device ( xg_device_h device );
 void xg_vk_workload_deactivate_device ( xg_device_h device );

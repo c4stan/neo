@@ -82,6 +82,8 @@ void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
 
     state->workloads_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_t, xg_workload_max_allocated_workloads_m );
     state->workloads_freelist = std_freelist_m ( state->workloads_array, xg_workload_max_allocated_workloads_m );
+    state->workload_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) );
+    std_mem_zero ( state->workload_bitset, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) * 8 );
     std_mutex_init ( &state->workloads_mutex );
     state->workloads_uid = 0;
 
@@ -100,12 +102,65 @@ void xg_vk_workload_reload ( xg_vk_workload_state_t* state ) {
     xg_workload_state = state;
 }
 
+void xg_vk_workload_destroy_ptr ( xg_vk_workload_t* workload ) {
+    // gen
+    ++workload->gen;
+
+    // cmd buffer
+    xg_cmd_buffer_discard ( workload->cmd_buffers, workload->cmd_buffers_count );
+    xg_resource_cmd_buffer_discard ( workload->resource_cmd_buffers, workload->resource_cmd_buffers_count );
+
+    // events
+    //xg_gpu_queue_event_destroy ( workload->execution_complete_gpu_event );
+    xg_cpu_queue_event_destroy ( workload->execution_complete_cpu_event );
+
+    if ( workload->swapchain_texture_acquired_event != xg_null_handle_m ) {
+        xg_gpu_queue_event_destroy ( workload->swapchain_texture_acquired_event );
+    }
+
+    //uint64_t device_idx = xg_vk_device_get_idx ( workload->device );
+    //uint64_t workload_idx = ( uint64_t ) ( workload - xg_workload_state->workloads_array );
+    //xg_vk_workload_uniform_buffer_t* uniform_buffer = &xg_workload_state->device_contexts[device_idx].uniform_buffers[workload_idx];
+    //uniform_buffer->used_size = 0;
+
+    xg_buffer_destroy ( workload->uniform_buffer.handle );
+    workload->uniform_buffer.handle = xg_null_handle_m;
+
+#if 0
+
+    for ( uint32_t i = 0; i < workload->timestamp_query_pools_count; ++i ) {
+        xg_vk_workload_query_pool_t* pool = &workload->timestamp_query_pools[i];
+        xg_vk_timestamp_query_pool_readback ( pool->handle, pool->buffer );
+    }
+
+#endif
+
+    uint64_t workload_idx = ( uint64_t ) ( workload - xg_workload_state->workloads_array );
+    std_bitset_clear ( xg_workload_state->workload_bitset, workload_idx );
+
+    std_list_push ( &xg_workload_state->workloads_freelist, workload );
+}
+
 void xg_vk_workload_unload ( void ) {
     for ( size_t i = 0; i < xg_workload_max_allocated_workloads_m; ++i ) {
         std_mutex_deinit ( &xg_workload_state->workloads_array[i].mutex );
     }
 
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xg_workload_state->workload_bitset, idx, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) ) ) {
+        xg_vk_workload_t* workload = &xg_workload_state->workloads_array[idx];
+
+        if ( workload->submitted ) {
+            const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
+            const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
+            vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
+        }
+
+        xg_vk_workload_destroy_ptr ( workload );
+    }
+
     std_virtual_heap_free ( xg_workload_state->workloads_array );
+    std_virtual_heap_free ( xg_workload_state->workload_bitset );
     std_mutex_deinit ( &xg_workload_state->workloads_mutex );
     // TODO
 }
@@ -115,6 +170,8 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
 
     xg_vk_workload_t* workload = std_list_pop_m ( &xg_workload_state->workloads_freelist );
     uint64_t workload_idx = ( uint64_t ) ( workload - xg_workload_state->workloads_array );
+
+    std_bitset_set ( xg_workload_state->workload_bitset, workload_idx );
 
     workload->cmd_buffers_count = 0;
     workload->resource_cmd_buffers_count = 0;
@@ -128,6 +185,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     workload->swapchain_texture_acquired_event = xg_null_handle_m;
 
     workload->stop_debug_capture_on_present = false;
+    workload->submitted = false;
 
     xg_buffer_h buffer_handle = xg_buffer_create ( & xg_buffer_params_m (
         .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_mappable_m ),
@@ -236,40 +294,7 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
     std_mutex_lock ( &xg_workload_state->workloads_mutex );
 
     xg_vk_workload_t* workload = get_workload ( workload_handle );
-
-    // gen
-    ++workload->gen;
-
-    // cmd buffer
-    xg_cmd_buffer_discard ( workload->cmd_buffers, workload->cmd_buffers_count );
-    xg_resource_cmd_buffer_discard ( workload->resource_cmd_buffers, workload->resource_cmd_buffers_count );
-
-    // events
-    //xg_gpu_queue_event_destroy ( workload->execution_complete_gpu_event );
-    xg_cpu_queue_event_destroy ( workload->execution_complete_cpu_event );
-
-    if ( workload->swapchain_texture_acquired_event != xg_null_handle_m ) {
-        xg_gpu_queue_event_destroy ( workload->swapchain_texture_acquired_event );
-    }
-
-    //uint64_t device_idx = xg_vk_device_get_idx ( workload->device );
-    //uint64_t workload_idx = ( uint64_t ) ( workload - xg_workload_state->workloads_array );
-    //xg_vk_workload_uniform_buffer_t* uniform_buffer = &xg_workload_state->device_contexts[device_idx].uniform_buffers[workload_idx];
-    //uniform_buffer->used_size = 0;
-
-    xg_buffer_destroy ( workload->uniform_buffer.handle );
-    workload->uniform_buffer.handle = xg_null_handle_m;
-
-#if 0
-
-    for ( uint32_t i = 0; i < workload->timestamp_query_pools_count; ++i ) {
-        xg_vk_workload_query_pool_t* pool = &workload->timestamp_query_pools[i];
-        xg_vk_timestamp_query_pool_readback ( pool->handle, pool->buffer );
-    }
-
-#endif
-
-    std_list_push ( &xg_workload_state->workloads_freelist, workload );
+    xg_vk_workload_destroy_ptr ( workload );
     std_mutex_unlock ( &xg_workload_state->workloads_mutex );
 }
 
@@ -316,6 +341,17 @@ void xg_vk_workload_queue_debug_capture_stop_on_present ( xg_workload_h workload
     std_assert_m ( workload->gen == handle_gen );
 
     workload->stop_debug_capture_on_present = true;
+}
+
+void xg_vk_workload_on_submit ( xg_workload_h workload_handle ) {
+    #if std_log_assert_enabled_m
+    uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
+#endif
+    uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
+    xg_vk_workload_t* workload = &xg_workload_state->workloads_array[handle_idx];
+    std_assert_m ( workload->gen == handle_gen );
+
+    workload->submitted = true;
 }
 
 #if 0

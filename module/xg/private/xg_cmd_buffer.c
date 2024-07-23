@@ -52,6 +52,7 @@ void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state ) {
     // Once the pool runs out of buffers and more are requestd, it can grow, by lazily allocating more buffers.
     xg_cmd_buffer_state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_cmd_buffer_t, xg_cmd_buffer_max_cmd_buffers_m );
     xg_cmd_buffer_state->cmd_buffers_freelist = NULL;//std_freelist_m ( xg_cmd_buffer_state->cmd_buffers_array, sizeof ( xg_cmd_buffer_t ) );
+    xg_cmd_buffer_state->cmd_buffers_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_ceil_m ( xg_cmd_buffer_max_cmd_buffers_m, 64 ) );
     std_mutex_init ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 
     for ( size_t i = 0; i < xg_cmd_buffer_preallocated_cmd_buffers_m; ++i ) {
@@ -73,6 +74,7 @@ void xg_cmd_buffer_reload ( xg_cmd_buffer_state_t* state ) {
 
 void xg_cmd_buffer_unload ( void ) {
     for ( size_t i = 0; i < xg_cmd_buffer_state->allocated_cmd_buffers_count; ++i ) {
+        // TODO test workload and wait for completion?
         xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[i];
         xg_cmd_buffer_free_memory ( cmd_buffer );
     }

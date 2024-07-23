@@ -54,6 +54,7 @@ typedef struct {
 typedef struct {
     xg_vk_texture_t* textures_array;
     xg_vk_texture_t* textures_freelist;
+    uint64_t* textures_bitset;
     std_mutex_t textures_mutex;
 
 #if 0
@@ -68,12 +69,13 @@ void xg_vk_texture_load ( xg_vk_texture_state_t* state );
 void xg_vk_texture_reload ( xg_vk_texture_state_t* state );
 void xg_vk_texture_unload ( void );
 
+// create = reserve + alloc
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params );
-
 xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params );
 bool xg_texture_alloc ( xg_texture_h texture );
 
 bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture );
+
 bool xg_texture_destroy ( xg_texture_h texture );
 
 bool xg_texture_resize ( xg_texture_h texture, size_t width, size_t height );

@@ -263,8 +263,6 @@ static void xi_test ( void ) {
         .y = 100,
         .width = 200,
         .height = 250,
-        .padding_x = 10,
-        .padding_y = 2,
         .style = xi_style_m (
             .font = font,
         ),

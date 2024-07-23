@@ -1300,65 +1300,6 @@ static void update_cameras ( wm_input_state_t* input_state, wm_input_state_t* ne
     }
 }
 
-static char property_edit_buffer[128];
-static uint64_t property_edit_id;
-
-static bool property_editor_f32 ( void* data, xi_workload_h xi_workload, uint64_t xi_id ) {
-    xi_i* xi = m_state->modules.xi;
-
-    xi_id = xi_line_id_m() ^ xi_id;
-    xi_textfield_state_t textfield = xi_textfield_state_m (
-        .width = 64,
-        .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
-        .id = xi_id,
-    );
-
-    if ( property_edit_id != xi_id ) {
-        std_f32_to_str ( *( float* ) data, textfield.text, xi_textfield_text_size_m );
-    } else {
-        std_str_copy_static_m ( textfield.text, property_edit_buffer );
-    }
-
-    xi_textfield_event_e event = xi->add_textfield ( xi_workload, &textfield );
-
-    if ( event == xi_textfield_event_focus_acquire_m ) {
-        //std_assert_m ( property_edit_id == 0 );
-        property_edit_id = xi_id;
-        std_log_info_m ( "acquire " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
-        std_str_copy_static_m ( property_edit_buffer, textfield.text );
-        return false;
-    } else if ( event == xi_textfield_event_focus_release_m ) {
-        std_log_info_m ( "release " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
-        property_edit_id = 0;
-        float f32 = std_str_to_f32 ( textfield.text );
-        *( float* ) data = f32;
-        return true;
-    } else if ( event == xi_textfield_event_text_commit_m ) {
-        std_log_info_m ( "commit " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
-        float f32 = std_str_to_f32 ( textfield.text );
-        *( float* ) data = f32;
-        return true;
-    } else if ( event == xi_textfield_event_text_edit_m ) {
-        std_log_info_m ( "edit " std_fmt_u64_m " " std_fmt_u64_m, property_edit_id, xi_id );
-        std_str_copy_static_m ( property_edit_buffer, textfield.text );
-        return false;
-    }
-
-    return false;
-}
-
-static void property_editor ( xi_workload_h xi_workload, uint64_t xi_id, se_entity_h entity, se_component_e component, se_property_t* property, se_property_h property_handle ) {
-    se_i* se = m_state->modules.se;
-
-    void* data = se->get_entity_component ( entity, component, property->stream );
-
-    if ( property->type == se_property_3f32_m ) {
-        property_editor_f32 ( data + property->offset + 0, xi_workload, xi_id ^ xi_line_id_m() );
-        property_editor_f32 ( data + property->offset + 4, xi_workload, xi_id ^ xi_line_id_m() );
-        property_editor_f32 ( data + property->offset + 8, xi_workload, xi_id ^ xi_line_id_m() );
-    }
-}
-
 static std_app_state_e viewapp_update ( void ) {
     wm_window_h window = m_state->render.window;
 

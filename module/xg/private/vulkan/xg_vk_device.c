@@ -476,6 +476,16 @@ void xg_vk_device_reload ( xg_vk_device_state_t* state ) {
     xg_vk_device_state = state;
 }
 
+void xg_vk_device_wait_idle_all ( void ) {
+    for ( size_t i = 0; i < xg_vk_max_devices_m; ++i ) {
+        xg_vk_device_t* device = &xg_vk_device_state->devices_array[i];
+
+        if ( device->flags & xg_vk_device_active_m ) {
+            vkDeviceWaitIdle ( device->vk_handle );
+        }
+    }
+}
+
 void xg_vk_device_unload ( void ) {
     for ( size_t i = 0; i < xg_vk_max_devices_m; ++i ) {
         xg_vk_device_t* device = &xg_vk_device_state->devices_array[i];

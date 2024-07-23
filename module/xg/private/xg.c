@@ -152,10 +152,14 @@ void xg_reload ( void* std_runtime, void* api ) {
 
 void xg_unload ( void ) {
     xg_debug_capture_unload();
+    
+    xg_vk_device_wait_idle_all();
+
+    xg_vk_workload_unload();
+
     xg_resource_cmd_buffer_unload();
     xg_cmd_buffer_unload();
 
-    xg_vk_workload_unload();
     xg_vk_pipeline_unload();
     xg_vk_sampler_unload();
     xg_vk_swapchain_unload();

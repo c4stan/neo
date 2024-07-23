@@ -254,6 +254,7 @@ typedef struct {
 typedef struct {
     xg_cmd_buffer_t*    cmd_buffers_array;
     xg_cmd_buffer_t*    cmd_buffers_freelist;
+    uint64_t*           cmd_buffers_bitset;
     uint64_t            allocated_cmd_buffers_count;
     std_mutex_t         cmd_buffers_mutex;
     //std_queue_shared_t  cmd_buffers_queue;  // mpmc xg_cmd_buffer_t idx queue - indexes into the pool buffer. TODO make this a mpsc when the API is there

@@ -35,7 +35,6 @@ typedef struct {
     bool is_submitted;
 
     // Translation context
-    //std_buffer_t cmd_headers;
     xg_cmd_header_t* cmd_headers;
     size_t cmd_headers_count;
     xg_vk_cmd_allocator_t cmd_allocator;

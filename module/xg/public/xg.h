@@ -794,14 +794,17 @@ typedef struct {
     float max_depth;
 } xg_viewport_state_t;
 
-#define xg_default_viewport_state_m ( xg_viewport_state_t ) { \
+#define xg_viewport_state_m( ... ) ( xg_viewport_state_t ) { \
     .x = 0, \
     .y = 0, \
     .width = 0, \
     .height = 0, \
     .min_depth = 0, \
-    .max_depth = 1 \
+    .max_depth = 1, \
+    ##__VA_ARGS__ \
 }
+
+#define xg_default_viewport_state_m xg_viewport_state_m()
 
 typedef struct {
     uint32_t x;
@@ -810,12 +813,18 @@ typedef struct {
     uint32_t height;
 } xg_scissor_state_t;
 
-#define xg_default_scissor_state_m ( xg_scissor_state_t ) { \
+#define xi_scissor_width_full_m 0xffffffff
+#define xi_scissor_height_full_m 0xffffffff
+
+#define xg_scissor_state_m( ... ) ( xg_scissor_state_t ) { \
     .x = 0, \
     .y = 0, \
-    .width = 0, \
-    .height = 0 \
+    .width = 0xffffffff, \
+    .height = 0xffffffff, \
+    ##__VA_ARGS__ \
 }
+
+#define xg_default_scissor_state_m xg_scissor_state_m()
 
 // -- Render Textures (attachments) --
 
@@ -1084,6 +1093,7 @@ typedef struct {
     xg_graphics_pipeline_dynamic_state_t    dynamic_state;
 } xg_graphics_pipeline_state_t;
 
+// TODO rename all to remove default and use VA_ARGS
 #define xg_default_graphics_pipeline_state_m ( xg_graphics_pipeline_state_t ) { \
     .vertex_shader = xg_default_pipeline_state_shader_m, \
     .fragment_shader = xg_default_pipeline_state_shader_m, \

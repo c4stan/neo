@@ -927,6 +927,7 @@ typedef struct {
 typedef struct {
     bool pending_states[xg_graphics_pipeline_dynamic_state_count_m];
     bool enabled_viewport;
+    bool enabled_scissor;
     xg_viewport_state_t viewport;
     xg_scissor_state_t scissor;
 } xg_vk_translation_dynamic_pipeline_state_cache_t;
@@ -1110,6 +1111,9 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                     state->dynamic_state.enabled_viewport = true;
                 }
 
+                // If the pipeline declaration didn't enable a dynamic state, that means that state is static, which causes the dynamic
+                // state previously bound to be cleared on pipeline bind. So we need to take that into account and clear the enabled flag
+                // for the state.
                 if ( !state->graphics_pipeline->state.dynamic_state.enabled_states[xg_graphics_pipeline_dynamic_state_viewport_m] ) {
                     state->dynamic_state.enabled_viewport = false;
                 }
@@ -2564,6 +2568,8 @@ static void xg_vk_cmd_buffer_device_context_recycle_submission_contexts ( xg_vk_
 
 void xg_vk_cmd_buffer_submit ( xg_workload_h workload_handle ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
+
+    xg_vk_workload_on_submit ( workload_handle );
 
     uint64_t device_idx = xg_vk_device_get_idx ( workload->device );
     xg_vk_cmd_buffer_device_context_t* device_context = &xg_vk_cmd_buffer_state->device_contexts[device_idx];

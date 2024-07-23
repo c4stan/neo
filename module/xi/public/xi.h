@@ -108,6 +108,7 @@ typedef struct {
     uint32_t height;
     uint32_t padding_x;
     uint32_t padding_y;
+    uint32_t header_height;
     bool minimized;
     bool resizable;
     bool movable;
@@ -124,8 +125,9 @@ typedef struct {
     .y = 0, \
     .width = 0, \
     .height = 0, \
+    .header_height = 20, \
     .padding_x = 10, \
-    .padding_y = 5, \
+    .padding_y = 2, \
     .minimized = false, \
     .resizable = true, \
     .movable = true, \
@@ -144,8 +146,6 @@ typedef struct {
     char title[xi_section_title_size];
     xi_font_h font;
     uint32_t height;
-    uint32_t padding_x;
-    uint32_t padding_y;
     xi_id_t id;
     uint64_t sort_order;
     xi_style_t style;
@@ -155,9 +155,7 @@ typedef struct {
     .minimized = false, \
     .title = "", \
     .font = xi_null_handle_m, \
-    .height = 0, \
-    .padding_x = 0, \
-    .padding_y = 0, \
+    .height = 20, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_null_style_m(), \
@@ -418,15 +416,6 @@ typedef struct {
     xi_viewport_t viewport;
 } xi_flush_params_t;
 
-// TODO remove and move property editors inside xi
-typedef enum {
-    xi_textfield_event_none_m,
-    xi_textfield_event_focus_acquire_m,
-    xi_textfield_event_focus_release_m,
-    xi_textfield_event_text_edit_m,
-    xi_textfield_event_text_commit_m,
-} xi_textfield_event_e;
-
 // Api
 
 typedef struct {
@@ -466,7 +455,7 @@ typedef struct {
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );
     void ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
     void ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
-    xi_textfield_event_e ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
+    bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
     void ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
 
     void ( *draw_gizmo )    ( xi_workload_h workload, xi_gizmo_state_t* state );

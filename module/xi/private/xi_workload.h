@@ -6,6 +6,16 @@
 #include <xs.h>
 
 typedef struct {
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+} xi_scissor_t;
+
+typedef uint32_t xi_scissor_h;
+#define xi_null_scissor_m ( ( xi_scissor_h ) 0xffffffff )
+
+typedef struct {
     float x;
     float y;
     float width;
@@ -16,6 +26,7 @@ typedef struct {
     float uv0[2]; // top left
     float uv1[2]; // bottom right
     uint64_t sort_order;
+    xi_scissor_h scissor;
 } xi_draw_rect_t;
 
 #define xi_default_draw_rect_m ( xi_draw_rect_t ) { \
@@ -29,6 +40,7 @@ typedef struct {
     .uv0 = { 0, 0 }, \
     .uv1 = { 0, 0 }, \
     .sort_order = 0, \
+    .scissor = xi_null_scissor_m, \
 }
 
 typedef struct {
@@ -91,6 +103,9 @@ typedef struct {
     xi_workload_t* workloads_freelist;
     uint64_t workloads_count;
 
+    xi_scissor_t scissor_array[xi_workload_max_scissors_m];
+    uint32_t scissor_count;
+
     //xi_workload_submit_context_t* submit_contexts;
     //std_ring_t submit_ring;
     xi_workload_device_context_t device_contexts[xg_vk_max_active_devices_m];
@@ -114,6 +129,8 @@ void xi_workload_cmd_draw ( xi_workload_h workload, const xi_draw_rect_t* rects,
 void xi_workload_cmd_draw_tri ( xi_workload_h workload, const xi_draw_tri_t* tris, uint64_t tri_count );
 void xi_workload_cmd_draw_mesh ( xi_workload_h workload, const xi_draw_mesh_t* mesh );
 void xi_workload_flush ( xi_workload_h workload, const xi_flush_params_t* params );
+
+xi_scissor_h xi_workload_add_viewport ( xi_workload_h workload, uint32_t x, uint32_t y, uint32_t width, uint32_t height );
 
 void xi_workload_activate_device ( xg_i* xg, xg_device_h device );
 void xi_workload_deactivate_device ( xg_i* xg, xg_device_h device );

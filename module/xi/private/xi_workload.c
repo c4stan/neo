@@ -14,6 +14,7 @@ void xi_workload_load ( xi_workload_state_t* state ) {
     xi_workload_state->workloads_array = std_virtual_heap_alloc_array_m ( xi_workload_t, xi_workload_max_workloads_m );
     xi_workload_state->workloads_freelist = std_freelist_m ( xi_workload_state->workloads_array, xi_workload_max_workloads_m );
     xi_workload_state->workloads_count = 0;
+    xi_workload_state->scissor_count = 0;
 
     // TODO have xg provide some default null textures, similar to default samplers
     xi_workload_state->null_texture = xg_null_handle_m;
@@ -52,6 +53,19 @@ xi_workload_h xi_workload_create ( void ) {
 
     xi_workload_h handle = ( xi_workload_h ) ( workload - xi_workload_state->workloads_array );
     return handle;
+}
+
+xi_scissor_h xi_workload_add_scissor ( xi_workload_h workload, uint32_t x, uint32_t y, uint32_t width, uint32_t height ) {
+    if ( xi_workload_state->scissor_count == xi_workload_max_scissors_m ) {
+        return xi_null_scissor_m;
+    }
+
+    xi_scissor_t* scissor = &xi_workload_state->scissor_array[xi_workload_state->scissor_count++];
+    scissor->x = x;
+    scissor->y = y;
+    scissor->width = width;
+    scissor->height = height;
+    return xi_workload_state->scissor_array - scissor;
 }
 
 void xi_workload_cmd_draw ( xi_workload_h workload_handle, const xi_draw_rect_t* rects, uint64_t rect_count ) {
@@ -348,6 +362,17 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                 )
             ),
             flush_params->key + rect->sort_order );
+
+        xg_scissor_state_t scissor = xg_scissor_state_m();
+
+        if ( rect->scissor != xi_null_scissor_m ) {
+            scissor.x = xi_workload_state->scissor_array[rect->scissor].x;
+            scissor.y = xi_workload_state->scissor_array[rect->scissor].y;
+            scissor.width = xi_workload_state->scissor_array[rect->scissor].width;
+            scissor.height = xi_workload_state->scissor_array[rect->scissor].height;
+        }
+
+        //xg->cmd_set_pipeline_scissor ( flush_params->cmd_buffer, &scissor, flush_params->key + rect->sort_order );
 
         xg->cmd_draw ( flush_params->cmd_buffer, 6, i * 6, flush_params->key + rect->sort_order );
     }

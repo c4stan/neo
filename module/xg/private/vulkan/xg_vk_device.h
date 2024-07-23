@@ -107,3 +107,5 @@ void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc );
 
 //void xg_vk_device_map_host_buffer ( xg_host_buffer_t* buffer );
 //void xg_vk_device_unmap_host_buffer ( xg_host_buffer_t* buffer );
+
+void xg_vk_device_wait_idle_all ( void );

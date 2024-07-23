@@ -15,6 +15,8 @@ void xg_vk_texture_load ( xg_vk_texture_state_t* state ) {
 
     xg_vk_texture_state->textures_array = std_virtual_heap_alloc_array_m ( xg_vk_texture_t, xg_vk_max_textures_m );
     xg_vk_texture_state->textures_freelist = std_freelist_m ( xg_vk_texture_state->textures_array, xg_vk_max_textures_m );
+    xg_vk_texture_state->textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_ceil_m ( xg_vk_max_textures_m, 64 ) );
+    std_mem_zero ( xg_vk_texture_state->textures_bitset, 8 * std_div_ceil_m ( xg_vk_max_textures_m, 64 ) );
     std_mutex_init ( &xg_vk_texture_state->textures_mutex );
 }
 
@@ -23,14 +25,26 @@ void xg_vk_texture_reload ( xg_vk_texture_state_t* state ) {
 }
 
 void xg_vk_texture_unload ( void ) {
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xg_vk_texture_state->textures_bitset, idx, std_div_ceil_m ( xg_vk_max_textures_m, 64) ) ) {
+        xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[idx];
+        
+        if ( ! ( texture->flags & xg_texture_flag_bit_swapchain_texture_m ) ) {
+            std_log_info_m ( "Destroying texture " std_fmt_u64_m ": " std_fmt_str_m, idx, texture->params.debug_name );
+            xg_texture_destroy ( idx );
+        }
+
+        ++idx;
+    }
+
     std_virtual_heap_free ( xg_vk_texture_state->textures_array );
+    std_virtual_heap_free ( xg_vk_texture_state->textures_bitset );
     std_mutex_deinit ( &xg_vk_texture_state->textures_mutex );
 }
 
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params ) {
     xg_texture_h texture_handle = xg_texture_reserve ( params );
     std_verify_m ( xg_texture_alloc ( texture_handle ) );
-
     return texture_handle;
 }
 
@@ -128,9 +142,10 @@ void xg_texture_create_view ( xg_vk_texture_view_t* view, xg_texture_h texture_h
 xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
     xg_vk_texture_t* texture = std_list_pop_m ( &xg_vk_texture_state->textures_freelist );
+    xg_texture_h texture_handle = ( xg_texture_h ) ( texture - xg_vk_texture_state->textures_array );
+    std_bitset_set ( xg_vk_texture_state->textures_bitset, texture_handle );
     std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
     std_assert_m ( texture );
-    xg_texture_h texture_handle = ( xg_texture_h ) ( texture - xg_vk_texture_state->textures_array );
 
     xg_texture_flag_bit_e flags = 0;
 
@@ -317,6 +332,7 @@ bool xg_texture_destroy ( xg_texture_h texture_handle ) {
 
     const xg_vk_device_t* device = xg_vk_device_get ( texture->params.device );
     vkDestroyImage ( device->vk_handle, texture->vk_handle, NULL );
+    std_bitset_clear ( xg_vk_texture_state->textures_bitset, texture_handle );
     texture->params.allocator.free ( texture->params.allocator.impl, texture->allocation.handle );
 
     vkDestroyImageView ( device->vk_handle, texture->default_view.vk_handle, NULL );

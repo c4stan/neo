@@ -100,6 +100,8 @@ typedef struct {
     // TODO support stack of sections, not just one
     bool in_section;
     bool minimized_section;
+    bool culled_section;
+    bool minimized_window;
 } xi_ui_state_t;
 
 void xi_ui_load ( xi_ui_state_t* state );
@@ -120,7 +122,7 @@ void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state );
 void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state );
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state );
 void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
-xi_textfield_event_e xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state );
+bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state );
 void xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state );
 
 void xi_ui_newline ( void );

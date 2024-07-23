@@ -204,7 +204,7 @@ void std_bitset_clear ( const void* bitset, size_t idx );
 // scans for the first bit set to 1. the bit at location starting_bit_idx is included in the scan
 // u64_blocks_count is to always be specified relative to the very beginning of the bitset, not from the given starting bit
 // returns false if no bit set to 1 was found
-bool std_bitset_scan ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx, size_t u64_blocks_count );
+bool std_bitset_scan ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx, size_t total_u64_count );
 bool std_bitset_scan_rev ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx );
 
 bool std_bitset_set_atomic ( const void* bitset, size_t idx );
