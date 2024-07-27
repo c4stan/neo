@@ -416,7 +416,7 @@ static WPARAM wm_window_map_left_right_key ( WPARAM vk, LPARAM lParam )
     return new_vk;
 }
 
-#if std_enabled_m(wm_input_events_m)
+#if wm_enable_input_events_m
 #if defined(std_platform_win32_m)
 static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, int64_t* retcode ) {
     // Process msg
@@ -904,11 +904,10 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
     return false;
 }
 #endif
-#endif // std_enabled_m(wm_input_events_m)
+#endif // wm_enable_input_events_m
 
-#if std_enabled_m(wm_input_state_m)
+#if wm_enable_input_state_m
 void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_console ) {
-    return;
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
     char* kb = window->input_state.keyboard;
     char* mouse = window->input_state.mouse;
@@ -1254,7 +1253,7 @@ bool wm_window_get_input_state ( wm_window_h handle, wm_input_state_t* state ) {
     std_mutex_unlock ( &wm_window_state->mutex );
     return true;
 }
-#endif // std_enabled_m(wm_input_state_m)
+#endif // wm_enable_input_state_m
 
 #if defined(std_platform_win32_m)
 LRESULT CALLBACK wm_window_os_callback ( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam ) {
@@ -1287,7 +1286,7 @@ LRESULT CALLBACK wm_window_os_callback ( HWND hwnd, UINT msg, WPARAM wparam, LPA
     std_mutex_unlock ( &wm_window_state->mutex );
 
     // Process msg
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
     int64_t retcode = 0;
 
     if ( wm_process_input_event ( handle, window, hwnd, msg, wparam, lparam, &retcode ) ) {
@@ -1313,7 +1312,7 @@ static void wm_window_default_event_handler ( wm_window_h handle, wm_window_t* w
 }
 
 static void wm_window_event_dispatcher ( wm_window_h handle, wm_window_t* window, XEvent* event ) {
-#if std_enabled_m(wm_input_events_m)
+#if wm_enable_input_events_m
 
     if ( wm_process_input_event ( handle, window, event ) ) {
         //    return ( LRESULT ) retcode;
@@ -1333,7 +1332,7 @@ static void wm_window_event_dispatcher ( wm_window_h handle, wm_window_t* window
 void wm_window_update ( wm_window_h handle ) {
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     window->pending_wheel_up = 0;
     window->pending_wheel_down = 0;
     wm_clear_input_state ( handle );
@@ -1360,7 +1359,7 @@ void wm_window_update ( wm_window_h handle ) {
 #endif // defined(std_platform_linux_m)
 
     // Update state after processing all events.
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     wm_update_input_state ( handle );
 #endif
 }
@@ -1479,11 +1478,11 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     // Pop from freelist and write all data
     wm_window_t* window = std_list_pop_m ( &wm_window_state->windows_freelist );
 
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
     window->handlers_count = 0;
 #endif
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     std_mem_zero ( &window->input_state, sizeof ( window->input_state ) );
 #endif
 
@@ -1584,7 +1583,7 @@ bool wm_window_destroy ( wm_window_h handle ) {
     return true;
 }
 
-#if std_enabled_m(wm_input_events_m)
+#if wm_enable_input_events_m
 bool wm_window_add_event_handler ( wm_window_h handle, const wm_input_event_handler_t* handler ) {
     // Lock
     std_mutex_lock ( &wm_window_state->mutex );

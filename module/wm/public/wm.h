@@ -51,7 +51,7 @@ typedef struct {
     char title[wm_window_title_max_len_m];
 } wm_window_info_t;
 
-#if std_enabled_m ( wm_input_events_m ) || std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_events_m || wm_enable_input_state_m
 
 typedef enum {
     wm_keyboard_state_a_m,
@@ -136,7 +136,7 @@ typedef enum {
 } wm_mouse_state_e;
 #endif
 
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
 
 typedef enum {
     // args: key | flags | null | null
@@ -240,9 +240,9 @@ typedef struct {
     wm_input_event_handler_f* callback;
 } wm_input_event_handler_t;
 
-#endif
+#endif // wm_enable_input_events_m
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
 #define wm_keyboard_state_size_m wm_keyboard_state_count_m
 #define wm_mouse_state_size_m wm_mouse_state_count_m
 typedef struct {
@@ -252,12 +252,8 @@ typedef struct {
     uint32_t cursor_y;
     char mouse[wm_mouse_state_size_m]; // access with [] by wm_mouse_state_e values
     char keyboard[wm_keyboard_state_size_m]; // access with [] by wm_keyboard_state_e values
-#if std_enabled_m ( wm_input_buffer_m )
-    char buffer[wm_input_buffer_size_m];
-    uint32_t buffer_used_size;
-#endif // std_enabled_m ( wm_input_buffer_m )
 } wm_input_state_t;
-#endif // std_enabled_m ( wm_input_state_m )
+#endif // wm_enable_input_state_m
 
 typedef struct {
     size_t width;
@@ -313,12 +309,12 @@ typedef struct {
     bool ( *get_window_info ) ( wm_window_h window, wm_window_info_t* info );
     void ( *update_window ) ( const wm_window_h window );
 
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
     bool ( *add_window_event_handler ) ( wm_window_h window, const wm_input_event_handler_t* handler );
     bool ( *remove_window_event_handler ) ( wm_window_h window, const wm_input_event_handler_t* handler );
 #endif
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     bool ( *get_window_input_state ) ( wm_window_h window, wm_input_state_t* state );
     void ( *debug_print_window_input_state ) ( wm_window_h window, bool overwrite_console );
 #endif

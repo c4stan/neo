@@ -21,26 +21,18 @@ int xg_vertex_stream_binding_cmp_f ( const void* _a, const void* _b ) {
     return a->stream_id > b->stream_id ? 1 : a->stream_id < b->stream_id ? -1 : 0;
 }
 
-int xg_vk_cmd_buffer_header_compare_f ( const void* _a, const void* _b ) {
-    xg_cmd_header_t* a = ( xg_cmd_header_t* ) _a;
-    xg_cmd_header_t* b = ( xg_cmd_header_t* ) _b;
-    return a->key > b->key ? 1 : a->key < b->key ? -1 : 0;
-}
-
 // STATIC
 
 static xg_cmd_buffer_state_t* xg_cmd_buffer_state;
 
 static void xg_cmd_buffer_alloc_memory ( xg_cmd_buffer_t* cmd_buffer ) {
-    void* cmd_headers_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_cmd_buffer_size_m, 16 );
-    void* cmd_args_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_cmd_buffer_size_m, 16 );
-    cmd_buffer->cmd_headers_allocator = std_queue_local ( cmd_headers_buffer, xg_cmd_buffer_cmd_buffer_size_m );
-    cmd_buffer->cmd_args_allocator = std_queue_local ( cmd_args_buffer, xg_cmd_buffer_cmd_buffer_size_m );
+    cmd_buffer->cmd_headers_allocator = std_queue_local_create ( xg_cmd_buffer_cmd_buffer_size_m );
+    cmd_buffer->cmd_args_allocator = std_queue_local_create ( xg_cmd_buffer_cmd_buffer_size_m );
 }
 
 static void xg_cmd_buffer_free_memory ( xg_cmd_buffer_t* cmd_buffer ) {
-    std_virtual_heap_free ( cmd_buffer->cmd_headers_allocator.base );
-    std_virtual_heap_free ( cmd_buffer->cmd_args_allocator.base );
+    std_queue_local_destroy ( &cmd_buffer->cmd_headers_allocator );
+    std_queue_local_destroy ( &cmd_buffer->cmd_args_allocator );
 }
 
 void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state ) {
@@ -116,6 +108,268 @@ xg_cmd_buffer_h xg_cmd_buffer_open ( xg_workload_h workload ) {
     xg_cmd_buffer_h handle;
     xg_cmd_buffer_open_n ( &handle, 1, workload );
     return handle;
+}
+
+// TODO try moving to std_sort?
+/*
+    main source for current implementation:
+        https://cboard.cprogramming.com/c-programming/158635-merge-sort-top-down-versus-bottom-up-3.html#post1174189
+
+    various other sources and notes:
+        https://www.1024cores.net/home/parallel-computing/radix-sort
+        Radix sort:
+            allocate a radix buffer
+            iterate input array, split items into the radix bins
+            recursively call on each bin
+            propagate up the result by replacing the input array
+
+        Counting sort:
+            allocate a counter buffer
+            iterate input array, count occurrences of each item
+            fill output array
+
+        Radix + counting sort:
+            on some radix sort iterations it might be worth to do a counting sort pass instead of a radix
+            radix sort does a single pass on the items and splits them into different bins
+                1 input read, 1 output write
+            counting sort used inside radix accumulated counters instead of splitting on the first pass,
+            then does a pass on the counter to compute starting indices and finally does another pass on
+            the input, this time to split the items into bins with the aid of the counter buffer
+                2 input read, 1 count write, 1 count read, 1 output write
+
+*/
+void xg_cmd_buffer_sort_n ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count ) {
+    size_t total_header_size = 0;
+
+    for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
+        const xg_cmd_buffer_t* cmd_buffer = cmd_buffers[i];
+        total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+    }
+
+    size_t total_header_count = total_header_size / sizeof ( xg_cmd_header_t );
+    std_assert_m ( total_header_count <= cmd_header_cap );
+
+    // Stable u64 LSD radix sort using 8-bit bins
+    // Allocate 2 buffers of same size as total items to be sorted and ping-pong on each sorting step
+    // TODO pre-allocate these
+    //std_alloc_t alloc1 = std_virtual_heap_alloc ( total_header_size, 16 );
+    //std_alloc_t alloc2 = std_virtual_heap_alloc ( total_header_size, 16 );
+    //alloc1.buffer.size = total_header_size;
+    //alloc2.buffer.size = total_header_size;
+    //std_auto_m buffer1 = ( xg_cmd_header_t* ) alloc1.buffer.base;
+    //std_auto_m buffer2 = ( xg_cmd_header_t* ) alloc2.buffer.base;
+
+    //std_auto_m buffer1 = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
+    //std_auto_m buffer2 = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
+    void* buffer1 = cmd_headers_temp;
+    void* buffer2 = cmd_headers;
+
+    //
+    // byte 0
+    // source -> buffer1
+    //
+    uint64_t count_table[256] = {0};
+    xg_cmd_header_t* input;
+    xg_cmd_header_t* output;
+
+    // Fill the count table
+    for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
+        const xg_cmd_buffer_t* cmd_buffer = cmd_buffers[i];
+        size_t header_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+        const xg_cmd_header_t* cmd_header_begin = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base );
+        const xg_cmd_header_t* cmd_header_end = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + header_size );
+
+        for ( const xg_cmd_header_t* header = cmd_header_begin; header < cmd_header_end; ++header ) {
+            ++count_table[header->key & 255];
+        }
+    }
+
+    // Accumulate count table
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    // Fill the output buffer
+    output = buffer1;
+
+    for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
+        const xg_cmd_buffer_t* cmd_buffer = cmd_buffers[i];
+        size_t header_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+        const xg_cmd_header_t* cmd_header_begin = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base );
+        const xg_cmd_header_t* cmd_header_end = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + header_size );
+
+        for ( const xg_cmd_header_t* header = cmd_header_begin; header < cmd_header_end; ++header ) {
+            uint64_t idx = count_table[header->key & 255]++;
+            output[idx] = *header;
+        }
+    }
+
+    //
+    // byte 1
+    // buffer1 -> buffer2
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer1;
+    output = buffer2;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 8 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 8 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // byte 2
+    // bufer2 -> buffer1
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer2;
+    output = buffer1;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 16 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 16 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // byte 3
+    // buffer1 -> buffer2
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer1;
+    output = buffer2;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 24 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 24 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // byte 4
+    // buffer2 -> buffer1
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer2;
+    output = buffer1;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 32 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 32 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // byte 5
+    // buffer1 -> buffer2
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer1;
+    output = buffer2;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 40 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 40 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // byte 6
+    // buffer2 -> buffer1
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer2;
+    output = buffer1;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 48 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 48 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // byte 7
+    // buffer1 -> output
+    //
+    std_mem_zero_m ( count_table );
+    input = buffer1;
+    output = buffer2;
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        ++count_table[ ( input[i].key >> 56 ) & 255];
+    }
+
+    for ( size_t i = 0, sum = 0; i < 256; ++i ) {
+        uint64_t start = sum;
+        sum += count_table[i];
+        count_table[i] = start;
+    }
+
+    for ( size_t i = 0; i < total_header_count; ++i ) {
+        uint64_t idx = count_table[ ( input[i].key >> 56 ) & 255]++;
+        output[idx] = input[i];
+    }
+
+    //
+    // the end
+    // sorted result is in buffer2
 }
 
 #if 0

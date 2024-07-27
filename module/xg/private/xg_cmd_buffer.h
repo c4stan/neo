@@ -30,6 +30,15 @@
 */
 
 typedef struct {
+    // Abusing the fact that x64 pointers have their top 16 bits unused
+    // https://stackoverflow.com/questions/31522582/can-i-use-some-bits-of-pointer-x86-64-for-custom-data-and-how-if-possible
+    // Args contains a memory address.
+    uint64_t args : 48;
+    uint64_t type : 16;
+    uint64_t key;
+} xg_cmd_header_t;
+
+typedef struct {
     //xg_device_h device;
     xg_workload_h workload;
     std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
@@ -80,15 +89,6 @@ typedef enum {
 #define xg_cmd_buffer_cmd_alignment_m 8
 
 int xg_vk_cmd_buffer_header_compare_f ( const void* a, const void* b );
-
-typedef struct {
-    // Abusing the fact that x64 pointers have their top 16 bits unused
-    // https://stackoverflow.com/questions/31522582/can-i-use-some-bits-of-pointer-x86-64-for-custom-data-and-how-if-possible
-    // Args contains a memory address.
-    uint64_t args : 48;
-    uint64_t type : 16;
-    uint64_t key;
-} xg_cmd_header_t;
 
 typedef struct {
     uint32_t bindings_count;
@@ -273,6 +273,12 @@ void xg_cmd_buffer_unload ( void );
 // Returns a number of ready to record command buffers to the user. Tries to grab them from the pool, allocates new ones if necessary.
 xg_cmd_buffer_h xg_cmd_buffer_open ( xg_workload_h workload );
 void xg_cmd_buffer_open_n ( xg_cmd_buffer_h* cmd_buffers, size_t count, xg_workload_h workload );
+
+// sorts all cmd headers from an array of cmd buffers into a single sorted array
+// cmd_header_cap should be big enough to contain all the cmd headers contained in the passed in cmd buffers
+// both cmd_headers and cmd_headers_temp need to respect cmd_header_cap
+// after calling cmd_headers will contain the sorted result. cmd_headers_temp will contain garbage and can be reused or destroyed 
+void xg_cmd_buffer_sort_n ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count );
 
 #if 0
     // Queue a command buffer for later processing/submission.

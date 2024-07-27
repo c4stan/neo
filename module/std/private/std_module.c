@@ -395,7 +395,7 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
 
     // The builder will send back the build results to this process through this pipe
     std_process_pipe_params_t pipe_params;
-    pipe_params.name = "std_module_updates_pipe";
+    pipe_params.name = "std_module_update_pipe";
     pipe_params.flags = std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m;
     pipe_params.write_capacity = output_size;
     pipe_params.read_capacity = output_size;

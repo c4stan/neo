@@ -23,6 +23,10 @@ size_t std_virtual_page_size ( void ) {
     return std_allocator_state->virtual_page_size;
 }
 
+size_t std_virtual_page_align ( size_t size ) {
+    return std_align ( size, std_allocator_state->virtual_page_size );
+}
+
 #if 0
 std_virtual_buffer_t std_virtual_buffer ( void* base, size_t mapped, size_t reserved ) {
     std_virtual_buffer_t buffer;

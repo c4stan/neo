@@ -2,6 +2,9 @@ name = std
 output = lib
 configs = debug, release
 code = public, private
+if win32
+    libs = mincore.lib
+endif
 if linux
     libs = m #, dl, pthread
 endif

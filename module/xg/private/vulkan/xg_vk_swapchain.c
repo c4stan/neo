@@ -2,7 +2,6 @@
 
 #include "xg_vk_device.h"
 #include "xg_vk_texture.h"
-#include "xg_vk_cmd_buffer.h"
 #include "xg_vk_instance.h"
 #include "xg_vk_enum.h"
 
@@ -408,11 +407,11 @@ uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle,
 
     uint32_t texture_idx;
 
-#if std_enabled_m(xg_debug_measure_acquire_time_m)
+#if xg_debug_enable_measure_acquire_time_m
     std_tick_t acquire_start_tick = std_tick_now();
 #endif
 
-#if std_enabled_m(xg_debug_disable_semaphore_frame_sync_m)
+#if xg_debug_enable_disable_semaphore_frame_sync_m
     VkFence fence;
     VkFenceCreateInfo fence_create_info;
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -454,7 +453,7 @@ uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle,
 
 #endif
 
-#if std_enabled_m(xg_debug_measure_acquire_time_m)
+#if xg_debug_enable_measure_acquire_time_m
     float acquire_time_ms = std_tick_to_milli_f32 ( std_tick_now() - acquire_start_tick );
 
     if ( acquire_time_ms > 0.2f ) {
@@ -490,7 +489,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
         handles[i] = info.os_handle;
     }
 
-#if std_enabled_m(xg_debug_measure_present_time_m)
+#if xg_debug_enable_measure_present_time_m
     std_tick_t present_start_tick = std_tick_now();
 #endif
 
@@ -506,7 +505,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
     present_info.pSwapchains = &swapchain->vk_handle;
     present_info.pImageIndices = &texture_idx;
     present_info.pResults = &present_result;
-#if std_enabled_m(xg_debug_disable_semaphore_frame_sync_m)
+#if xg_debug_enable_disable_semaphore_frame_sync_m
     present_info.waitSemaphoreCount = 0;
 #endif
 
@@ -518,7 +517,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
     } else {
         std_assert_msg_m ( result == VK_SUCCESS, "Present fail: " std_fmt_int_m, result );
 
-#if std_enabled_m(xg_debug_flush_gpu_submissions_m) || std_enabled_m(xg_debug_disable_semaphore_frame_sync_m)
+#if xg_debug_enable_flush_gpu_submissions_m || xg_debug_enable_disable_semaphore_frame_sync_m
         result = vkQueueWaitIdle ( device->graphics_queue.vk_handle );
         std_assert_m ( result == VK_SUCCESS );
 #endif
@@ -534,7 +533,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
         xg_debug_capture_stop();
     }
 
-#if std_enabled_m(xg_debug_measure_present_time_m)
+#if xg_debug_enable_measure_present_time_m
     float present_time_ms = std_tick_to_milli_f32 ( std_tick_now() - present_start_tick );
 
     if ( present_time_ms > 0.2f ) {

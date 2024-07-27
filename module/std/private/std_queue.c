@@ -4,8 +4,75 @@
 #include <std_byte.h>
 #include <std_log.h>
 
+#include <std_platform.h>
+
+#if defined ( std_platform_win32_m )
+// https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
+// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples
+static void std_queue_virtual_alloc_aliased ( char** base, char** alias, size_t* size ) {
+    size_t queue_size = std_pow2_round_up ( std_virtual_page_align ( *size ) );
+    *base = NULL;
+    *alias = NULL;
+
+    void* p1 = NULL;
+    void* p2 = NULL;
+    HANDLE s = NULL;
+    void* v1 = NULL;
+    void* v2 = NULL;
+
+    p1 = VirtualAlloc2 ( NULL, NULL, 2 * queue_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, NULL, 0 );
+    if ( !p1 ) {
+        std_log_os_error_m();
+        goto exit;
+    }
+
+    BOOL result = VirtualFree ( p1, queue_size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
+    if ( result == FALSE ) {
+        std_log_os_error_m();
+        goto exit;
+    }
+
+    p2 = p1 + queue_size;
+    
+    s = CreateFileMapping ( INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, queue_size, NULL );
+    if ( !s ) {
+        std_log_os_error_m();
+        goto exit;
+    }
+
+    v1 = MapViewOfFile3 ( s, NULL, p1, 0, queue_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0 );
+    if ( !v1 ) {
+        std_log_os_error_m();
+        goto exit;
+    }
+    p1 = NULL;
+
+    v2 = MapViewOfFile3 ( s, NULL, p2, 0, queue_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0 );
+    if ( !v2 ) {
+        std_log_os_error_m();
+        goto exit;
+    }
+    p2 = NULL;
+
+    *base = v1;
+    *alias = v2;
+    *size = queue_size;
+    return;
+
+exit:
+    if ( p1 ) VirtualFree ( p1, 0, MEM_RELEASE );
+    if ( p2 ) VirtualFree ( p2, 0, MEM_RELEASE );
+    if ( s ) CloseHandle ( s );
+    if ( v1 ) UnmapViewOfFileEx ( v1, 0 );
+    if ( v2 ) UnmapViewOfFileEx ( v2, 0 );
+}
+#elif defined ( std_platform_linux_m ) 
+    // TODO
+#endif
+
 //==============================================================================
 
+#if 0
 std_queue_local_t std_queue_local ( void* base, size_t size ) {
     if ( !std_pow2_test ( size ) ) {
         size = std_pow2_round_down ( size );
@@ -17,6 +84,21 @@ std_queue_local_t std_queue_local ( void* base, size_t size ) {
     queue.top = 0;
     queue.bot = 0;
     return queue;
+}
+#endif
+
+std_queue_local_t std_queue_local_create ( size_t size ) {
+    std_queue_local_t queue;
+    std_queue_virtual_alloc_aliased ( &queue.base, &queue.alias, &size );
+    queue.mask = size - 1;
+    queue.top = 0;
+    queue.bot = 0;
+    return queue;
+}
+
+void std_queue_local_destroy ( std_queue_local_t* queue ) {
+    UnmapViewOfFile ( queue->base );
+    UnmapViewOfFile ( queue->alias );
 }
 
 void std_queue_local_clear ( std_queue_local_t* queue ) {
@@ -36,24 +118,20 @@ void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t s
     std_assert_m ( item != NULL );
     // Load
     char* base = queue->base;
-    size_t  mask = queue->mask;
-    size_t  top = queue->top;
+    size_t mask = queue->mask;
+    size_t top = queue->top;
 
     size_t cap = mask + 1;
 #if std_log_assert_enabled_m
     // Test for enough free space
-    size_t  bot = queue->bot;
+    size_t bot = queue->bot;
     size_t used_size = top - bot;
     std_assert_m ( cap - used_size >= size );
 #endif
 
     // Push the data
     size_t offset = top & mask;
-    size_t pre = cap > offset + size ? size : offset + size - cap;
-    size_t post = size - pre;
-    std_mem_copy ( base + offset, item, pre );
-    std_mem_copy ( base, ( char* ) item + pre, post );
-
+    std_mem_copy ( base + offset, item, size );
     queue->top = top + size;
 }
 
@@ -74,8 +152,8 @@ void std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size ) {
 void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t size ) {
     // Load
     char* base = queue->base;
-    size_t  mask = queue->mask;
-    size_t  bot = queue->bot;
+    size_t mask = queue->mask;
+    size_t bot = queue->bot;
 
 #if std_log_assert_enabled_m
     size_t  top = queue->top;
@@ -86,11 +164,7 @@ void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t siz
 
     // Read the data
     size_t offset = bot & mask;
-    size_t cap = mask + 1;
-    size_t pre = cap > offset + size ? size : offset + size - cap;
-    size_t post = size - pre;
-    std_mem_copy ( dest, base + offset, pre );
-    std_mem_copy ( ( char* ) dest + pre, base, post );
+    std_mem_copy ( dest, base + offset, size );
 
     queue->bot = bot + size;
 }
@@ -98,15 +172,17 @@ void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t siz
 void* std_queue_local_emplace ( std_queue_local_t* queue, size_t size ) {
     // Load
     char* base = queue->base;
-    size_t  mask = queue->mask;
-    size_t  top = queue->top;
+    size_t mask = queue->mask;
+    size_t top = queue->top;
 
     size_t offset = top & mask;
 
 #if std_log_assert_enabled_m
-    // Check space available and no wrap
+    // Test for enough free space
     size_t cap = mask + 1;
-    std_assert_m ( cap > offset + size );
+    size_t bot = queue->bot;
+    size_t used_size = top - bot;
+    std_assert_m ( cap - used_size >= size );
 #endif
 
     queue->top += size;
@@ -325,6 +401,7 @@ void* std_circular_pool_at_pool ( const std_circular_pool_t* pool, size_t idx ) 
 //==============================================================================
 // Shared
 
+#if 0
 std_queue_shared_t std_queue_shared ( void* base, size_t size ) {
     if ( !std_pow2_test ( size ) ) {
         //std_log_warn_m ( "Shared queue buffer size is not power of two, rounding it down." );
@@ -339,6 +416,21 @@ std_queue_shared_t std_queue_shared ( void* base, size_t size ) {
     queue.top = 0;
     queue.bot = 0;
     return queue;
+}
+#endif
+
+std_queue_shared_t std_queue_shared_create ( size_t size ) {
+    std_queue_shared_t queue;
+    std_queue_virtual_alloc_aliased ( &queue.base, &queue.alias, &size );
+    queue.mask = size - 1;
+    queue.top = 0;
+    queue.bot = 0;
+    return queue;
+}
+
+void std_queue_shared_destroy ( std_queue_shared_t* queue ) {
+    UnmapViewOfFile ( queue->base );
+    UnmapViewOfFile ( queue->alias );
 }
 
 void std_queue_shared_clear ( std_queue_shared_t* queue ) {
@@ -379,10 +471,7 @@ void std_queue_spsc_push ( std_queue_shared_t* queue, const void* item, size_t s
 
     // Push the data
     size_t offset = top & mask;
-    size_t pre = cap > offset + size ? size : offset + size - cap;
-    size_t post = size - pre;
-    std_mem_copy ( base + offset, item, pre );
-    std_mem_copy ( base, ( char* ) item + pre, post );
+    std_mem_copy ( base + offset, item, size );
 
     std_compiler_fence();
     queue->top = top + size;
@@ -416,11 +505,7 @@ void std_queue_spsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t siz
 
     // Read the data
     size_t offset = bot & mask;
-    size_t cap = mask + 1;
-    size_t pre = cap > offset + size ? size : offset + size - cap;
-    size_t post = size - pre;
-    std_mem_copy ( dest, base + offset, pre );
-    std_mem_copy ( ( char* ) dest + pre, base, post );
+    std_mem_copy ( dest, base + offset, size );
 
     std_compiler_fence();
     queue->bot = bot + size;
@@ -473,11 +558,7 @@ bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t s
     if ( std_compare_and_swap_u64 ( &queue->top, &top, new_top ) ) {
         top += sizeof ( uint32_t );
         offset = top & mask;
-        // Test for wrap around
-        size_t pre = cap > offset + size ? size : offset + size - cap;
-        size_t post = size - pre;
-        std_mem_copy ( base + offset, item, pre );
-        std_mem_copy ( base, ( char* ) item + pre, post );
+        std_mem_copy ( base + offset, item, size );
         std_compiler_fence();
         *tag = ( uint32_t ) size;
         return true;
@@ -553,18 +634,12 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
         bot += sizeof ( uint32_t );
         offset = bot & mask;
-        // Test for wrap around
-        size_t cap = mask + 1;
-        size_t pre = cap > offset + size ? size : offset + size - cap;
-        size_t post = size - pre;
-        std_mem_copy ( dest, base + offset, pre );
-        std_mem_copy ( ( char* ) dest + pre, base, post );
+        std_mem_copy ( dest, base + offset, size );
         // TODO this mem_zero call is bad. Is there a way to avoid this?
-        // The issue is that if there's no guarantee on data alignment, after a wrap around on the buffer
+        // The reason for it is that if there's no guarantee on data alignment, after a wrap around on the buffer
         // the tag bytes might end up located where before was stored some user data, which is likely not to be 0
-        // To solve that need to set all popped data to 0, or establish a stride and just clear the tag on pop
-        std_mem_zero ( base + offset, pre );
-        std_mem_zero ( base, post );
+        // To solve that need to clear all popped data to 0, or establish a stride and just clear the tag on pop
+        std_mem_zero ( base + offset, size );
         std_compiler_fence();
         *tag = 0;
         return size;
@@ -574,8 +649,16 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
 }
 
 // 32
+#if 0
 std_queue_shared_t std_queue_mpmc_32 ( void* base, size_t size ) {
     std_queue_shared_t queue = std_queue_shared ( base, size );
+    std_mem_set ( queue.base, queue.mask + 1, 0xff );
+    return queue;
+}
+#endif
+
+std_queue_shared_t std_queue_mpmc_32_create ( size_t size ) {
+    std_queue_shared_t queue = std_queue_shared_create ( size );
     std_mem_set ( queue.base, queue.mask + 1, 0xff );
     return queue;
 }
@@ -668,8 +751,16 @@ bool std_queue_mpmc_pop_move_32 ( std_queue_shared_t* queue, void* dest ) {
 }
 
 // 64
+#if 0
 std_queue_shared_t std_queue_mpmc_64 ( void* base, size_t size ) {
     std_queue_shared_t queue = std_queue_shared ( base, size );
+    std_mem_set ( queue.base, queue.mask + 1, 0xff );
+    return queue;
+}
+#endif
+
+std_queue_shared_t std_queue_mpmc_64_create ( size_t size ) {
+    std_queue_shared_t queue = std_queue_shared_create ( size );
     std_mem_set ( queue.base, queue.mask + 1, 0xff );
     return queue;
 }
@@ -836,12 +927,7 @@ size_t std_queue_mpsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
 
     bot += sizeof ( uint32_t );
     offset = bot & mask;
-    // Test for wrap around
-    size_t cap = mask + 1;
-    size_t pre = cap > offset + size ? size : offset + size - cap;
-    size_t post = size - pre;
-    std_mem_copy ( dest, base + offset, pre );
-    std_mem_copy ( ( char* ) dest + pre, base, post );
+    std_mem_copy ( dest, base + offset, size );
     std_compiler_fence();
     *tag = 0;
     return size;
@@ -873,10 +959,7 @@ void std_queue_spmc_push ( std_queue_shared_t* queue, const void* item, size_t s
 
     // Push the data
     size_t offset = top & mask;
-    size_t pre = cap > offset + size ? size : offset + size - cap;
-    size_t post = size - pre;
-    std_mem_copy ( base + offset, item, pre );
-    std_mem_copy ( base, ( char* ) item + pre, post );
+    std_mem_copy ( base + offset, item, size );
 
     std_compiler_fence();
     // Push the size

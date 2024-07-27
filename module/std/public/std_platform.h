@@ -12,9 +12,10 @@
     #define std_platform_win32_m
     #define WIN32_LEAN_AND_MEAN
     #define _CRT_SECURE_NO_WARNINGS
+    //#define WIN32_DEFAULT_LIBS
     #include <Windows.h>
     #include <windowsx.h>
-    #include <memoryapi.h>
+    //#include <memoryapi.h>
     #include <DbgHelp.h>
     #include <synchapi.h>
 

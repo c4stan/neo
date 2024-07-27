@@ -11,9 +11,8 @@
 #include <std_byte.h>
 #include <std_atomic.h>
 
-#if std_enabled_m(xg_backend_vulkan_m)
+#if xg_enable_backend_vulkan_m
     #include "vulkan/xg_vk_allocator.h"
-    #include "vulkan/xg_vk_cmd_buffer.h"
     #include "vulkan/xg_vk_workload.h"
     #include "vulkan/xg_vk_pipeline.h"
 #endif
@@ -48,9 +47,9 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 
     std_assert_m ( device->supported_features.geometryShader );
 
-#if std_enabled_m(xg_vk_enable_raytracing)
-    std_assert_m ( device->supported_features.bufferDeviceAddress );
-#endif
+//#if std_enabled_m(xg_vk_enable_raytracing)
+//    std_assert_m ( device->supported_features.bufferDeviceAddress );
+//#endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     // Print generic properties
@@ -718,7 +717,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         "VK_KHR_swapchain",
         "VK_KHR_synchronization2",
         "VK_KHR_imageless_framebuffer",
-#if std_enabled_m(xg_vk_enable_raytracing)
+#if xg_enable_raytracing_m
         "VK_KHR_acceleration_structure",
         "VK_KHR_ray_tracing_pipeline",
         //"VK_KHR_ray_query",
@@ -800,7 +799,6 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
 
     xg_vk_allocator_activate_device ( device_handle );
-    xg_vk_cmd_buffer_activate_device ( device_handle );
     xg_vk_workload_activate_device ( device_handle );
     xg_vk_pipeline_activate_device ( device_handle );
 
@@ -825,8 +823,6 @@ bool xg_vk_device_deactivate ( xg_device_h device_handle ) {
     vkDestroyDevice ( device->vk_handle, NULL );
 
     std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
-
-    xg_vk_cmd_buffer_deactivate_device ( device_handle );
 
     return true;
 }

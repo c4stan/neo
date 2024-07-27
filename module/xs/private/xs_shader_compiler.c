@@ -43,7 +43,7 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
         std_stack_string_copy ( &stack, "-g" );
 
         args[argc++] = stack.top;
-#if std_enabled_m(std_debug_m)
+#if std_build_debug_m
         std_stack_string_copy ( &stack, "-O0" );
 #else
         std_stack_string_copy ( &stack, "-O" );

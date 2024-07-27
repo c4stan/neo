@@ -75,6 +75,10 @@ void std_platform_load_state_info ( std_platform_state_t* state ) {
                     case CacheTrace:
                         cache_type = std_platform_cache_type_unknown_m;
                         break;
+
+                    case CacheUnknown:
+                        cache_type = std_platform_cache_type_unknown_m;
+                        break;
                 }
 
                 cache->type = cache_type;

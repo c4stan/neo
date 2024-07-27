@@ -20,10 +20,12 @@ xg_pipeline_output_max_color_targets_m          8
 
 xg_swapchain_max_textures_m                     8
 
+xg_enable_raytracing_m                          1
+
 ########## debug ##########
 
 xg_debug_name_size_m                            32
 
 ########## Backends ##########
 
-xg_backend_vulkan_m                             std_on_m
+xg_enable_backend_vulkan_m                      1

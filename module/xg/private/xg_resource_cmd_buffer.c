@@ -1,6 +1,6 @@
 #include "xg_resource_cmd_buffer.h"
 
-#if std_enabled_m(xg_backend_vulkan_m)
+#if xg_enable_backend_vulkan_m
     #include "vulkan/xg_vk_texture.h"
     #include "vulkan/xg_vk_buffer.h"
     #include "vulkan/xg_vk_pipeline.h"
@@ -12,17 +12,13 @@
 static xg_resource_cmd_buffer_state_t* xg_resource_cmd_buffer_state;
 
 static void xg_resource_cmd_buffer_alloc_memory ( xg_resource_cmd_buffer_t* cmd_buffer ) {
-    // Copied from xg_cmd_buffer
-
-    void* cmd_headers_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_resource_cmd_buffer_size_m, 16 );
-    void* cmd_args_buffer = std_virtual_heap_alloc ( xg_cmd_buffer_resource_cmd_buffer_size_m, 16 );
-    cmd_buffer->cmd_headers_allocator = std_queue_local ( cmd_headers_buffer, xg_cmd_buffer_resource_cmd_buffer_size_m );
-    cmd_buffer->cmd_args_allocator = std_queue_local ( cmd_args_buffer, xg_cmd_buffer_resource_cmd_buffer_size_m );
+    cmd_buffer->cmd_headers_allocator = std_queue_local_create ( xg_cmd_buffer_resource_cmd_buffer_size_m );
+    cmd_buffer->cmd_args_allocator = std_queue_local_create ( xg_cmd_buffer_resource_cmd_buffer_size_m );
 }
 
 static void xg_resource_cmd_buffer_free_memory ( xg_resource_cmd_buffer_t* cmd_buffer ) {
-    std_virtual_heap_free ( cmd_buffer->cmd_headers_allocator.base );
-    std_virtual_heap_free ( cmd_buffer->cmd_args_allocator.base );
+    std_queue_local_destroy ( &cmd_buffer->cmd_headers_allocator );
+    std_queue_local_destroy ( &cmd_buffer->cmd_args_allocator );
 }
 
 void xg_resource_cmd_buffer_load ( xg_resource_cmd_buffer_state_t* state ) {

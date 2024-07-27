@@ -8,11 +8,26 @@ typedef struct {
 
     void ( *set_debug_name ) ( VkDevice, const VkDebugUtilsObjectNameInfoEXT* );
 
-#if std_enabled_m(xg_vk_enable_sync2_m)
+#if xg_vk_enable_sync2_m
     void ( *cmd_sync2_pipeline_barrier ) ( VkCommandBuffer, const VkDependencyInfoKHR* );
 #endif
 
     void ( *set_debug_callback ) ( VkInstance, const VkDebugUtilsMessengerCreateInfoEXT*, const VkAllocationCallbacks*, VkDebugUtilsMessengerEXT* );
+
+#if xg_enable_raytracing_m
+    // vkGetAccelerationStructureBuildSizesKHR
+    void ( *get_acceleration_structure_build_sizes ) ( VkDevice, VkAccelerationStructureBuildTypeKHR, const VkAccelerationStructureBuildGeometryInfoKHR*, const uint32_t*, VkAccelerationStructureBuildSizesInfoKHR* );
+
+    // vkCreateAccelerationStructureKHR
+    VkResult ( *create_acceleration_structure ) ( VkDevice, const VkAccelerationStructureCreateInfoKHR*, const VkAllocationCallbacks*, VkAccelerationStructureKHR* );
+    
+    // vkBuildAccelerationStructuresKHR
+    VkResult ( *build_acceleration_structures ) ( VkDevice, VkDeferredOperationKHR, uint32_t, const VkAccelerationStructureBuildGeometryInfoKHR*, const VkAccelerationStructureBuildRangeInfoKHR* const* );
+    
+    // vkGetAccelerationStructureDeviceAddressKHR
+    VkDeviceAddress ( *get_acceleration_structure_device_address ) ( VkDevice, const VkAccelerationStructureDeviceAddressInfoKHR* );
+    //
+#endif
 } xg_vk_instance_ext_api_i;
 
 typedef struct {

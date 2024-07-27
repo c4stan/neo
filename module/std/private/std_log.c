@@ -33,7 +33,7 @@ void std_log_print_stacktrace ( void ) {
 }
 #endif
 
-#if std_enabled_m(std_log_colored_console_output_m)
+#if std_enable_log_colored_console_output_m
     #define std_terminal_color_reset_m    "\x1B[0m"
     //#define std_terminal_color_bright_m   "\x1B[1m"
     #define std_terminal_color_red_m      "\x1B[1m\x1B[31m"
@@ -60,7 +60,7 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
 
     const char* color_prefix = "";
     const char* color_postfix = "";
-#if std_enabled_m(std_log_colored_console_output_m)
+#if std_enable_log_colored_console_output_m
 
     if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         color_prefix = std_terminal_color_red_m;

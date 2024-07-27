@@ -3,7 +3,7 @@
 #include <std_string.h>
 #include <std_atomic.h>
 
-#if std_enabled_m(xg_debug_simple_frame_test_m)
+#if xg_debug_enable_simple_frame_test_m
 
 #include "xg_vk_device.h"
 #include "xg_vk_swapchain.h"

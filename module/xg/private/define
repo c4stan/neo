@@ -23,19 +23,19 @@ xg_cmd_buffer_preallocated_resource_cmd_buffers_m   8
 xg_instance_enabled_runtime_layers_m        (xg_runtime_layer_bit_debug_m | xg_runtime_layer_bit_renderdoc_m)
 xg_instance_crash_on_validation_error_m     false
 
-xg_debug_events_log_m                       std_off_m
-xg_debug_flush_gpu_submissions_m            std_off_m
+xg_debug_enable_events_log_m                    0
+xg_debug_enable_flush_gpu_submissions_m         0
 # TODO move this to Vulkan backend?
-xg_debug_disable_semaphore_frame_sync_m     std_off_m
-xg_debug_simple_frame_test_m                std_off_m
-xg_debug_measure_present_time_m             std_off_m
-xg_debug_measure_acquire_time_m             std_off_m
-xg_debug_measure_workload_wait_time_m       std_off_m
+xg_debug_enable_disable_semaphore_frame_sync_m  0
+xg_debug_enable_simple_frame_test_m             0
+xg_debug_enable_measure_present_time_m          0
+xg_debug_enable_measure_acquire_time_m          0
+xg_debug_enable_measure_workload_wait_time_m    0
 
 ########## Vulkan Backend ##########
 
 # Resources containers
-xg_vk_max_devices_m                             4
+xg_vk_max_devices_m                             1
 xg_vk_max_swapchains_m                          128
 xg_vk_max_graphics_pipelines_m                  1024
 xg_vk_max_compute_pipelines_m                   128
@@ -58,18 +58,22 @@ xg_vk_max_allocations_m                         1024 * 4
 xg_vk_max_linear_allocators_m                   32
 
 # cmd buffer management
-xg_vk_cmd_buffer_max_cmd_allocators_m               16
 xg_vk_cmd_buffer_cmd_buffers_per_allocator_m        4
-xg_vk_cmd_buffer_max_desc_allocators_m              16
-
-xg_vk_cmd_buffer_max_framebuffers_per_workload_m    4
-xg_vk_cmd_buffer_max_fences_m                       16
-xg_vk_cmd_buffer_max_translates_per_submit_m        2
-
 xg_vk_cmd_buffer_max_execution_barriers_per_cmd_m   8
 xg_vk_cmd_buffer_max_memory_barriers_per_cmd_m      8
 xg_vk_cmd_buffer_max_buffer_barriers_per_cmd_m      16
 xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m     16
+
+xg_vk_workload_max_cmd_allocators_m                 16
+xg_vk_workload_cmd_buffers_per_allocator_m          4
+xg_vk_workload_max_desc_allocators_m                16
+xg_vk_workload_max_framebuffers_per_workload_m      4
+xg_vk_workload_max_fences_m                         16
+xg_vk_workload_max_translates_per_submit_m          2
+xg_vk_workload_max_execution_barriers_per_cmd_m     8
+xg_vk_workload_max_memory_barriers_per_cmd_m        8
+xg_vk_workload_max_buffer_barriers_per_cmd_m        16
+xg_vk_workload_max_texture_barriers_per_cmd_m       16
 
 # descriptor management
 xg_vk_max_sets_per_descriptor_pool_m                    1024*10
@@ -91,6 +95,4 @@ xg_vk_query_instance_layers_buffer_size_m       1024 * 4
 xg_vk_query_instance_extensions_buffer_size_m   1024 * 4
 xg_vk_query_max_device_displays_m               16
 
-xg_vk_enable_sync2_m                            std_on_m
-
-xg_vk_enable_raytracing                         std_off_m
+xg_vk_enable_sync2_m                            1

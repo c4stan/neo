@@ -14,6 +14,14 @@ layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform sampler
 
 layout ( location = 0 ) out vec4 out_color;
 
+// https://alextardif.com/TAA.html
+// https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
+// https://ziyadbarakat.wordpress.com/2020/07/28/temporal-anti-aliasing-step-by-step/
+// https://s3.amazonaws.com/arena-attachments/655504/c5c71c5507f0f8bf344252958254fb7d.pdf?1468341463
+// https://www.gamedev.net/forums/topic/714378-removing-jitter-when-rendering-velocity-texture-for-taa/
+// https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
+// https://bartwronski.com/2014/03/15/temporal-supersampling-and-antialiasing/
+
 vec4 clip_aabb ( vec4 color, float p, vec3 minimum, vec3 maximum ) {
     // note: only clips towards aabb center (but fast!)
     vec3 center  = 0.5 * ( maximum + minimum );
@@ -91,6 +99,7 @@ void main ( void ) {
 #if 0
     // reduces flickering on edges
     // TODO fix this, as it is it kills all AA
+    // https://community.arm.com/arm-community-blogs/b/graphics-gaming-and-vr-blog/posts/temporal-anti-aliasing
     float lum0 = rgb_to_luma ( color );
     float lum1 = rgb_to_luma ( history );
     float luma_diff = abs ( lum0 - lum1 ) / ( 0.000001 + max ( lum0, max ( lum1, rgb_to_luma ( color_max ) ) ) );

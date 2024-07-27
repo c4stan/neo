@@ -225,6 +225,13 @@ Vulkan
         Once a pool is ready it's possible to write timestamp values to it by calling vkCmdWriteTimestamp. Once the workload has been completed, it is possible to readback the
         written values by calling vkGetQueryPoolResults.
 
+    Raytrace
+        To be able to HW raytrace, vulkan requires to declare and build all geometry upfront into acceleration structure vulkan resources. There are 2 types of those, top (TLAS)
+        and bottom (BLAS) level. A TLAS represents a scene, or a portion of it, and a BLAS represents an individual 3D model. A TLAS contains a number of references to BLAS and
+        a transform matrix for each of those. A BLAS contains the actual geometry data.
+
+    
+
 xg_vk
     Command buffers
         User level command buffers are not Vulkan cmd buffers -- commands are recorded on cpu buffers and then processed, before being submitted to Vulkan. XG has ownership of
@@ -276,7 +283,7 @@ xg_vk
 
 // ----------------------------
 
-#if std_enabled_m(xg_debug_simple_frame_test_m)
+#if xg_debug_enable_simple_frame_test_m
     #include <wm.h>
     void xg_debug_simple_frame ( xg_device_h device_handle, wm_window_h window_handle );
 #endif

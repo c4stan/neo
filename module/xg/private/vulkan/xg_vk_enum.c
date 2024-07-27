@@ -630,6 +630,16 @@ VkImageAspectFlags xg_texture_flags_to_vk_aspect ( xg_texture_flag_bit_e flags )
     return result;
 }
 
+VkGeometryInstanceFlagsKHR xg_raytrace_instance_flags_to_vk ( xg_raytrace_instance_flag_bit_e flags ) {
+    VkGeometryInstanceFlagsKHR result = 0;
+
+    if ( flags & xg_raytrace_instance_flag_bit_disable_face_cull_m ) {
+        result |= VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    }
+
+    return result;
+}
+
 xg_memory_flag_bit_e xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags ) {
     xg_memory_flag_bit_e result = 0;
 

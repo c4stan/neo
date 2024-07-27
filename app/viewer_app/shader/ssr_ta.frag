@@ -94,6 +94,7 @@ void main ( void ) {
     float prev_depth = sample_catmull_rom ( tex_prev_depth, sampler_point, prev_screen.xy, frame_cbuffer.resolution_f32 ).x;
 #endif
 
+    // Object id rejection
     uvec4 object_id_sample = texture ( usampler2D ( tex_id, sampler_point ), screen_uv.xy );
     uvec4 prev_object_id_sample = texture ( usampler2D ( tex_prev_id, sampler_point ), prev_screen.xy );
     uint object_id = object_id_sample.x;//floatBitsToUint ( object_id_sample.x );

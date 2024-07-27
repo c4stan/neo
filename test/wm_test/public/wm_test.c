@@ -51,7 +51,7 @@ static void wm_test_run ( void ) {
     wm_window_params_t params = { .name = "wm_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &params );
 
-#if std_enabled_m(wm_input_state_m)
+#if wm_enable_input_state_m
     bool first_print = true;
 #endif
 
@@ -64,7 +64,7 @@ static void wm_test_run ( void ) {
             break;
         }
 
-#if std_enabled_m(wm_input_state_m)
+#if wm_enable_input_state_m
         wm->debug_print_window_input_state ( window, !first_print );
         first_print = false;
 #endif

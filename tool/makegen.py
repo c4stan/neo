@@ -15,10 +15,11 @@ if platform.system() == 'Windows':
 # -----------------------------------------------------------------------------
 
 # -- pipe
-BUILD_CHANGES_OUTPUT_PIPE_NAME = 'std_module_updates_pipe'
+BUILD_CHANGES_OUTPUT_PIPE_NAME = 'std_module_update_pipe'
 
 # -- WINNT target version
-WINNT_VERSION = '0x0602'
+# https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt
+WINNT_VERSION = '0x0A00' # win10
 
 # -- Warnings
 CORE_WARNINGS_FLAGS = (
@@ -665,10 +666,10 @@ class Project:
         def_cmd += ' -Dstd_solution_module_name_m=' + solution_name
         def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/cli.py\\"'
         if self.config == CONFIG_DEBUG:
-            def_cmd += ' -Dstd_debug_m=std_on_m'
+            def_cmd += ' -Dstd_build_debug_m=1'
             def_cmd += ' -Dstd_submodules_path_m=\\"submodules/debug/\\"'
         elif self.config == CONFIG_RELEASE:
-            def_cmd += ' -Dstd_debug_m=std_off_m'
+            def_cmd += ' -Dstd_build_debug_m=0'
             def_cmd += ' -Dstd_submodules_path_m=\\"submodules/release/\\"'
         def_cmd += ' -Dstd_rootpath_m=\\"' + normpath(self.index.root_path) + '/\\"'
         stack_size = '1000000'
@@ -752,8 +753,8 @@ class Project:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
                     main_target.cmd += '\t@' + compiler_name + ' ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
 
-        # TODO when is this not supposed to happen? remove the if line completely?
-        if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP or self.output == OUTPUT_LIB:
+        # When target is LIB, ignore the other .lib dependency. It will get linked in by the final target (DLL or EXE) that also includes this lib
+        if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP: # or self.output == OUTPUT_LIB:
             if platform.system() == 'Windows':
                 for lib in self.external_libs:
                     main_target.cmd += ' -l' + lib

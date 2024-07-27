@@ -226,7 +226,7 @@ static void xg_test2_run ( void ) {
     std_module_unload_m ( wm_module_name_m );
 }
 
-#if std_enabled_m(xg_debug_simple_frame_test_m)
+#if xg_debug_enable_simple_frame_test_m
 static void xg_test1_run ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
     wm_window_params_t window_params;

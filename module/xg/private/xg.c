@@ -5,13 +5,12 @@
 #include "xg_resource_cmd_buffer.h"
 #include "xg_debug_capture.h"
 
-#if std_enabled_m(xg_backend_vulkan_m)
+#if xg_backend_vulkan_m
     #include "vulkan/xg_vk.h"
     #include "vulkan/xg_vk_device.h"
     #include "vulkan/xg_vk_swapchain.h"
     #include "vulkan/xg_vk_texture.h"
     #include "vulkan/xg_vk_buffer.h"
-    #include "vulkan/xg_vk_cmd_buffer.h"
     #include "vulkan/xg_vk_event.h"
     #include "vulkan/xg_vk_pipeline.h"
     #include "vulkan/xg_vk_allocator.h"
@@ -48,7 +47,7 @@ static void xg_api_init ( xg_i* xg ) {
     //xg->create_cmd_buffers = xg_cmd_buffer_open_n;
     //xg.close_cmd_buffers = xg_cmd_buffer_close;
     //xg.discard_cmd_buffers = xg_cmd_buffer_discard;
-    xg->submit_workload = xg_vk_cmd_buffer_submit;
+    xg->submit_workload = xg_workload_submit;
     xg->is_workload_complete = xg_workload_is_complete;
     xg->write_workload_uniform = xg_workload_write_uniform;
     // Command Buffer
@@ -92,7 +91,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->get_default_allocator = xg_allocator_default;
     xg->get_default_allocator_info = xg_vk_allocator_get_info;
 
-#if std_enabled_m(xg_debug_simple_frame_test_m)
+#if xg_debug_enable_simple_frame_test_m
     xg->debug_simple_frame = xg_debug_simple_frame;
 #endif
 }
@@ -105,7 +104,6 @@ void* xg_load ( void* std_runtime ) {
     xg_vk_instance_load ( &state->vk.instance, xg_instance_enabled_runtime_layers_m );
     xg_vk_device_load ( &state->vk.device );
     xg_vk_allocator_load ( &state->vk.allocator );
-    xg_vk_cmd_buffer_load ( &state->vk.cmd_buffer );
     xg_vk_event_load ( &state->vk.event );
     xg_vk_texture_load ( &state->vk.texture );
     xg_vk_buffer_load ( &state->vk.buffer );
@@ -132,7 +130,6 @@ void xg_reload ( void* std_runtime, void* api ) {
     xg_vk_instance_reload ( &state->vk.instance );
     xg_vk_device_reload ( &state->vk.device );
     xg_vk_allocator_reload ( &state->vk.allocator );
-    xg_vk_cmd_buffer_reload ( &state->vk.cmd_buffer );
     xg_vk_event_reload ( &state->vk.event );
     xg_vk_texture_reload ( &state->vk.texture );
     xg_vk_buffer_reload ( &state->vk.buffer );
@@ -166,7 +163,7 @@ void xg_unload ( void ) {
     xg_vk_buffer_unload();
     xg_vk_texture_unload();
     xg_vk_event_unload();
-    xg_vk_cmd_buffer_unload();
+    //xg_vk_cmd_buffer_unload();
     xg_vk_allocator_unload();
     xg_vk_device_unload();
     xg_vk_instance_unload();

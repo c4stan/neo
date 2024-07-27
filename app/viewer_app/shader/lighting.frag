@@ -43,7 +43,12 @@ void main ( void ) {
     float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
 
     vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
-    view_geo_pos += view_normal * 0.01; // Normal Offset Shadows, helps with acne
+    // Normal Offset shadows, helps with acne
+    // https://digitalrune.github.io/DigitalRune-Documentation/html/3f4d959e-9c98-4a97-8d85-7a73c26145d7.htm
+    // https://mynameismjp.wordpress.com/2013/09/10/shadow-maps/
+    // https://c0de517e.blogspot.com/2011/05/shadowmap-bias-notes.html
+    // https://ndotl.wordpress.com/2014/12/19/notes-on-shadow-bias/
+    view_geo_pos += view_normal * 0.01;
     vec4 world_geo_pos = view_cbuffer.world_from_view * vec4 ( view_geo_pos, 1.f );
 
     vec3 irradiance = vec3 ( 0, 0, 0 );

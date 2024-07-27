@@ -689,9 +689,7 @@ static void test_queue ( void ) {
     {
         std_log_info_m ( "testing std_queue..." );
         size_t size = 16;
-        void* buffer = std_virtual_heap_alloc ( size, 16 );
-
-        std_queue_local_t queue = std_queue_local ( buffer, size );
+        std_queue_local_t queue = std_queue_local_create ( size );
         //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
         int i = 5;
@@ -741,15 +739,13 @@ static void test_queue ( void ) {
         //std_assert_m ( std_queue_local_size ( &queue ) == size );
         std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
 
-        std_virtual_heap_free ( buffer );
+        std_queue_local_destroy ( &queue );
     }
 
     // Shared SPSC queue
     {
         size_t size = 1024ull * 4 * 1024 * 16;
-        void* buffer = std_virtual_heap_alloc ( size, 16 );
-
-        std_queue_shared_t queue = std_queue_shared ( buffer, size );
+        std_queue_shared_t queue = std_queue_shared_create ( size );
 
         test_queue_spsc_thread_args_t args;
         args.queue = &queue;
@@ -773,8 +769,7 @@ static void test_queue ( void ) {
         result = std_thread_join ( thread );
         std_assert_m ( result );
 
-        result = std_virtual_heap_free ( buffer );
-        std_assert_m ( result );
+        std_queue_shared_destroy ( &queue );
     }
 
     // Shared SPMC and MPSC queues
@@ -788,8 +783,7 @@ static void test_queue ( void ) {
         // SPMC
         {
             size_t queue_size = std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) );
-            void* queue_buffer = std_virtual_heap_alloc ( queue_size, 16 );
-            std_queue_shared_t queue = std_queue_shared ( queue_buffer, queue_size );
+            std_queue_shared_t queue = std_queue_shared_create ( queue_size );
 
             test_queue_item_t item;
 
@@ -814,15 +808,14 @@ static void test_queue ( void ) {
                 bool result = std_thread_join ( threads[i] );
                 std_assert_m ( result );
             }
-
-            std_virtual_heap_free ( queue_buffer );
+            
+            std_queue_shared_destroy ( &queue );
         }
 
         // MPSC
         {
             size_t queue_size = std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) );
-            void* queue_buffer = std_virtual_heap_alloc ( queue_size, 16 );
-            std_queue_shared_t queue = std_queue_shared ( queue_buffer, queue_size );
+            std_queue_shared_t queue = std_queue_shared_create ( queue_size );
             test_queue_item_t* merge_items = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
 
             test_queue_thread_args_t args[THREAD_COUNT];
@@ -860,7 +853,7 @@ static void test_queue ( void ) {
                 std_assert_m ( item->c == i );
             }
 
-            std_virtual_heap_free ( queue_buffer );
+            std_queue_shared_destroy ( &queue );
             std_virtual_heap_free ( merge_items );
         }
 
@@ -881,11 +874,10 @@ static void test_queue ( void ) {
         // Generic size MPMC
         {
             size_t queue_size = std_pow2_round_up ( n * sizeof ( test_queue_item_t ) + n * sizeof ( uint64_t ) );
-            void* queue_memory = std_virtual_heap_alloc ( queue_size, 16 );
             test_queue_item_t* read_memory = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
             test_queue_item_t* write_memory = std_virtual_heap_alloc_array_m ( test_queue_item_t, n );
 
-            std_queue_shared_t queue = std_queue_shared ( queue_memory, queue_size );
+            std_queue_shared_t queue = std_queue_shared_create ( queue_size );
 
             for ( size_t i = 0; i < n; ++i ) {
                 test_queue_item_t* item = &read_memory[i];
@@ -933,7 +925,7 @@ static void test_queue ( void ) {
                 std_assert_m ( item->c == i );
             }
 
-            std_virtual_heap_free ( queue_memory );
+            std_queue_shared_destroy ( &queue );
             std_virtual_heap_free ( read_memory );
             std_virtual_heap_free ( write_memory );
         }
@@ -941,11 +933,10 @@ static void test_queue ( void ) {
         // u64 specialized MPMC
         {
             size_t queue_size = std_pow2_round_up ( n * sizeof ( uint64_t ) );
-            void* queue_memory = std_virtual_heap_alloc ( queue_size, 16 );
             uint64_t* read_memory = std_virtual_heap_alloc_array_m ( uint64_t, n );
             uint64_t* write_memory = std_virtual_heap_alloc_array_m ( uint64_t, n );
 
-            std_queue_shared_t queue = std_queue_mpmc_64 ( queue_memory, queue_size );
+            std_queue_shared_t queue = std_queue_mpmc_64_create ( queue_size );
 
             for ( size_t i = 0; i < n; ++i ) {
                 uint64_t* item = &read_memory[i];
@@ -993,7 +984,7 @@ static void test_queue ( void ) {
                 std_assert_m ( *item == i );
             }
 
-            std_virtual_heap_free ( queue_memory );
+            std_queue_shared_destroy ( &queue );
             std_virtual_heap_free ( read_memory );
             std_virtual_heap_free ( write_memory );
         }
@@ -1001,11 +992,10 @@ static void test_queue ( void ) {
         // u32 specialized MPMC
         {
             size_t queue_size = std_pow2_round_up ( sizeof ( uint32_t ) * n );
-            void* queue_memory = std_virtual_heap_alloc ( queue_size, 16 );
             uint32_t* read_memory = std_virtual_heap_alloc_array_m ( uint32_t, n );
             uint32_t* write_memory = std_virtual_heap_alloc_array_m ( uint32_t, n );
 
-            std_queue_shared_t queue = std_queue_mpmc_32 ( queue_memory, queue_size );
+            std_queue_shared_t queue = std_queue_mpmc_32_create ( queue_size );
 
             for ( size_t i = 0; i < n; ++i ) {
                 uint32_t* item = &read_memory[i];
@@ -1053,7 +1043,7 @@ static void test_queue ( void ) {
                 std_assert_m ( *item == i );
             }
 
-            std_virtual_heap_free ( queue_memory );
+            std_queue_shared_destroy ( &queue );
             std_virtual_heap_free ( read_memory );
             std_virtual_heap_free ( write_memory );
         }

@@ -10,7 +10,7 @@
 typedef struct {
     std_app_i api;
     bool boot;
-#if std_enabled_m(wm_input_state_m)
+#if wm_enable_input_state_m
     bool first_print;
 #endif
     wm_window_h window;
@@ -62,7 +62,7 @@ static std_app_state_e std_app_test_tick ( void ) {
             return std_app_state_exit_m;
         }
 
-#if std_enabled_m(wm_input_state_m)
+#if wm_enable_input_state_m
         //wm->debug_print_window_input_state ( m_state->window, !m_state->first_print );
         m_state->first_print = false;
 #endif

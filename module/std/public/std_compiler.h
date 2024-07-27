@@ -66,8 +66,6 @@
     #define std_likely_m( x )                                     __builtin_expect ( (x), 1 )
     #define std_unlikely_m( x )                                   __builtin_expect ( (x), 0 )
     #define std_unused_m( x )                                     ( void ) x
-    // TODO remove this?
-    #define std_enabled_m( x )                                    x == std_on_m
     #define std_on_m                                              1
     #define std_off_m                                             0
     #define std_pp_string_m( x )                                  #x
@@ -135,8 +133,6 @@
     #define std_likely_m( x )                                     __builtin_expect ( (x), 1 )
     #define std_unlikely_m( x )                                   __builtin_expect ( (x), 0 )
     #define std_unused_m( x )                                     ( void ) x
-    // TODO remove this?
-    #define std_enabled_m( x )                                    x == std_on_m
     #define std_on_m                                              1
     #define std_off_m                                             0
     #define std_pp_string_m( x )                                  #x

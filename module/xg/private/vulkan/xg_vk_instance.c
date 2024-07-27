@@ -105,10 +105,17 @@ static void xg_vk_instance_ext_api_init ( void ) {
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_begin_debug_region, "vkCmdBeginDebugUtilsLabelEXT" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_end_debug_region, "vkCmdEndDebugUtilsLabelEXT" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.set_debug_name, "vkSetDebugUtilsObjectNameEXT" );
-#if std_enabled_m(xg_vk_enable_sync2_m)
+#if xg_vk_enable_sync2_m
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_sync2_pipeline_barrier, "vkCmdPipelineBarrier2KHR" );
 #endif
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.set_debug_callback, "vkCreateDebugUtilsMessengerEXT" );
+
+#if xg_enable_raytracing_m
+    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_build_sizes, "vkGetAccelerationStructureBuildSizesKHR" );
+    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureKHR" );
+    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.build_acceleration_structures, "vkBuildAccelerationStructuresKHR" );
+    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_device_address, "vkGetAccelerationStructureDeviceAddressKHR" );
+#endif
 
 #undef xg_vk_instance_ext_init_pfn_m
 }
@@ -185,13 +192,13 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
     };
 
     const char* debug_layers[] = {      // Additional debug info/warning/error reporting
-#if std_enabled_m(std_debug_m)
+#if std_build_debug_m
         "VK_LAYER_KHRONOS_validation",
 #endif
     };
 
     const char* renderdoc_layers[] = {  // RenderDoc support
-#if !std_enabled_m(xg_vk_enable_raytracing)
+#if !xg_enable_raytracing_m
         // RenderDoc layer kills RT device extensions...
         //"VK_LAYER_RENDERDOC_Capture"
         //"VK_LAYER_NV_nsight"

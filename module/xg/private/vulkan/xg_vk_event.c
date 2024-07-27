@@ -88,7 +88,7 @@ xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
     VkResult result = vkCreateSemaphore ( device->vk_handle, &semaphore_create_info, NULL, &event->vk_semaphore );
     std_verify_m ( result == VK_SUCCESS );
 
-#if std_enabled_m(xg_debug_events_log_m)
+#if xg_debug_enable_events_log_m
     std_log_info_m ( "[XG-VK-EVENT] Create " std_fmt_u64_m, event->vk_semaphore );
 #endif
 
@@ -105,7 +105,7 @@ void xg_gpu_queue_event_destroy ( xg_gpu_queue_event_h event_handle ) {
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
     const xg_vk_device_t* device = xg_vk_device_get ( event->device );
 
-#if std_enabled_m(xg_debug_events_log_m)
+#if xg_debug_enable_events_log_m
     std_log_info_m ( "[XG-VK-EVENT] Destroy " std_fmt_u64_m, event->vk_semaphore );
 #endif
 
@@ -121,7 +121,7 @@ const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_gpu_queue_event_h 
 }
 
 void xg_gpu_queue_event_log_wait ( xg_gpu_queue_event_h event_handle ) {
-#if std_enabled_m(xg_debug_events_log_m)
+#if xg_debug_enable_events_log_m
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
     std_log_info_m ( "[XG-VK-EVENT] Wait " std_fmt_u64_m, event->vk_semaphore );
 #else
@@ -130,7 +130,7 @@ void xg_gpu_queue_event_log_wait ( xg_gpu_queue_event_h event_handle ) {
 }
 
 void xg_gpu_queue_event_log_signal ( xg_gpu_queue_event_h event_handle ) {
-#if std_enabled_m(xg_debug_events_log_m)
+#if xg_debug_enable_events_log_m
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
     std_log_info_m ( "[XG-VK-EVENT] Signal " std_fmt_u64_m, event->vk_semaphore );
 #else

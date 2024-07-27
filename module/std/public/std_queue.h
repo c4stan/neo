@@ -5,16 +5,12 @@
 #include <std_log.h>
 #include <std_byte.h>
 
-/*
-    Is it better to return a pointer on push and let the user do the memcpy?
-        would not be doable in the case of a wrap-around queue
-        would allow to use the same struct/api for queue and circular pool
-*/
-
-// TODO do the virtual mem trick where 2 adjacent logical pages are mapped to the same phyisical page, to avoid having to manually wrap-around the memcpy at the end
+// https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
+// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples
 
 typedef struct {
     char* base;
+    char* alias;
     size_t top;
     size_t bot;
     size_t mask;        // Equals to (size - 1). Size must be pow2.
@@ -22,7 +18,9 @@ typedef struct {
 
 // TODO base the implementation on std_ring_t
 // The implementation wraps the stores when the queue buffer wraps around. In that case alignment is not guaranteed.
-std_queue_local_t   std_queue_local             ( void* base, size_t size );
+//std_queue_local_t   std_queue_local             ( void* base, size_t size );
+std_queue_local_t   std_queue_local_create      ( size_t size );
+void                std_queue_local_destroy     ( std_queue_local_t* queue );
 void                std_queue_local_clear       ( std_queue_local_t* queue );
 size_t              std_queue_local_size        ( const std_queue_local_t* queue );
 size_t              std_queue_local_used_size   ( const std_queue_local_t* queue );
@@ -62,21 +60,24 @@ void std_ring_pop ( std_ring_t* ring, uint64_t count );
 // ----------
 
 std_static_align_m ( std_l1d_size_m ) typedef struct {
-    char* base;
-    char  _p0[std_l1d_size_m - sizeof ( char* )];
+    char*    base;
+    char*   alias;
+    char    _p0[std_l1d_size_m - sizeof ( char* ) - sizeof ( char* )];
     size_t  top;
-    char  _p1[std_l1d_size_m - sizeof ( size_t )];
+    char    _p1[std_l1d_size_m - sizeof ( size_t )];
     size_t  bot;
-    char  _p2[std_l1d_size_m - sizeof ( size_t )];
+    char    _p2[std_l1d_size_m - sizeof ( size_t )];
     size_t  mask;       // Equals to (size - 1). Size must be pow2.
-    char  _p3[std_l1d_size_m - sizeof ( size_t )];
+    char    _p3[std_l1d_size_m - sizeof ( size_t )];
 } std_queue_shared_t;
 
 /*
     https://fastcompression.blogspot.com/2015/08/accessing-unaligned-memory.html
 */
 
-std_queue_shared_t  std_queue_shared            ( void* base, size_t size );
+//std_queue_shared_t  std_queue_shared            ( void* base, size_t size );
+std_queue_shared_t  std_queue_shared_create     ( size_t size );
+void                std_queue_shared_destroy    ( std_queue_shared_t* queue );
 void                std_queue_shared_clear      ( std_queue_shared_t* queue );
 size_t              std_queue_shared_size       ( std_queue_shared_t* queue );
 size_t              std_queue_shared_used_size  ( std_queue_shared_t* queue );
@@ -121,12 +122,14 @@ size_t              std_queue_mpmc_pop_move     ( std_queue_shared_t* queue, voi
 #define             std_queue_shared_32_reserved_value_m 0xffffffff
 #define             std_queue_shared_64_reserved_value_m 0xffffffffffffffff
 
-std_queue_shared_t  std_queue_mpmc_32               ( void* base, size_t size );
+//std_queue_shared_t  std_queue_mpmc_32               ( void* base, size_t size );
+std_queue_shared_t  std_queue_mpmc_32_create        ( size_t size );
 bool                std_queue_mpmc_push_32          ( std_queue_shared_t* queue, const void* item );
 bool                std_queue_mpmc_pop_discard_32   ( std_queue_shared_t* queue );
 bool                std_queue_mpmc_pop_move_32      ( std_queue_shared_t* queue, void* dest );
 
-std_queue_shared_t  std_queue_mpmc_64               ( void* base, size_t size );
+//std_queue_shared_t  std_queue_mpmc_64               ( void* base, size_t size );
+std_queue_shared_t  std_queue_mpmc_64_create        ( size_t size );
 bool                std_queue_mpmc_push_64          ( std_queue_shared_t* queue, const void* item );
 bool                std_queue_mpmc_pop_discard_64   ( std_queue_shared_t* queue );
 bool                std_queue_mpmc_pop_move_64      ( std_queue_shared_t* queue, void* dest );

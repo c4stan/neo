@@ -12,12 +12,12 @@ static void wm_api_init ( wm_i* wm ) {
     wm->is_window_alive = mw_window_is_alive;
     wm->update_window = wm_window_update;
 
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
     wm->add_window_event_handler = wm_window_add_event_handler;
     wm->remove_window_event_handler = wm_window_remove_event_handler;
 #endif
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     wm->get_window_input_state = wm_window_get_input_state;
     wm->debug_print_window_input_state = wm_window_debug_print_input_state;
 #endif

@@ -11,7 +11,7 @@ typedef struct wm_window_t {
     struct wm_window_t* next;
     struct wm_window_t* prev;
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     uint8_t pending_wheel_up;
     uint8_t pending_wheel_down;
     wm_input_state_t input_state;
@@ -19,7 +19,7 @@ typedef struct wm_window_t {
     uint32_t cursor_y;
 #endif
 
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
     wm_input_event_handler_t input_handlers[wm_max_input_event_handlers_m];
     size_t handlers_count;
 #endif
@@ -58,12 +58,12 @@ bool wm_window_destroy ( wm_window_h window );
 bool wm_window_get_info ( wm_window_h window, wm_window_info_t* info );
 void wm_window_update ( wm_window_h window );
 
-#if std_enabled_m ( wm_input_events_m )
+#if wm_enable_input_events_m
     bool wm_window_add_event_handler ( wm_window_h window, const wm_input_event_handler_t* handler );
     bool wm_window_remove_event_handler ( wm_window_h window, const wm_input_event_handler_t* handler );
 #endif
 
-#if std_enabled_m ( wm_input_state_m )
+#if wm_enable_input_state_m
     bool wm_window_get_input_state ( wm_window_h window, wm_input_state_t* state );
     void wm_window_debug_print_input_state ( wm_window_h window, bool overwrite_console );
 #endif

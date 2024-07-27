@@ -1186,14 +1186,17 @@ typedef enum {
 */
 
 typedef enum {
-    xg_buffer_usage_bit_copy_source_m   = 1 << 0,
-    xg_buffer_usage_bit_copy_dest_m     = 1 << 1,
-    xg_buffer_usage_bit_texel_uniform_m = 1 << 2,
-    xg_buffer_usage_bit_texel_storage_m = 1 << 3,
-    xg_buffer_usage_bit_uniform_m       = 1 << 4,
-    xg_buffer_usage_bit_storage_m       = 1 << 5,
-    xg_buffer_usage_bit_index_buffer_m  = 1 << 6,
-    xg_buffer_usage_bit_vertex_buffer_m = 1 << 7,
+    xg_buffer_usage_bit_copy_source_m       = 1 << 0,
+    xg_buffer_usage_bit_copy_dest_m         = 1 << 1,
+    xg_buffer_usage_bit_texel_uniform_m     = 1 << 2,
+    xg_buffer_usage_bit_texel_storage_m     = 1 << 3,
+    xg_buffer_usage_bit_uniform_m           = 1 << 4,
+    xg_buffer_usage_bit_storage_m           = 1 << 5,
+    xg_buffer_usage_bit_index_buffer_m      = 1 << 6,
+    xg_buffer_usage_bit_vertex_buffer_m     = 1 << 7,
+    xg_buffer_usage_bit_raytrace_uniform_m  = 1 << 8,
+    xg_buffer_usage_bit_raytrace_storage_m  = 1 << 8,
+    xg_buffer_usage_bit_device_addressed_m  = 1 << 9,
 } xg_buffer_usage_bit_e;
 
 typedef enum {
@@ -1843,7 +1846,6 @@ typedef enum {
 )
 
 typedef struct {
-    xg_device_h device;
     xg_buffer_h vertex_buffer;
     uint64_t vertex_buffer_offset;
     xg_format_e vertex_format;
@@ -1858,21 +1860,40 @@ typedef struct {
 } xg_raytrace_geometry_data_t;
 
 typedef struct {
+    xg_device_h device;
     xg_raytrace_geometry_data_t* geometries;
     uint32_t geometries_count;
 } xg_raytrace_geometry_params_t;
 
+// Row major storage
+// r0 = m[0] = e00 e01 e02 e03
+// r1 = m[1] = e04 e05 e06 e07
+// r2 = m[2] = e08 e09 e10 e11
+typedef union {
+    float f[12];
+    float m[3][4];
+    struct {
+        float r0[4];
+        float r1[4];
+        float r2[4];
+    };
+} xg_matrix_3x4_t;
+
+typedef enum {
+    xg_raytrace_instance_flag_bit_disable_face_cull_m = 1 << 0,
+} xg_raytrace_instance_flag_bit_e;
+
 typedef struct {
     xg_raytrace_geometry_h geometry;
-    // one transform per instance
-    xg_buffer_h transform_buffer;
-    uint64_t transform_buffer_offset;
-    uint32_t transform_count;
+    xg_matrix_3x4_t transform;
+    uint8_t visibility_mask;
+    xg_raytrace_instance_flag_bit_e flags;
 } xg_raytrace_geometry_instance_t;
 
 typedef struct {
-    xg_raytrace_geometry_instance_t* instances;
-    uint32_t instances_count;
+    xg_device_h device;
+    xg_raytrace_geometry_instance_t* instance_array;
+    uint32_t instance_count;
 } xg_raytrace_world_params_t;
 
 // XG API
@@ -2011,7 +2032,7 @@ typedef struct {
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
     xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size );
 
-#if std_enabled_m(xg_debug_simple_frame_test_m)
+#if xg_debug_enable_simple_frame_test_m
     void                    ( *debug_simple_frame )                 ( xg_device_h device, wm_window_h window );
 #endif
 } xg_i;

@@ -33,8 +33,11 @@ VkSamplerMipmapMode         xg_sampler_mipmap_filter_to_vk ( xg_sampler_filter_e
 VkSamplerAddressMode        xg_sampler_address_mode_to_vk ( xg_sampler_address_mode_e address_mode );
 VkImageAspectFlags          xg_texture_aspect_to_vk ( xg_texture_aspect_e aspect );
 VkImageAspectFlags          xg_texture_flags_to_vk_aspect ( xg_texture_flag_bit_e flags );
+VkGeometryInstanceFlagsKHR  xg_raytrace_instance_flags_to_vk ( xg_raytrace_instance_flag_bit_e flags );
 
 xg_format_e                 xg_format_from_vk ( VkFormat format );
 xg_color_space_e            xg_color_space_from_vk ( VkColorSpaceKHR colorspace );
 xg_present_mode_e           xg_present_mode_from_vk ( VkPresentModeKHR mode );
-xg_memory_flag_bit_e           xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags );
+xg_memory_flag_bit_e        xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags );
+
+

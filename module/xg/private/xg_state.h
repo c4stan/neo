@@ -6,7 +6,7 @@
 #include "xg_resource_cmd_buffer.h"
 #include "xg_debug_capture.h"
 
-#if std_enabled_m(xg_backend_vulkan_m)
+#if xg_enable_backend_vulkan_m
     #include "vulkan/xg_vk_state.h"
 #endif
 
@@ -17,7 +17,7 @@ typedef struct {
     xg_cmd_buffer_state_t cmd_buffer;
     xg_resource_cmd_buffer_state_t resource_cmd_buffer;
     xg_debug_capture_state_t debug_capture;
-#if std_enabled_m(xg_backend_vulkan_m)
+#if xg_enable_backend_vulkan_m
     xg_vk_state_t vk;
 #endif
 } xg_state_t;
