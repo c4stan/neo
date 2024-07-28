@@ -98,6 +98,7 @@ typedef struct {
 typedef struct {
     xg_vk_workload_t* workload_array;
     xg_vk_workload_t* workload_freelist;
+    // TODO remove, useless
     uint64_t* workload_bitset;
     std_mutex_t workloads_mutex;
     uint64_t workloads_uid;

@@ -720,7 +720,11 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 #if xg_enable_raytracing_m
         "VK_KHR_acceleration_structure",
         "VK_KHR_ray_tracing_pipeline",
-        //"VK_KHR_ray_query",
+#if xg_vk_enable_nv_raytracing_ext_m
+        "VK_NV_ray_tracing",
+#else
+        "VK_KHR_ray_query",
+#endif
         "VK_KHR_deferred_host_operations",
 #endif
     };
@@ -806,6 +810,9 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 }
 
 bool xg_vk_device_deactivate ( xg_device_h device_handle ) {
+    xg_vk_workload_deactivate_device ( device_handle );
+    xg_vk_pipeline_deactivate_device ( device_handle );
+
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );
 
     xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];

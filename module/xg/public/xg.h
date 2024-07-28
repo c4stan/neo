@@ -499,9 +499,10 @@ typedef struct {
     .device = xg_null_handle_m \
 }
 
-// TODO does alignment here make sense?
+// TODO remove completely, just have an alloc/free main API that takes in an enum for the mem type,
+// similar to get_default_allocator but does the alloc/free directly. can then store the mem type into the handle
+// Storing function pointers like this causes crashes when hot reloading the xg dll
 typedef xg_alloc_t ( xg_alloc_f ) ( void* allocator, xg_device_h device, size_t size, size_t alignment );
-//typedef xg_alloc_t ( xg_realloc_f ) ( void* allocator, xg_device_h device, std_memory_h mem, size_t new_size, size_t alignment );
 typedef void ( xg_free_f ) ( void* allocator, xg_memory_h mem );
 
 typedef struct {
@@ -520,6 +521,14 @@ typedef enum {
     xg_memory_type_readback_m,
     xg_memory_type_count_m
 } xg_memory_type_e;
+
+typedef struct {
+    xg_device_h device;
+    size_t size;
+    size_t align;
+    xg_memory_type_e type;
+    char debug_name[xg_debug_name_size_m];
+} xg_alloc_params_t;
 
 typedef struct {
     uint64_t allocated_size;
@@ -1923,6 +1932,7 @@ typedef struct {
     uint32_t                ( *acquire_next_swapchain_texture )     ( xg_swapchain_h swapchain, xg_workload_h workload );
     xg_texture_h            ( *get_swapchain_texture )              ( xg_swapchain_h swapchain );
     void                    ( *present_swapchain )                  ( xg_swapchain_h swapchain, xg_workload_h workload );
+    void                    ( *destroy_swapchain )                  ( xg_swapchain_h swapchain );
 
     // Workload
     xg_workload_h           ( *create_workload )                    ( xg_device_h device );

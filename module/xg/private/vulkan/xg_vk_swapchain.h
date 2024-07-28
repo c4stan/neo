@@ -37,6 +37,7 @@ typedef struct {
 typedef struct {
     xg_vk_swapchain_t* swapchains_array;
     xg_vk_swapchain_t* swapchains_freelist;
+    uint64_t* swapchain_bitset;
     std_mutex_t swapchains_mutex;
 } xg_vk_swapchain_state_t;
 
@@ -56,3 +57,5 @@ bool            xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapcha
 uint32_t        xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain, xg_workload_h workload );
 xg_texture_h    xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain );
 void            xg_vk_swapchain_present ( xg_swapchain_h swapchain, xg_workload_h workload );
+
+void xg_vk_swapchain_destroy ( xg_swapchain_h swapchain );

@@ -98,7 +98,7 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
     if ( ( 1 << msg->level ) & ( std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         fflush ( stdout );
         if ( std_log_state->is_debugger_attached ) {
-            //std_debug_break_m();
+            std_debug_break_m();
         }
     }
 

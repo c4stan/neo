@@ -1267,7 +1267,7 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
         std_allocator_tlsf_add_to_freelist ( heap, header, size );
 
-        std_allocator_tlsf_print_state ( heap );
+        //std_allocator_tlsf_print_state ( heap );
 
         std_noop_m;
     }

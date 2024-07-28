@@ -51,6 +51,7 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
 
     xg_vk_workload_device_context_t* context = &xg_vk_workload_state->device_contexts[device_idx];
     std_assert_m ( !context->is_active );
+    context->is_active = true;
 
     context->device_handle = device_handle;
 
@@ -61,7 +62,7 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
 
     for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
         context->submit_contexts[i].is_submitted = false;
-        context->submit_contexts[i].workload = UINT64_MAX;
+        context->submit_contexts[i].workload = xg_null_handle_m;
 
         // cmd pool
         {
@@ -128,9 +129,33 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     }
 }
 
+static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context, uint64_t timeout );
+
+static void xg_vk_workload_deactivate_device_context ( xg_vk_workload_device_context_t* device_context ) {
+    const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
+
+    for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
+        xg_vk_workload_submit_context_t* submit_context = &device_context->submit_contexts[i];
+
+        //if ( submit_context->is_submitted ) {
+        //    const xg_vk_workload_t* workload = xg_vk_workload_get ( submit_context->workload );
+        //    const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
+        //    vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
+        //}
+
+        // Call this to process on workload complete events like resource destruction
+        //xg_vk_workload_recycle_submission_contexts ( device_context, UINT64_MAX );
+
+        vkDestroyCommandPool ( device->vk_handle, submit_context->cmd_allocator.vk_cmd_pool, NULL );
+        vkDestroyDescriptorPool ( device->vk_handle, submit_context->desc_allocator.vk_desc_pool, NULL );
+    }
+}
+
 void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
-    std_unused_m ( device_handle );
-    // TODO
+    uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
+    xg_vk_workload_device_context_t* context = &xg_vk_workload_state->device_contexts[device_idx];
+    std_assert_m ( context->is_active );
+    xg_vk_workload_deactivate_device_context ( context );
 }
 
 void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
@@ -202,6 +227,7 @@ void xg_vk_workload_unload ( void ) {
         std_mutex_deinit ( &xg_vk_workload_state->workload_array[i].mutex );
     }
 
+#if 0
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, xg_vk_workload_state->workload_bitset, idx, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) ) ) {
         xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[idx];
@@ -212,8 +238,36 @@ void xg_vk_workload_unload ( void ) {
             vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
         }
 
-        xg_vk_workload_destroy_ptr ( workload );
+        //xg_vk_workload_destroy_ptr ( workload );
     }
+#else
+    for ( size_t i = 0; i  < xg_vk_max_active_devices_m; ++i ) {
+        xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[i];
+        if ( !device_context->is_active ) {
+            continue;
+        }
+
+        // Wait for all workloads to complete and process on complete events like resource destruction
+        xg_vk_workload_recycle_submission_contexts ( device_context, UINT64_MAX );
+
+#if 0
+        const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
+
+        for ( size_t j = 0; j <  xg_workload_max_queued_workloads_m; ++j ) {
+            xg_vk_workload_submit_context_t* submit_context = &device_context->submit_contexts[j];
+
+            //if ( submit_context->is_submitted ) {
+            //    const xg_vk_workload_t* workload = xg_vk_workload_get ( submit_context->workload );
+            //    const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
+            //    vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
+            //}
+
+            vkDestroyCommandPool ( device->vk_handle, submit_context->cmd_allocator.vk_cmd_pool, NULL );
+            vkDestroyDescriptorPool ( device->vk_handle, submit_context->desc_allocator.vk_desc_pool, NULL );
+        }
+#endif
+    }
+#endif
 
     std_virtual_heap_free ( xg_vk_workload_state->workload_array );
     std_virtual_heap_free ( xg_vk_workload_state->workload_bitset );
@@ -1954,7 +2008,7 @@ static void xg_vk_desc_allocator_reset ( xg_vk_desc_allocator_t* allocator ) {
     allocator->descriptor_counts[xg_resource_binding_buffer_texel_storage_m] = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
 }
 
-static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context ) {
+static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context, uint64_t timeout ) {
     size_t count = std_ring_count ( &device_context->submit_ring );
 
 #if xg_debug_enable_measure_workload_wait_time_m
@@ -1969,7 +2023,7 @@ static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_c
             break;
         }
 
-        uint64_t timeout = 0;
+        //uint64_t timeout = 0;
         const xg_vk_workload_t* workload = xg_vk_workload_get ( submit_context->workload );
 #if xg_debug_enable_measure_workload_wait_time_m
         std_tick_t wait_start_tick = 0;
@@ -2079,7 +2133,7 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     std_mutex_lock ( &device_context->submit_contexts_mutex );
 
     // TODO offer some way to call this (and thus trigger end-of-workload resource destruction) without having to submit a new workload after this one is complete.
-    xg_vk_workload_recycle_submission_contexts ( device_context );
+    xg_vk_workload_recycle_submission_contexts ( device_context, 0 );
 
     // test cmd buffers, if empty process resource cmd buffers and exit here
     {

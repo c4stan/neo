@@ -353,7 +353,6 @@ xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t s
     return alloc;
 }
 
-
 void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handle ) {
     std_auto_m segment = ( xg_vk_allocator_tlsf_segment_t* ) handle.id;
 

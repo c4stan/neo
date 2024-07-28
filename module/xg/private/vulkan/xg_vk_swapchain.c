@@ -17,11 +17,15 @@
 
 static xg_vk_swapchain_state_t* xg_vk_swapchain_state;
 
+#define xg_vk_swapchain_bitset_u64_count_m std_div_ceil_m ( xg_vk_max_swapchains_m, 64 )
+
 void xg_vk_swapchain_load ( xg_vk_swapchain_state_t* state ) {
     xg_vk_swapchain_state = state;
 
     xg_vk_swapchain_state->swapchains_array = std_virtual_heap_alloc_array_m ( xg_vk_swapchain_t, xg_vk_max_swapchains_m );
     xg_vk_swapchain_state->swapchains_freelist = std_freelist_m ( xg_vk_swapchain_state->swapchains_array, xg_vk_max_swapchains_m );
+    xg_vk_swapchain_state->swapchain_bitset = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_swapchain_bitset_u64_count_m );
+    std_mem_zero_array_m ( xg_vk_swapchain_state->swapchain_bitset, xg_vk_swapchain_bitset_u64_count_m );
     std_mutex_init ( &xg_vk_swapchain_state->swapchains_mutex );
 }
 
@@ -30,7 +34,14 @@ void xg_vk_swapchain_reload ( xg_vk_swapchain_state_t* state ) {
 }
 
 void xg_vk_swapchain_unload ( void ) {
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xg_vk_swapchain_state->swapchain_bitset, idx, xg_vk_swapchain_bitset_u64_count_m ) ) {
+        xg_vk_swapchain_destroy ( idx );
+        ++idx;
+    }
+
     std_virtual_heap_free ( xg_vk_swapchain_state->swapchains_array );
+    std_virtual_heap_free ( xg_vk_swapchain_state->swapchain_bitset );
     std_mutex_deinit ( &xg_vk_swapchain_state->swapchains_mutex );
 }
 
@@ -41,6 +52,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     std_mutex_unlock ( &xg_vk_swapchain_state->swapchains_mutex );
     std_assert_m ( swapchain );
     xg_swapchain_h swapchain_handle = ( xg_swapchain_h ) ( swapchain - xg_vk_swapchain_state->swapchains_array );
+    std_bitset_set ( xg_vk_swapchain_state->swapchain_bitset, swapchain_handle );
 
     // Get WM info
     wm_window_info_t window_info;
@@ -176,6 +188,16 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
     xg_vk_safecall_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ), xg_null_handle_m );
 
+    if ( params->debug_name[0] != '\0' ) {
+        VkDebugUtilsObjectNameInfoEXT debug_name;
+        debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        debug_name.pNext = NULL;
+        debug_name.objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
+        debug_name.objectHandle = ( uint64_t ) swapchain->vk_handle;
+        debug_name.pObjectName = params->debug_name;
+        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+    }
+
     VkImage swapchain_textures[xg_swapchain_max_textures_m];
     uint32_t acquired_texture_count = xg_swapchain_max_textures_m;
     vkGetSwapchainImagesKHR ( device->vk_handle, swapchain->vk_handle, &acquired_texture_count, swapchain_textures );
@@ -310,6 +332,16 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     swapchain_create_info.clipped = VK_TRUE;
     swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
     xg_vk_safecall_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ), xg_null_handle_m );
+
+    if ( swapchain->debug_name[0] != '\0' ) {
+        VkDebugUtilsObjectNameInfoEXT debug_name;
+        debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        debug_name.pNext = NULL;
+        debug_name.objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
+        debug_name.objectHandle = ( uint64_t ) swapchain->vk_handle;
+        debug_name.pObjectName = swapchain->debug_name;
+        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+    }
 
     VkImage swapchain_textures[xg_swapchain_max_textures_m];
     uint32_t acquired_texture_count = xg_swapchain_max_textures_m;
@@ -541,4 +573,16 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
     }
 
 #endif
+}
+
+void xg_vk_swapchain_destroy ( xg_swapchain_h swapchain_handle ) {
+    xg_vk_swapchain_t* swapchain = &xg_vk_swapchain_state->swapchains_array[swapchain_handle];
+    const xg_vk_device_t* device = xg_vk_device_get ( swapchain->device );
+
+    for ( size_t i = 0; i < swapchain->texture_count; ++i ) {
+        xg_gpu_queue_event_destroy ( swapchain->execution_complete_gpu_events[i] );
+    }
+
+    vkDestroySwapchainKHR ( device->vk_handle, swapchain->vk_handle, NULL );
+    std_bitset_clear ( xg_vk_swapchain_state->swapchain_bitset, swapchain_handle );
 }

@@ -158,6 +158,8 @@ void xg_vk_framebuffer_release ( xg_vk_framebuffer_h framebuffer );
 void xg_vk_pipeline_activate_device ( xg_device_h device );
 void xg_vk_pipeline_deactivate_device ( xg_device_h device );
 
+// For creating a reusable binding set
+// TODO rename resource_group to something else? feels too generic. bindset? preset?
 xg_pipeline_resource_group_h xg_vk_pipeline_create_resource_group ( xg_device_h device, xg_pipeline_state_h pipeline, xg_resource_binding_set_e set );
 void xg_vk_pipeline_update_resource_group ( xg_device_h device, xg_pipeline_resource_group_h group, const xg_pipeline_resource_bindings_t* bindings );
 void xg_vk_pipeline_destroy_resource_group ( xg_device_h device, xg_pipeline_resource_group_h group );

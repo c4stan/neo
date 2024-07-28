@@ -150,7 +150,7 @@ void xg_reload ( void* std_runtime, void* api ) {
 void xg_unload ( void ) {
     xg_debug_capture_unload();
     
-    xg_vk_device_wait_idle_all();
+    //xg_vk_device_wait_idle_all();
 
     xg_vk_workload_unload();
 

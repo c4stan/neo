@@ -96,3 +96,5 @@ xg_vk_query_instance_extensions_buffer_size_m   1024 * 4
 xg_vk_query_max_device_displays_m               16
 
 xg_vk_enable_sync2_m                            1
+# GTX 1080 only supports nv_ray_tracing, KHR is missing
+xg_vk_enable_nv_raytracing_ext_m                1
