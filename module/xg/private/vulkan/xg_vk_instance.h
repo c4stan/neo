@@ -14,6 +14,9 @@ typedef struct {
 
     void ( *set_debug_callback ) ( VkInstance, const VkDebugUtilsMessengerCreateInfoEXT*, const VkAllocationCallbacks*, VkDebugUtilsMessengerEXT* );
 
+    //vkDestroyDebugUtilsMessengerEXT
+    void ( *destroy_debug_callback ) ( VkInstance, VkDebugUtilsMessengerEXT, const VkAllocationCallbacks* );
+
 #if xg_enable_raytracing_m
     // vkGetAccelerationStructureBuildSizesKHR
     void ( *get_acceleration_structure_build_sizes ) ( VkDevice, VkAccelerationStructureBuildTypeKHR, const VkAccelerationStructureBuildGeometryInfoKHR*, const uint32_t*, VkAccelerationStructureBuildSizesInfoKHR* );
@@ -32,6 +35,7 @@ typedef struct {
 
 typedef struct {
     VkInstance vk_handle;
+    VkDebugUtilsMessengerEXT callback;
     xg_vk_instance_ext_api_i ext_api;
 } xg_vk_instance_state_t;
 

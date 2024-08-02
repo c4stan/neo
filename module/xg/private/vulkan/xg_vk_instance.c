@@ -109,6 +109,7 @@ static void xg_vk_instance_ext_api_init ( void ) {
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_sync2_pipeline_barrier, "vkCmdPipelineBarrier2KHR" );
 #endif
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.set_debug_callback, "vkCreateDebugUtilsMessengerEXT" );
+    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.destroy_debug_callback, "vkDestroyDebugUtilsMessengerEXT" );
 
 #if xg_enable_raytracing_m
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_build_sizes, "vkGetAccelerationStructureBuildSizesKHR" );
@@ -145,8 +146,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
     return VK_FALSE;
 }
 
-static void xg_vk_instance_bind_debug_callback ( void ) {
-    VkDebugUtilsMessengerEXT debug_messenger;
+static void xg_vk_instance_destroy_debug_callback ( void ) {
+    std_assert_m ( xg_vk_instance_state->callback != VK_NULL_HANDLE );
+    xg_vk_instance_state->ext_api.destroy_debug_callback ( xg_vk_instance_state->vk_handle, xg_vk_instance_state->callback, NULL );
+}
+
+static void xg_vk_instance_create_debug_callback ( void ) {
+    std_assert_m ( xg_vk_instance_state->callback == VK_NULL_HANDLE );
 
     VkDebugUtilsMessengerCreateInfoEXT info = {0};
     info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -155,7 +161,7 @@ static void xg_vk_instance_bind_debug_callback ( void ) {
     info.pfnUserCallback = xg_vk_instance_debug_callback;
     info.pUserData = NULL;
 
-    xg_vk_instance_state->ext_api.set_debug_callback ( xg_vk_instance_state->vk_handle, &info, NULL, &debug_messenger );
+    xg_vk_instance_state->ext_api.set_debug_callback ( xg_vk_instance_state->vk_handle, &info, NULL, &xg_vk_instance_state->callback );
 }
 
 void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e layers_flags ) {
@@ -298,16 +304,19 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
     xg_vk_instance_ext_api_init();
 
     // Debug
-    xg_vk_instance_bind_debug_callback();
+    xg_vk_instance_state->callback = VK_NULL_HANDLE;
+    xg_vk_instance_create_debug_callback();
 }
 
 void xg_vk_instance_reload ( xg_vk_instance_state_t* state ) {
     xg_vk_instance_state = state;
 
-    xg_vk_instance_bind_debug_callback();
+    xg_vk_instance_destroy_debug_callback();
+    xg_vk_instance_create_debug_callback();
 }
 
 void xg_vk_instance_unload ( void ) {
+    xg_vk_instance_destroy_debug_callback();
     vkDestroyInstance ( xg_vk_instance_state->vk_handle, NULL );
 }
 

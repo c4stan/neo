@@ -106,7 +106,7 @@ void xg_vk_cmd_buffer_reload ( xg_vk_cmd_buffer_state_t* state ) {
 
 void xg_vk_cmd_buffer_unload ( void ) {
     // TODO wait for all workloads to end
-    for ( uint32_t i = 0; i < xg_vk_max_active_devices_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_max_active_devices_m; ++i ) {
         xg_vk_cmd_buffer_device_context_t* context = &xg_vk_cmd_buffer_state->device_contexts[i];
 
         if ( !context->is_active ) {

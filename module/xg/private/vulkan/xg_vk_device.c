@@ -812,6 +812,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 bool xg_vk_device_deactivate ( xg_device_h device_handle ) {
     xg_vk_workload_deactivate_device ( device_handle );
     xg_vk_pipeline_deactivate_device ( device_handle );
+    xg_vk_allocator_deactivate_device ( device_handle );
 
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );
 

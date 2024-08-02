@@ -47,7 +47,7 @@ const xg_vk_workload_t* xg_vk_workload_get ( xg_workload_h workload_handle ) {
 void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
-    std_assert_m ( device_idx < xg_vk_max_active_devices_m );
+    std_assert_m ( device_idx < xg_max_active_devices_m );
 
     xg_vk_workload_device_context_t* context = &xg_vk_workload_state->device_contexts[device_idx];
     std_assert_m ( !context->is_active );
@@ -163,8 +163,6 @@ void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
 
     state->workload_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_t, xg_workload_max_allocated_workloads_m );
     state->workload_freelist = std_freelist_m ( state->workload_array, xg_workload_max_allocated_workloads_m );
-    state->workload_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) );
-    std_mem_zero ( state->workload_bitset, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) * 8 );
     std_mutex_init ( &state->workloads_mutex );
     state->workloads_uid = 0;
 
@@ -216,9 +214,6 @@ void xg_vk_workload_destroy_ptr ( xg_vk_workload_t* workload ) {
 
 #endif
 
-    uint64_t workload_idx = ( uint64_t ) ( workload - xg_vk_workload_state->workload_array );
-    std_bitset_clear ( xg_vk_workload_state->workload_bitset, workload_idx );
-
     std_list_push ( &xg_vk_workload_state->workload_freelist, workload );
 }
 
@@ -241,7 +236,7 @@ void xg_vk_workload_unload ( void ) {
         //xg_vk_workload_destroy_ptr ( workload );
     }
 #else
-    for ( size_t i = 0; i  < xg_vk_max_active_devices_m; ++i ) {
+    for ( size_t i = 0; i  < xg_max_active_devices_m; ++i ) {
         xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[i];
         if ( !device_context->is_active ) {
             continue;
@@ -270,7 +265,6 @@ void xg_vk_workload_unload ( void ) {
 #endif
 
     std_virtual_heap_free ( xg_vk_workload_state->workload_array );
-    std_virtual_heap_free ( xg_vk_workload_state->workload_bitset );
     std_mutex_deinit ( &xg_vk_workload_state->workloads_mutex );
     // TODO
 }
@@ -280,8 +274,6 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
 
     xg_vk_workload_t* workload = std_list_pop_m ( &xg_vk_workload_state->workload_freelist );
     uint64_t workload_idx = ( uint64_t ) ( workload - xg_vk_workload_state->workload_array );
-
-    std_bitset_set ( xg_vk_workload_state->workload_bitset, workload_idx );
 
     workload->cmd_buffers_count = 0;
     workload->resource_cmd_buffers_count = 0;
@@ -298,7 +290,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     workload->submitted = false;
 
     xg_buffer_h buffer_handle = xg_buffer_create ( & xg_buffer_params_m (
-        .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_mappable_m ),
+        .memory_type = xg_memory_type_gpu_mappable_m,
         .device = device_handle,
         .size = xg_vk_workload_uniform_buffer_size_m,
         .allowed_usage = xg_buffer_usage_bit_uniform_m,

@@ -79,7 +79,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     }
 
     xg_texture_h temp_texture = xg->create_texture ( &xg_texture_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device,
         .width = 600,
         .height = 400,

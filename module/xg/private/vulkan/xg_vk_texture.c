@@ -5,6 +5,7 @@
 #include "xg_vk_device.h"
 #include "xg_vk_enum.h"
 #include "xg_vk_instance.h"
+#include "xg_vk_allocator.h"
 
 #include <std_list.h>
 
@@ -274,7 +275,15 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     // TODO
     std_assert_m ( !dedicated_requirements.requiresDedicatedAllocation );
     VkMemoryRequirements vk_memory_requirements = memory_requirements_2.memoryRequirements;
-    xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_memory_requirements.size, vk_memory_requirements.alignment );
+    xg_vk_alloc_params_t alloc_params = xg_vk_alloc_params_m ( 
+        .device = params->device,
+        .size = vk_memory_requirements.size,
+        .align = vk_memory_requirements.alignment,
+        .type = params->memory_type
+    );
+    std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
+    //xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_memory_requirements.size, vk_memory_requirements.alignment );
+    xg_alloc_t alloc = xg_alloc ( &alloc_params );
     VkResult result = vkBindImageMemory ( device->vk_handle, vk_image, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
     std_verify_m ( result == VK_SUCCESS );
 
@@ -332,7 +341,8 @@ bool xg_texture_destroy ( xg_texture_h texture_handle ) {
     
     if ( ! ( texture->flags & xg_texture_flag_bit_swapchain_texture_m ) ) {
         vkDestroyImage ( device->vk_handle, texture->vk_handle, NULL );
-        texture->params.allocator.free ( texture->params.allocator.impl, texture->allocation.handle );
+        //texture->params.allocator.free ( texture->params.allocator.impl, texture->allocation.handle );
+        xg_free ( texture->allocation.handle );
     }
 
     std_bitset_clear ( xg_vk_texture_state->textures_bitset, texture_handle );

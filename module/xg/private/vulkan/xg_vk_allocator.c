@@ -6,6 +6,7 @@
 
 #include "xg_vk.h"
 #include "xg_vk_device.h"
+#include "xg_vk_instance.h"
 
 // --------------------------
 
@@ -17,7 +18,7 @@ void xg_vk_allocator_load ( xg_vk_allocator_state_t* state ) {
     state->allocations_array = std_virtual_heap_alloc_array_m ( xg_vk_alloc_t, xg_vk_max_allocations_m );
     state->allocations_freelist = std_freelist_m ( state->allocations_array, xg_vk_max_allocations_m );
     
-    for ( uint32_t i = 0; i < xg_vk_max_active_devices_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_max_active_devices_m; ++i ) {
         for ( uint32_t j = 0; j < xg_memory_type_count_m; ++j ) {
             state->device_contexts[i].heaps[j].gpu_alloc = xg_null_alloc_m;
             // TODO rest?
@@ -32,7 +33,8 @@ void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state ) {
 }
 
 void xg_vk_allocator_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
+    //std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
+    
     std_mutex_deinit ( &xg_vk_allocator_state->allocations_mutex );
 }
 
@@ -79,6 +81,16 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
     VkResult vk_result = vkAllocateMemory ( device->vk_handle, &info, NULL, &memory );
     std_assert_m ( vk_result == VK_SUCCESS );
 
+    {
+        VkDebugUtilsObjectNameInfoEXT debug_name;
+        debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        debug_name.pNext = NULL;
+        debug_name.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
+        debug_name.objectHandle = ( uint64_t ) memory;
+        debug_name.pObjectName = "simple_alloc";
+        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+    }
+
     // Store the allocation
     std_mutex_lock ( &xg_vk_allocator_state->allocations_mutex );
     xg_vk_alloc_t* xg_vk_alloc = std_list_pop_m ( &xg_vk_allocator_state->allocations_freelist );
@@ -99,6 +111,8 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
     xg_memory_h memory_handle;
     memory_handle.id = ( uint64_t ) ( xg_vk_alloc - xg_vk_allocator_state->allocations_array );
     memory_handle.size = size;
+    memory_handle.type = type;
+    memory_handle.device = xg_vk_device_get_idx ( device_handle );
     alloc.device = device_handle;
     alloc.base = ( uint64_t ) memory;
     alloc.offset = 0;
@@ -239,7 +253,10 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
     heap->unused_segments_freelist = std_freelist_m ( heap->segments, segment_count );
     heap->unused_segments_count = segment_count;
 
-    heap->gpu_alloc = xg_vk_allocator_simple_alloc(device, size, type);
+    heap->gpu_alloc = xg_vk_allocator_simple_alloc ( device, size, type );
+
+    heap->memory_type = type;
+    heap->device_idx = xg_vk_device_get_idx ( device );
 
 #if 0
     uint64_t s = xg_vk_allocator_tlsf_min_segment_size_m;
@@ -341,6 +358,8 @@ xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t s
     xg_alloc_t alloc;
     alloc.handle.id = ( uint64_t ) segment;
     alloc.handle.size = segment_size;
+    alloc.handle.device = heap->device_idx;
+    alloc.handle.type = heap->memory_type;
     alloc.base = heap->gpu_alloc.base;
     alloc.offset = std_align_u64 ( segment_offset, align );
     alloc.size = segment_size;
@@ -446,6 +465,20 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
 
 // --------------------------
 
+xg_alloc_t xg_alloc ( xg_vk_alloc_params_t* params ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( params->device );
+    xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
+    xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[params->type];
+    return xg_vk_tlsf_heap_alloc ( heap, params->size, params->align );
+}
+
+void xg_free ( xg_memory_h handle ) {
+    uint64_t device_idx = handle.device;
+    xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
+    xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[handle.type];
+    xg_vk_tlsf_heap_free ( heap, handle );
+}
+
 #if 0
 static xg_alloc_t xg_vk_allocator_default_alloc ( void* allocator, xg_device_h device_handle, size_t size, size_t align ) {
     std_unused_m ( align );
@@ -461,29 +494,6 @@ static void xg_vk_allocator_default_free ( void* allocator, xg_memory_h memory_h
 xg_allocator_i xg_allocator_default ( xg_memory_type_e type ) {
     xg_allocator_i allocator;
     allocator.impl = ( void* ) type;
-    allocator.alloc = xg_vk_allocator_default_alloc;
-    allocator.free = xg_vk_allocator_default_free;
-    return allocator;
-}
-#else
-static xg_alloc_t xg_vk_allocator_default_alloc ( void* allocator, xg_device_h device_handle, size_t size, size_t align ) {
-    std_unused_m ( device_handle );
-    std_unused_m ( align );
-    std_auto_m heap = ( xg_vk_allocator_tlsf_heap_t* ) allocator;
-    return xg_vk_tlsf_heap_alloc ( heap, size, align );
-}
-
-static void xg_vk_allocator_default_free ( void* allocator, xg_memory_h memory_handle ) {
-    std_auto_m heap = ( xg_vk_allocator_tlsf_heap_t* ) allocator;
-    xg_vk_tlsf_heap_free ( heap, memory_handle );
-}
-
-xg_allocator_i xg_allocator_default ( xg_device_h device_handle, xg_memory_type_e type ) {
-    uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
-    xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
-
-    xg_allocator_i allocator;
-    allocator.impl = ( void* ) &context->heaps[type];
     allocator.alloc = xg_vk_allocator_default_alloc;
     allocator.free = xg_vk_allocator_default_free;
     return allocator;
@@ -521,7 +531,7 @@ void xg_vk_allocator_deactivate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
 
-    for ( uint32_t i = 0; i < xg_format_count_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
         if ( !xg_memory_handle_is_null_m ( context->heaps[i].gpu_alloc.handle ) ) {
             xg_vk_allocator_tlsf_heap_deinit ( &context->heaps[i], device_handle );
         }

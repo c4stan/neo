@@ -3,7 +3,6 @@
 #include "xg_vk_instance.h"
 #include "xg_vk_device.h"
 #include "xg_vk_buffer.h"
-#include "xg_vk_allocator.h"
 #include "xg_vk_enum.h"
 
 static xg_vk_raytrace_state_t* xg_vk_raytrace_state;
@@ -90,7 +89,7 @@ xg_raytrace_geometry_h xg_vk_raytrace_geometry_create ( const xg_raytrace_geomet
 
     // Alloc BLAS memory
     xg_buffer_params_t as_buffer_params = xg_buffer_params_m ( 
-        .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device_handle,
         .size = build_size_info.accelerationStructureSize,
         .allowed_usage = xg_buffer_usage_bit_raytrace_storage_m | xg_buffer_usage_bit_device_addressed_m,
@@ -112,7 +111,7 @@ xg_raytrace_geometry_h xg_vk_raytrace_geometry_create ( const xg_raytrace_geomet
 
     // BLAS build info
     xg_buffer_params_t scratch_buffer_params = xg_buffer_params_m (
-        .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device_handle,
         .size = build_size_info.buildScratchSize,
         .allowed_usage = xg_buffer_usage_bit_storage_m | xg_buffer_usage_bit_device_addressed_m,
@@ -179,7 +178,7 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     uint32_t instance_count = params->instance_count;
     uint64_t instance_data_size = sizeof ( VkAccelerationStructureInstanceKHR ) * params->instance_count;
     xg_buffer_h instance_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
-        .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_mappable_m ),
+        .memory_type = xg_memory_type_gpu_mappable_m,
         .device = device_handle,
         .size = instance_data_size,
         .allowed_usage = xg_buffer_usage_bit_raytrace_uniform_m | xg_buffer_usage_bit_device_addressed_m,
@@ -239,7 +238,7 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
 
     // Create TLAS buffer
     xg_buffer_h tlas_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
-        .allocator = xg_allocator_default ( device_handle, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device_handle,
         .size = build_size_info.accelerationStructureSize,
         .allowed_usage = xg_buffer_usage_bit_raytrace_storage_m | xg_buffer_usage_bit_device_addressed_m,

@@ -108,7 +108,7 @@ typedef struct {
 
     //xi_workload_submit_context_t* submit_contexts;
     //std_ring_t submit_ring;
-    xi_workload_device_context_t device_contexts[xg_vk_max_active_devices_m];
+    xi_workload_device_context_t device_contexts[xg_max_active_devices_m];
 
     xs_pipeline_state_h render_pipeline_bgra8;
     xs_pipeline_state_h render_pipeline_a2bgr10;

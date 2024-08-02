@@ -447,7 +447,9 @@ typedef struct {
 
 typedef struct {
     uint64_t id;
-    uint64_t size;
+    uint64_t size : 56;
+    uint64_t device : 4; // TODO use log2 macro on xg_max_active_devices_m
+    uint64_t type :  4;
 } xg_memory_h;
 
 // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryPropertyFlagBits.html
@@ -486,7 +488,7 @@ typedef struct {
     xg_device_h device;
 } xg_alloc_t;
 
-#define xg_null_memory_handle_m ( xg_memory_h ) { UINT64_MAX, UINT64_MAX }
+#define xg_null_memory_handle_m ( xg_memory_h ) { -1, -1, -1, -1  }
 #define xg_memory_handle_is_null_m( handle ) ( handle.id == UINT64_MAX || handle.size == UINT64_MAX )
 
 #define xg_null_alloc_m ( xg_alloc_t ) { \
@@ -499,6 +501,7 @@ typedef struct {
     .device = xg_null_handle_m \
 }
 
+#if 0
 // TODO remove completely, just have an alloc/free main API that takes in an enum for the mem type,
 // similar to get_default_allocator but does the alloc/free directly. can then store the mem type into the handle
 // Storing function pointers like this causes crashes when hot reloading the xg dll
@@ -513,22 +516,16 @@ typedef struct {
 
 #define xg_null_allocator_m (xg_allocator_i) { NULL, NULL, NULL }
 #define xg_allocator_is_null_m( allocator ) ( allocator.alloc == NULL || allocator.free == NULL )
+#endif
 
 typedef enum {
     xg_memory_type_gpu_only_m,
     xg_memory_type_gpu_mappable_m,
     xg_memory_type_upload_m,
     xg_memory_type_readback_m,
-    xg_memory_type_count_m
+    xg_memory_type_count_m,
+    xg_memory_type_null_m = xg_memory_type_count_m
 } xg_memory_type_e;
-
-typedef struct {
-    xg_device_h device;
-    size_t size;
-    size_t align;
-    xg_memory_type_e type;
-    char debug_name[xg_debug_name_size_m];
-} xg_alloc_params_t;
 
 typedef struct {
     uint64_t allocated_size;
@@ -1576,7 +1573,7 @@ typedef uint64_t xg_gpu_event_h;    // VK semaphore
 // TODO what about VkEvent?
 
 typedef struct {
-    xg_allocator_i allocator;
+    xg_memory_type_e memory_type;
     xg_device_h device;
     size_t size;
     // TODO rename to allowed_gpu_usage?
@@ -1585,7 +1582,7 @@ typedef struct {
 } xg_buffer_params_t;
 
 #define xg_buffer_params_m( ... ) ( xg_buffer_params_t ) { \
-    .allocator = xg_null_allocator_m, \
+    .memory_type = xg_memory_type_null_m, \
     .device = xg_null_handle_m, \
     .size = 0, \
     .allowed_usage = 0, \
@@ -1606,7 +1603,7 @@ typedef struct {
 } xg_texture_view_access_ext_dynamic_params_t;
 
 typedef struct {
-    xg_allocator_i allocator;
+    xg_memory_type_e memory_type;
     xg_device_h device;
     size_t width;
     size_t height;
@@ -1625,7 +1622,7 @@ typedef struct {
 } xg_texture_params_t;
 
 #define xg_texture_params_m(...) ( xg_texture_params_t ) { \
-    .allocator = xg_null_allocator_m, \
+    .memory_type = xg_memory_type_null_m, \
     .device = xg_null_handle_m, \
     .width = 1, \
     .height = 1, \
@@ -2033,8 +2030,9 @@ typedef struct {
     void                    ( *destroy_compute_pipeline )           ( xg_compute_pipeline_state_h pipeline );
     void                    ( *destroy_raytrace_pipeline )          ( xg_raytrace_pipeline_state_h pipeline );
 
-    xg_allocator_i          ( *get_default_allocator )              ( xg_device_h device, xg_memory_type_e type );
-    void                    ( *get_default_allocator_info )         ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
+    //xg_allocator_i          ( *get_default_allocator )              ( xg_device_h device, xg_memory_type_e type );
+    void                    ( *get_allocator_info )                 ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
+
     // TODO add map_buffer/texture for convenience?
     //char*                 ( *map_alloc )                          ( const xg_alloc_t* alloc );
     //void                    ( *unmap_alloc )                        ( const xg_alloc_t* alloc );

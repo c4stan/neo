@@ -107,11 +107,15 @@ typedef struct {
     void* freelists[xg_vk_allocator_tlsf_x_size_m][xg_vk_allocator_tlsf_y_size_m];
     uint16_t available_freelists[xg_vk_allocator_tlsf_x_size_m];
     uint64_t available_rows;
+
+    xg_memory_type_e memory_type;
+    uint64_t device_idx;
 } xg_vk_allocator_tlsf_heap_t;
 
 typedef struct {
     xg_device_h device;
     VkDeviceMemory vk_handle;
+    char debug_name[xg_debug_name_size_m];
 } xg_vk_alloc_t;
 
 typedef struct {
@@ -123,16 +127,36 @@ typedef struct {
     xg_vk_alloc_t* allocations_freelist;
     std_mutex_t allocations_mutex;
 
-    xg_vk_allocator_device_context_t device_contexts[xg_vk_max_active_devices_m];
+    xg_vk_allocator_device_context_t device_contexts[xg_max_active_devices_m];
 } xg_vk_allocator_state_t;
 
 void xg_vk_allocator_load ( xg_vk_allocator_state_t* state );
 void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state );
 void xg_vk_allocator_unload ( void );
 
-xg_allocator_i xg_allocator_default ( xg_device_h device_handle, xg_memory_type_e type );
+//xg_allocator_i xg_allocator_default ( xg_device_h device_handle, xg_memory_type_e type );
 
 void xg_vk_allocator_activate_device ( xg_device_h device );
 void xg_vk_allocator_deactivate_device ( xg_device_h device );
 
 void xg_vk_allocator_get_info ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
+
+typedef struct {
+    xg_device_h device;
+    size_t size;
+    size_t align;
+    xg_memory_type_e type;
+    char debug_name[xg_debug_name_size_m];
+} xg_vk_alloc_params_t;
+
+#define xg_vk_alloc_params_m( ... ) ( xg_vk_alloc_params_t ) { \
+    .device = xg_null_handle_m, \
+    .size = 0, \
+    .align = 0, \
+    .type = xg_memory_type_null_m, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
+
+xg_alloc_t xg_alloc ( xg_vk_alloc_params_t* params );
+void xg_free ( xg_memory_h handle );

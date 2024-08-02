@@ -48,7 +48,7 @@ void xs_database_reload ( xs_database_state_t* state ) {
 }
 
 void xs_database_unload ( void ) {
-    // TODO
+    
 }
 
 static char* xs_database_alloc_string ( size_t size ) {

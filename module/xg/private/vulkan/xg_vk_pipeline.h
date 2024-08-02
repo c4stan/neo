@@ -54,6 +54,7 @@ typedef uint64_t xg_vk_descriptor_set_layout_h;
 typedef struct {
     VkPipeline vk_handle;
     VkPipelineLayout vk_layout_handle;
+    VkShaderModule vk_shader_handles[xg_shading_stage_count_m];
 
     xg_vk_descriptor_set_layout_h resource_set_layout_handles[xg_resource_binding_set_count_m];
     uint64_t push_constants_hash;
@@ -132,7 +133,7 @@ typedef struct {
     std_mutex_t framebuffers_map_mutex;
 
     // Device contexts
-    xg_vk_pipeline_device_context_t device_contexts[xg_vk_max_active_devices_m];
+    xg_vk_pipeline_device_context_t device_contexts[xg_max_active_devices_m];
 } xg_vk_pipeline_state_t;
 
 void xg_vk_pipeline_load ( xg_vk_pipeline_state_t* state );

@@ -3,6 +3,7 @@
 #include "xg_vk_device.h"
 #include "xg_vk_enum.h"
 #include "xg_vk_instance.h"
+#include "xg_vk_allocator.h"
 
 static xg_vk_buffer_state_t* xg_vk_buffer_state;
 
@@ -148,7 +149,15 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     // TODO
     std_assert_m ( !dedicated_requirements.requiresDedicatedAllocation );
     VkMemoryRequirements vk_buffer_memory = memory_requirements_2.memoryRequirements;
-    xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_buffer_memory.size, vk_buffer_memory.alignment );
+    xg_vk_alloc_params_t alloc_params = xg_vk_alloc_params_m ( 
+        .device = params->device,
+        .size = vk_buffer_memory.size,
+        .align = vk_buffer_memory.alignment,
+        .type = params->memory_type,
+    );
+    std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
+    //xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_buffer_memory.size, vk_buffer_memory.alignment );
+    xg_alloc_t alloc = xg_alloc ( &alloc_params );
     result = vkBindBufferMemory ( device->vk_handle, vk_buffer, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
     std_assert_m ( result == VK_SUCCESS );
 
@@ -181,7 +190,8 @@ bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
 
     const xg_vk_device_t* device = xg_vk_device_get ( buffer->params.device );
     vkDestroyBuffer ( device->vk_handle, buffer->vk_handle, NULL );
-    buffer->params.allocator.free ( buffer->params.allocator.impl, buffer->allocation.handle );
+    //buffer->params.allocator.free ( buffer->params.allocator.impl, buffer->allocation.handle );
+    xg_free ( buffer->allocation.handle );
 
     std_list_push ( &xg_vk_buffer_state->buffers_freelist, buffer );
     std_mutex_unlock ( &xg_vk_buffer_state->buffers_mutex );

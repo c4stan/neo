@@ -4,7 +4,7 @@
 xg_device_name_size_m                           256
 xg_display_name_size_m                          256
 xg_display_max_modes_m                          128
-xg_vk_max_active_devices_m                      1
+xg_max_active_devices_m                         1
 
 xg_vertex_stream_max_bindings_m                 32
 xg_input_layout_max_streams_m                   8

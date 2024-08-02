@@ -203,19 +203,19 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     vkGetSwapchainImagesKHR ( device->vk_handle, swapchain->vk_handle, &acquired_texture_count, swapchain_textures );
     texture_count = acquired_texture_count;
 
-    xg_texture_params_t swapchain_texture_params;
-    swapchain_texture_params.allocator = xg_null_allocator_m;
-    swapchain_texture_params.device = params->device;
-    swapchain_texture_params.width = width;
-    swapchain_texture_params.height = height;
-    swapchain_texture_params.depth = 1;
-    swapchain_texture_params.mip_levels = 1;
-    swapchain_texture_params.array_layers = 1;
-    swapchain_texture_params.dimension = xg_texture_dimension_2d_m;
-    swapchain_texture_params.format = params->format;
-    swapchain_texture_params.allowed_usage = allowed_usage;
-    swapchain_texture_params.initial_layout = xg_texture_layout_undefined_m; // ?
-    swapchain_texture_params.samples_per_pixel = xg_sample_count_1_m;
+    xg_texture_params_t swapchain_texture_params = xg_texture_params_m (
+        .device = params->device,
+        .width = width,
+        .height = height,
+        .depth = 1,
+        .mip_levels = 1,
+        .array_layers = 1,
+        .dimension = xg_texture_dimension_2d_m,
+        .format = params->format,
+        .allowed_usage = allowed_usage,
+        .initial_layout = xg_texture_layout_undefined_m, // ?
+        .samples_per_pixel = xg_sample_count_1_m,
+    );
     std_str_copy_static_m ( swapchain_texture_params.debug_name, params->debug_name );
 
     std_log_info_m ( "Swapchain created with " std_fmt_size_m " backbuffer textures", acquired_texture_count );
@@ -348,19 +348,19 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     vkGetSwapchainImagesKHR ( device->vk_handle, swapchain->vk_handle, &acquired_texture_count, swapchain_textures );
     texture_count = acquired_texture_count;
 
-    xg_texture_params_t swapchain_texture_params;
-    swapchain_texture_params.allocator = xg_null_allocator_m;
-    swapchain_texture_params.device = swapchain->device;
-    swapchain_texture_params.width = width;
-    swapchain_texture_params.height = height;
-    swapchain_texture_params.depth = 1;
-    swapchain_texture_params.mip_levels = 1;
-    swapchain_texture_params.array_layers = 1;
-    swapchain_texture_params.dimension = xg_texture_dimension_2d_m;
-    swapchain_texture_params.format = swapchain->format;
-    swapchain_texture_params.allowed_usage = allowed_usage;
-    swapchain_texture_params.initial_layout = xg_texture_layout_undefined_m; // ?
-    swapchain_texture_params.samples_per_pixel = 1;
+    xg_texture_params_t swapchain_texture_params = xg_texture_params_m (
+        .device = swapchain->device,
+        .width = width,
+        .height = height,
+        .depth = 1,
+        .mip_levels = 1,
+        .array_layers = 1,
+        .dimension = xg_texture_dimension_2d_m,
+        .format = swapchain->format,
+        .allowed_usage = allowed_usage,
+        .initial_layout = xg_texture_layout_undefined_m, // ?
+        .samples_per_pixel = 1,
+    );
     std_str_copy_static_m ( swapchain_texture_params.debug_name, swapchain->debug_name );
 
     // TODO update info.texture_count
@@ -584,5 +584,6 @@ void xg_vk_swapchain_destroy ( xg_swapchain_h swapchain_handle ) {
     }
 
     vkDestroySwapchainKHR ( device->vk_handle, swapchain->vk_handle, NULL );
+    vkDestroySurfaceKHR ( xg_vk_instance(), swapchain->surface, NULL );
     std_bitset_clear ( xg_vk_swapchain_state->swapchain_bitset, swapchain_handle );
 }

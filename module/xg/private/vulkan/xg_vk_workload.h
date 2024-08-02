@@ -98,12 +98,10 @@ typedef struct {
 typedef struct {
     xg_vk_workload_t* workload_array;
     xg_vk_workload_t* workload_freelist;
-    // TODO remove, useless
-    uint64_t* workload_bitset;
     std_mutex_t workloads_mutex;
     uint64_t workloads_uid;
 
-    xg_vk_workload_device_context_t device_contexts[xg_vk_max_active_devices_m];
+    xg_vk_workload_device_context_t device_contexts[xg_max_active_devices_m];
 } xg_vk_workload_state_t;
 
 void xg_vk_workload_load ( xg_vk_workload_state_t* state );

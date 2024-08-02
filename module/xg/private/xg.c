@@ -88,8 +88,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->create_sampler = xg_sampler_create;
     xg->get_default_sampler = xg_sampler_get_default;
     // Allocator
-    xg->get_default_allocator = xg_allocator_default;
-    xg->get_default_allocator_info = xg_vk_allocator_get_info;
+    //xg->get_default_allocator = xg_allocator_default;
+    xg->get_allocator_info = xg_vk_allocator_get_info;
 
 #if xg_debug_enable_simple_frame_test_m
     xg->debug_simple_frame = xg_debug_simple_frame;
@@ -102,8 +102,8 @@ void* xg_load ( void* std_runtime ) {
     xg_state_t* state = xg_state_alloc();
 
     xg_vk_instance_load ( &state->vk.instance, xg_instance_enabled_runtime_layers_m );
-    xg_vk_device_load ( &state->vk.device );
     xg_vk_allocator_load ( &state->vk.allocator );
+    xg_vk_device_load ( &state->vk.device );
     xg_vk_event_load ( &state->vk.event );
     xg_vk_texture_load ( &state->vk.texture );
     xg_vk_buffer_load ( &state->vk.buffer );
@@ -164,8 +164,8 @@ void xg_unload ( void ) {
     xg_vk_texture_unload();
     xg_vk_event_unload();
     //xg_vk_cmd_buffer_unload();
-    xg_vk_allocator_unload();
     xg_vk_device_unload();
+    xg_vk_allocator_unload();
     xg_vk_instance_unload();
 
     xg_state_free();

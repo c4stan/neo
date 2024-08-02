@@ -674,9 +674,9 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
     // Compute shader
+    VkShaderModule shader;
     VkPipelineShaderStageCreateInfo shader_info;
     {
-        VkShaderModule shader;
         VkShaderModuleCreateInfo module_info;
 
         module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -754,8 +754,13 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
             std_str_copy_static_m ( xg_vk_pipeline->common.debug_name, params->debug_name );
         }
 
+        for ( uint32_t i = 0; i < xg_shading_stage_count_m; ++i ) {
+            xg_vk_pipeline->common.vk_shader_handles[i] = VK_NULL_HANDLE;
+        }
+
         xg_vk_pipeline->common.vk_handle = pipeline;
         xg_vk_pipeline->common.vk_layout_handle = pipeline_layout_results.pipeline_layout;
+        xg_vk_pipeline->common.vk_shader_handles[xg_shading_stage_compute_m] = shader;
         xg_vk_pipeline->common.hash = pipeline_hash;
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
@@ -790,10 +795,10 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
     // Begin constructing Vulkan pipeline
     // Shaders
+    VkShaderModule vk_shader_handles[xg_shading_stage_count_m] = { [0 ... xg_shading_stage_count_m-1] = VK_NULL_HANDLE };
     VkPipelineShaderStageCreateInfo shader_info[xg_shading_stage_count_m];
     size_t shader_count = 0;
     {
-        VkShaderModule shaders[xg_shading_stage_count_m];
         VkShaderModuleCreateInfo module_info[xg_shading_stage_count_m];
 
         std_hash_metro_state_t hash_state;
@@ -805,13 +810,13 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             module_info[shader_count].flags = 0;
             module_info[shader_count].pCode = ( const uint32_t* ) params->state.vertex_shader.buffer.base;
             module_info[shader_count].codeSize = params->state.vertex_shader.buffer.size;
-            vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &shaders[shader_count] );
+            vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
 
             shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             shader_info[shader_count].pNext = NULL;
             shader_info[shader_count].flags = 0;
             shader_info[shader_count].stage = VK_SHADER_STAGE_VERTEX_BIT;
-            shader_info[shader_count].module = shaders[shader_count];
+            shader_info[shader_count].module = vk_shader_handles[shader_count];
             shader_info[shader_count].pName = "main";
             shader_info[shader_count].pSpecializationInfo = NULL;
 
@@ -825,13 +830,13 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             module_info[shader_count].flags = 0;
             module_info[shader_count].pCode = ( const uint32_t* ) params->state.fragment_shader.buffer.base;
             module_info[shader_count].codeSize = params->state.fragment_shader.buffer.size;
-            vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &shaders[shader_count] );
+            vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
 
             shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             shader_info[shader_count].pNext = NULL;
             shader_info[shader_count].flags = 0;
             shader_info[shader_count].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            shader_info[shader_count].module = shaders[shader_count];
+            shader_info[shader_count].module = vk_shader_handles[shader_count];
             shader_info[shader_count].pName = "main";
             shader_info[shader_count].pSpecializationInfo = NULL;
 
@@ -1432,6 +1437,10 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             std_str_copy ( xg_vk_pipeline->common.debug_name, xg_debug_name_size_m, params->debug_name );
         }
 
+        for ( uint32_t i = 0; i < xg_shading_stage_count_m; ++i ) {
+            xg_vk_pipeline->common.vk_shader_handles[i] = vk_shader_handles[i];
+        }
+
         xg_vk_pipeline->common.vk_handle = pipeline;
         xg_vk_pipeline->common.vk_layout_handle = pipeline_layout_results.pipeline_layout;
         xg_vk_pipeline->common.hash = pipeline_hash;
@@ -1465,6 +1474,12 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
 
     const xg_vk_device_t* device = xg_vk_device_get ( pipeline->common.device_handle );
 
+    for ( uint32_t i = 0; i < xg_shading_stage_count_m; ++i ) {
+        if ( pipeline->common.vk_shader_handles[i] != VK_NULL_HANDLE ) {
+            vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[i], NULL );
+        }
+    }
+
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
 
     std_mutex_lock ( &xg_vk_pipeline_state->graphics_pipelines_freelist_mutex );
@@ -1488,6 +1503,7 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
 
     const xg_vk_device_t* device = xg_vk_device_get ( pipeline->common.device_handle );
 
+    vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[xg_shading_stage_compute_m], NULL );
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
 
     std_mutex_lock ( &xg_vk_pipeline_state->compute_pipelines_freelist_mutex );
