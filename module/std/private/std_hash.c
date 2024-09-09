@@ -581,6 +581,17 @@ void std_map_clear ( std_map_t* map ) {
 //                                     H A S H   M A P
 // ======================================================================================= //
 
+std_hash_map_t std_hash_map_create ( uint64_t capacity ) {
+    uint64_t* hashes = std_virtual_heap_alloc_array_m ( uint64_t, capacity );
+    uint64_t* payloads = std_virtual_heap_alloc_array_m ( uint64_t, capacity );
+    return std_hash_map ( hashes, payloads, capacity );
+}
+
+void std_hash_map_destroy ( std_hash_map_t* map ) {
+    std_virtual_heap_free ( map->hashes );
+    std_virtual_heap_free ( map->payloads );
+}
+
 std_hash_map_t std_hash_map ( uint64_t* hashes, uint64_t* payloads, size_t capacity ) {
     std_hash_map_t map;
     map.hashes = hashes;

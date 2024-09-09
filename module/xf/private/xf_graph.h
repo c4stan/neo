@@ -65,6 +65,12 @@ typedef struct xf_node_t {
     void* user_args;
     bool enabled;
     //tk_workload_h cpu_workload;
+    xg_renderpass_h renderpass;
+    struct {
+        xg_render_textures_layout_t render_textures;
+        uint32_t resolution_x;
+        uint32_t resolution_y;
+    } renderpass_params;
 } xf_node_t;
 
 // TODO move out

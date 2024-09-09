@@ -10,7 +10,7 @@
 #include <se.inl>
 
 typedef struct {
-    xs_pipeline_state_h pipeline_state;
+    xs_database_pipeline_h pipeline_state;
     xg_sampler_h sampler;
     uint32_t width;
     uint32_t height;
@@ -48,113 +48,85 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
     xs_i* xs = state->modules.xs;
     rv_i* rv = state->modules.rv;
 
-    {
-        xg_render_textures_binding_t render_textures = xg_null_render_texture_bindings_m;
-        render_textures.render_targets_count = 1;
-        render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
+    xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
+        .render_targets_count = 1,
+        .render_targets = { xf_render_target_binding_m ( node_args->io->render_targets[0] ) },
+    );
+    xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
 
     draw_cbuffer_t cbuffer;
     std_mem_zero_m ( &cbuffer );
 
-    {
-        #if 0
-        se_query_h lights_query;
-        {
-            se_query_params_t query_params = se_default_query_params_m;
-            std_bitset_set ( query_params.request_component_flags, LIGHT_COMPONENT_ID );
-            lights_query = se->create_query ( &query_params );
-        }
+    se_query_result_t light_query_result;
+    se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_light_component_id_m } ) );
+    uint64_t light_count = light_query_result.entity_count;
+    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+    std_assert_m ( light_count <= MAX_LIGHTS_COUNT );
 
-        se->resolve_pending_queries();
-        const se_query_result_t* lights_query_result = se->get_query_result ( lights_query );
-        uint64_t light_count = lights_query_result->count;
-        #else
-        se_query_result_t light_query_result;
-        se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { LIGHT_COMPONENT_ID } ) );
-        uint64_t light_count = light_query_result.entity_count;
+    cbuffer.light_count = light_count;
 
-        se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
-        #endif
-        std_assert_m ( light_count <= MAX_LIGHTS_COUNT );
+    for ( uint64_t i = 0; i < light_count; ++i ) {
+        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
 
-        cbuffer.light_count = light_count;
+        rv_view_info_t view_info;
+        rv->get_view_info ( &view_info, light_component->view );
 
-        for ( uint64_t i = 0; i < light_count; ++i ) {
-#if 0
-            se_entity_h entity = lights_query_result->entities[i];
-            se_component_h component = se->get_component ( entity, LIGHT_COMPONENT_ID );
-            std_auto_m light_component = ( viewapp_light_component_t* ) component;
-#else
-            viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
-#endif
-
-            rv_view_info_t view_info;
-            rv->get_view_info ( &view_info, light_component->view );
-
-            cbuffer.lights[i].pos[0] = light_component->position[0];
-            cbuffer.lights[i].pos[1] = light_component->position[1];
-            cbuffer.lights[i].pos[2] = light_component->position[2];
-            cbuffer.lights[i].intensity = light_component->intensity;
-            cbuffer.lights[i].color[0] = light_component->color[0];
-            cbuffer.lights[i].color[1] = light_component->color[1];
-            cbuffer.lights[i].color[2] = light_component->color[2];
-            cbuffer.lights[i].proj_from_view = view_info.proj_matrix;
-            cbuffer.lights[i].view_from_world = view_info.view_matrix;
-        }
-
-#if 0
-        se->dispose_query_results();
-#endif
+        cbuffer.lights[i] = ( draw_cbuffer_light_t ) {
+            .pos =  {
+                light_component->position[0],
+                light_component->position[1],
+                light_component->position[2],
+            },
+            .intensity = light_component->intensity,
+            .color = { 
+                light_component->color[0],
+                light_component->color[1],
+                light_component->color[2],
+            },
+            .proj_from_view = view_info.proj_matrix,
+            .view_from_world = view_info.view_matrix,
+        };
     }
 
-    xg_buffer_range_t cbuffer_range = xg->write_workload_uniform ( node_args->workload, &cbuffer, sizeof ( cbuffer ) );
+    xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( args->pipeline_state );
+    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-    {
-        xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( args->pipeline_state );
-        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
+    xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
+        .set = xg_resource_binding_set_per_draw_m,
+        .texture_count = 5,
+        .textures = {
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[3], 3 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[4], 4 ),
+        },
+        .sampler_count = 1,
+        .samplers = { xg_sampler_resource_binding_m ( .sampler = args->sampler, .shader_register = 5 ) },
+        .buffer_count = 1,
+        .buffers = { xg_buffer_resource_binding_m ( 
+            .shader_register = 6,
+            .type = xg_buffer_binding_type_uniform_m,
+            .range = xg->write_workload_uniform ( node_args->workload, &cbuffer, sizeof ( cbuffer ) ),
+        ) }
+    );
 
-        xg_texture_resource_binding_t textures[5];
-        textures[0] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 );
-        textures[1] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 );
-        textures[2] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 );
-        textures[3] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[3], 3 );
-        textures[4] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[4], 4 );
+    xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
 
-        xg_sampler_resource_binding_t sampler;
-        sampler.sampler = args->sampler;
-        sampler.shader_register = 5;
+    xg_viewport_state_t viewport = xg_viewport_state_m (
+        .width = args->width,
+        .height = args->height,
+    );
+    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
-        xg_buffer_resource_binding_t buffer;
-        buffer.shader_register = 6;
-        buffer.type = xg_buffer_binding_type_uniform_m;
-        buffer.range = cbuffer_range;
-
-        xg_pipeline_resource_bindings_t bindings = xg_default_pipeline_resource_bindings_m;
-        bindings.set = xg_resource_binding_set_per_draw_m;
-        bindings.texture_count = 5;
-        bindings.sampler_count = 1;
-        bindings.buffer_count = 1;
-        bindings.textures = textures;
-        bindings.samplers = &sampler;
-        bindings.buffers = &buffer;
-
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
-
-        xg_viewport_state_t viewport = xg_default_viewport_state_m;
-        viewport.width = args->width;
-        viewport.height = args->height;
-        xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
-
-        xg->cmd_draw ( cmd_buffer, 3, 0, key );
-    }
+    xg->cmd_draw ( cmd_buffer, 3, 0, key );
 }
 
 xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth, xf_texture_h shadows ) {
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+    xs_i* xs = state->modules.xs;
+    xf_i* xf = state->modules.xf;
 
     xf_graph_info_t graph_info;
     xf->get_graph_info ( &graph_info, graph );
@@ -162,29 +134,31 @@ xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_
     xf_texture_info_t color_info;
     xf->get_texture_info ( &color_info, color );
 
-    lighting_pass_args_t args;
-    args.pipeline_state = xs->lookup_pipeline_state ( "lighting" );
-    args.sampler = xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m );
-    args.width = color_info.width;
-    args.height = color_info.height;
+    lighting_pass_args_t args = {
+        .pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "lighting" ) ),
+        .sampler = xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ),
+        .width = color_info.width,
+        .height = color_info.height,
+    };
 
-    xf_node_h lighting_node;
-    {
-        xf_node_params_t params = xf_default_node_params_m;
-        params.render_targets[params.render_targets_count++] = xf_render_target_dependency_m ( target, xg_default_texture_view_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( color, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( normal, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( material, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( depth, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( shadows, xg_shading_stage_fragment_m );
-        params.execute_routine = lighting_pass;
-        params.user_args = std_buffer_m ( &args );
-        std_str_copy_static_m ( params.debug_name, "lighting" );
-        params.passthrough.enable = true;
-        params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_alias_m;
-        params.passthrough.render_targets[0].alias = color;
-        lighting_node = xf->create_node ( graph, &params );
-    }
+    xf_node_params_t params = xf_node_params_m (
+        .render_targets_count = 1,
+        .render_targets = { xf_render_target_dependency_m ( target, xg_default_texture_view_m ) },
+        .shader_texture_reads_count = 5,
+        .shader_texture_reads = { 
+            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( normal, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( material, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( depth, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( shadows, xg_pipeline_stage_bit_fragment_shader_m ),
+        },
+        .execute_routine = lighting_pass,
+        .user_args = std_buffer_m ( &args ),
+        .debug_name = "lighting",
+        .passthrough.enable = true,
+        .passthrough.render_targets = { xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_alias_m, .alias = color ) },
+    );
+    xf_node_h lighting_node = xf->create_node ( graph, &params );
 
     return lighting_node;
 }

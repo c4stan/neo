@@ -30,9 +30,9 @@ void xi_workload_unload ( void ) {
     // TODO destroy null_texture
 }
 
-void xi_workload_load_shaders ( xs_i* xs ) {
-    xi_workload_state->render_pipeline_bgra8 = xs->lookup_pipeline_state ( "xi_render_b8g8r8a8" );
-    xi_workload_state->render_pipeline_a2bgr10 = xs->lookup_pipeline_state ( "xi_render_a2b10g10r10" );
+void xi_workload_load_shaders ( xs_i* xs, xs_database_h sdb ) {
+    xi_workload_state->render_pipeline_bgra8 = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xi_render_b8g8r8a8" ) );
+    xi_workload_state->render_pipeline_a2bgr10 = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xi_render_a2b10g10r10" ) );
 }
 
 void xi_workload_activate_device ( xg_i* xg, xg_device_h device ) {
@@ -121,26 +121,28 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
     if ( xi_workload_state->null_texture == xg_null_handle_m ) {
         xg_texture_h texture;
         {
-            xg_texture_params_t params = xg_default_texture_params_m;
-            params.allocator = xg->get_default_allocator ( flush_params->device, xg_memory_type_gpu_only_m );
-            params.device = flush_params->device;
-            params.width = 1;
-            params.height = 1;
-            params.format = xg_format_r8g8b8a8_unorm_m;
-            params.allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_resource_m;
+            xg_texture_params_t params = xg_texture_params_m (
+                .memory_type = xg_memory_type_gpu_only_m,
+                .device = flush_params->device,
+                .width = 1,
+                .height = 1,
+                .format = xg_format_r8g8b8a8_unorm_m,
+                .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_resource_m,
+            );
             std_str_copy_static_m ( params.debug_name, "xi null texture" );
             texture = xg->create_texture ( &params );
         }
 
         {
-            xg_texture_memory_barrier_t barrier = xg_default_texture_memory_barrier_m;
-            barrier.texture = texture;
-            barrier.layout.old = xg_texture_layout_undefined_m;
-            barrier.layout.new = xg_texture_layout_copy_dest_m;
-            barrier.memory.flushes = xg_memory_access_bit_none_m;
-            barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
-            barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-            barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
+            xg_texture_memory_barrier_t barrier = xg_texture_memory_barrier_m (
+                .texture = texture,
+                .layout.old = xg_texture_layout_undefined_m,
+                .layout.new = xg_texture_layout_copy_dest_m,
+                .memory.flushes = xg_memory_access_bit_none_m,
+                .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+            );
 
             xg_barrier_set_t barrier_set = xg_barrier_set_m();
             barrier_set.texture_memory_barriers_count = 1;
@@ -159,42 +161,21 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
         }
 
         {
-            xg_texture_memory_barrier_t barrier = xg_default_texture_memory_barrier_m;
-            barrier.texture = texture;
-            barrier.layout.old = xg_texture_layout_copy_dest_m;
-            barrier.layout.new = xg_texture_layout_shader_read_m;
-            barrier.memory.flushes = xg_memory_access_bit_transfer_write_m;
-            barrier.memory.invalidations = xg_memory_access_bit_shader_read_m;
-            barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-            barrier.execution.blocked = xg_pipeline_stage_bit_fragment_shader_m;
+            xg_texture_memory_barrier_t barrier = xg_texture_memory_barrier_m (
+                .texture = texture,
+                .layout.old = xg_texture_layout_copy_dest_m,
+                .layout.new = xg_texture_layout_shader_read_m,
+                .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                .memory.invalidations = xg_memory_access_bit_shader_read_m,
+                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                .execution.blocked = xg_pipeline_stage_bit_fragment_shader_m,
+            );
 
             xg_barrier_set_t barrier_set = xg_barrier_set_m();
             barrier_set.texture_memory_barriers_count = 1;
             barrier_set.texture_memory_barriers = &barrier;
 
             xg->cmd_barrier_set ( flush_params->cmd_buffer, &barrier_set, flush_params->key );
-        }
-
-        xg_sampler_h point_sampler;
-        {
-            xg_sampler_params_t params = xg_sampler_params_m (
-                .debug_name = "xi point sampler",
-                .min_filter = xg_sampler_filter_point_m,
-                .mag_filter = xg_sampler_filter_point_m,
-                .mipmap_filter = xg_sampler_filter_point_m,
-            );
-            point_sampler = xg->create_sampler ( &params );
-        }
-
-        xg_sampler_h linear_sampler;
-        {
-            xg_sampler_params_t params = xg_sampler_params_m (
-                .debug_name = "xi linear sampler",
-                .min_filter = xg_sampler_filter_linear_m,
-                .mag_filter = xg_sampler_filter_linear_m,
-                .mipmap_filter = xg_sampler_filter_linear_m,
-            );
-            linear_sampler = xg->create_sampler ( &params );
         }
 
         xi_workload_state->null_texture = texture;
@@ -304,7 +285,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
 
     // create vertex buffer
     xg_buffer_params_t vertex_buffer_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( flush_params->device, xg_memory_type_gpu_mappable_m ),
+        .memory_type = xg_memory_type_gpu_mappable_m,
         .device = flush_params->device,
         .size = sizeof ( xi_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
         .allowed_usage = xg_buffer_usage_bit_vertex_buffer_m,
@@ -340,6 +321,9 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
     bindings.offset = 0;
     xg->cmd_set_vertex_streams ( flush_params->cmd_buffer, &bindings, 1, flush_params->key );
 
+    // set viewport
+    xg->cmd_set_pipeline_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), flush_params->key );
+
     // TODO single draw call?
     // draw rects
     for ( uint32_t i = 0; i < workload->rect_count; ++i ) {
@@ -350,16 +334,20 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             &xg_pipeline_resource_bindings_m (
                 .set = xg_resource_binding_set_per_draw_m,
                 .texture_count = 1,
-                .textures = & xg_texture_resource_binding_m (
-                    .shader_register = 0,
-                    .layout = xg_texture_layout_shader_read_m,
-                    .texture = rect->texture != xg_null_handle_m ? rect->texture : xi_workload_state->null_texture,
-                ),
+                .textures = {
+                    xg_texture_resource_binding_m (
+                        .shader_register = 0,
+                        .layout = xg_texture_layout_shader_read_m,
+                        .texture = rect->texture != xg_null_handle_m ? rect->texture : xi_workload_state->null_texture,
+                    ),
+                },
                 .sampler_count = 1,
-                .samplers = & xg_sampler_resource_binding_m (
-                    .shader_register = 1,
-                    .sampler = rect->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
-                )
+                .samplers = {
+                    xg_sampler_resource_binding_m (
+                        .shader_register = 1,
+                        .sampler = rect->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
+                    )
+                },
             ),
             flush_params->key + rect->sort_order );
 
@@ -386,16 +374,20 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             &xg_pipeline_resource_bindings_m (
                 .set = xg_resource_binding_set_per_draw_m,
                 .texture_count = 1,
-                .textures = &xg_texture_resource_binding_m (
-                    .shader_register = 0,
-                    .layout = xg_texture_layout_shader_read_m,
-                    .texture = tri->texture != xg_null_handle_m ? tri->texture : xi_workload_state->null_texture,
-                ),
+                .textures = { 
+                    xg_texture_resource_binding_m (
+                        .shader_register = 0,
+                        .layout = xg_texture_layout_shader_read_m,
+                        .texture = tri->texture != xg_null_handle_m ? tri->texture : xi_workload_state->null_texture,
+                    ),
+                },
                 .sampler_count = 1,
-                .samplers = &xg_sampler_resource_binding_m (
-                    .shader_register = 1,
-                    .sampler = tri->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
-                )
+                .samplers = {
+                    xg_sampler_resource_binding_m (
+                        .shader_register = 1,
+                        .sampler = tri->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
+                    ),
+                },
             ),
             flush_params->key + tri->sort_order );
 

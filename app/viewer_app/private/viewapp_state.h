@@ -36,29 +36,22 @@ typedef struct {
 
     xg_device_h device;
     xg_swapchain_h swapchain;
-    xg_texture_h depth_stencil_texture;
+
+    xs_database_h sdb;
 
     xf_graph_h graph;
 
     xf_node_h taa_node;
 
+    xg_raytrace_world_h raytrace_world;
+
     wm_window_info_t window_info;
     wm_input_state_t input_state;
 
     std_tick_t frame_tick;
-
-    xf_texture_h swapchain_multi_texture;
-    xf_texture_h ssgi_raymarch_texture;
-    xf_texture_h ssgi_accumulation_texture;
-    xf_texture_h ssr_accumulation_texture;
-    xf_texture_h ssgi_2_raymarch_texture;
-    xf_texture_h ssgi_2_accumulation_texture;
-    xf_texture_h taa_accumulation_texture;
-    xf_texture_h object_id_texture;
 } viewapp_render_state_t;
 
 // UI
-
 typedef struct {
     xi_font_h font;
 
@@ -74,10 +67,10 @@ typedef struct {
 } viewapp_ui_state_t;
 
 // Components
-#define MESH_COMPONENT_ID 0
-#define CAMERA_COMPONENT_ID 1
-#define LIGHT_COMPONENT_ID 2
-#define MODEL_COMPONENT_ID 3
+#define viewapp_mesh_component_id_m 0
+#define viewapp_camera_component_id_m 1
+#define viewapp_light_component_id_m 2
+#define viewapp_model_component_id_m 3
 
 typedef struct {
     float base_color[3];
@@ -95,9 +88,9 @@ typedef struct {
 }
 
 typedef struct {
-    xs_pipeline_state_h depth_pipeline;
-    xs_pipeline_state_h geometry_pipeline;
-    xs_pipeline_state_h shadow_pipeline;
+    xs_database_pipeline_h depth_pipeline;
+    xs_database_pipeline_h geometry_pipeline;
+    xs_database_pipeline_h shadow_pipeline;
     xg_buffer_h pos_buffer;
     xg_buffer_h nor_buffer;
     //xg_buffer_h tan_buffer;
@@ -161,41 +154,11 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
-#if 0
-typedef struct {
-    se_entity_h camera;
-    //se_entity_h sphere;
-    se_entity_h planes[5];
-    se_entity_h light;
-
-    viewapp_render_component_t render_components[32];
-    viewapp_render_component_t* render_components_freelist;
-
-    viewapp_mesh_component_t mesh_components[32];
-    viewapp_mesh_component_t* mesh_components_freelist;
-
-    viewapp_light_component_t light_components[32];
-    viewapp_light_component_t* light_components_freelist;
-
-    viewapp_camera_component_t camera_component;
-} viewapp_components_state_t;
-#else
-typedef struct {
-    se_entity_h camera;
-    se_entity_h sphere;
-    se_entity_h planes[5];
-    se_entity_h light;
-} viewapp_entity_state_t;
-#endif
-
 // Viewapp
 typedef struct {
     std_app_i api;
-
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;
-    //viewapp_components_state_t components;
-    //viewapp_entity_state_t entities;
     viewapp_ui_state_t ui;
 } viewapp_state_t;
 

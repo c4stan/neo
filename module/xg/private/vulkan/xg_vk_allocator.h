@@ -73,6 +73,14 @@
 -------------------------------------------------------------------------------
 */
 
+/*
+    - internal state
+    - std module api
+    - module public api
+    - module private api
+    - static private code
+*/
+
 #include "xg_vk.h"
 
 #include <std_mutex.h>
@@ -133,8 +141,6 @@ typedef struct {
 void xg_vk_allocator_load ( xg_vk_allocator_state_t* state );
 void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state );
 void xg_vk_allocator_unload ( void );
-
-//xg_allocator_i xg_allocator_default ( xg_device_h device_handle, xg_memory_type_e type );
 
 void xg_vk_allocator_activate_device ( xg_device_h device );
 void xg_vk_allocator_deactivate_device ( xg_device_h device );

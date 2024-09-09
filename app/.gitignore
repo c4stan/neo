@@ -2,3 +2,5 @@
 !.gitignore
 !viewer_app
 !viewer_app/*
+!data_bake
+!data_bake/*

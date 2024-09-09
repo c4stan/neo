@@ -92,6 +92,8 @@ bool                std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, ui
 bool                std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ); // TODO rename std_hash_map_remove_hash
 uint64_t*           std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ); // TODO split into _edit (returns u64 ptr) and _get(?) (returns u64 value)
 bool                std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t* payload );
+std_hash_map_t      std_hash_map_create ( uint64_t capacity );
+void                std_hash_map_destroy ( std_hash_map_t* map );
 
 #define std_static_hash_map_m( keys, payloads ) std_hash_map ( std_static_buffer_m ( keys ), std_static_buffer_m ( payloads ) )
 

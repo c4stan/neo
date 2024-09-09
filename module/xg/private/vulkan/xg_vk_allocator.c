@@ -33,7 +33,7 @@ void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state ) {
 }
 
 void xg_vk_allocator_unload ( void ) {
-    //std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
+    std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
     
     std_mutex_deinit ( &xg_vk_allocator_state->allocations_mutex );
 }
@@ -48,48 +48,32 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
     uint32_t memory_type_index = device->memory_heaps[type].vk_memory_type_idx;
     xg_memory_flag_bit_e memory_flags = device->memory_heaps[type].memory_flags;
 
-#if 0
-    switch ( type ) {
-        case xg_memory_type_gpu_only_m:
-            memory_flags = xg_memory_type_bit_device_m;
-            break;
-
-        case xg_memory_type_gpu_mappable_m:
-            memory_flags = xg_memory_type_bit_device_m | xg_memory_type_bit_mappable_m | xg_memory_type_bit_coherent_m;
-            break;
-
-        case xg_memory_type_upload_m:
-            memory_flags = xg_memory_type_bit_coherent_m;
-            break;
-
-        case xg_memory_type_readback_m:
-            memory_flags = xg_memory_type_bit_coherent_m | xg_memory_type_bit_cached_m;
-            break;
-
-        default:
-            std_not_implemented_m();
-    }
-#endif
-
     // Allocate Vulkan memory
-    VkMemoryAllocateInfo info;
-    info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    info.pNext = NULL;
-    info.allocationSize = size;
-    info.memoryTypeIndex = memory_type_index;
+    VkMemoryAllocateFlagsInfo flags_info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+#if xg_enable_raytracing_m
+        .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT,
+#endif
+    };
+
+    VkMemoryAllocateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .pNext = &flags_info,
+        .allocationSize = size,
+        .memoryTypeIndex = memory_type_index,
+    };
     VkDeviceMemory memory;
     VkResult vk_result = vkAllocateMemory ( device->vk_handle, &info, NULL, &memory );
     std_assert_m ( vk_result == VK_SUCCESS );
 
-    {
-        VkDebugUtilsObjectNameInfoEXT debug_name;
-        debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-        debug_name.pNext = NULL;
-        debug_name.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
-        debug_name.objectHandle = ( uint64_t ) memory;
-        debug_name.pObjectName = "simple_alloc";
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
-    }
+    VkDebugUtilsObjectNameInfoEXT debug_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_DEVICE_MEMORY,
+        .objectHandle = ( uint64_t ) memory,
+        .pObjectName = "simple_alloc",
+    };
+    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
 
     // Store the allocation
     std_mutex_lock ( &xg_vk_allocator_state->allocations_mutex );
@@ -107,19 +91,20 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
     }
 
     // Return the allocation
-    xg_alloc_t alloc;
-    xg_memory_h memory_handle;
-    memory_handle.id = ( uint64_t ) ( xg_vk_alloc - xg_vk_allocator_state->allocations_array );
-    memory_handle.size = size;
-    memory_handle.type = type;
-    memory_handle.device = xg_vk_device_get_idx ( device_handle );
-    alloc.device = device_handle;
-    alloc.base = ( uint64_t ) memory;
-    alloc.offset = 0;
-    alloc.size = size;
-    alloc.flags = memory_flags;
-    alloc.handle = memory_handle;
-    alloc.mapped_address = mapped_address;
+    xg_alloc_t alloc = {
+        .device = device_handle,
+        .base = ( uint64_t ) memory,
+        .offset = 0,
+        .size = size,
+        .flags = memory_flags,
+        .handle = {
+            .id = ( uint64_t ) ( xg_vk_alloc - xg_vk_allocator_state->allocations_array ),
+            .size = size,
+            .type = type,
+            .device = xg_vk_device_get_idx ( device_handle ),
+        },
+        .mapped_address = mapped_address,
+    };
     return alloc;
 }
 

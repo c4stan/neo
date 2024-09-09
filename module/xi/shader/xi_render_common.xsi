@@ -1,6 +1,10 @@
 vertex_shader xi_render.vert
 fragment_shader xi_render.frag
 
+begin viewport
+    dynamic on
+end
+
 begin render_target 0
     blend on
     blend_color_op add

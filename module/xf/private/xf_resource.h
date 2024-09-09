@@ -39,7 +39,7 @@ typedef struct {
 
 #define xf_texture_execution_state_m( ... ) ( xf_texture_execution_state_t ) { \
     .layout = xg_texture_layout_undefined_m, \
-    .stage = xg_pipeline_stage_bit_invalid_m, \
+    .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
     ##__VA_ARGS__ \
 }
@@ -50,7 +50,7 @@ typedef struct {
 } xf_buffer_execution_state_t;
 
 #define xf_buffer_execution_state_m( ... ) ( xf_buffer_execution_state_t ) { \
-    .stage = xg_pipeline_stage_bit_invalid_m, \
+    .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
     ##__VA_ARGS__ \
 }
@@ -121,7 +121,6 @@ typedef struct {
     uint32_t index;
     xf_texture_h textures[xf_resource_multi_texture_max_textures_m];
     xf_texture_h alias;
-    //bool swapchain;
     xg_swapchain_h swapchain;
 } xf_multi_texture_t;
 
@@ -196,8 +195,6 @@ void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer, xg_pipeline_st
 void xf_resource_texture_set_dirty ( xf_texture_h texture, bool is_dirty );
 void xf_resource_buffer_set_dirty ( xf_buffer_h buffer, bool is_dirty );
 
-void xf_resource_texture_refresh_external ( xf_texture_h texture );
-
 /*
     Multi texture handle : | multi texture flag | unused | multi texture subtexture index | multi texture index |
                            |          1         |   31   |               16               |         16          |
@@ -232,3 +229,5 @@ void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h textur
 void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
 
 void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
+
+void xf_resource_swapchain_resize ( xf_texture_h swapchain );

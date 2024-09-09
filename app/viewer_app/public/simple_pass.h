@@ -4,7 +4,7 @@
 #include <xs.h>
 
 typedef struct {
-    xs_pipeline_state_h pipeline;
+    xs_database_pipeline_h pipeline;
     uint32_t render_targets_count;
     xf_texture_h render_targets[xf_node_max_render_targets_m];
     uint32_t texture_reads_count;

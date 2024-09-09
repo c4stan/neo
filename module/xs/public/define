@@ -14,5 +14,7 @@ xs_database_max_folders_m               16
 xs_database_max_pipeline_states_m       1024
 xs_database_max_pipeline_state_headers_m    128
 xs_database_memory_pool_max_size_m      1024 * 1024 * 4
+xs_database_max_databases_m             32
+xs_database_build_max_global_definitions_m  32
 
 xs_shader_parser_max_token_size_m       32

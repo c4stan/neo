@@ -419,9 +419,10 @@ typedef struct {
 // Api
 
 typedef struct {
-    void ( *register_shaders ) ( xs_i* xs );
-    void ( *activate_device ) ( xg_device_h device );
-    void ( *deactivate_device ) ( xg_device_h device );
+    void ( *load_shaders ) ( xg_device_h device );
+    void ( *reload_shaders ) ( xg_device_h device );
+    //void ( *activate_device ) ( xg_device_h device );
+    //void ( *deactivate_device ) ( xg_device_h device );
 
     void ( *begin_update ) ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer );
 

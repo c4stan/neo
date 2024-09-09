@@ -1,0 +1,33 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+
+#include <xs.glsl>
+
+#include "common.glsl"
+
+layout ( location = 0 ) rayPayloadNV vec4 payload;
+
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform accelerationStructureNV scene;
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m, rgba32f ) uniform image2D img_color;
+
+void main ( void ) {
+    imageStore ( img_color, ivec2 ( gl_LaunchIDNV.xy ), vec4 ( 0.0, 0.0, 1.0, 1.0 ) );
+    
+    const vec2 pixelCenter = vec2 ( gl_LaunchIDNV.xy ) + vec2 ( 0.5 );
+    const vec2 inUV = pixelCenter / vec2 ( gl_LaunchSizeNV.xy );
+    vec2 d = inUV * 2.0 - 1.0;
+
+    vec4 origin = view_cbuffer.world_from_view * vec4 ( 0, 0, 0, 1 );
+    vec4 target = view_cbuffer.view_from_proj * vec4 ( d.x, d.y, 1, 1 );
+    vec4 direction = view_cbuffer.world_from_view * vec4 ( normalize ( target.xyz ), 0 );
+
+    float tmin = 0.001;
+    float tmax = 10000.0;
+
+    payload = vec4 ( 0.0 );
+
+    traceNV ( scene, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, origin.xyz, tmin, direction.xyz, tmax, 0);
+
+    //traceRayEXT ( scene, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, ray_origin, 0.0, computeDir ( ray_dir, gl_LaunchIDEXT, gl_LaunchSizeEXT ), 100.0f, 0 );
+    imageStore ( img_color, ivec2 ( gl_LaunchIDNV.xy ), payload );
+}

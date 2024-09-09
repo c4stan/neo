@@ -935,7 +935,7 @@ xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e 
             return xg_pipeline_stage_bit_compute_shader_m;
 
         default:
-            return xg_pipeline_stage_bit_invalid_m;
+            return xg_pipeline_stage_bit_none_m;
     }
 }
 

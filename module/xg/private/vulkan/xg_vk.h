@@ -16,11 +16,11 @@
 
 #include <vulkan/vulkan.h>
 
-// TODO remove this
+// TODO remove these
 #define xg_vk_safecall_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); return x; }
-
 #define xg_vk_safecall_return_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); return x; }
 #define xg_vk_safecall_goto_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); goto x; }
+// TODO rename this to xg_vk_verify_m
 #define xg_vk_assert_m( result ) std_verify_m ( ( result ) == VK_SUCCESS )
 
 /*
@@ -113,7 +113,8 @@ Vulkan
         Once the frame has been fully rendered, the descriptor pool can be reused.
 
         When creating a pipeline, it's necessary to define a number of descriptor set layouts. Each layout is composed of multiple bindings,
-        and each binding contains a resource type (texture, buffer, ...) and the shader stages and binding id that the resource will be accessible from.
+        and each binding contains a resource type (texture, buffer, ...) and the shader stages and register (glsl layout binding) that the resource will be accessible from.
+        Shader registers must be unique across pipeline states, they cannot be reused per stage.
 
         A descriptor set is also created against a descriptor sets layout. After allocation, VkWriteDescriptorSet sets which resources the descriptors bindings actually
         point to, along with additional info depending on the resource type (image view if image, offset and size if buffer, ...).
@@ -210,7 +211,9 @@ Vulkan
 
         When creating a subpass, a list of attachments is provided. When creating a framebuffer, that same list of attachments (this time in actual views, instead of definitions)
         must be provided. When beginning a render pass in a command buffer, a framebuffer having that layout must be provided.
-        TODO - framebufferless vulkan extension
+        When extension VK_KHR_imageless_framebuffer is enabled, image views are not necessary when creating the framebuffer. Instead, they are bound dynamically at render pass
+        begin time via a pointer to VkRenderPassAttachmentBeginInfoKHR in pNext.
+        https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_imageless_framebuffer.html
 
         When creating a framebuffer or a graphics pipeline a render pass is provided. That framebuffer and that pipeline can only be bound when inside that render pass, or
         when inside one compatible with it. Two render passes are compatible when all their attachments have matching format and sample count. Image layouts and load/store ops
@@ -224,6 +227,10 @@ Vulkan
         that pool from the workload, and reset the pool once the workload is complete. At that point the pool can be reused.
         Once a pool is ready it's possible to write timestamp values to it by calling vkCmdWriteTimestamp. Once the workload has been completed, it is possible to readback the
         written values by calling vkGetQueryPoolResults.
+
+    Dynamic state
+        Some pipeline state can be flagged as dynamnic, meaning that the values in the pipeline state params will be *ignored*. The user is instead expected to set them
+        manually before any relevant drawing command. So dynamic does not mean overridable, it means completely ignored in the provided state and left to the user at runtime.
 
     Raytrace
         To be able to HW raytrace, vulkan requires to declare and build all geometry upfront into acceleration structure vulkan resources. There are 2 types of those, top (TLAS)

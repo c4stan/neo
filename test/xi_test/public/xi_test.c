@@ -134,19 +134,17 @@ static void xi_test ( void ) {
     // TODO support dynamic add and rebuild (do we already do that?)
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     xi_i* xi = std_module_load_m ( xi_module_name_m );
-    xi->register_shaders ( xs );
+    xi->load_shaders ( device );
     {
-        xs->set_output_folder ( "output/shader/" );
+        //xs_database_build_params_t build_params;
+        //build_params.viewport_width = 600;
+        //build_params.viewport_height = 400;
+        //xs_database_build_result_t result = xs->build_database_shaders ( device, &build_params );
+        //std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders built", result.successful_pipeline_states, result.successful_shaders );
 
-        xs_database_build_params_t build_params;
-        build_params.viewport_width = 600;
-        build_params.viewport_height = 400;
-        xs_database_build_result_t result = xs->build_database_shaders ( device, &build_params );
-        std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders built", result.successful_pipeline_states, result.successful_shaders );
-
-        if ( result.failed_shaders || result.failed_pipeline_states ) {
-            std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
-        }
+        //if ( result.failed_shaders || result.failed_pipeline_states ) {
+        //    std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
+        //}
     }
 
     // create test font
@@ -181,27 +179,30 @@ static void xi_test ( void ) {
 
     xf_node_h clear_node;
     {
-        xf_node_params_t node_params = xf_default_node_params_m;
-        node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
-        node_params.execute_routine = clear_pass;
-        std_str_copy_static_m ( node_params.debug_name, "clear" );
-        node_params.debug_color = xg_debug_region_color_red_m;
-
+        xf_node_params_t node_params = xf_node_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
+            .execute_routine = clear_pass,
+            .debug_name = "clear",
+            .debug_color = xg_debug_region_color_red_m,
+        );
         clear_node = xf->create_node ( graph, &node_params );
     }
 
     xf_ui_pass_args_t ui_node_args;
     xf_node_h ui_node;
     {
-        xf_node_params_t node_params = xf_default_node_params_m;
-        node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
-        node_params.presentable_texture = swapchain_multi_texture;
-        node_params.execute_routine = ui_pass;
-        node_params.user_args = std_buffer_m ( &ui_node_args );
-        node_params.copy_args = false;
-        std_str_copy_static_m ( node_params.debug_name, "ui" );
-        node_params.debug_color = xg_debug_region_color_green_m;
-        node_params.key_space_size = 128;
+        xf_node_params_t node_params = xf_node_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
+            .presentable_texture = swapchain_multi_texture,
+            .execute_routine = ui_pass,
+            .user_args = std_buffer_m ( &ui_node_args ),
+            .copy_args = false,
+            .debug_name = "ui",
+            .debug_color = xg_debug_region_color_green_m,
+            .key_space_size = 128,
+        );
 
         ui_node = xf->create_node ( graph, &node_params );
     }
@@ -427,24 +428,11 @@ static void xi_test ( void ) {
         }
 
         if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
-            xs_database_build_params_t build_params;
-            build_params.viewport_width = window_info.width;
-            build_params.viewport_height = window_info.height;
-            xs->build_database_shaders ( device, &build_params );
+            xs->rebuild_databases();
         }
 
         wm_window_info_t new_window_info;
         wm->get_window_info ( window, &new_window_info );
-
-        if ( window_info.width != new_window_info.width || window_info.height != new_window_info.height ) {
-            xg->resize_swapchain ( swapchain, new_window_info.width, new_window_info.height );
-            xf->refresh_external_texture ( swapchain_multi_texture );
-
-            xs_database_build_params_t build_params;
-            build_params.viewport_width = new_window_info.width;
-            build_params.viewport_height = new_window_info.height;
-            xs->build_database_shaders ( device, &build_params );
-        }
 
         window_info = new_window_info;
 
@@ -503,8 +491,8 @@ static void xi_test ( void ) {
             // TODO updating node params like this is only ok when sim and render are serial
             ui_node_args.device = device;
             ui_node_args.xg_workload = workload;
-            ui_node_args.resolution_x = 600;
-            ui_node_args.resolution_y = 400;
+            ui_node_args.resolution_x = new_window_info.width;
+            ui_node_args.resolution_y = new_window_info.height;
             ui_node_args.xi_workload = xi_workload;
         }
 

@@ -6,6 +6,7 @@
 #include <std_platform.h>
 #include <std_atomic.h>
 #include <std_byte.h>
+#include <std_file.h>
 
 #include <malloc.h>
 
@@ -1113,7 +1114,7 @@ uint64_t std_allocator_tlsf_heap_size_roundup ( uint64_t size ) {
     return size;
 }
 
-std_unused_function_m()
+std_unused_static_m()
 static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
     char buffer[1024];
     std_log_info_m ( "-- TLSF heap state --" );
@@ -1653,3 +1654,22 @@ typedef struct {
 
 #endif
 */
+
+std_buffer_t std_virtual_heap_read_file ( const char* path ) {
+    std_file_h file = std_file_open ( path, std_file_read_m );
+    std_file_info_t file_info;
+    bool valid_info = std_file_info ( &file_info, file );
+    if ( !valid_info ) {
+        return std_null_buffer_m;
+    }
+    
+    void* buffer = std_virtual_heap_alloc ( file_info.size, 16 );
+    uint64_t read_size = std_file_read ( buffer, file_info.size, file );
+    if ( read_size == std_file_read_error_m ) {
+        return std_null_buffer_m;
+        std_virtual_heap_free ( buffer );
+    }
+
+    std_file_close ( file );
+    return std_buffer ( buffer, file_info.size );
+}

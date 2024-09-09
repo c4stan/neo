@@ -13,4 +13,4 @@ if linux
     bindings = renderdoc_captures
     includes = $renderdoc_include
 endif
-ignores = xg_vk_raytrace.h, xg_vk_cmd_buffer.c
+ignores = xg_vk_cmd_buffer.c

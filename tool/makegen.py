@@ -48,6 +48,7 @@ CORE_WARNINGS_FLAGS = (
     ' -Wno-unused-but-set-variable'
     ' -Wno-comment'
     ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
+    ' -Wno-missing-braces'                      # suggested braces warnings?
 )
 
 EXTENDED_WARNINGS_FLAGS = (
@@ -687,7 +688,10 @@ class Project:
 
         for key in self.bindings:
             value = self.bindings[key]
-            def_cmd += ' -Dstd_binding_' + key + '_m=' + value
+            if value.isnumeric():
+                def_cmd += ' -Dstd_binding_' + key + '_m=' + value
+            else:
+                def_cmd += ' -Dstd_binding_' + key + '_m=' + '"\\"' + value + '\\""'
 
         compiler_defs_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/defines')
         compiler_defs_file.write(def_cmd)
@@ -757,7 +761,7 @@ class Project:
         if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP: # or self.output == OUTPUT_LIB:
             if platform.system() == 'Windows':
                 for lib in self.external_libs:
-                    main_target.cmd += ' -l' + lib
+                    main_target.cmd += ' -l' + '"' + lib + '"'
             elif platform.system() == 'Linux': # TODO not sure if this is a win32/linux or clang/gcc thing... ?
                 for lib in self.external_libs:
                     base, name, ext = parse_path(lib)

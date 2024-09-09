@@ -57,4 +57,4 @@ xg_debug_measure_workload_wait_time_m         std_off_m
 
 ########## Backends ##########
 
-xg_backend_vulkan_m                             std_on_m
+xg_backend_vulkan_enabled_m                 true

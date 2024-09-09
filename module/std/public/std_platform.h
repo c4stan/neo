@@ -16,7 +16,7 @@
     #include <Windows.h>
     #include <windowsx.h>
     //#include <memoryapi.h>
-    #include <DbgHelp.h>
+    #include <dbghelp.h>
     #include <synchapi.h>
 
     #include <stdint.h>

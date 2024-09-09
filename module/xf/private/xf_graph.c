@@ -120,7 +120,7 @@ static void xf_graph_node_accumulate_resource_usage ( xf_node_h node ) {
 
     for ( size_t i = 0; i < params->shader_texture_writes_count; ++i ) {
         const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_writes[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_resource_m );
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_storage_m );
     }
 
     for ( size_t i = 0; i < params->shader_buffer_reads_count; ++i ) {
@@ -208,6 +208,10 @@ xf_node_h xf_graph_add_node ( xf_graph_h graph_handle, const xf_node_params_t* p
     node->params = *params;
     node->edge_count = 0;
     node->enabled = true;
+    node->renderpass = xg_null_handle_m;
+    node->renderpass_params.render_textures = xg_render_textures_layout_m();
+    node->renderpass_params.resolution_x = 0;
+    node->renderpass_params.resolution_y = 0;
 
     if ( node->params.copy_args && node->params.user_args.base ) {
         void* alloc = std_virtual_heap_alloc ( node->params.user_args.size, 16 ); // TODO some kind of linear allocator
@@ -454,7 +458,7 @@ static void xf_graph_build_texture ( xf_graph_t* graph, xf_texture_h texture_han
 
             if ( create_new ) {
                 xg_texture_params_t params;
-                params.allocator = xg->get_default_allocator ( graph->device, xg_memory_type_gpu_only_m );
+                params.memory_type = xg_memory_type_gpu_only_m;
                 params.device = graph->device;
                 params.width = texture->params.width;
                 params.height = texture->params.height;
@@ -546,7 +550,7 @@ static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_i* xg, xg_devi
 
         if ( create_new ) {
             xg_buffer_params_t params;
-            params.allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m );
+            params.memory_type = xg_memory_type_gpu_only_m;
             params.device = device;
             params.size = buffer->params.size;
             params.allowed_usage = buffer->required_usage;
@@ -632,6 +636,121 @@ static void xf_graph_build_resources ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffe
     }
 }
 
+static void xf_graph_build_nodes ( xf_graph_t* graph, xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
+        xf_node_h node_handle = graph->nodes[i];
+        xf_node_t* node = &xf_graph_state->nodes_array[node_handle];
+
+        xg_render_textures_layout_t render_textures = xg_render_textures_layout_m();
+        uint32_t resolution_x = 0;
+        uint32_t resolution_y = 0;
+
+        // check node render targets
+        for ( size_t resource_it = 0; resource_it < node->params.render_targets_count; ++resource_it ) {
+            xf_node_render_target_dependency_t* resource = &node->params.render_targets[resource_it];
+            const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
+
+            uint32_t mip_level = resource->view.mip_base;
+            uint32_t width = texture->params.width / ( 1 << mip_level );
+            uint32_t height = texture->params.height / ( 1 << mip_level );
+
+            if ( resolution_x != 0 ) {
+                std_assert_m ( resolution_x == width );
+            }
+
+            if ( resolution_y != 0 ) {
+                std_assert_m ( resolution_y == height );
+            }
+
+            resolution_x = width;
+            resolution_y = height;
+
+            uint32_t j = render_textures.render_targets_count++;
+            render_textures.render_targets[j].slot = resource_it;
+            render_textures.render_targets[j].format = texture->params.format;
+            render_textures.render_targets[j].samples_per_pixel = texture->params.samples_per_pixel;
+        }
+
+        // check node depth stencil
+        {
+            xf_texture_h depth_stencil = node->params.depth_stencil_target;
+            render_textures.depth_stencil_enabled = depth_stencil != xf_null_handle_m;
+
+            if ( depth_stencil != xf_null_handle_m ) {
+                const xf_texture_t* texture = xf_resource_texture_get ( depth_stencil );
+
+                uint32_t width = texture->params.width;
+                uint32_t height = texture->params.height;
+
+                if ( resolution_x != 0 ) {
+                    std_assert_m ( resolution_x == width );
+                }
+
+                if ( resolution_y != 0 ) {
+                    std_assert_m ( resolution_y == height );
+                }
+
+                resolution_x = width;
+                resolution_y = height;
+
+                render_textures.depth_stencil.format = texture->params.format;
+                render_textures.depth_stencil.samples_per_pixel = texture->params.samples_per_pixel;
+            }
+        }
+
+        // determine if renderpass update is needed
+        bool need_update = false;
+        if ( render_textures.render_targets_count > 0 || render_textures.depth_stencil_enabled ) {
+            need_update = node->renderpass == xg_null_handle_m;
+            need_update |= resolution_x != node->renderpass_params.resolution_x;
+            need_update |= resolution_y != node->renderpass_params.resolution_y;
+            need_update |= render_textures.render_targets_count != node->renderpass_params.render_textures.render_targets_count;
+            need_update |= render_textures.depth_stencil_enabled != node->renderpass_params.render_textures.depth_stencil_enabled;
+
+            if ( !need_update && render_textures.depth_stencil_enabled && ( 
+                render_textures.depth_stencil.format != node->renderpass_params.render_textures.depth_stencil.format 
+                || render_textures.depth_stencil.samples_per_pixel != node->renderpass_params.render_textures.depth_stencil.samples_per_pixel 
+            ) ) {
+                need_update |= render_textures.depth_stencil.format != node->renderpass_params.render_textures.depth_stencil.format;
+                need_update |= render_textures.depth_stencil.samples_per_pixel != node->renderpass_params.render_textures.depth_stencil.samples_per_pixel;
+            }
+
+            if ( !need_update ) {
+                for ( uint32_t j = 0; j < render_textures.render_targets_count; ++j ) {
+                    if ( 
+                        render_textures.render_targets[j].slot != node->renderpass_params.render_textures.render_targets[j].slot 
+                        || render_textures.render_targets[j].format != node->renderpass_params.render_textures.render_targets[j].format 
+                        || render_textures.render_targets[j].samples_per_pixel != node->renderpass_params.render_textures.render_targets[j].samples_per_pixel 
+                    ) {
+                        need_update = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // update renderpass
+        if ( need_update ) {
+            if ( node->renderpass != xg_null_handle_m ) {
+                xg->cmd_destroy_renderpass ( resource_cmd_buffer, node->renderpass, xg_resource_cmd_buffer_time_workload_start_m );
+            }
+
+            xg_graphics_renderpass_params_t params = xg_graphics_renderpass_params_m (
+                .device = graph->device,
+                .render_textures = render_textures,
+                .resolution_x = resolution_x,
+                .resolution_y = resolution_y,
+            );
+            std_str_copy_static_m ( params.debug_name, node->params.debug_name );
+            node->renderpass = xg->create_renderpass ( &params );
+
+            node->renderpass_params.render_textures = render_textures;
+            node->renderpass_params.resolution_x = resolution_x;
+            node->renderpass_params.resolution_y = resolution_y;
+        }
+    }
+}
+
 static void xf_graph_build ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     /*
         build
@@ -660,6 +779,8 @@ static void xf_graph_build ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffer_h cmd_bu
 
     // Build resources
     xf_graph_build_resources ( graph, xg, cmd_buffer, resource_cmd_buffer );
+
+    xf_graph_build_nodes ( graph, xg, resource_cmd_buffer );
 }
 
 void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
@@ -684,8 +805,13 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
             xg->get_swapchain_info ( &info, swapchain );
 
             if ( !info.acquired ) {
-                uint32_t idx = xg->acquire_next_swapchain_texture ( swapchain, xg_workload );
+                bool resize = false;
+                uint32_t idx = xg->acquire_next_swapchain_texture ( swapchain, xg_workload, &resize );
                 xf_resource_multi_texture_set_index ( graph->multi_textures_array[i], idx );
+
+                if ( resize ) {
+                    xf_resource_swapchain_resize ( graph->multi_textures_array[i] );
+                }
             }
         }
     }
@@ -794,7 +920,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = layout,
-                    .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_read_m
                 );
 
@@ -811,7 +938,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 xg_texture_layout_e layout = xg_texture_layout_shader_write_m;
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = layout,
-                    .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_write_m
                 );
 
@@ -826,7 +954,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 xf_buffer_dependency_t* resource = &node->params.shader_buffer_reads[i];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
                 xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-                    .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_read_m
                 );
 
@@ -839,7 +968,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 xf_buffer_dependency_t* resource = &node->params.shader_buffer_writes[i];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
                 xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-                    .stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_write_m
                 );
 
@@ -913,6 +1043,10 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
             xg->cmd_begin_debug_region ( cmd_buffer, node->params.debug_name, node->params.debug_color, sort_key );
 
+            if ( node->renderpass != xg_null_handle_m ) {
+                xg->cmd_begin_renderpass ( cmd_buffer, node->renderpass, sort_key );
+            }
+
             {
                 xg_barrier_set_t barrier_set = xg_barrier_set_m();
                 barrier_set.texture_memory_barriers = texture_barriers;
@@ -954,6 +1088,10 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 barrier_set.texture_memory_barriers = present_barrier;
                 barrier_set.texture_memory_barriers_count = 1;
                 xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
+            }
+
+            if ( node->renderpass != xg_null_handle_m ) {
+                xg->cmd_end_renderpass ( cmd_buffer, node->renderpass, sort_key );
             }
 
             xg->cmd_end_debug_region ( cmd_buffer, sort_key );

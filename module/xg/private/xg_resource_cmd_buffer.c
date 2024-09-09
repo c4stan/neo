@@ -241,6 +241,14 @@ void xg_resource_cmd_buffer_resource_group_destroy ( xg_resource_cmd_buffer_h cm
     cmd_args->destroy_time = destroy_time;
 }
 
+void xg_resource_cmd_buffer_graphics_renderpass_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time ) {
+    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_graphics_renderpass_destroy_m, xg_resource_cmd_graphics_renderpass_destroy_t );
+
+    cmd_args->renderpass = renderpass;
+    cmd_args->destroy_time = destroy_time;
+}
+
 #if 0
 void xg_resource_cmd_buffer_timestamp_query_buffer_clear ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time ) {
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );

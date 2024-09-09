@@ -2,12 +2,6 @@
 
 #include "xg_vk.h"
 
-std_static_assert_m ( xg_buffer_usage_bit_vertex_buffer_m == ( 1 << 7 ) );
-typedef enum {
-    xg_vk_buffer_usage_device_addressed_m   = 1 << 8,
-    xg_vk_buffer_usage_raytrace_geometry_m  = 1 << 9,
-} xg_vk_buffer_usage_t;
-
 VkFormat                    xg_format_to_vk ( xg_format_e format );
 VkShaderStageFlags          xg_shader_stage_to_vk ( xg_shading_stage_bit_e stage );
 VkCullModeFlags             xg_cull_mode_to_vk ( xg_cull_mode_bit_e mode );

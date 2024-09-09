@@ -30,7 +30,7 @@ typedef struct {
     xi_font_t* fonts_array;
     xi_font_t* fonts_freelist;
 
-    xs_pipeline_state_h font_atlas_pipeline;
+    xs_database_pipeline_h font_atlas_pipeline;
     //xg_buffer_h uniform_buffer; // TODO have a per-device cache instead of creating a new one on font creation
     xi_font_atlas_uniform_data_t* uniform_data;
 } xi_font_state_t;
@@ -39,7 +39,7 @@ void xi_font_load ( xi_font_state_t* state );
 void xi_font_reload ( xi_font_state_t* state );
 void xi_font_unload ( void );
 
-void xi_font_load_shaders ( xs_i* xs );
+void xi_font_load_shaders ( xs_i* xs, xs_database_h sdb );
 
 xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* params );
 void xi_font_destroy ( xi_font_h font );

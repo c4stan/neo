@@ -26,8 +26,6 @@ static void xf_api_init ( xf_i* xf ) {
     xf->texture_from_external = xf_resource_texture_declare_from_external;
     xf->get_multi_texture = xf_resource_multi_texture_get;
 
-    xf->refresh_external_texture = xf_resource_texture_refresh_external;
-
     xf->get_texture_info = xf_resource_texture_get_info;
     xf->get_graph_info = xf_graph_get_info;
     xf->get_node_info = xf_graph_get_node_info;

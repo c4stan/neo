@@ -5,7 +5,7 @@
 #include "xg_resource_cmd_buffer.h"
 #include "xg_debug_capture.h"
 
-#if xg_backend_vulkan_m
+#if xg_backend_vulkan_enabled_m
     #include "vulkan/xg_vk.h"
     #include "vulkan/xg_vk_device.h"
     #include "vulkan/xg_vk_swapchain.h"
@@ -17,6 +17,7 @@
     #include "vulkan/xg_vk_sampler.h"
     #include "vulkan/xg_vk_workload.h"
 #endif
+    #include "vulkan/xg_vk_raytrace.h"
 
 static void xg_api_init ( xg_i* xg ) {
     // Device
@@ -41,6 +42,10 @@ static void xg_api_init ( xg_i* xg ) {
     xg->destroy_graphics_pipeline = xg_vk_graphics_pipeline_destroy;
     xg->create_compute_pipeline = xg_vk_compute_pipeline_create;
     xg->destroy_compute_pipeline = xg_vk_compute_pipeline_destroy;
+    xg->create_raytrace_pipeline = xg_vk_raytrace_pipeline_create;
+    xg->destroy_raytrace_pipeline = xg_vk_raytrace_pipeline_destroy;
+    xg->create_renderpass = xg_vk_graphics_renderpass_create;
+    xg->destroy_renderpass = xg_vk_graphics_renderpass_destroy;
     // Workload
     xg->create_workload = xg_workload_create;
     xg->create_cmd_buffer = xg_workload_add_cmd_buffer;
@@ -50,6 +55,11 @@ static void xg_api_init ( xg_i* xg ) {
     xg->submit_workload = xg_workload_submit;
     xg->is_workload_complete = xg_workload_is_complete;
     xg->write_workload_uniform = xg_workload_write_uniform;
+    xg->wait_all_workload_complete = xg_workload_wait_all_workload_complete;
+    // Raytrace
+    xg->create_raytrace_world = xg_vk_raytrace_world_create;
+    xg->cmd_set_raytrace_pipeline_state = xg_cmd_buffer_raytrace_pipeline_state_bind;
+    xg->cmd_trace_rays = xg_cmd_buffer_raytrace_trace_rays;
     // Command Buffer
     xg->cmd_barrier_set = xg_cmd_buffer_barrier_set;
     xg->cmd_clear_texture = xg_cmd_buffer_texture_clear;
@@ -66,12 +76,15 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_copy_buffer = xg_cmd_buffer_copy_buffer;
     xg->cmd_copy_buffer_to_texture = xg_cmd_buffer_copy_buffer_to_texture;
     xg->cmd_set_pipeline_resources = xg_cmd_buffer_pipeline_resources_bind;
+    xg->cmd_set_pipeline_viewport = xg_cmd_buffer_graphics_pipeline_state_set_viewport;
     //#if defined(std_platform_win32_m)
     xg->cmd_start_debug_capture = xg_cmd_buffer_start_debug_capture;
     xg->cmd_stop_debug_capture = xg_cmd_buffer_stop_debug_capture;
     //#endif
     xg->cmd_begin_debug_region = xg_cmd_buffer_begin_debug_region;
     xg->cmd_end_debug_region = xg_cmd_buffer_end_debug_region;
+    xg->cmd_begin_renderpass = xg_cmd_buffer_graphics_renderpass_begin;
+    xg->cmd_end_renderpass = xg_cmd_buffer_graphics_renderpass_end;
     // Resource command buffer
     xg->create_resource_cmd_buffer = xg_workload_add_resource_cmd_buffer;
     //xg->create_resource_cmd_buffers = xg_resource_cmd_buffer_open_n;
@@ -80,7 +93,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_create_texture = xg_resource_cmd_buffer_texture_create;
     xg->cmd_destroy_buffer = xg_resource_cmd_buffer_buffer_destroy;
     xg->cmd_destroy_texture = xg_resource_cmd_buffer_texture_destroy;
-    xg->cmd_set_pipeline_viewport = xg_cmd_buffer_graphics_pipeline_state_set_viewport;
+    xg->cmd_destroy_renderpass = xg_resource_cmd_buffer_graphics_renderpass_destroy;
+
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;
     xg->get_buffer_info = xg_buffer_get_info;
@@ -109,6 +123,7 @@ void* xg_load ( void* std_runtime ) {
     xg_vk_buffer_load ( &state->vk.buffer );
     xg_vk_swapchain_load ( &state->vk.swapchain );
     xg_vk_sampler_load ( &state->vk.sampler );
+    xg_vk_raytrace_load ( &state->vk.raytrace );
     xg_vk_pipeline_load ( &state->vk.pipeline );
     xg_vk_workload_load ( &state->vk.workload );
 
@@ -135,6 +150,7 @@ void xg_reload ( void* std_runtime, void* api ) {
     xg_vk_buffer_reload ( &state->vk.buffer );
     xg_vk_swapchain_reload ( &state->vk.swapchain );
     xg_vk_sampler_reload ( &state->vk.sampler );
+    xg_vk_raytrace_reload ( &state->vk.raytrace );
     xg_vk_pipeline_reload ( &state->vk.pipeline );
     xg_vk_workload_reload ( &state->vk.workload );
 
@@ -145,6 +161,7 @@ void xg_reload ( void* std_runtime, void* api ) {
     //#endif
 
     xg_api_init ( &state->api );
+    xg_state_bind ( state );
 }
 
 void xg_unload ( void ) {
@@ -158,6 +175,7 @@ void xg_unload ( void ) {
     xg_cmd_buffer_unload();
 
     xg_vk_pipeline_unload();
+    xg_vk_raytrace_unload();
     xg_vk_sampler_unload();
     xg_vk_swapchain_unload();
     xg_vk_buffer_unload();

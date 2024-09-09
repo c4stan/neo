@@ -537,25 +537,6 @@ xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture_
     return handle;
 }
 
-void xf_resource_texture_refresh_external ( xf_texture_h texture_handle ) {
-    // TODO what really needs to get cleared/refreshed here?
-    if ( std_bit_test_64 ( texture_handle, 63 ) ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
-
-        for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
-            xf_texture_t* texture = &xf_resource_state->textures_array[multi_texture->textures[i]];
-            std_assert_m ( texture->is_user_bind );
-            std_mem_zero_m ( &texture->state );
-        }
-
-        multi_texture->index = 0;
-    } else {
-        xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
-        std_assert_m ( texture->is_user_bind );
-        std_mem_zero_m ( &texture->state );
-    }
-}
-
 static void xf_resource_texture_barrier ( std_stack_t* stack, xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
     const xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
@@ -663,5 +644,20 @@ void xf_resource_texture_alias ( xf_texture_h texture_handle, xf_texture_h alias
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
         texture->alias = alias;
+    }
+}
+
+static xf_multi_texture_t* xf_resource_multi_texture_get_multi ( xf_texture_h texture_handle ) {
+    std_assert_m ( xf_resource_texture_is_multi ( texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+    return multi_texture;
+}
+
+void xf_resource_swapchain_resize ( xf_texture_h swapchain ) {
+    xf_multi_texture_t* multi_texture = xf_resource_multi_texture_get_multi ( swapchain );
+
+    for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
+        xf_texture_t* texture = xf_resource_texture_get ( multi_texture->textures[i] );
+        texture->state.shared.layout = xg_texture_layout_undefined_m;
     }
 }

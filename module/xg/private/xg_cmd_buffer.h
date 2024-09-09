@@ -41,6 +41,7 @@ typedef struct {
 typedef struct {
     //xg_device_h device;
     xg_workload_h workload;
+    // TODO why is this not a stack
     std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
     std_queue_local_t cmd_args_allocator;
 } xg_cmd_buffer_t;
@@ -51,27 +52,30 @@ typedef enum {
     xg_cmd_graphics_pipeline_state_bind_m,
     xg_cmd_graphics_render_textures_bind_m,
 
+    xg_cmd_graphics_renderpass_begin_m,
+    xg_cmd_graphics_renderpass_end_m,
+
+    xg_cmd_graphics_pipeline_state_set_viewport_m,
+    xg_cmd_graphics_pipeline_state_set_scissor_m,
+
     xg_cmd_graphics_streams_submit_m,
     xg_cmd_graphics_streams_submit_indexed_m,
     xg_cmd_graphics_streams_submit_instanced_m,
 
-    xg_cmd_graphics_pipeline_state_set_viewport_m,
-    xg_cmd_graphics_pipeline_state_set_scissor_m,
+    // Compute pipeline
+    xg_cmd_compute_pipeline_state_bind_m,
+    xg_cmd_compute_dispatch_m,
+
+    // Raytrace
+    xg_cmd_raytrace_pipeline_state_bind_m,
+    xg_cmd_raytrace_trace_rays_m,
 
     // Copy
     xg_cmd_copy_buffer_m,
     xg_cmd_copy_texture_m,
     xg_cmd_copy_buffer_to_texture_m,
     xg_cmd_copy_texture_to_buffer_m,
-    /*
-        TODO:
-            COPY
-            COMPUTE
-    */
-    // Compute pipeline
-    xg_cmd_compute_dispatch_m,
-    xg_cmd_compute_pipeline_state_bind_m,
-    xg_cmd_compute_pipeline_resource_bind_m,
+
     // Misc?
     xg_cmd_pipeline_resource_bind_m,
     xg_cmd_pipeline_resource_group_bind_m,
@@ -106,9 +110,11 @@ typedef struct {
     uint32_t buffer_count;
     uint32_t texture_count;
     uint32_t sampler_count;
+    uint32_t raytrace_world_count;
     //xg_buffer_resource_binding_t[]
     //xg_texture_resource_binding_t[]
     //xg_sampler_resource_binding_t[]
+    //xg_raytrace_world_resource_binding_t[]
 } xg_cmd_pipeline_resource_bind_t;
 
 typedef struct {
@@ -160,6 +166,14 @@ typedef struct {
 } xg_cmd_graphics_pipeline_state_set_scissor_t;
 
 typedef struct {
+    xg_renderpass_h renderpass;
+} xg_cmd_graphics_renderpass_begin_t;
+
+typedef struct {
+    xg_renderpass_h renderpass;
+} xg_cmd_graphics_renderpass_end_t;
+
+typedef struct {
     uint32_t workgroup_count_x;
     uint32_t workgroup_count_y;
     uint32_t workgroup_count_z;
@@ -168,6 +182,16 @@ typedef struct {
 typedef struct {
     xg_compute_pipeline_state_h pipeline;
 } xg_cmd_compute_pipeline_state_bind_t;
+
+typedef struct {
+    xg_raytrace_pipeline_state_h pipeline;
+} xg_cmd_raytrace_pipeline_state_bind_t;
+
+typedef struct {
+    uint32_t ray_count_x;
+    uint32_t ray_count_y;
+    uint32_t ray_count_z;
+} xg_cmd_raytrace_trace_rays_t;
 
 typedef struct {
     xg_buffer_h source;
@@ -266,9 +290,12 @@ void xg_cmd_buffer_unload ( void );
 
 // **
 //
-// Cmd buffer API
+// ======================================================================================= //
+//                               C M D   B U F F E R   A P I
+// ======================================================================================= //
 //
 // **
+// Each command has a key value associated that works as a global sorting key. The backend will do the sorting before GPU submission.
 
 // Returns a number of ready to record command buffers to the user. Tries to grab them from the pool, allocates new ones if necessary.
 xg_cmd_buffer_h xg_cmd_buffer_open ( xg_workload_h workload );
@@ -294,9 +321,9 @@ xg_cmd_buffer_t* xg_cmd_buffer_get ( xg_cmd_buffer_h cmd_buffer );
 // ======================================================================================= //
 //                                     G R A P H I C S
 // ======================================================================================= //
-// Each command has a key value associated that works as a global sorting key. The backend will do the sorting before GPU submission.
-// Bind input vertex streams.
-void xg_cmd_buffer_graphics_streams_bind ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t bindings_count, uint64_t key );
+// Begin/end renderpass
+void xg_cmd_buffer_graphics_renderpass_begin ( xg_cmd_buffer_h cmd_buffer, const xg_renderpass_h renderpass, uint64_t key );
+void xg_cmd_buffer_graphics_renderpass_end ( xg_cmd_buffer_h cmd_buffer, const xg_renderpass_h renderpass, uint64_t key );
 
 // Bind pipeline state.
 void xg_cmd_buffer_graphics_pipeline_state_bind ( xg_cmd_buffer_h cmd_buffer, xg_graphics_pipeline_state_h pipeline, uint64_t key );
@@ -304,20 +331,30 @@ void xg_cmd_buffer_graphics_pipeline_state_bind ( xg_cmd_buffer_h cmd_buffer, xg
 // Bind render textures.
 void xg_cmd_buffer_graphics_render_textures_bind ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
 
+// Bind input vertex streams.
+void xg_cmd_buffer_graphics_streams_bind ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t bindings_count, uint64_t key );
+
 // Draw calls
 void xg_cmd_buffer_graphics_streams_submit ( xg_cmd_buffer_h cmd_buffer, size_t vertex_count, size_t streams_base, uint64_t key );
 void xg_cmd_buffer_graphics_streams_submit_indexed ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h ibuffer, size_t index_count, size_t ibuffer_base, uint64_t key );
 void xg_cmd_buffer_graphics_streams_submit_instanced ( xg_cmd_buffer_h cmd_buffer, size_t vertex_base, size_t vertex_count, size_t instance_base, size_t instance_count, uint64_t key );
 
+// Set dynamic pipeline state
 void xg_cmd_buffer_graphics_pipeline_state_set_viewport ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
 void xg_cmd_buffer_graphics_pipeline_state_set_scissor ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
 
 // ======================================================================================= //
 //                                      C O M P U T E
 // ======================================================================================= //
-void    xg_cmd_buffer_compute_dispatch                  ( xg_cmd_buffer_h buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, uint64_t key );
-void    xg_cmd_buffer_compute_pipeline_state_bind       ( xg_cmd_buffer_h buffer, xg_compute_pipeline_state_h pipeline, uint64_t key );
+void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, uint64_t key );
+void xg_cmd_buffer_compute_pipeline_state_bind ( xg_cmd_buffer_h buffer, xg_compute_pipeline_state_h pipeline, uint64_t key );
 //void    xg_cmd_buffer_compute_pipeline_resource_bind    ( xg_cmd_buffer_h buffer, xg_pipeline_resource_bindings_t* bindings, uint64_t key );
+
+// ======================================================================================= //
+//                                     R A Y T R A C E
+// ======================================================================================= //
+void xg_cmd_buffer_raytrace_trace_rays ( xg_cmd_buffer_h buffer, uint32_t ray_count_x, uint32_t ray_count_y, uint32_t ray_count_z, uint64_t key );
+void xg_cmd_buffer_raytrace_pipeline_state_bind ( xg_cmd_buffer_h buffer, xg_raytrace_pipeline_state_h pipeline, uint64_t key );
 
 // ======================================================================================= //
 //                                         C O P Y

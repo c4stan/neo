@@ -31,8 +31,8 @@ void xi_font_load ( xi_font_state_t* state ) {
     xi_font_state->uniform_data = NULL;
 }
 
-void xi_font_load_shaders ( xs_i* xs ) {
-    xs_pipeline_state_h font_atlas_pipeline = xs->lookup_pipeline_state ( "xi_font_atlas" );
+void xi_font_load_shaders ( xs_i* xs, xs_database_h sdb ) {
+    xs_database_pipeline_h font_atlas_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xi_font_atlas" ) );
     std_assert_m ( font_atlas_pipeline != xs_null_handle_m );
     xi_font_state->font_atlas_pipeline = font_atlas_pipeline;
 }
@@ -98,13 +98,14 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
 
     xg_texture_h raster_texture;
     {
-        xg_texture_params_t texture_params = xg_default_texture_params_m;
-        texture_params.allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_only_m );
-        texture_params.device = params->xg_device;
-        texture_params.width = xi_font_texture_atlas_width_m;
-        texture_params.height = xi_font_texture_atlas_height_m;
-        texture_params.format = xg_format_r8_uint_m;
-        texture_params.allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_resource_m;
+        xg_texture_params_t texture_params = xg_texture_params_m (
+            .memory_type = xg_memory_type_gpu_only_m,
+            .device = params->xg_device,
+            .width = xi_font_texture_atlas_width_m,
+            .height = xi_font_texture_atlas_height_m,
+            .format = xg_format_r8_uint_m,
+            .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_resource_m,
+        );
         std_str_copy_static_m ( texture_params.debug_name, "font atlas temp" );
         raster_texture = xg->create_texture ( &texture_params );
     }
@@ -112,7 +113,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     xg_buffer_h staging_buffer;
     {
         xg_buffer_params_t buffer_params = xg_buffer_params_m (
-            .allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_upload_m ),
+            .memory_type = xg_memory_type_upload_m,
             .device = params->xg_device,
             .size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m,
             .allowed_usage = xg_buffer_usage_bit_copy_source_m,
@@ -137,14 +138,15 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
 
     // copy from staging to source atlas
     {
-        xg_texture_memory_barrier_t barrier = xg_default_texture_memory_barrier_m;
-        barrier.texture = raster_texture;
-        barrier.layout.old = xg_texture_layout_undefined_m;
-        barrier.layout.new = xg_texture_layout_copy_dest_m;
-        barrier.memory.flushes = xg_memory_access_bit_none_m;
-        barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
-        barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-        barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
+        xg_texture_memory_barrier_t barrier = xg_texture_memory_barrier_m (
+            .texture = raster_texture,
+            .layout.old = xg_texture_layout_undefined_m,
+            .layout.new = xg_texture_layout_copy_dest_m,
+            .memory.flushes = xg_memory_access_bit_none_m,
+            .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+        );
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -164,13 +166,14 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
 
     xg_texture_h atlas_texture;
     {
-        xg_texture_params_t texture_params = xg_default_texture_params_m;
-        texture_params.allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_only_m );
-        texture_params.device = params->xg_device;
-        texture_params.width = xi_font_texture_atlas_width_m;
-        texture_params.height = xi_font_texture_atlas_height_m;
-        texture_params.format = xg_format_r8g8b8a8_unorm_m;
-        texture_params.allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_resource_m;
+        xg_texture_params_t texture_params = xg_texture_params_m (
+            .memory_type = xg_memory_type_gpu_only_m,
+            .device = params->xg_device,
+            .width = xi_font_texture_atlas_width_m,
+            .height = xi_font_texture_atlas_height_m,
+            .format = xg_format_r8g8b8a8_unorm_m,
+            .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_resource_m,
+        );
         std_str_copy_static_m ( texture_params.debug_name, "font atlas" );
         atlas_texture = xg->create_texture ( &texture_params );
     }
@@ -179,22 +182,24 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     // final undefined -> render target
     {
         xg_texture_memory_barrier_t barriers[2];
-        barriers[0] = xg_default_texture_memory_barrier_m;
-        barriers[0].texture = raster_texture;
-        barriers[0].layout.old = xg_texture_layout_copy_dest_m;
-        barriers[0].layout.new = xg_texture_layout_shader_read_m;
-        barriers[0].memory.flushes = xg_memory_access_bit_transfer_write_m;
-        barriers[0].memory.invalidations = xg_memory_access_bit_shader_read_m;
-        barriers[0].execution.blocker = xg_pipeline_stage_bit_transfer_m;
-        barriers[0].execution.blocked = xg_pipeline_stage_bit_fragment_shader_m;
-        barriers[1] = xg_default_texture_memory_barrier_m;
-        barriers[1].texture = atlas_texture;
-        barriers[1].layout.old = xg_texture_layout_undefined_m;
-        barriers[1].layout.new = xg_texture_layout_render_target_m;
-        barriers[1].memory.flushes = xg_memory_access_bit_none_m;
-        barriers[1].memory.invalidations = xg_memory_access_bit_color_write_m;
-        barriers[1].execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m;
-        barriers[1].execution.blocked = xg_pipeline_stage_bit_color_output_m;
+        barriers[0] = xg_texture_memory_barrier_m (
+            .texture = raster_texture,
+            .layout.old = xg_texture_layout_copy_dest_m,
+            .layout.new = xg_texture_layout_shader_read_m,
+            .memory.flushes = xg_memory_access_bit_transfer_write_m,
+            .memory.invalidations = xg_memory_access_bit_shader_read_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_fragment_shader_m,
+        );
+        barriers[1] = xg_texture_memory_barrier_m (
+            .texture = atlas_texture,
+            .layout.old = xg_texture_layout_undefined_m,
+            .layout.new = xg_texture_layout_render_target_m,
+            .memory.flushes = xg_memory_access_bit_none_m,
+            .memory.invalidations = xg_memory_access_bit_color_write_m,
+            .execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m,
+            .execution.blocked = xg_pipeline_stage_bit_color_output_m,
+        );
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 2;
@@ -208,7 +213,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         xg_i* xg = std_module_get_m ( xg_module_name_m );
 
         xg_buffer_params_t cbuffer_params = xg_buffer_params_m (
-            .allocator = xg->get_default_allocator ( params->xg_device, xg_memory_type_gpu_mappable_m ),
+            .memory_type = xg_memory_type_gpu_mappable_m,
             .device = params->xg_device,
             .size = sizeof ( xi_font_atlas_uniform_data_t ),
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
@@ -240,26 +245,30 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         &xg_pipeline_resource_bindings_m (
             .set = xg_resource_binding_set_per_draw_m,
             .buffer_count = 1,
-            .buffers = ( xg_buffer_resource_binding_t[1] ) {
-                {
+            .buffers = {
+                xg_buffer_resource_binding_m (
                     .shader_register = 0,
                     .type = xg_buffer_binding_type_uniform_m,
                     .range = { .handle = uniform_buffer, .offset = 0, .size = sizeof ( xi_font_atlas_uniform_data_t ) }
-                }
+                ),
             },
             .texture_count = 1,
-            .textures = &xg_texture_resource_binding_m (
-                .shader_register = 1,
-                .layout = xg_texture_layout_shader_read_m,
-                .texture = raster_texture,
-                .view = xg_default_texture_view_m
-            ),
+            .textures = {
+                xg_texture_resource_binding_m (
+                    .shader_register = 1,
+                    .layout = xg_texture_layout_shader_read_m,
+                    .texture = raster_texture,
+                    .view = xg_default_texture_view_m
+                ),
+            },
             .sampler_count = 1,
-            .samplers = &xg_sampler_resource_binding_m (
-                .shader_register = 2,
-                .sampler = xg->get_default_sampler ( params->xg_device, xg_default_sampler_point_clamp_m )
-            )
-    ),
+            .samplers = {
+                xg_sampler_resource_binding_m (
+                    .shader_register = 2,
+                    .sampler = xg->get_default_sampler ( params->xg_device, xg_default_sampler_point_clamp_m )
+                )
+            }
+        ), 
         key );
 
 #if 0
@@ -305,14 +314,15 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     xg->cmd_draw ( cmd_buffer, 3, 0, 0 );
 
     {
-        xg_texture_memory_barrier_t barrier = xg_default_texture_memory_barrier_m;
-        barrier.texture = atlas_texture;
-        barrier.layout.old = xg_texture_layout_render_target_m;
-        barrier.layout.new = xg_texture_layout_shader_read_m;
-        barrier.memory.flushes = xg_memory_access_bit_color_write_m;
-        barrier.memory.invalidations = xg_memory_access_bit_shader_read_m;
-        barrier.execution.blocker = xg_pipeline_stage_bit_color_output_m;
-        barrier.execution.blocked = xg_pipeline_stage_bit_fragment_shader_m;
+        xg_texture_memory_barrier_t barrier = xg_texture_memory_barrier_m (
+            .texture = atlas_texture,
+            .layout.old = xg_texture_layout_render_target_m,
+            .layout.new = xg_texture_layout_shader_read_m,
+            .memory.flushes = xg_memory_access_bit_color_write_m,
+            .memory.invalidations = xg_memory_access_bit_shader_read_m,
+            .execution.blocker = xg_pipeline_stage_bit_color_output_m,
+            .execution.blocked = xg_pipeline_stage_bit_fragment_shader_m,
+        );
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;

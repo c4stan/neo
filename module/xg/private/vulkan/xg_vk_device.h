@@ -38,6 +38,84 @@ typedef struct {
 } xg_vk_device_cmd_queue_t;
 
 typedef struct {
+    void ( *cmd_begin_debug_region ) ( VkCommandBuffer, const VkDebugUtilsLabelEXT* );
+    void ( *cmd_end_debug_region ) ( VkCommandBuffer );
+
+    // vkSetDebugUtilsObjectNameEXT
+    void ( *set_debug_name ) ( VkDevice, const VkDebugUtilsObjectNameInfoEXT* );
+
+#if xg_vk_enable_sync2_m
+    void ( *cmd_sync2_pipeline_barrier ) ( VkCommandBuffer, const VkDependencyInfoKHR* );
+#endif
+
+//#if xg_enable_raytracing_m
+    // vkGetAccelerationStructureBuildSizesKHR
+    void ( *get_acceleration_structure_build_sizes ) ( VkDevice, VkAccelerationStructureBuildTypeKHR, const VkAccelerationStructureBuildGeometryInfoKHR*, const uint32_t*, VkAccelerationStructureBuildSizesInfoKHR* );
+
+    // vkCreateAccelerationStructureKHR
+    VkResult ( *create_acceleration_structure ) ( VkDevice, const VkAccelerationStructureCreateInfoKHR*, const VkAllocationCallbacks*, VkAccelerationStructureKHR* );
+    
+    // vkCmdBuildAccelerationStructuresKHR
+    void ( *cmd_build_acceleration_structures ) (
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    infoCount,
+    const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
+    const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos );
+    
+    // vkGetAccelerationStructureDeviceAddressKHR
+    VkDeviceAddress ( *get_acceleration_structure_device_address ) ( VkDevice, const VkAccelerationStructureDeviceAddressInfoKHR* );
+
+#if xg_vk_enable_nv_raytracing_ext_m
+    // vkCreateRayTracingPipelinesNV
+    VkResult ( *create_raytrace_pipelines ) (
+        VkDevice                                    device,
+        VkPipelineCache                             pipelineCache,
+        uint32_t                                    createInfoCount,
+        const VkRayTracingPipelineCreateInfoNV*     pCreateInfos,
+        const VkAllocationCallbacks*                pAllocator,
+        VkPipeline*                                 pPipelines );
+#else
+    // vkCreateRayTracingPipelinesKHR
+    VkResult ( *create_raytrace_pipelines ) (
+        VkDevice                                    device,
+        VkDeferredOperationKHR                      deferredOperation,
+        VkPipelineCache                             pipelineCache,
+        uint32_t                                    createInfoCount,
+        const VkRayTracingPipelineCreateInfoKHR*    pCreateInfos,
+        const VkAllocationCallbacks*                pAllocator,
+        VkPipeline*                                 pPipelines );
+#endif
+
+    // vkGetRayTracingShaderGroupHandlesKHR
+    VkResult ( *get_shader_group_handles ) (
+        VkDevice                                    device,
+        VkPipeline                                  pipeline,
+        uint32_t                                    firstGroup,
+        uint32_t                                    groupCount,
+        size_t                                      dataSize,
+        void*                                       pData );
+
+    // vkCmdTraceRaysKHR
+    void ( *trace_rays ) (
+        VkCommandBuffer                             commandBuffer,
+        const VkStridedDeviceAddressRegionKHR*      pRaygenShaderBindingTable,
+        const VkStridedDeviceAddressRegionKHR*      pMissShaderBindingTable,
+        const VkStridedDeviceAddressRegionKHR*      pHitShaderBindingTable,
+        const VkStridedDeviceAddressRegionKHR*      pCallableShaderBindingTable,
+        uint32_t                                    width,
+        uint32_t                                    height,
+        uint32_t                                    depth );
+
+    // vkDestroyAccelerationStructureKHR
+    void ( *destroy_acceleration_structure ) (
+        VkDevice                                    device,
+        VkAccelerationStructureKHR                  accelerationStructure,
+        const VkAllocationCallbacks*                pAllocator );
+
+//#endif
+} xg_vk_device_ext_api_i;
+
+typedef struct {
     uint64_t                            id;
     xg_vk_device_f                      flags;
     // Handles
@@ -46,6 +124,10 @@ typedef struct {
     // Properties
     VkPhysicalDeviceProperties          generic_properties;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceProperties.html
     VkPhysicalDeviceFeatures            supported_features;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR raytrace_properties; //
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR supported_raytrace_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRayTracingPipelineFeaturesKHR.html
+    VkPhysicalDeviceBufferDeviceAddressFeatures supported_device_address_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR supported_acceleration_structure_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
     VkPhysicalDeviceMemoryProperties    memory_properties;                // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
     VkQueueFamilyProperties             queues_families_properties[16];   // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
     uint32_t                            queues_families_count;
@@ -78,6 +160,7 @@ typedef struct {
     //VkCommandPool                       graphics_cmd_pool;
     //VkCommandPool                       compute_cmd_pool;
     //VkCommandPool                       copy_cmd_pool;
+    xg_vk_device_ext_api_i              ext_api;
 } xg_vk_device_t;
 
 typedef struct {
@@ -109,3 +192,5 @@ void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc );
 //void xg_vk_device_unmap_host_buffer ( xg_host_buffer_t* buffer );
 
 void xg_vk_device_wait_idle_all ( void );
+
+xg_vk_device_ext_api_i* xg_vk_device_ext_api ( xg_device_h device );

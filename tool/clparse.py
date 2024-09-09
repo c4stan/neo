@@ -244,13 +244,14 @@ def build_workspace(name, flags):
     if not validate_workspace(name):
         return
     # https://www.gnu.org/software/make/manual/html_node/Options-Summary.html
-    make_flags = '-s -j16 -O'
+    make_flags = '-O' # If it's a multi thread build, make sure the output is properly formatted. If it's a single thread build this does nothing.
     build_flags = makegen.BUILD_FLAG_NONE
-    make_flags = ' -j16 -O'
-    #build_flags = build_flags | makegenlib.BUILD_FLAG_VERBOSE
+    if not '-s' in flags:
+        make_flags += ' -j16' # Multi thread build. 16 concurrent jobs
     if '-v' in flags or '-verbose' in flags:
-        make_flags = ' -j16 -O'
         build_flags = build_flags | makegen.BUILD_FLAG_VERBOSE
+    else:
+        make_flags += ' -s' # Disable verbose output. Do not print each make recipe.
     if '-pp' in flags:
         build_flags = build_flags | makegen.BUILD_FLAG_OUTPUT_PP
     if '-asm' in flags:

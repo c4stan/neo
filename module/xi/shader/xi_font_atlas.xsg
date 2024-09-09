@@ -10,7 +10,6 @@ fragment_shader xi_font_atlas.frag
 //end
 
 begin viewport
-    // dynamic on
     width 512
     height 512
 end

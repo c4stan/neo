@@ -138,7 +138,7 @@ size_t std_bit_count_64 ( uint64_t value ) {
 }
 
 uint64_t std_bit_read_64 ( uint64_t value, size_t bit ) {
-    return ( value & ( 1 << bit ) ) == 1 << bit;
+    return ( value & ( 1ull << bit ) ) == 1ull << bit;
 }
 
 uint64_t std_bit_read_ls_64 ( uint64_t value, size_t n ) {
@@ -178,7 +178,7 @@ uint32_t std_bit_read_seq_32 ( uint32_t value, size_t ls_offset, size_t n ) {
 }
 
 bool std_bit_test_64 ( uint64_t value, uint32_t bit ) {
-    return value & ( 1 << bit );
+    return value & ( 1ull << bit );
 }
 
 void std_bit_write_32 ( uint32_t* value, size_t bit, uint32_t x ) {
@@ -505,57 +505,51 @@ uint64_t std_ring_distance_u64 ( uint64_t a, uint64_t b, uint64_t ring_size ) {
 
 // Bitset
 // TODO use 32 bit blocks?
-bool std_bitset_test ( const void* bitset, size_t idx ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+bool std_bitset_test ( const uint64_t* blocks, size_t idx ) {
     uint64_t block_idx = idx >> 6;
     uint64_t bit_idx = idx & 0x3f; // 63, 2^6 - 1
     uint64_t block = blocks[block_idx];
-    bool test = block & ( 1 << bit_idx );
+    bool test = block & ( 1ull << bit_idx );
     return test;
 }
 
-void std_bitset_set ( const void* bitset, size_t idx ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+void std_bitset_set ( uint64_t* blocks, size_t idx ) {
     uint64_t block_idx = idx >> 6;
     uint64_t bit_idx = idx & 0x3f;
     uint64_t block = blocks[block_idx];
-    block = block | ( 1 << bit_idx );
+    block = block | ( 1ull << bit_idx );
     blocks[block_idx] = block;
 }
 
-bool std_bitset_set_atomic ( const void* bitset, size_t idx ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+bool std_bitset_set_atomic ( uint64_t* blocks, size_t idx ) {
     uint64_t block_idx = idx >> 6;
     uint64_t bit_idx = idx & 0x3f;
     uint64_t* block = &blocks[block_idx];
     uint64_t old_block = *block;
-    uint64_t new_block = old_block | ( 1 << bit_idx );
+    uint64_t new_block = old_block | ( 1ull << bit_idx );
     return std_compare_and_swap_u64 ( block, &old_block, new_block );
 }
 
-void std_bitset_clear ( const void* bitset, size_t idx ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+void std_bitset_clear ( uint64_t* blocks, size_t idx ) {
     uint64_t block_idx = idx >> 6;
     uint64_t bit_idx = idx & 0x3f;
     uint64_t block = blocks[block_idx];
-    uint64_t mask = ~ ( 1 << bit_idx );
+    uint64_t mask = ~ ( 1ull << bit_idx );
     block = block & mask;
     blocks[block_idx] = block;
 }
 
-bool std_bitset_clear_atomic ( const void* bitset, size_t idx ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+bool std_bitset_clear_atomic ( uint64_t* blocks, size_t idx ) {
     uint64_t block_idx = idx >> 6;
     uint64_t bit_idx = idx & 0x3f;
     uint64_t* block = &blocks[block_idx];
     uint64_t old_block = *block;
-    uint64_t mask = ~ ( 1 << bit_idx );
+    uint64_t mask = ~ ( 1ull << bit_idx );
     uint64_t new_block = old_block & mask;
     return std_compare_and_swap_u64 ( block, &old_block, new_block );
 }
 
-bool std_bitset_scan ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx, size_t u64_blocks_count ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+bool std_bitset_scan ( uint64_t* result_bit_idx, const uint64_t* blocks, size_t starting_bit_idx, size_t u64_blocks_count ) {
     uint64_t block_idx = starting_bit_idx >> 6;
     uint64_t bit_idx = starting_bit_idx & 0x3f;
 
@@ -582,8 +576,7 @@ bool std_bitset_scan ( uint64_t* result_bit_idx, const void* bitset, size_t star
     return false;
 }
 
-bool std_bitset_scan_rev ( uint64_t* result_bit_idx, const void* bitset, size_t starting_bit_idx ) {
-    uint64_t* blocks = ( uint64_t* ) bitset;
+bool std_bitset_scan_rev ( uint64_t* result_bit_idx, const uint64_t* blocks, size_t starting_bit_idx ) {
     uint64_t block_idx = starting_bit_idx >> 6;
     uint64_t bit_idx = starting_bit_idx & 0x3f;
 

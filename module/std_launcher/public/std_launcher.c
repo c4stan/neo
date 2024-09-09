@@ -1,5 +1,3 @@
-#include <std_launcher.h>
-
 #include <std_main.h>
 #include <std_log.h>
 #include <std_process.h>
@@ -7,6 +5,10 @@
 #include <std_module.h>
 #include <std_app.h>
 
+//
+// TODO make std_launcher completely independent from std, that way std becomes fully reloadable?
+//      right now for the launcher the std code it uses doesn't update in the case where it gets changed and reloaded
+//
 void std_main ( void ) {
     const char* app_name;
     {

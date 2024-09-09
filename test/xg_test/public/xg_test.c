@@ -17,7 +17,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
-    xg->acquire_next_swapchain_texture ( swapchain, workload );
+    xg->acquire_next_swapchain_texture ( swapchain, workload, NULL );
 
     xg_texture_h texture = xg->get_swapchain_texture ( swapchain );
 
@@ -28,16 +28,17 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     xg->cmd_begin_debug_region ( cmd_buffer, "Test region", xg_debug_region_color_yellow_m, 0 );
 
     {
-        xg_texture_memory_barrier_t texture_barrier = xg_default_texture_memory_barrier_m;
-        texture_barrier.texture = texture;
-        texture_barrier.layout.old = xg_texture_layout_undefined_m;
-        texture_barrier.layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
+        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+            .texture = texture,
+            .layout.old = xg_texture_layout_undefined_m,
+            .layout.new = xg_texture_layout_copy_dest_m,
+            .memory.flushes = xg_memory_access_bit_none_m,
+            .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+        );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m();
+        xg_barrier_set_t barrier_set = xg_barrier_set_m ();
         barrier_set.texture_memory_barriers_count = 1;
         barrier_set.texture_memory_barriers = &texture_barrier;
 
@@ -62,14 +63,15 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     }
 
     {
-        xg_texture_memory_barrier_t texture_barrier = xg_default_texture_memory_barrier_m;
-        texture_barrier.texture = texture;
-        texture_barrier.layout.old = xg_texture_layout_copy_dest_m;
-        texture_barrier.layout.new = xg_texture_layout_present_m;
-        texture_barrier.memory.flushes = xg_memory_access_bit_transfer_write_m;
-        texture_barrier.memory.invalidations = xg_memory_access_bit_none_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_bit_bottom_of_pipe_m;
+        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+            .texture = texture,
+            .layout.old = xg_texture_layout_copy_dest_m,
+            .layout.new = xg_texture_layout_present_m,
+            .memory.flushes = xg_memory_access_bit_transfer_write_m,
+            .memory.invalidations = xg_memory_access_bit_none_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_bottom_of_pipe_m,
+        );
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -89,14 +91,15 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     ) );
 
     {
-        xg_texture_memory_barrier_t texture_barrier = xg_default_texture_memory_barrier_m;
-        texture_barrier.texture = temp_texture;
-        texture_barrier.layout.old = xg_texture_layout_undefined_m;
-        texture_barrier.layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_bit_transfer_write_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
+        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+            .texture = temp_texture,
+            .layout.old = xg_texture_layout_undefined_m,
+            .layout.new = xg_texture_layout_copy_dest_m,
+            .memory.flushes = xg_memory_access_bit_none_m,
+            .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+        );
 
         xg_barrier_set_t barrier_set = xg_barrier_set_m();
         barrier_set.texture_memory_barriers_count = 1;
@@ -194,7 +197,7 @@ static void xg_test2_run ( void ) {
 
         if ( !std_mem_cmp ( &info, &new_info, sizeof ( wm_window_info_t ) ) ) {
             if ( info.width != new_info.width || info.height != new_info.height ) {
-                xg->resize_swapchain ( swapchain, new_info.width, new_info.height );
+                //xg->resize_swapchain ( swapchain, new_info.width, new_info.height );
             }
 
             info = new_info;

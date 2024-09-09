@@ -74,7 +74,7 @@ static inline void se_entity_params_alloc_component ( se_entity_params_allocator
     se_component_update_t* component = std_virtual_stack_alloc_m ( allocator->stack, se_component_update_t );
     component->id = id;
     component->stream_count = 0;
-    std_bitset_set ( &allocator->entity->mask, id );
+    std_bitset_set ( allocator->entity->mask.u64, id );
     allocator->component = component;
 }
 

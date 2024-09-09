@@ -1,5 +1,7 @@
 #include "xg_vk_enum.h"
 
+#include "xg_vk_buffer.h"
+
 VkFormat xg_format_to_vk ( xg_format_e format ) {
     if ( format < 0 || format > xg_format_count_m ) {
         std_log_error_m ( "Malformed format enum" );
@@ -23,6 +25,18 @@ VkShaderStageFlags xg_shader_stage_to_vk ( xg_shading_stage_bit_e stage ) {
 
     if ( stage & xg_shading_stage_bit_compute_m ) {
         flags |= VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+
+    if ( stage & xg_shading_stage_bit_ray_gen_m ) {
+        flags |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    }
+
+    if ( stage & xg_shading_stage_bit_ray_miss_m ) {
+        flags |= VK_SHADER_STAGE_MISS_BIT_KHR;
+    }
+
+    if ( stage & xg_shading_stage_bit_ray_hit_closest_m ) {
+        flags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
     }
 
     return flags;
@@ -256,6 +270,9 @@ VkDescriptorType xg_descriptor_type_to_vk ( xg_resource_binding_e type ) {
         //case xg_resource_binding_pipeline_output_m:
         //    return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 
+        case xg_resource_binding_raytrace_world_m:
+            return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+
         default:
             std_log_error_m ( "Resource descriptor type not supported" );
             return 0;
@@ -356,12 +373,20 @@ VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_bit_e usage ) {
         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
 
-    if ( usage & xg_vk_buffer_usage_device_addressed_m ) {
+    if ( usage & xg_vk_buffer_usage_bit_acceleration_structure_build_input_read_only_m ) {
+        flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
+
+    if ( usage & xg_vk_buffer_usage_bit_acceleration_structure_storage_m ) {
+        flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+    }
+
+    if ( usage & xg_vk_buffer_usage_bit_shader_device_address_m ) {
         flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
 
-    if ( usage & xg_vk_buffer_usage_raytrace_geometry_m ) {
-        flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    if ( usage & xg_vk_buffer_usage_bit_shader_binding_table_m ) {
+        flags |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
     }
 
     return flags;

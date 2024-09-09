@@ -2,20 +2,30 @@
 
 #include "xi_state.h"
 
-static void xi_register_shaders ( xs_i* xs ) {
+static xs_database_h xi_sdb = xs_null_handle_m;
+
+static void xi_load_shaders ( xg_device_h device ) {
+    xs_i* xs = std_module_get_m ( xs_module_name_m );
+
     char path[std_process_path_max_len_m];
     std_stack_t stack = std_static_stack_m ( path );
     std_stack_string_append ( &stack, std_module_path_m );
     std_stack_string_append ( &stack, "shader/");
-    xs->add_database_folder ( path );
-    xi_workload_load_shaders ( xs );
-    xi_font_load_shaders ( xs );
+    
+    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, std_debug_string_assign_m ( .debug_name, "xi_sdb" ) ) );
+    xs->add_database_folder ( sdb, path );
+    xs->set_output_folder ( sdb, "output/shader/" );
+    xi_workload_load_shaders ( xs, sdb );
+    xi_font_load_shaders ( xs, sdb );
+    xs->build_database ( sdb );
+    xi_sdb = sdb;
 }
 
 static void xi_api_init ( xi_i* xi ) {
     xi->create_font = xi_font_create_ttf;
 
-    xi->register_shaders = xi_register_shaders;
+    xi->load_shaders = xi_load_shaders;
+
     xi->create_workload = xi_workload_create;
     xi->flush_workload = xi_workload_flush;
 

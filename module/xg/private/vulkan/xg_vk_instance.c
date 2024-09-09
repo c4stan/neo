@@ -83,7 +83,7 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
         applicationInfo.applicationVersion = 1;
         applicationInfo.pEngineName = "XG";
         applicationInfo.engineVersion = 1;
-        applicationInfo.apiVersion = VK_API_VERSION_1_2;//instance_version;
+        applicationInfo.apiVersion = VK_API_VERSION_1_3;//instance_version;
         VkInstanceCreateInfo instanceInfo = {};
         instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instanceInfo.pNext = NULL;
@@ -99,8 +99,8 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
     return instance;
 }
 
-static void xg_vk_instance_ext_api_init ( void ) {
-#define xg_vk_instance_ext_init_pfn_m(ptr, name) { *(ptr) = ( std_typeof_m ( *(ptr) ) ) vkGetInstanceProcAddr ( xg_vk_instance_state->vk_handle, name ); std_assert_m ( ptr ); }
+static void xg_vk_instance_load_ext_api ( void ) {
+#define xg_vk_instance_ext_init_pfn_m(ptr, name) { *(ptr) = ( std_typeof_m ( *(ptr) ) ) ( vkGetInstanceProcAddr ( xg_vk_instance_state->vk_handle, name ) ); std_assert_m ( *ptr ); }
 
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_begin_debug_region, "vkCmdBeginDebugUtilsLabelEXT" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_end_debug_region, "vkCmdEndDebugUtilsLabelEXT" );
@@ -118,14 +118,14 @@ static void xg_vk_instance_ext_api_init ( void ) {
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_device_address, "vkGetAccelerationStructureDeviceAddressKHR" );
 #endif
 
-#undef xg_vk_instance_ext_init_pfn_m
+#undef xg_vk_instance_ext_init_pfn_m    
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* data, void* user_data ) {
     std_unused_m ( type );
     std_unused_m ( user_data );
 
-    if ( std_log_debugger_attached() && ( false ) ) {
+    if ( std_log_debugger_attached() ) {
         if ( severity != VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT ) {
             std_debug_break_m();
         }
@@ -149,6 +149,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
 static void xg_vk_instance_destroy_debug_callback ( void ) {
     std_assert_m ( xg_vk_instance_state->callback != VK_NULL_HANDLE );
     xg_vk_instance_state->ext_api.destroy_debug_callback ( xg_vk_instance_state->vk_handle, xg_vk_instance_state->callback, NULL );
+    xg_vk_instance_state->callback = VK_NULL_HANDLE;
 }
 
 static void xg_vk_instance_create_debug_callback ( void ) {
@@ -301,7 +302,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
     std_assert_m ( layer_i == layers_count );
     std_assert_m ( extension_i == extensions_count );
     xg_vk_instance_state->vk_handle = xg_vk_instance_create ( layers, layers_count, extensions, extensions_count );
-    xg_vk_instance_ext_api_init();
+    xg_vk_instance_load_ext_api();
 
     // Debug
     xg_vk_instance_state->callback = VK_NULL_HANDLE;
@@ -311,6 +312,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
 void xg_vk_instance_reload ( xg_vk_instance_state_t* state ) {
     xg_vk_instance_state = state;
 
+    xg_vk_instance_load_ext_api();
     xg_vk_instance_destroy_debug_callback();
     xg_vk_instance_create_debug_callback();
 }

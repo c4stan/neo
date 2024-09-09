@@ -9,7 +9,7 @@
 
 #if 0
 typedef struct {
-    xs_pipeline_state_h pipeline_state;
+    xs_database_pipeline_h pipeline_state;
 } depth_pass_args_t;
 
 static void depth_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -38,15 +38,13 @@ xf_node_h add_depth_clear_pass ( xf_graph_h graph, xf_texture_h depth, const cha
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
 
-    xf_node_h node;
-    {
-        xf_node_params_t params = xf_default_node_params_m;
-        params.copy_texture_writes[params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m );
-        params.execute_routine = clear_pass;
-        std_str_copy_static_m ( params.debug_name, name );
-        node = xf->create_node ( graph, &params );
-    }
-
+    xf_node_params_t params = xf_node_params_m (
+        .copy_texture_writes_count = 1,
+        .copy_texture_writes = { xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m ) },
+        .execute_routine = clear_pass,
+    );
+    std_str_copy_static_m ( params.debug_name, name );
+    xf_node_h node = xf->create_node ( graph, &params );
     return node;
 }
 
@@ -60,7 +58,7 @@ xf_node_h add_depth_pass ( xf_graph_h graph, xf_texture_h depth ) {
     {
         const char* pipeline_name = "depth";
         xs_string_hash_t pipeline_hash = xs_hash_string_m ( pipeline_name, std_str_len ( pipeline_name ) );
-        xs_pipeline_state_h pipeline_state = xs->lookup_pipeline_state ( pipeline_hash );
+        xs_database_pipeline_h pipeline_state = xs->lookup_pipeline_state ( pipeline_hash );
         std_assert_m ( pipeline_state != xs_null_handle_m );
 
         args.pipeline_state = pipeline_state;

@@ -7,7 +7,6 @@ fragment_shader frag_kernel.frag
 include test_include.xsi
 
 begin viewport
-    dynamic on
     min_depth 0
     max_depth 1
 end

@@ -518,3 +518,15 @@ bool std_str_validate ( const char* str, size_t cap ) {
 //    std_str_copy ( str, size, text );
 //    return str;
 //}
+
+void std_debug_string_write ( std_debug_string_t* dst, const char* src ) {
+    std_str_copy_static_m ( dst->str, src );
+}
+
+void std_debug_string_copy ( std_debug_string_t* dst, const std_debug_string_t* src ) {
+    std_str_copy_static_m ( dst->str, src->str );
+}
+
+const char* std_debug_string_get ( std_debug_string_t* str ) {
+    return str->str;
+}

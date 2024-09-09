@@ -1,6 +1,7 @@
 begin buffer
     stage vertex
     stage fragment
+    stage ray_gen
     set frame
     register 0
 end
@@ -8,6 +9,7 @@ end
 begin buffer
     stage vertex
     stage fragment
+    stage ray_gen
     set view
     register 0
 end

@@ -14,8 +14,9 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 
 // note: sizeof(char[32]) == 32, use _T for static arrays (need to take its address)
 // TODO split static_array from array from single item
-#define     std_mem_zero_m( item ) std_mem_zero( (item), sizeof ( *(item) ) )
-#define     std_mem_zero_array_m( item, count ) std_mem_zero( (item), sizeof ( *(item) ) * (count) )
+#define     std_mem_zero_m( item ) std_mem_zero ( (item), sizeof ( *(item) ) )
+#define     std_mem_zero_array_m( item, count ) std_mem_zero ( (item), sizeof ( *(item) ) * (count) )
+#define     std_mem_zero_static_array_m( array ) std_mem_zero ( array, sizeof ( array ) )
 #define     std_mem_copy_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) )
 #define     std_mem_copy_array_m( dest, source, count ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) * (count) )
 #define     std_mem_cmp_array_m(a, b, count) std_mem_cmp( (a), (b), sizeof ( std_typeof_m ( *(a) ) ) * (count) )
@@ -198,16 +199,16 @@ uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_si
 #define std_ptr_value_m( ptr, type ) ( *( type* ) ( ptr ) )
 
 // call std_mem_set to initialize the bitset to the desired initial value
-void std_bitset_set ( const void* bitset, size_t idx );
-bool std_bitset_test ( const void* bitset, size_t idx );
-void std_bitset_clear ( const void* bitset, size_t idx );
+void std_bitset_set ( uint64_t* bitset, size_t idx );
+bool std_bitset_test ( const uint64_t* bitset, size_t idx );
+void std_bitset_clear ( uint64_t* bitset, size_t idx );
 // scans for the first bit set to 1. the bit at location starting_bit_idx is included in the scan
 // u64_blocks_count is to always be specified relative to the very beginning of the bitset, not from the given starting bit
 // returns false if no bit set to 1 was found
-bool std_bitset_scan ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx, size_t total_u64_count );
-bool std_bitset_scan_rev ( uint64_t* out_idx, const void* bitset, size_t starting_bit_idx );
+bool std_bitset_scan ( uint64_t* out_idx, const uint64_t* bitset, size_t starting_bit_idx, size_t total_u64_count );
+bool std_bitset_scan_rev ( uint64_t* out_idx, const uint64_t* bitset, size_t starting_bit_idx );
 
-bool std_bitset_set_atomic ( const void* bitset, size_t idx );
-bool std_bitset_clear_atomic ( const void* bitset, size_t idx );
+bool std_bitset_set_atomic ( uint64_t* bitset, size_t idx );
+bool std_bitset_clear_atomic ( uint64_t* bitset, size_t idx );
 
 //#include <std_byte.inl>

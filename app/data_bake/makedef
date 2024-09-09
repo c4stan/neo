@@ -1,0 +1,11 @@
+name = data_bake
+code = public, private
+defs = public.def
+configs = debug, release
+output = exe
+deps = std, fs
+if win32
+    libs = $assimp_lib
+    includes = $assimp_include
+    bindings = assimp_models
+endif

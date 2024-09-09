@@ -110,8 +110,8 @@ typedef struct {
     //std_ring_t submit_ring;
     xi_workload_device_context_t device_contexts[xg_max_active_devices_m];
 
-    xs_pipeline_state_h render_pipeline_bgra8;
-    xs_pipeline_state_h render_pipeline_a2bgr10;
+    xs_database_pipeline_h render_pipeline_bgra8;
+    xs_database_pipeline_h render_pipeline_a2bgr10;
 
     xg_texture_h null_texture;
     xg_sampler_h point_sampler;
@@ -122,7 +122,7 @@ void xi_workload_load ( xi_workload_state_t* state );
 void xi_workload_reload ( xi_workload_state_t* state );
 void xi_workload_unload ( void );
 
-void xi_workload_load_shaders ( xs_i* xs );
+void xi_workload_load_shaders ( xs_i* xs, xs_database_h sdb );
 
 xi_workload_h xi_workload_create ( void );
 void xi_workload_cmd_draw ( xi_workload_h workload, const xi_draw_rect_t* rects, uint64_t rect_count );

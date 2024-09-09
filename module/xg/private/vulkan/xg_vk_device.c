@@ -29,27 +29,98 @@
 
 // ---- Private -----
 
-
 static xg_vk_device_state_t* xg_vk_device_state;
 
 static uint64_t xg_vk_device_id_next ( void ) {
     return std_atomic_increment_u64 ( &xg_vk_device_state->device_id ) - 1;
 }
 
+static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
+    xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
+
+#define xg_vk_device_ext_init_pfn_m(ptr, name) { *(ptr) = ( std_typeof_m ( *(ptr) ) ) ( vkGetDeviceProcAddr ( device->vk_handle, name ) ); std_assert_m ( *ptr ); }
+
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_begin_debug_region, "vkCmdBeginDebugUtilsLabelEXT" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_end_debug_region, "vkCmdEndDebugUtilsLabelEXT" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.set_debug_name, "vkSetDebugUtilsObjectNameEXT" );
+#if xg_vk_enable_sync2_m
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_sync2_pipeline_barrier, "vkCmdPipelineBarrier2KHR" );
+#endif
+
+#if xg_enable_raytracing_m
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_acceleration_structure_build_sizes, "vkGetAccelerationStructureBuildSizesKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_build_acceleration_structures, "vkCmdBuildAccelerationStructuresKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_acceleration_structure_device_address, "vkGetAccelerationStructureDeviceAddressKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.trace_rays, "vkCmdTraceRaysKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.destroy_acceleration_structure, "vkDestroyAccelerationStructureKHR" );
+#if xg_vk_enable_nv_raytracing_ext_m
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesNV" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNV" );
+#else
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNK" );
+#endif
+#endif
+
+#undef xg_vk_instance_ext_init_pfn_m    
+}
+
 static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
-    // Get Property lists
     std_log_info_m ( "Querying device " std_fmt_size_m " for properties", device->id );
+    
+    // Properties
     vkGetPhysicalDeviceProperties ( device->vk_physical_handle, &device->generic_properties );
-    vkGetPhysicalDeviceFeatures ( device->vk_physical_handle, &device->supported_features );
+    device->raytrace_properties = ( VkPhysicalDeviceRayTracingPipelinePropertiesKHR ) {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
+        .pNext = NULL
+    };
+    VkPhysicalDeviceProperties2 properties_query = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &device->raytrace_properties
+    };
+    vkGetPhysicalDeviceProperties2 ( device->vk_physical_handle, &properties_query );
+    device->generic_properties = properties_query.properties;
+
+    // Features
+    device->supported_device_address_features = ( VkPhysicalDeviceBufferDeviceAddressFeatures ) {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+        .pNext = NULL
+    };
+    device->supported_raytrace_features = ( VkPhysicalDeviceRayTracingPipelineFeaturesKHR ) {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR,
+        .pNext = &device->supported_device_address_features
+    };
+    device->supported_acceleration_structure_features = ( VkPhysicalDeviceAccelerationStructureFeaturesKHR ) {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+        .pNext = &device->supported_raytrace_features,
+    };
+    VkPhysicalDeviceFeatures2 features_query = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &device->supported_acceleration_structure_features
+    };
+    vkGetPhysicalDeviceFeatures2 ( device->vk_physical_handle, &features_query );
+    device->supported_features = features_query.features;
+    
+    // Memory
     vkGetPhysicalDeviceMemoryProperties ( device->vk_physical_handle, &device->memory_properties );
+
+    // Queues
     vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queues_families_count, NULL );
     vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queues_families_count, device->queues_families_properties );
 
-    std_assert_m ( device->supported_features.geometryShader );
+#if xg_enable_raytracing_m
+    std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
+    std_assert_m ( device->supported_device_address_features.bufferDeviceAddress );
+    std_assert_m ( device->supported_acceleration_structure_features.accelerationStructure );
+    //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructureHostCommands );
+#endif
 
-//#if std_enabled_m(xg_vk_enable_raytracing)
-//    std_assert_m ( device->supported_features.bufferDeviceAddress );
-//#endif
+    // needed for sv_primitiveID I think
+    // TODO avoid using this? 
+    //      see https://x.com/SebAaltonen/status/1821440546096689383
+    //          Variable Rate Shading with Visibility Buffer Rendering - John Hable - SIGGRAPH 2024
+    std_assert_m ( device->supported_features.geometryShader );
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     // Print generic properties
@@ -473,6 +544,15 @@ void xg_vk_device_load ( xg_vk_device_state_t* state ) {
 
 void xg_vk_device_reload ( xg_vk_device_state_t* state ) {
     xg_vk_device_state = state;
+
+    for ( size_t i = 0; i < xg_vk_max_devices_m; ++i ) {
+        xg_vk_device_t* device = &xg_vk_device_state->devices_array[i];
+
+        if ( device->flags & xg_vk_device_active_m ) {
+            xg_vk_device_load_ext_api ( i );
+        }
+    }
+
 }
 
 void xg_vk_device_wait_idle_all ( void ) {
@@ -671,12 +751,6 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         return false;
     }
 
-    // Fill Features list
-    VkPhysicalDeviceFeatures enabled_features;
-    std_mem_set ( &enabled_features, sizeof ( enabled_features ), 0 );
-    // enabled_features.tessellationShader = VK_TRUE;
-    enabled_features.geometryShader = VK_TRUE;
-
     // Fill Layers list
     // *** Device layers are deprecated ***
 #if 0
@@ -763,24 +837,48 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         device->queue_create_info[i].pQueuePriorities = &queue_priority;
     }
 
+    // Fill Features list
+    VkPhysicalDeviceFeatures enabled_features = {
+        .geometryShader = VK_TRUE,
+    };
+
     // Enable sync2 API
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_KHR_synchronization2.html
-    VkPhysicalDeviceSynchronization2FeaturesKHR sync2_feature;
-    sync2_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
-    sync2_feature.pNext = NULL;
-    sync2_feature.synchronization2 = VK_TRUE;
+    VkPhysicalDeviceSynchronization2FeaturesKHR sync2_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
+        .pNext = NULL,
+        .synchronization2 = VK_TRUE,
+    };
 
     // Enable imageless framebuffers
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_KHR_imageless_framebuffer.html
-    VkPhysicalDeviceImagelessFramebufferFeatures imageless_framebuffer_feature;
-    imageless_framebuffer_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES;
-    imageless_framebuffer_feature.pNext = &sync2_feature;
-    imageless_framebuffer_feature.imagelessFramebuffer = VK_TRUE;
+    VkPhysicalDeviceImagelessFramebufferFeatures imageless_framebuffer_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES,
+        .pNext = &sync2_feature,
+        .imagelessFramebuffer = VK_TRUE,
+    };
+
+    // Enable buffer device address
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+        .pNext = &imageless_framebuffer_feature,
+        .bufferDeviceAddress = VK_TRUE,
+    };
+
+    // Enable acceleration strucutre
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_strucutre_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+        .pNext = &buffer_device_address_feature,
+        .accelerationStructure = VK_TRUE,
+        //.accelerationStructureHostCommands = VK_TRUE,
+    };
 
     // Create Device
     VkDeviceCreateInfo device_create_info;
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_create_info.pNext = &imageless_framebuffer_feature;
+    device_create_info.pNext = &acceleration_strucutre_feature;
     device_create_info.flags = 0;
     device_create_info.queueCreateInfoCount = device->queue_create_info_count;
     device_create_info.pQueueCreateInfos = queue_create_info;
@@ -801,6 +899,8 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     device->flags |= xg_vk_device_active_m;
 
     std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
+
+    xg_vk_device_load_ext_api ( device_handle );
 
     xg_vk_allocator_activate_device ( device_handle );
     xg_vk_workload_activate_device ( device_handle );
@@ -983,6 +1083,11 @@ void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc ) {
     vkUnmapMemory ( device->vk_handle, ( VkDeviceMemory ) alloc->base );
     // TODO call vkFlushMappedMemoryRanges if the unmapped memory is not coherent (always or expose a flag to control when?)
     // currenly the assumption when mapping heaps is that all used memory is coherent, TODO fix that too
+}
+
+xg_vk_device_ext_api_i* xg_vk_device_ext_api ( xg_device_h device_handle ) {
+    xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
+    return &device->ext_api;
 }
 
 #if 0

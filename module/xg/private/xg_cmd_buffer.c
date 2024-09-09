@@ -435,6 +435,20 @@ static void* xg_cmd_buffer_record_cmd ( xg_cmd_buffer_t* cmd_buffer, xg_cmd_type
 
 // Graphics pipeline
 
+void xg_cmd_buffer_graphics_renderpass_begin ( xg_cmd_buffer_h cmd_buffer_handle, const xg_renderpass_h renderpass, uint64_t key ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_graphics_renderpass_begin_m, key, xg_cmd_graphics_renderpass_begin_t );
+
+    cmd_args->renderpass = renderpass;
+}
+
+void xg_cmd_buffer_graphics_renderpass_end ( xg_cmd_buffer_h cmd_buffer_handle, const xg_renderpass_h renderpass, uint64_t key ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_graphics_renderpass_end_m, key, xg_cmd_graphics_renderpass_end_t );
+
+    cmd_args->renderpass = renderpass;
+}
+
 void xg_cmd_buffer_graphics_streams_bind ( xg_cmd_buffer_h cmd_buffer_handle, const xg_vertex_stream_binding_t* bindings, size_t bindings_count, uint64_t key ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_graphics_streams_bind_m, key, xg_cmd_graphics_streams_bind_t );
@@ -532,11 +546,13 @@ void xg_cmd_buffer_pipeline_resources_bind ( xg_cmd_buffer_h cmd_buffer_handle, 
     uint32_t buffer_count = bindings->buffer_count;
     uint32_t texture_count = bindings->texture_count;
     uint32_t sampler_count = bindings->sampler_count;
+    uint32_t raytrace_world_count = bindings->raytrace_world_count;
 
     cmd_args->set = set;
     cmd_args->buffer_count = buffer_count;
     cmd_args->texture_count = texture_count;
     cmd_args->sampler_count = sampler_count;
+    cmd_args->raytrace_world_count = raytrace_world_count;
 
     if ( buffer_count > 0 ) {
         std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_buffer_resource_binding_t ) );
@@ -562,6 +578,15 @@ void xg_cmd_buffer_pipeline_resources_bind ( xg_cmd_buffer_h cmd_buffer_handle, 
 
         for ( uint32_t i = 0; i < sampler_count; ++i ) {
             samplers[i] = bindings->samplers[i];
+        }
+    }
+
+    if ( raytrace_world_count > 0 ) {
+        std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_raytrace_world_resource_binding_t ) );
+        std_auto_m raytrace_worlds = ( xg_raytrace_world_resource_binding_t* ) std_queue_local_emplace_array_m ( &cmd_buffer->cmd_args_allocator, xg_raytrace_world_resource_binding_t, raytrace_world_count );
+
+        for ( uint32_t i = 0; i < raytrace_world_count; ++i ) {
+            raytrace_worlds[i] = bindings->raytrace_worlds[i];
         }
     }
 
@@ -620,6 +645,22 @@ void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h cmd_buffer_handle, uint32_
 void xg_cmd_buffer_compute_pipeline_state_bind ( xg_cmd_buffer_h cmd_buffer_handle, xg_graphics_pipeline_state_h pipeline, uint64_t key ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_compute_pipeline_state_bind_m, key, xg_cmd_compute_pipeline_state_bind_t );
+
+    cmd_args->pipeline = pipeline;
+}
+
+void xg_cmd_buffer_raytrace_trace_rays ( xg_cmd_buffer_h cmd_buffer_handle, uint32_t ray_count_x, uint32_t ray_count_y, uint32_t ray_count_z, uint64_t key ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_raytrace_trace_rays_m, key, xg_cmd_raytrace_trace_rays_t );
+
+    cmd_args->ray_count_x = ray_count_x;
+    cmd_args->ray_count_y = ray_count_y;
+    cmd_args->ray_count_z = ray_count_z;
+}
+
+void xg_cmd_buffer_raytrace_pipeline_state_bind ( xg_cmd_buffer_h cmd_buffer_handle, xg_raytrace_pipeline_state_h pipeline, uint64_t key ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_raytrace_pipeline_state_bind_m, key, xg_cmd_raytrace_pipeline_state_bind_t );
 
     cmd_args->pipeline = pipeline;
 }

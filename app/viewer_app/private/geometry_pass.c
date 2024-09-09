@@ -81,152 +81,133 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     // Bind render targets
-    {
-        xg_render_textures_binding_t render_textures;
-        render_textures.render_targets_count = 3;
-        render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-        render_textures.render_targets[1] = xf_render_target_binding_m ( node_args->io->render_targets[1] );
-        render_textures.render_targets[2] = xf_render_target_binding_m ( node_args->io->render_targets[2] );
-        render_textures.depth_stencil.texture = node_args->io->depth_stencil_target;
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
+    xg_render_textures_binding_t render_textures = {
+        .render_targets_count = 3,
+        .render_targets = {
+            xf_render_target_binding_m ( node_args->io->render_targets[0] ),
+            xf_render_target_binding_m ( node_args->io->render_targets[1] ),
+            xf_render_target_binding_m ( node_args->io->render_targets[2] ),
+        },
+        .depth_stencil.texture = node_args->io->depth_stencil_target,
+    };
+    xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
+
+    xg_viewport_state_t viewport = xg_viewport_state_m (
+        .width = pass_args->width,
+        .height = pass_args->height,
+    );
+    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
     se_i* se = std_module_get_m ( se_module_name_m );
 
-#if 0
-    se_query_h mesh_query;
-    {
-        se_query_params_t query_params = se_default_query_params_m;
-        std_bitset_set ( query_params.request_component_flags, MESH_COMPONENT_ID );
-        mesh_query = se->create_query ( &query_params );
-    }
-
-    se->resolve_pending_queries();
-    const se_query_result_t* mesh_query_result = se->get_query_result ( mesh_query );
-    uint64_t mesh_count = mesh_query_result->count;
-#else
     se_query_result_t mesh_query_result;
-    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { MESH_COMPONENT_ID } ) );
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
     se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
-#endif
-
-    xg_viewport_state_t viewport = xg_default_viewport_state_m;
-    viewport.width = pass_args->width;
-    viewport.height = pass_args->height;
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
-#if 0
-        se_entity_h entity = mesh_query_result->entities[i];
-        se_component_h component = se->get_component ( entity, MESH_COMPONENT_ID );
-        std_auto_m mesh_component = ( viewapp_mesh_component_t* ) component;
-#else
         viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
-#endif
 
         // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->geometry_pipeline );
         xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-        //uint64_t draw_buffer_vertex_offset;
-        //uint64_t draw_buffer_fragment_offset;
-        xg_buffer_range_t vert_draw_buffer_range;
-        xg_buffer_range_t frag_draw_buffer_range;
-        {
-            draw_cbuffer_vs_t vs;
-            std_mem_zero_m ( &vs );
-            sm_vec_3f_t up;// = sm_vec_3f ( 0, 1, 0 );
-            up.x = mesh_component->up[0];
-            up.y = mesh_component->up[1];
-            up.z = mesh_component->up[2];
-            sm_vec_3f_t dir;
-            dir.x = mesh_component->orientation[0];
-            dir.y = mesh_component->orientation[1];
-            dir.z = mesh_component->orientation[2];
-            dir = sm_vec_3f_norm ( dir );
-            sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+        sm_vec_3f_t up = {
+            .x = mesh_component->up[0],
+            .y = mesh_component->up[1],
+            .z = mesh_component->up[2],
+        };
 
-            sm_mat_4x4f_t trans;
-            std_mem_zero_m ( &trans );
-            trans.r0[0] = 1;
-            trans.r1[1] = 1;
-            trans.r2[2] = 1;
-            trans.r3[3] = 1;
-            trans.r0[3] = mesh_component->position[0];
-            trans.r1[3] = mesh_component->position[1];
-            trans.r2[3] = mesh_component->position[2];
-            vs.world = sm_matrix_4x4f_mul ( trans, rot );
+        sm_vec_3f_t dir = {
+            .x = mesh_component->orientation[0],
+            .y = mesh_component->orientation[1],
+            .z = mesh_component->orientation[2],
+        };
+        dir = sm_vec_3f_norm ( dir );
+        
+        sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
 
-            draw_cbuffer_fs_t fs;
-            std_mem_zero_m ( &fs );
-            fs.base_color[0] = mesh_component->material.base_color[0];
-            fs.base_color[1] = mesh_component->material.base_color[1];
-            fs.base_color[2] = mesh_component->material.base_color[2];
-            std_assert_m ( i < 256 );
-            fs.object_id = ( uint32_t ) i; //mesh_component->material.ssr;
-            fs.roughness = mesh_component->material.roughness;
-            fs.metalness = mesh_component->material.metalness;
+        sm_mat_4x4f_t trans = {
+            .r0[0] = 1,
+            .r1[1] = 1,
+            .r2[2] = 1,
+            .r3[3] = 1,
+            .r0[3] = mesh_component->position[0],
+            .r1[3] = mesh_component->position[1],
+            .r2[3] = mesh_component->position[2],
+        };
 
-            vert_draw_buffer_range = xg->write_workload_uniform ( workload, &vs, sizeof ( vs ) );
-            frag_draw_buffer_range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) );
-        }
+        draw_cbuffer_vs_t vs = {
+            .world = sm_matrix_4x4f_mul ( trans, rot ),
+        };
+
+        std_assert_m ( i < 256 );
+        draw_cbuffer_fs_t fs = {
+            .base_color[0] = mesh_component->material.base_color[0],
+            .base_color[1] = mesh_component->material.base_color[1],
+            .base_color[2] = mesh_component->material.base_color[2],
+            .object_id = ( uint32_t ) i,
+            .roughness = mesh_component->material.roughness,
+            .metalness = mesh_component->material.metalness,
+        };
 
         // Bind draw resources
-        {
-            xg_buffer_resource_binding_t buffers[2];
+        xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
+            .set = xg_resource_binding_set_per_draw_m,
+            .buffer_count = 2,
+            .buffers = {
+                xg_buffer_resource_binding_m (
+                    .shader_register = 0,
+                    .type = xg_buffer_binding_type_uniform_m,
+                    .range = xg->write_workload_uniform ( workload, &vs, sizeof ( vs ) ),
+                ),
+                xg_buffer_resource_binding_m (
+                    .shader_register = 1,
+                    .type = xg_buffer_binding_type_uniform_m,
+                    .range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) ),
+                )
+            }
+        );
 
-            buffers[0].shader_register = 0;
-            buffers[0].type = xg_buffer_binding_type_uniform_m;
-            buffers[0].range = vert_draw_buffer_range;
-
-            buffers[1].shader_register = 1;
-            buffers[1].type = xg_buffer_binding_type_uniform_m;
-            buffers[1].range = frag_draw_buffer_range;
-
-            xg_pipeline_resource_bindings_t draw_bindings = xg_default_pipeline_resource_bindings_m;
-            draw_bindings.set = xg_resource_binding_set_per_draw_m;
-            draw_bindings.buffer_count = 2;
-            draw_bindings.buffers = buffers;
-
-            xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-        }
+        xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
 
         // Set vertex streams
-        {
-            xg_vertex_stream_binding_t vertex_bindings[2];
-            vertex_bindings[0].buffer = mesh_component->pos_buffer;
-            vertex_bindings[0].stream_id = 0;
-            vertex_bindings[0].offset = 0;
-            vertex_bindings[1].buffer = mesh_component->nor_buffer;
-            vertex_bindings[1].stream_id = 1;
-            vertex_bindings[1].offset = 0;
-            xg->cmd_set_vertex_streams ( cmd_buffer, vertex_bindings, 2, key );
-        }
+        xg_vertex_stream_binding_t vertex_bindings[2] = {
+            xg_vertex_stream_binding_m (
+                .buffer = mesh_component->pos_buffer,
+                .stream_id = 0,
+                .offset = 0,
+            ),
+            xg_vertex_stream_binding_m (
+                .buffer = mesh_component->nor_buffer,
+                .stream_id = 1,
+                .offset = 0,
+            )
+        };
+        xg->cmd_set_vertex_streams ( cmd_buffer, vertex_bindings, 2, key );
 
         // Draw
         xg->cmd_draw_indexed ( cmd_buffer, mesh_component->idx_buffer, mesh_component->index_count, 0, key );
     }
-
-#if 0
-    se->dispose_query_results();
-#endif
 }
 
 xf_node_h add_geometry_clear_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth ) {
     xf_i* xf = std_module_get_m ( xf_module_name_m );
 
-    xf_node_params_t node_params = xf_default_node_params_m;
-    node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m );
-    node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( color, xg_default_texture_view_m );
-    node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( normal, xg_default_texture_view_m );
-    node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( material, xg_default_texture_view_m );
-    node_params.execute_routine = clear_pass;
-    std_str_copy_static_m ( node_params.debug_name, "geometry_clear" );
+    xf_node_params_t node_params = xf_node_params_m (
+        .copy_texture_writes_count = 4,
+        .copy_texture_writes = { 
+            xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m ),
+            xf_copy_texture_dependency_m ( color, xg_default_texture_view_m ),
+            xf_copy_texture_dependency_m ( normal, xg_default_texture_view_m ),
+            xf_copy_texture_dependency_m ( material, xg_default_texture_view_m ),
+        },
+        .execute_routine = clear_pass,
+        .debug_name = "geometry_clear",
+    );
     xf_node_h clear_node = xf->create_node ( graph, &node_params );
-
     return clear_node;
 }
 
@@ -236,23 +217,29 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
     xf_texture_info_t color_info;
     xf->get_texture_info ( &color_info, color );
 
-    geometry_pass_args_t pass_args;
-    pass_args.width = color_info.width;
-    pass_args.height = color_info.height;
+    geometry_pass_args_t pass_args = {
+        .width = color_info.width,
+        .height = color_info.height,
+    };
 
-    xf_node_params_t node_params = xf_default_node_params_m;
-    node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( color, xg_default_texture_view_m );
-    node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( normal, xg_default_texture_view_m );
-    node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( material, xg_default_texture_view_m );
-    node_params.depth_stencil_target = depth;
-    node_params.execute_routine = geometry_pass;
-    node_params.user_args = std_buffer_m ( &pass_args );
-    std_str_copy_static_m ( node_params.debug_name, "geometry" );
-    node_params.passthrough.enable = true;
-    node_params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_ignore_m;
-    node_params.passthrough.render_targets[1].mode = xf_node_passthrough_mode_ignore_m;
-    node_params.passthrough.render_targets[2].mode = xf_node_passthrough_mode_ignore_m;
+    xf_node_params_t node_params = xf_node_params_m (
+        .render_targets_count = 3,
+        .render_targets = {
+            xf_render_target_dependency_m ( color, xg_default_texture_view_m ),
+            xf_render_target_dependency_m ( normal, xg_default_texture_view_m ),
+            xf_render_target_dependency_m ( material, xg_default_texture_view_m ),
+        },
+        .depth_stencil_target = depth,
+        .execute_routine = geometry_pass,
+        .user_args = std_buffer_m ( &pass_args ),
+        .debug_name = "geometry",
+        .passthrough.enable = true,
+        .passthrough.render_targets = {
+            xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_ignore_m ),
+            xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_ignore_m ),
+            xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_ignore_m ),
+        }
+    );
     xf_node_h node = xf->create_node ( graph, &node_params );
-
     return node;
 }

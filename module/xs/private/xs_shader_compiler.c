@@ -37,6 +37,9 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
         std_stack_t stack = std_static_stack_m ( args_buffer );
 
         args[argc++] = stack.top;
+        std_stack_string_copy ( &stack, "--target-env=vulkan1.2" );
+
+        args[argc++] = stack.top;
         std_stack_string_copy ( &stack, params->shader_path );
 
         args[argc++] = stack.top;

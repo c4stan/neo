@@ -79,3 +79,26 @@ uint64_t std_str_hash_64 ( const char* str );
 
 bool std_str_validate ( const char* str, size_t cap );
 #define std_str_validate_m( _str ) ( std_str_validate ( _str, sizeof ( _str ) ) )
+
+#define std_enable_debug_string_m std_build_debug_m==1
+#if std_enable_debug_string_m
+
+typedef struct {
+    char str[std_debug_string_size_m];
+} std_debug_string_t;
+
+#define std_null_debug_string_m ( std_debug_string_t ) { 0 }
+#define std_debug_string_assign_m( _dst, _str ) _dst = ( std_debug_string_t ) { .str = _str }
+
+void std_debug_string_write ( std_debug_string_t* str, const char* src );
+void std_debug_string_copy ( std_debug_string_t* dst, const std_debug_string_t* src );
+const char* std_debug_string_get ( std_debug_string_t* str );
+
+#else
+
+#define std_debug_string_t
+#define std_debug_string_write( str, src )
+#define std_debug_string_copy( str, src )
+#define std_debug_string_get( str ) ""
+
+#endif

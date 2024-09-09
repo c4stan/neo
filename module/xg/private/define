@@ -39,7 +39,9 @@ xg_vk_max_devices_m                             1
 xg_vk_max_swapchains_m                          128
 xg_vk_max_graphics_pipelines_m                  1024
 xg_vk_max_compute_pipelines_m                   128
+xg_vk_max_raytrace_pipelines_m                  128
 xg_vk_max_renderpasses_m                        1024
+xg_vk_max_graphics_renderpass_m                 256
 xg_vk_max_framebuffers_m                        1024
 xg_vk_max_buffers_m                             1024 * 2
 xg_vk_max_textures_m                            1024 * 2
@@ -53,9 +55,10 @@ xg_vk_max_cpu_queue_events_m                    xg_workload_max_allocated_worklo
 xg_vk_max_descriptor_sets_layouts_m             1024 * 2
 xg_vk_max_pipeline_resource_groups_m            1024
 xg_vk_max_query_pools_m                         32
-
 xg_vk_max_allocations_m                         1024 * 4
 xg_vk_max_linear_allocators_m                   32
+xg_vk_raytrace_max_geometries_m                 32
+xg_vk_raytrace_max_worlds_m                     4
 
 # cmd buffer management
 xg_vk_cmd_buffer_cmd_buffers_per_allocator_m        4
@@ -84,6 +87,7 @@ xg_vk_max_uniform_buffer_per_descriptor_pool_m          1024*10
 xg_vk_max_storage_buffer_per_descriptor_pool_m          8
 xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m    8
 xg_vk_max_storage_texel_buffer_per_descriptor_pool_m    8
+xg_vk_max_raytrace_world_per_descriptor_pool_m          8
 
 # Size of static stack-allocated temporary buffers used to query the Vulkan API
 xg_vk_query_max_device_extensions_m             512

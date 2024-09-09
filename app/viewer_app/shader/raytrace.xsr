@@ -1,0 +1,18 @@
+ray_gen_shader raygen.rgen
+ray_hit_closest_shader rayhit.rchit
+ray_miss_shader raymiss.rmiss
+
+include common.xsi
+
+begin ray_world
+    register 0
+    stage ray_gen
+    update per_draw
+end
+
+begin texture
+    register 1
+    stage ray_gen
+    access write
+    update per_draw
+end

@@ -16,6 +16,7 @@
 #include "xg_vk_enum.h"
 #include "xg_vk_sampler.h"
 #include "xg_vk_instance.h"
+#include "xg_vk_raytrace.h"
 
 #include <std_list.h>
 
@@ -42,6 +43,18 @@ static xg_vk_workload_t* xg_vk_workload_edit ( xg_workload_h workload_handle ) {
 
 const xg_vk_workload_t* xg_vk_workload_get ( xg_workload_h workload_handle ) {
     return xg_vk_workload_edit ( workload_handle );
+}
+
+static void xg_vk_desc_allocator_reset ( xg_vk_desc_allocator_t* allocator ) {
+    allocator->set_count = xg_vk_max_sets_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_sampler_m] = xg_vk_max_samplers_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_texture_to_sample_m] = xg_vk_max_sampled_texture_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_texture_storage_m] = xg_vk_max_storage_texture_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_uniform_m] = xg_vk_max_uniform_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_storage_m] = xg_vk_max_storage_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_texel_uniform_m] = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_buffer_texel_storage_m] = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
+    allocator->descriptor_counts[xg_resource_binding_raytrace_world_m] = xg_vk_max_raytrace_world_per_descriptor_pool_m;
 }
 
 void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
@@ -113,23 +126,22 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
             sizes[xg_resource_binding_buffer_texel_uniform_m].descriptorCount = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
             sizes[xg_resource_binding_buffer_texel_storage_m].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
             sizes[xg_resource_binding_buffer_texel_storage_m].descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
+#if xg_vk_enable_nv_raytracing_ext_m
+            sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+#else
+            sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+#endif
+            sizes[xg_resource_binding_raytrace_world_m].descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m;
             info.pPoolSizes = sizes;
             VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &allocator->vk_desc_pool );
             xg_vk_assert_m ( result );
 
-            allocator->set_count = xg_vk_max_sets_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_sampler_m] = xg_vk_max_samplers_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_texture_to_sample_m] = xg_vk_max_sampled_texture_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_texture_storage_m] = xg_vk_max_storage_texture_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_buffer_uniform_m] = xg_vk_max_uniform_buffer_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_buffer_storage_m] = xg_vk_max_storage_buffer_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_buffer_texel_uniform_m] = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
-            allocator->descriptor_counts[xg_resource_binding_buffer_texel_storage_m] = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
+            xg_vk_desc_allocator_reset ( allocator );
         }
     }
 }
 
-static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context, uint64_t timeout );
+//static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context, uint64_t timeout );
 
 static void xg_vk_workload_deactivate_device_context ( xg_vk_workload_device_context_t* device_context ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
@@ -205,6 +217,11 @@ void xg_vk_workload_destroy_ptr ( xg_vk_workload_t* workload ) {
     xg_buffer_destroy ( workload->uniform_buffer.handle );
     workload->uniform_buffer.handle = xg_null_handle_m;
 
+    // framebuffer
+    if ( workload->framebuffer != xg_null_handle_m ) {
+        xg_vk_framebuffer_release ( workload->framebuffer );
+    }
+
 #if 0
 
     for ( uint32_t i = 0; i < workload->timestamp_query_pools_count; ++i ) {
@@ -222,47 +239,7 @@ void xg_vk_workload_unload ( void ) {
         std_mutex_deinit ( &xg_vk_workload_state->workload_array[i].mutex );
     }
 
-#if 0
-    uint64_t idx = 0;
-    while ( std_bitset_scan ( &idx, xg_vk_workload_state->workload_bitset, idx, std_div_ceil_m ( xg_workload_max_allocated_workloads_m, 64 ) ) ) {
-        xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[idx];
-
-        if ( workload->submitted ) {
-            const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
-            const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
-            vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
-        }
-
-        //xg_vk_workload_destroy_ptr ( workload );
-    }
-#else
-    for ( size_t i = 0; i  < xg_max_active_devices_m; ++i ) {
-        xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[i];
-        if ( !device_context->is_active ) {
-            continue;
-        }
-
-        // Wait for all workloads to complete and process on complete events like resource destruction
-        xg_vk_workload_recycle_submission_contexts ( device_context, UINT64_MAX );
-
-#if 0
-        const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
-
-        for ( size_t j = 0; j <  xg_workload_max_queued_workloads_m; ++j ) {
-            xg_vk_workload_submit_context_t* submit_context = &device_context->submit_contexts[j];
-
-            //if ( submit_context->is_submitted ) {
-            //    const xg_vk_workload_t* workload = xg_vk_workload_get ( submit_context->workload );
-            //    const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
-            //    vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
-            //}
-
-            vkDestroyCommandPool ( device->vk_handle, submit_context->cmd_allocator.vk_cmd_pool, NULL );
-            vkDestroyDescriptorPool ( device->vk_handle, submit_context->desc_allocator.vk_desc_pool, NULL );
-        }
-#endif
-    }
-#endif
+    xg_workload_wait_all_workload_complete();
 
     std_virtual_heap_free ( xg_vk_workload_state->workload_array );
     std_mutex_deinit ( &xg_vk_workload_state->workloads_mutex );
@@ -303,9 +280,10 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     xg_vk_workload_uniform_buffer_t* uniform_buffer = &workload->uniform_buffer;
     uniform_buffer->handle = buffer_handle;
     uniform_buffer->alloc = uniform_buffer_info.allocation;
-    //uniform_buffer->base = xg_vk_device_map_alloc ( &uniform_buffer_info.allocation );
     uniform_buffer->used_size = 0;
     uniform_buffer->total_size = xg_vk_workload_uniform_buffer_size_m;
+
+    workload->framebuffer = xg_null_handle_m;
 
 #if 0
     workload->timestamp_query_pools_count = 0;
@@ -414,7 +392,9 @@ void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload_handl
 
 void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
-    workload->swapchain_texture_acquired_event = xg_gpu_queue_event_create ( workload->device );
+    if ( workload->swapchain_texture_acquired_event == xg_null_handle_m ) {
+        workload->swapchain_texture_acquired_event = xg_gpu_queue_event_create ( workload->device );
+    }
 }
 
 #if 0
@@ -461,6 +441,8 @@ typedef struct {
     xg_texture_resource_binding_t textures[xg_pipeline_resource_max_textures_per_set_m];
     uint32_t sampler_count;
     xg_sampler_resource_binding_t samplers[xg_pipeline_resource_max_samplers_per_set_m];
+    uint32_t raytrace_world_count;
+    xg_raytrace_world_resource_binding_t raytrace_worlds[xg_pipeline_resource_max_raytrace_worlds_per_set_m];
 
     xg_vk_descriptor_set_layout_h layout;
     VkDescriptorSet vk_set;
@@ -484,7 +466,11 @@ typedef struct {
     xg_pipeline_e pipeline_type;
     const xg_vk_graphics_pipeline_t* graphics_pipeline;
     const xg_vk_compute_pipeline_t* compute_pipeline;
+    const xg_vk_raytrace_pipeline_t* raytrace_pipeline;
     bool dirty_pipeline;
+
+    const xg_vk_graphics_renderpass_t* graphics_renderpass;
+    bool dirty_renderpass;
 
     // For now render textures and pipeline are basically treated as part of one same thing, looks like whenever the client binds one it is also supposed to (re-?)bind the other. TODO understand what's the proper relationship here.
     xg_render_textures_binding_t render_textures;
@@ -517,7 +503,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
     // Render textures
     if ( state->dirty_render_textures && state->pipeline_type == xg_pipeline_graphics_m ) {
-        if ( state->active_renderpass ) {
+        if ( state->active_renderpass && state->graphics_renderpass == NULL ) {
             vkCmdEndRenderPass ( vk_cmd_buffer );
             state->active_renderpass = false;
         }
@@ -575,18 +561,28 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             }
         }
 
-        // Lookup framebuffer
-        const xg_vk_renderpass_t* renderpass = xg_vk_renderpass_get ( state->graphics_pipeline->renderpass );
-        xg_vk_framebuffer_h framebuffer_handle = xg_vk_framebuffer_acquire ( device_handle, renderpass, width, height );
-        const xg_vk_framebuffer_t* framebuffer = xg_vk_framebuffer_get ( framebuffer_handle );
-        // TODO add framebuffer to workload and release it once workload is finished
+        const xg_vk_renderpass_t* renderpass;
+        const xg_vk_framebuffer_t* framebuffer;
+        if ( state->graphics_renderpass == NULL ) {
+            xg_vk_renderpass_h renderpass_handle = state->graphics_pipeline->renderpass;
+            renderpass = xg_vk_renderpass_get ( renderpass_handle );
+            xg_vk_framebuffer_h framebuffer_handle = xg_vk_framebuffer_acquire ( device_handle, renderpass_handle, width, height );
+            framebuffer = xg_vk_framebuffer_get ( framebuffer_handle );
+            xg_vk_workload_t* workload = xg_vk_workload_edit ( context->workload );
+            workload->framebuffer = framebuffer_handle;
+        } else {
+            xg_vk_renderpass_h renderpass_handle = state->graphics_renderpass->renderpass_handle;
+            renderpass = xg_vk_renderpass_get ( renderpass_handle );
+            xg_vk_framebuffer_h framebuffer_handle = state->graphics_renderpass->framebuffer_handle;
+            framebuffer = xg_vk_framebuffer_get ( framebuffer_handle );
+        }
 
         // Begin render pass
         VkRenderPassBeginInfo pass_begin_info;
         pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         pass_begin_info.pNext = &attachment_begin_info;
         pass_begin_info.renderPass = renderpass->vk_renderpass;
-        pass_begin_info.framebuffer = framebuffer->vk_framebuffer;
+        pass_begin_info.framebuffer = framebuffer->vk_handle;
         pass_begin_info.renderArea.offset.x = 0;
         pass_begin_info.renderArea.offset.y = 0;
         pass_begin_info.renderArea.extent.width = width;
@@ -612,6 +608,9 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
         case xg_pipeline_compute_m:
             common_pipeline = &state->compute_pipeline->common;
             break;
+
+        case xg_pipeline_raytrace_m:
+            common_pipeline = &state->raytrace_pipeline->common;
     }
 
     if ( state->dirty_pipeline ) {
@@ -625,12 +624,16 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                     break;
 
                 case xg_pipeline_compute_m:
-                    if ( state->active_renderpass ) {
+                    if ( state->active_renderpass && state->graphics_renderpass == NULL ) {
                         vkCmdEndRenderPass ( vk_cmd_buffer );
                         state->active_renderpass = false;
                     }
 
                     vk_pipeline_type = VK_PIPELINE_BIND_POINT_COMPUTE;
+                    break;
+
+                case xg_pipeline_raytrace_m:
+                    vk_pipeline_type = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
                     break;
             }
 
@@ -676,7 +679,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             first_deactivated_set = xg_resource_binding_set_invalid_m;
 
             for ( uint32_t set = 0; set < xg_resource_binding_set_count_m; ++set ) {
-                xg_vk_descriptor_set_layout_h set_layout_handle = common_pipeline->resource_set_layout_handles[set];
+                xg_vk_descriptor_set_layout_h set_layout_handle = common_pipeline->descriptor_set_layouts[set];
 
                 bool is_active = state->sets[set].is_active;
                 bool is_compatible = state->sets[set].layout == set_layout_handle;
@@ -697,15 +700,16 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
     // Pipeline resources
     for ( uint32_t set_it = 0; set_it < xg_resource_binding_set_count_m; ++set_it ) {
-        xg_vk_descriptor_set_layout_h set_layout_handle = common_pipeline->resource_set_layout_handles[set_it];
+        xg_vk_descriptor_set_layout_h set_layout_handle = common_pipeline->descriptor_set_layouts[set_it];
         xg_vk_translation_resource_binding_set_cache_t* set = &state->sets[set_it];
 
         uint32_t buffer_count = set->buffer_count;
         uint32_t texture_count = set->texture_count;
         uint32_t sampler_count = set->sampler_count;
+        uint32_t raytrace_world_count = set->raytrace_world_count;
 
         // TODO is this even possible at this point? should it be possible?
-        if ( buffer_count == 0 && texture_count == 0 && sampler_count == 0 ) {
+        if ( buffer_count == 0 && texture_count == 0 && sampler_count == 0 && raytrace_world_count == 0 ) {
             continue;
         }
 
@@ -730,7 +734,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
         VkDescriptorSet vk_set = set->vk_set;
 
         if ( vk_set == VK_NULL_HANDLE ) {
-            xg_vk_pipeline_resource_binding_set_layout_t* vk_set_layout = xg_vk_pipeline_vk_set_layout_get ( set_layout_handle );
+            const xg_vk_descriptor_set_layout_t* vk_set_layout = xg_vk_descriptor_set_layout_get ( set_layout_handle );
 
             // TODO try to batch these?
             VkDescriptorSetAllocateInfo vk_set_alloc_info;
@@ -738,7 +742,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             vk_set_alloc_info.pNext = NULL;
             vk_set_alloc_info.descriptorPool = context->desc_allocator.vk_desc_pool;
             vk_set_alloc_info.descriptorSetCount = 1;
-            vk_set_alloc_info.pSetLayouts = &vk_set_layout->vk_descriptor_set_layout;
+            vk_set_alloc_info.pSetLayouts = &vk_set_layout->vk_handle;
             VkResult set_alloc_result = vkAllocateDescriptorSets ( device->vk_handle, &vk_set_alloc_info, &vk_set );
 
             if ( set_alloc_result != VK_SUCCESS ) {
@@ -763,10 +767,10 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                 );
             }
 
-            for ( uint32_t i = 0; i < vk_set_layout->binding_points_count; ++i ) {
-                std_assert_m ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] > 0 );
+            for ( uint32_t i = 0; i < vk_set_layout->descriptor_count; ++i ) {
+                std_assert_m ( context->desc_allocator.descriptor_counts[vk_set_layout->descriptors[i].type] > 0 );
                 
-                if ( context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] <= 0 ) {
+                if ( context->desc_allocator.descriptor_counts[vk_set_layout->descriptors[i].type] <= 0 ) {
                     std_log_error_m ( "Remaining pool resources:"
                         "\n" std_fmt_u32_m " sets" 
                         "\n" std_fmt_i32_m " samplers" 
@@ -787,7 +791,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                     );
                 }
                 
-                context->desc_allocator.descriptor_counts[vk_set_layout->binding_points[i].type] -= 1;
+                context->desc_allocator.descriptor_counts[vk_set_layout->descriptors[i].type] -= 1;
             }
 
             std_assert_m ( context->desc_allocator.set_count > 0 );
@@ -795,16 +799,17 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
             set->vk_set = vk_set;
 
-            VkWriteDescriptorSet writes[xg_pipeline_resource_max_bindings_m];
+            VkWriteDescriptorSet writes[xg_pipeline_resource_max_bindings_m] = { 0 };
             uint32_t write_count = 0;
-            VkDescriptorBufferInfo vk_buffer_info[xg_pipeline_resource_max_bindings_m];
+            VkDescriptorBufferInfo vk_buffer_info[xg_pipeline_resource_max_bindings_m] = { 0 };
             uint32_t buffer_info_count = 0;
-            VkDescriptorImageInfo vk_image_info[xg_pipeline_resource_max_bindings_m];
+            VkDescriptorImageInfo vk_image_info[xg_pipeline_resource_max_bindings_m] = { 0 };
             uint32_t image_info_count = 0;
 
             for ( uint32_t i = 0; i < buffer_count; ++i ) {
                 xg_buffer_resource_binding_t* binding = &set->buffers[i];
-                xg_resource_binding_e binding_type = vk_set_layout->binding_points[binding->shader_register].type;
+                uint32_t binding_idx = vk_set_layout->shader_register_to_descriptor_idx[binding->shader_register];
+                xg_resource_binding_e binding_type = vk_set_layout->descriptors[binding_idx].type;
                 const xg_vk_buffer_t* buffer = xg_vk_buffer_get ( binding->range.handle );
 
                 VkDescriptorBufferInfo* info = &vk_buffer_info[buffer_info_count++];
@@ -822,7 +827,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                 write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 write->pNext = NULL;
                 write->dstSet = vk_set;
-                write->dstBinding = binding->shader_register;
+                write->dstBinding = binding_idx;
                 write->dstArrayElement = 0; // TODO
                 write->descriptorCount = 1;
                 write->pBufferInfo = info;
@@ -840,7 +845,8 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
             for ( uint32_t i = 0; i < texture_count; ++i ) {
                 xg_texture_resource_binding_t* binding = &set->textures[i];
-                xg_resource_binding_e binding_type = vk_set_layout->binding_points[binding->shader_register].type;
+                uint32_t binding_idx = vk_set_layout->shader_register_to_descriptor_idx[binding->shader_register];
+                xg_resource_binding_e binding_type = vk_set_layout->descriptors[binding_idx].type;
                 const xg_vk_texture_view_t* view = xg_vk_texture_get_view ( binding->texture, binding->view );
 
                 VkDescriptorImageInfo* info = &vk_image_info[image_info_count++];
@@ -853,7 +859,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                 write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 write->pNext = NULL;
                 write->dstSet = vk_set;
-                write->dstBinding = binding->shader_register;
+                write->dstBinding = binding_idx;
                 write->dstArrayElement = 0; // TODO
                 write->descriptorCount = 1;
                 write->pImageInfo = info;
@@ -874,6 +880,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
             for ( uint32_t i = 0; i < sampler_count; ++i ) {
                 xg_sampler_resource_binding_t* binding = &set->samplers[i];
+                uint32_t binding_idx = vk_set_layout->shader_register_to_descriptor_idx[binding->shader_register];
                 const xg_vk_sampler_t* sampler = xg_vk_sampler_get ( binding->sampler );
 
                 VkDescriptorImageInfo* info = &vk_image_info[image_info_count++];
@@ -884,11 +891,32 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                 write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 write->pNext = NULL;
                 write->dstSet = vk_set;
-                write->dstBinding = binding->shader_register;
+                write->dstBinding = binding_idx;
                 write->dstArrayElement = 0; // TODO
                 write->descriptorCount = 1;
                 write->pImageInfo = info;
                 write->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+            }
+
+            for ( uint32_t i = 0; i < raytrace_world_count; ++i ) {
+                xg_raytrace_world_resource_binding_t* binding = &set->raytrace_worlds[i];
+                uint32_t binding_idx = vk_set_layout->shader_register_to_descriptor_idx[binding->shader_register];
+                const xg_vk_raytrace_world_t* world = xg_vk_raytrace_world_get ( binding->world );
+
+                VkWriteDescriptorSetAccelerationStructureKHR as_info = {
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+                    .pNext = NULL,
+                    .accelerationStructureCount = 1,
+                    .pAccelerationStructures = &world->vk_handle,
+                };
+
+                VkWriteDescriptorSet* write = &writes[write_count++];
+                write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write->pNext = &as_info;
+                write->dstSet = vk_set;
+                write->dstBinding = binding_idx;
+                write->descriptorCount = 1;
+                write->descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
             }
 
 #if 0
@@ -963,6 +991,10 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
                 case xg_pipeline_compute_m:
                     pipeline_type = VK_PIPELINE_BIND_POINT_COMPUTE;
+                    break;
+
+                case xg_pipeline_raytrace_m:
+                    pipeline_type = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
                     break;
             }
 
@@ -1126,6 +1158,29 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
             break;
 
             // -----------------------------------------------------------------------
+            case xg_cmd_graphics_renderpass_begin_m: {
+                std_auto_m args = ( xg_cmd_graphics_renderpass_begin_t* ) header->args;
+            
+                state.graphics_renderpass = xg_vk_graphics_renderpass_get ( args->renderpass );
+                state.active_renderpass = true;
+                //state.dirty_renderpass = true;
+                state.dirty_render_textures = true;
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_renderpass_end_m: {
+                std_auto_m args = ( xg_cmd_graphics_renderpass_end_t* ) header->args;
+
+                std_assert_m ( state.active_renderpass );
+                std_assert_m ( state.graphics_renderpass == xg_vk_graphics_renderpass_get ( args->renderpass ) );
+                vkCmdEndRenderPass ( vk_cmd_buffer );
+                state.graphics_renderpass = NULL;
+                state.active_renderpass = false;
+            }
+            break;
+
+            // -----------------------------------------------------------------------
             case xg_cmd_compute_pipeline_state_bind_m: {
                 std_auto_m args = ( xg_cmd_compute_pipeline_state_bind_t* ) header->args;
 
@@ -1207,14 +1262,17 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 uint32_t buffer_count = args->buffer_count;
                 uint32_t texture_count = args->texture_count;
                 uint32_t sampler_count = args->sampler_count;
+                uint32_t raytrace_world_count = args->raytrace_world_count;
 
                 std_assert_m ( buffer_count <= xg_pipeline_resource_max_buffers_per_set_m );
                 std_assert_m ( texture_count <= xg_pipeline_resource_max_textures_per_set_m );
                 std_assert_m ( sampler_count <= xg_pipeline_resource_max_samplers_per_set_m );
+                std_assert_m ( raytrace_world_count <= xg_pipeline_resource_max_raytrace_worlds_per_set_m );
 
                 xg_buffer_resource_binding_t* buffers = std_align_ptr_m ( args + 1, xg_buffer_resource_binding_t );
                 xg_texture_resource_binding_t* textures = std_align_ptr_m ( buffers + buffer_count, xg_texture_resource_binding_t );
                 xg_sampler_resource_binding_t* samplers = std_align_ptr_m ( textures + texture_count, xg_sampler_resource_binding_t );
+                xg_raytrace_world_resource_binding_t* raytrace_worlds = std_align_ptr_m ( samplers + sampler_count, xg_raytrace_world_resource_binding_t );
 
                 std_assert_m ( args->set < xg_resource_binding_set_count_m );
 
@@ -1232,9 +1290,14 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                     set->samplers[i] = samplers[i];
                 }
 
+                for ( uint32_t i = 0; i < raytrace_world_count; ++i ) {
+                    set->raytrace_worlds[i] = raytrace_worlds[i];
+                }
+
                 set->buffer_count = buffer_count;
                 set->texture_count = texture_count;
                 set->sampler_count = sampler_count;
+                set->raytrace_world_count = raytrace_world_count;
 
                 set->is_dirty = true;
                 set->is_active = false;
@@ -1309,6 +1372,33 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 xg_vk_translation_state_cache_flush ( &state, context, device_handle, vk_cmd_buffer );
 
                 vkCmdDispatch ( vk_cmd_buffer, args->workgroup_count_x, args->workgroup_count_y, args->workgroup_count_z );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_raytrace_pipeline_state_bind_m: {
+                std_auto_m args = ( xg_cmd_raytrace_pipeline_state_bind_t* ) header->args;
+
+                const xg_vk_raytrace_pipeline_t* pipeline = xg_vk_raytrace_pipeline_get ( args->pipeline );
+
+                state.raytrace_pipeline = pipeline;
+                state.dirty_pipeline = true;
+                state.pipeline_type = xg_pipeline_raytrace_m;
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_raytrace_trace_rays_m: {
+                std_auto_m args = ( xg_cmd_raytrace_trace_rays_t* ) header->args;
+
+                xg_vk_translation_state_cache_flush ( &state, context, device_handle, vk_cmd_buffer );
+
+                const xg_vk_raytrace_pipeline_t* pipeline = state.raytrace_pipeline;
+                std_assert_m ( pipeline );
+                VkStridedDeviceAddressRegionKHR callable_region = { 0 };
+                xg_vk_device_ext_api ( device_handle )->trace_rays ( vk_cmd_buffer,
+                    &pipeline->sbt_raygen_region, &pipeline->sbt_miss_region, &pipeline->sbt_hit_region, &callable_region,
+                    args->ray_count_x, args->ray_count_y, args->ray_count_z );
             }
             break;
 
@@ -1619,7 +1709,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                     }
                 }
 
-                if ( state.active_renderpass ) {
+                if ( state.active_renderpass && state.graphics_renderpass == NULL ) {
                     vkCmdEndRenderPass ( vk_cmd_buffer );
                     state.active_renderpass = false;
                 }
@@ -1691,7 +1781,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                     }
                 }
 
-                if ( state.active_renderpass ) {
+                if ( state.active_renderpass && state.graphics_renderpass == NULL ) {
                     vkCmdEndRenderPass ( vk_cmd_buffer );
                     state.active_renderpass = false;
                 }
@@ -1717,7 +1807,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 range.baseArrayLayer = 0;
                 range.layerCount = 1;
 
-                if ( state.active_renderpass ) {
+                if ( state.active_renderpass && state.graphics_renderpass == NULL ) {
                     vkCmdEndRenderPass ( vk_cmd_buffer );
                     state.active_renderpass = false;
                 }
@@ -1841,7 +1931,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
         }
     }
 
-    if ( state.active_renderpass ) {
+    if ( state.active_renderpass && state.graphics_renderpass == NULL ) {
         vkCmdEndRenderPass ( vk_cmd_buffer );
         state.active_renderpass = false;
     }
@@ -1890,10 +1980,13 @@ static void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handl
                         .buffer_count = buffer_count,
                         .texture_count = texture_count,
                         .sampler_count = sampler_count,
-                        .buffers = buffers,
-                        .textures = textures,
-                        .samplers = samplers,
+                        //.buffers = buffers,
+                        //.textures = textures,
+                        //.samplers = samplers,
                     );
+                    std_mem_copy ( bindings.buffers, buffers, sizeof ( xg_buffer_resource_binding_t ) * buffer_count );
+                    std_mem_copy ( bindings.textures, textures, sizeof ( xg_texture_resource_binding_t ) * texture_count );
+                    std_mem_copy ( bindings.samplers, samplers, sizeof ( xg_sampler_resource_binding_t ) * sampler_count );
 
                     xg_vk_pipeline_update_resource_group ( workload->device, group, &bindings );
 
@@ -1984,20 +2077,19 @@ static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg
                     xg_vk_pipeline_destroy_resource_group ( workload->device, args->group );
                 }
                 break;
+
+                case xg_resource_cmd_graphics_renderpass_destroy_m: {
+                    std_auto_m args = ( xg_resource_cmd_graphics_renderpass_destroy_t* ) header->args;
+
+                    if ( args->destroy_time != destroy_time ) {
+                        continue;
+                    }
+
+                    xg_vk_graphics_renderpass_destroy ( args->renderpass );
+                }
             }
         }
     }
-}
-
-static void xg_vk_desc_allocator_reset ( xg_vk_desc_allocator_t* allocator ) {
-    allocator->set_count = xg_vk_max_sets_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_sampler_m] = xg_vk_max_samplers_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_texture_to_sample_m] = xg_vk_max_sampled_texture_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_texture_storage_m] = xg_vk_max_storage_texture_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_buffer_uniform_m] = xg_vk_max_uniform_buffer_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_buffer_storage_m] = xg_vk_max_storage_buffer_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_buffer_texel_uniform_m] = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
-    allocator->descriptor_counts[xg_resource_binding_buffer_texel_storage_m] = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
 }
 
 static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context, uint64_t timeout ) {
@@ -2111,6 +2203,80 @@ static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_wor
 
 static void xg_vk_workload_sort_result_destroy ( xg_vk_workload_cmd_sort_result_t result ) {
     std_virtual_heap_free ( result.cmd_headers );
+}
+
+xg_vk_workload_submit_context_t* xg_vk_workload_submit_context_create ( xg_workload_h workload_handle ) {
+    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
+
+    uint64_t device_idx = xg_vk_device_get_idx ( workload->device );
+    xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
+    std_assert_m ( device_context->device_handle != xg_null_handle_m );
+
+    // allocate submission context
+    std_mutex_lock ( &device_context->submit_contexts_mutex );
+
+    xg_vk_workload_recycle_submission_contexts ( device_context, 0 );
+
+    xg_vk_workload_submit_context_t* submit_context = &device_context->submit_contexts[std_ring_top_idx ( &device_context->submit_ring )];
+    std_ring_push ( &device_context->submit_ring, 1 );
+
+    std_mutex_unlock ( &device_context->submit_contexts_mutex );
+
+    submit_context->workload = workload_handle;
+    return submit_context;
+}
+
+void xg_vk_workload_submit_context_submit ( xg_vk_workload_submit_context_t* submit_context ) {
+    xg_vk_workload_t* workload = xg_vk_workload_edit ( submit_context->workload );
+    workload->submitted = true;
+
+    // submit
+    {
+        VkCommandBuffer vk_cmd_buffer = submit_context->cmd_allocator.vk_cmd_buffers[0];
+
+        const xg_vk_gpu_queue_event_t* event = NULL;
+
+        if ( workload->execution_complete_gpu_event != xg_null_handle_m ) {
+            event = xg_vk_gpu_queue_event_get ( workload->execution_complete_gpu_event );
+            xg_gpu_queue_event_log_signal ( workload->execution_complete_gpu_event );
+        }
+
+        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        VkSubmitInfo submit_info;
+        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit_info.pNext = NULL;
+        submit_info.waitSemaphoreCount = 0;
+        submit_info.pWaitSemaphores = NULL;
+        submit_info.pWaitDstStageMask = &wait_stage;
+        submit_info.commandBufferCount = 1;
+        submit_info.pCommandBuffers = &vk_cmd_buffer;
+        submit_info.signalSemaphoreCount = event ? 1 : 0;
+        submit_info.pSignalSemaphores = event ? &event->vk_semaphore : NULL;
+
+#if !xg_debug_enable_disable_semaphore_frame_sync_m
+
+        if ( workload->swapchain_texture_acquired_event != xg_null_handle_m ) {
+            xg_gpu_queue_event_log_wait ( workload->swapchain_texture_acquired_event );
+            const xg_vk_gpu_queue_event_t* vk_event = xg_vk_gpu_queue_event_get ( workload->swapchain_texture_acquired_event );
+
+            submit_info.waitSemaphoreCount = 1;
+            submit_info.pWaitSemaphores = &vk_event->vk_semaphore;
+        }
+
+#endif
+
+        const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
+
+        const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
+        VkResult result = vkQueueSubmit ( device->graphics_queue.vk_handle, 1, &submit_info, fence->vk_fence );
+        std_verify_m ( result == VK_SUCCESS );
+
+#if xg_debug_enable_flush_gpu_submissions_m || xg_debug_enable_disable_semaphore_frame_sync_m
+        result = vkQueueWaitIdle ( device->graphics_queue.vk_handle );
+#endif
+
+        submit_context->is_submitted = true;
+    }
 }
 
 void xg_workload_submit ( xg_workload_h workload_handle ) {
@@ -2240,5 +2406,17 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     // Queue capture stop on present if requested
     if ( translate_result.debug_capture_stop_on_workload_present ) {
         workload->stop_debug_capture_on_present = true;
+    }
+}
+
+void xg_workload_wait_all_workload_complete ( void ) {
+    for ( size_t i = 0; i  < xg_max_active_devices_m; ++i ) {
+        xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[i];
+        if ( !device_context->is_active ) {
+            continue;
+        }
+
+        // Wait for all workloads to complete and process on complete events like resource destruction
+        xg_vk_workload_recycle_submission_contexts ( device_context, UINT64_MAX );
     }
 }

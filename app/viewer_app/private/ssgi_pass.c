@@ -5,6 +5,8 @@
 
 #include <xs.h>
 
+#include "viewapp_state.h"
+
 typedef struct {
     float resolution_x_f32;
     float resolution_y_f32;
@@ -12,7 +14,7 @@ typedef struct {
 } ssgi_draw_data_t;
 
 typedef struct {
-    xs_pipeline_state_h pipeline;
+    xs_database_pipeline_h pipeline;
     xg_sampler_h sampler;
     uint32_t width;
     uint32_t height;
@@ -26,59 +28,51 @@ static void ssgi_raymarch_pass ( const xf_node_execute_args_t* node_args, void* 
     uint64_t key = node_args->base_key;
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
-    {
-        xg_render_textures_binding_t render_textures = xg_null_render_texture_bindings_m;
-        render_textures.render_targets_count = 1;
-        render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
+    xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
+        .render_targets_count = 1,
+        .render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] ),
+    );
+    xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
-    {
-        xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
-        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
+    xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
+    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-        xg_texture_resource_binding_t textures[4];
-        textures[0] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 );
-        textures[1] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 );
-        textures[2] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 );
-        textures[3] = xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[3], 3 );
+    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
+        .set = xg_resource_binding_set_per_draw_m,
+        .texture_count = 4,
+        .textures = {
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[3], 3 ),
+        },
+        .sampler_count = 1,
+        .samplers = { xg_sampler_resource_binding_m ( .sampler = pass_args->sampler, .shader_register = 4, ) },
+        .buffer_count = 1,
+        .buffers = { xg_buffer_resource_binding_m (
+            .shader_register = 5,
+            .type = xg_buffer_binding_type_uniform_m,
+            .range = xg->write_workload_uniform ( node_args->workload, &pass_args->draw_data, sizeof ( ssgi_draw_data_t ) ),
+        ) },
+    );
 
-        xg_sampler_resource_binding_t sampler;
-        sampler.sampler = pass_args->sampler;
-        sampler.shader_register = 4;
+    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
 
-        xg_buffer_range_t shader_buffer_range = xg->write_workload_uniform ( node_args->workload, &pass_args->draw_data, sizeof ( ssgi_draw_data_t ) );
+    xg_viewport_state_t viewport = xg_viewport_state_m (
+        .width = pass_args->width,
+        .height = pass_args->height,
+    );
+    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
-        xg_buffer_resource_binding_t buffer;
-        buffer.shader_register = 5;
-        buffer.range = shader_buffer_range;
-        buffer.type = xg_buffer_binding_type_uniform_m;
-
-        xg_pipeline_resource_bindings_t draw_bindings = xg_default_pipeline_resource_bindings_m;
-        draw_bindings.set = xg_resource_binding_set_per_draw_m;
-        draw_bindings.texture_count = 4;
-        draw_bindings.sampler_count = 1;
-        draw_bindings.buffer_count = 1;
-        draw_bindings.textures = textures;
-        draw_bindings.samplers = &sampler;
-        draw_bindings.buffers = &buffer;
-
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-
-        xg_viewport_state_t viewport = xg_default_viewport_state_m;
-        viewport.width = pass_args->width;
-        viewport.height = pass_args->height;
-        xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
-
-        xg->cmd_draw ( cmd_buffer, 3, 0, key );
-    }
+    xg->cmd_draw ( cmd_buffer, 3, 0, key );
 }
 
 xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_texture_h ssgi_raymarch, xf_texture_h normals, xf_texture_h color, xf_texture_h direct_lighting, xf_texture_h hiz ) {
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    viewapp_state_t* state = viewapp_state_get ();
+    xg_i* xg = state->modules.xg;
+    xs_i* xs = state->modules.xs;
+    xf_i* xf = state->modules.xf;
 
     xf_graph_info_t graph_info;
     xf->get_graph_info ( &graph_info, graph );
@@ -89,32 +83,32 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
     xf_texture_info_t hiz_info;
     xf->get_texture_info ( &hiz_info, hiz );
 
-    ssgi_pass_args_t ssgi_pass_args;
-    {
-        ssgi_pass_args.pipeline = xs->lookup_pipeline_state ( "ssgi" );
-        ssgi_pass_args.sampler = xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m );
-        ssgi_pass_args.width = dst_info.width;
-        ssgi_pass_args.height = dst_info.height;
-        ssgi_pass_args.draw_data.resolution_x_f32 = ( float ) ssgi_pass_args.width;
-        ssgi_pass_args.draw_data.resolution_y_f32 = ( float ) ssgi_pass_args.height;
-        ssgi_pass_args.draw_data.hiz_mip_count = ( uint32_t ) hiz_info.mip_levels;
-    }
+    ssgi_pass_args_t ssgi_pass_args = {
+        .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ssgi" ) ),
+        .sampler = xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ),
+        .width = dst_info.width,
+        .height = dst_info.height,
+        .draw_data.resolution_x_f32 = ( float ) ssgi_pass_args.width,
+        .draw_data.resolution_y_f32 = ( float ) ssgi_pass_args.height,
+        .draw_data.hiz_mip_count = ( uint32_t ) hiz_info.mip_levels,
+    };
 
-    xf_node_h ssgi_trace_node;
-    {
-        xf_node_params_t params = xf_default_node_params_m;
-        params.render_targets[params.render_targets_count++] = xf_render_target_dependency_m ( ssgi_raymarch, xg_default_texture_view_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( normals, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( color, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( direct_lighting, xg_shading_stage_fragment_m );
-        params.shader_texture_reads[params.shader_texture_reads_count++] = xf_sampled_texture_dependency_m ( hiz, xg_shading_stage_fragment_m );
-        params.execute_routine = ssgi_raymarch_pass;
-        params.user_args = std_buffer_m ( &ssgi_pass_args );
-        std_str_copy_static_m ( params.debug_name, name );
-        params.passthrough.enable = true;
-        params.passthrough.render_targets[0].mode = xf_node_passthrough_mode_clear_m;
-        ssgi_trace_node = xf->create_node ( graph, &params );
-    }
-
+    xf_node_params_t params = xf_node_params_m (
+        .render_targets_count = 1,
+        .render_targets = { xf_render_target_dependency_m ( ssgi_raymarch, xg_default_texture_view_m ) },
+        .shader_texture_reads_count = 4,
+        .shader_texture_reads = {
+            xf_sampled_texture_dependency_m ( normals, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( direct_lighting, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( hiz, xg_pipeline_stage_bit_fragment_shader_m ),
+        },
+        .execute_routine = ssgi_raymarch_pass,
+        .user_args = std_buffer_m ( &ssgi_pass_args ),
+        .passthrough.enable = true,
+        .passthrough.render_targets = { xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_clear_m ) }
+    );
+    std_str_copy_static_m ( params.debug_name, name );
+    xf_node_h ssgi_trace_node = xf->create_node ( graph, &params );
     return ssgi_trace_node;
 }

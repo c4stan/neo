@@ -4,6 +4,7 @@
 #include "xg_vk_texture.h"
 #include "xg_vk_instance.h"
 #include "xg_vk_enum.h"
+#include "xg_vk_workload.h"
 
 #include <xg_enum.h>
 #include "../xg_debug_capture.h"
@@ -264,8 +265,6 @@ xg_swapchain_h xg_vk_swapchain_create_virtual ( const xg_swapchain_virtual_param
 }
 
 bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, size_t height ) {
-    std_log_info_m ( "Resizing swapchain " std_fmt_u64_m " to " std_fmt_size_m "x" std_fmt_size_m, swapchain_handle, width, height );
-
     std_mutex_lock ( &xg_vk_swapchain_state->swapchains_mutex );
     xg_vk_swapchain_t* swapchain = &xg_vk_swapchain_state->swapchains_array[swapchain_handle];
     std_mutex_unlock ( &xg_vk_swapchain_state->swapchains_mutex );
@@ -274,8 +273,12 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     const xg_vk_device_t* device = xg_vk_device_get ( swapchain->device );
     std_assert_m ( device );
 
+    std_log_info_m ( "Resizing swapchain " std_fmt_u64_m " from " std_fmt_size_m "x" std_fmt_size_m " to " std_fmt_size_m "x" std_fmt_size_m, 
+        swapchain_handle, swapchain->width, swapchain->height, width, height );
+
     // Wait for idle device (TODO is this ok? need a way to check if a swapchain has work queued on?)
-    vkDeviceWaitIdle ( device->vk_handle );
+    //vkDeviceWaitIdle ( device->vk_handle );
+    xg_workload_wait_all_workload_complete ();
 
     // Destroy current swapchain
     vkDestroySwapchainKHR ( device->vk_handle, swapchain->vk_handle, NULL );
@@ -330,7 +333,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     swapchain_create_info.presentMode = vk_present_mode; //VK_PRESENT_MODE_MAILBOX_KHR;
     swapchain_create_info.clipped = VK_TRUE;
-    swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
+    swapchain_create_info.oldSwapchain = VK_NULL_HANDLE; // TODO
     xg_vk_safecall_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ), xg_null_handle_m );
 
     if ( swapchain->debug_name[0] != '\0' ) {
@@ -362,6 +365,9 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
         .samples_per_pixel = 1,
     );
     std_str_copy_static_m ( swapchain_texture_params.debug_name, swapchain->debug_name );
+
+    swapchain->width = width;
+    swapchain->height = height;
 
     // TODO update info.texture_count
 
@@ -417,11 +423,15 @@ static bool xg_vk_swapchain_resize_check ( xg_swapchain_h swapchain_handle ) {
     wm_i* wm = std_module_get_m ( wm_module_name_m );
     std_assert_m ( wm );
 
+    if ( !wm->is_window_alive ( swapchain->window ) ) {
+        return false;
+    }
+    
     wm_window_info_t window_info;
     wm->get_window_info ( swapchain->window, &window_info );
 
     if ( swapchain->width != window_info.width || swapchain->height != window_info.height ) {
-        std_log_warn_m ( "Swapchain window resize detected, proceeding with the swapchain resize..." );
+        std_log_info_m ( "Swapchain window resize detected, proceeding with the swapchain resize..." );
         xg_vk_swapchain_resize ( swapchain_handle, window_info.width, window_info.height );
         return true;
     } else {
@@ -429,11 +439,16 @@ static bool xg_vk_swapchain_resize_check ( xg_swapchain_h swapchain_handle ) {
     }
 }
 
-uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle ) {
+uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle, bool* resize ) {
     std_mutex_lock ( &xg_vk_swapchain_state->swapchains_mutex );
     xg_vk_swapchain_t* swapchain = &xg_vk_swapchain_state->swapchains_array[swapchain_handle];
     std_mutex_unlock ( &xg_vk_swapchain_state->swapchains_mutex );
-    std_assert_m ( swapchain );
+
+    if ( xg_vk_swapchain_resize_check ( swapchain_handle ) ) {
+        if ( resize ) {
+            *resize = true;
+        }
+    }
 
     const xg_vk_device_t* device = xg_vk_device_get ( swapchain->device );
 
@@ -466,22 +481,9 @@ uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle,
     xg_gpu_queue_event_log_signal ( workload->swapchain_texture_acquired_event );
     const xg_vk_gpu_queue_event_t* vk_acquire_event = xg_vk_gpu_queue_event_get ( workload->swapchain_texture_acquired_event );
     VkResult result = vkAcquireNextImageKHR ( device->vk_handle, swapchain->vk_handle, UINT64_MAX, vk_acquire_event->vk_semaphore, VK_NULL_HANDLE, &texture_idx );
-
-    // Resize of the surface happened but hasn't been picked up by the event loop yet, need to recreate swapchain
-    if ( result == VK_ERROR_OUT_OF_DATE_KHR ) {
-        std_log_warn_m ( "Swapchain " std_fmt_u64_m " out of date, acquire call failed.", swapchain_handle );
-
-        if ( xg_vk_swapchain_resize_check ( swapchain_handle ) ) {
-            xg_vk_swapchain_acquire_next_texture ( swapchain_handle, workload_handle );
-        } else {
-            std_log_warn_m ( "???" );
-            //std_abort_m ( "Swapchain size doesn't differ from window size, aborting." );
-        }
-    } else {
-        std_assert_msg_m ( result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, result );
-        swapchain->acquired_texture_idx = texture_idx;
-        xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
-    }
+    std_assert_msg_m ( result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, result );
+    swapchain->acquired_texture_idx = texture_idx;
+    xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
 
 #endif
 

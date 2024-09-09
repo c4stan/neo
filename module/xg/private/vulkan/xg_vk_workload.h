@@ -6,6 +6,7 @@
 
 #include "xg_vk_device.h"
 #include "xg_cmd_buffer.h"
+#include "xg_vk_pipeline.h"
 
 #include <std_mutex.h>
 
@@ -48,6 +49,8 @@ typedef struct {
 
     xg_vk_workload_uniform_buffer_t uniform_buffer;
 
+    xg_vk_framebuffer_h framebuffer;
+
     //xg_vk_workload_query_pool_t timestamp_query_pools[xg_workload_max_timestamp_query_pools_per_workload_m];
     //uint32_t timestamp_query_pools_count;
 } xg_vk_workload_t;
@@ -66,14 +69,13 @@ typedef struct {
     + xg_vk_max_storage_buffer_per_descriptor_pool_m \
     + xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m \
     + xg_vk_max_storage_texel_buffer_per_descriptor_pool_m \
+    + xg_vk_max_raytrace_world_per_descriptor_pool_m \
 )
 
 typedef struct {
     VkDescriptorPool vk_desc_pool;
     uint32_t set_count;
-    int32_t descriptor_counts[7]; // indexed by xg_resource_binding_e
-    //VkDescriptorSetLayoutBinding bindings[xg_vk_max_total_descriptors_per_pool_m];
-    //VkWriteDescriptorSet writes[xg_vk_max_total_descriptors_per_pool_m];
+    int32_t descriptor_counts[xg_resource_binding_count_m];
 } xg_vk_desc_allocator_t;
 
 typedef struct {
@@ -132,3 +134,9 @@ void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload, xg_g
 void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workload );
 void xg_vk_workload_activate_device ( xg_device_h device );
 void xg_vk_workload_deactivate_device ( xg_device_h device );
+
+void xg_workload_wait_all_workload_complete ( void );
+
+// TODO clean up this ugly stuff..
+xg_vk_workload_submit_context_t* xg_vk_workload_submit_context_create ( xg_workload_h workload );
+void xg_vk_workload_submit_context_submit ( xg_vk_workload_submit_context_t* context );

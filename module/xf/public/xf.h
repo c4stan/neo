@@ -68,18 +68,19 @@ typedef uint64_t xf_graph_h;
 typedef struct {
     xf_texture_h texture;
     xg_texture_view_t view;
-    xg_shading_stage_e shading_stage;
+    //xg_shading_stage_e shading_stage;
+    xg_pipeline_stage_bit_e stage;
 } xf_node_shader_texture_dependency_t;
 
 #define xf_shader_texture_dependency_m( _texture, _view, _shading_stage ) ( xf_node_shader_texture_dependency_t ) { \
-    .shading_stage = _shading_stage, \
+    .stage = _shading_stage, \
     .texture = _texture, \
     .view = _view, \
 }
-#define xf_default_shader_texture_dependency_m xf_shader_texture_dependency_m ( xf_null_handle_m, xg_default_texture_view_m, xg_shading_stage_null_m )
+#define xf_default_shader_texture_dependency_m xf_shader_texture_dependency_m ( xf_null_handle_m, xg_default_texture_view_m, xg_pipeline_stage_bit_none_m )
 
 #define xf_sampled_texture_dependency_m( _texture, _shading_stage ) xf_shader_texture_dependency_m ( _texture, xg_default_texture_view_m, _shading_stage )
-#define xf_storage_texture_dependency_m( _shading_stage, _texture, _view ) xf_shader_texture_dependency_m ( _texture, _view, _shading_stage )
+#define xf_storage_texture_dependency_m( _texture, _view, _shading_stage ) xf_shader_texture_dependency_m ( _texture, _view, _shading_stage )
 
 typedef struct {
     xf_texture_h texture;
@@ -99,12 +100,13 @@ typedef struct {
 
 typedef struct {
     xf_buffer_h buffer;
-    xg_shading_stage_e shading_stage;
+    //xg_shading_stage_e shading_stage;
+    xg_pipeline_stage_bit_e stage;
 } xf_buffer_dependency_t;
 
 #define xf_buffer_dependency_m( ... ) ( xf_buffer_dependency_t ) { \
     .buffer = xg_null_handle_m, \
-    .shading_stage = xg_shading_stage_null_m, \
+    .stage = xg_pipeline_stage_bit_none_m, \
     ##__VA_ARGS__ \
 }
 
@@ -197,11 +199,9 @@ typedef struct {
 
 #define xf_node_render_target_passthrough_m( ... ) ( xf_node_render_target_passthrough_t ) { \
     .mode = xf_node_passthrough_mode_ignore_m, \
-    .clear = xg_default_color_clear_m, \
+    .clear = xg_color_clear_m(), \
     ##__VA_ARGS__ \
 }
-
-#define xf_node_default_render_target_passthrough_m xf_node_render_target_passthrough_m()
 
 typedef struct {
     bool enable;
@@ -210,7 +210,7 @@ typedef struct {
 
 #define xf_node_passthrough_params_m( ... ) ( xf_node_passthrough_params_t ) { \
     .enable = false, \
-    .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_node_default_render_target_passthrough_m }, \
+    .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_node_render_target_passthrough_m() }, \
     ##__VA_ARGS__ \
 }
 
@@ -315,12 +315,10 @@ typedef struct {
     .user_args = std_null_buffer_m, \
     .copy_args = true, \
     \
-    .debug_name = {0}, \
+    .debug_name = { 0 }, \
     .debug_color = xg_debug_region_color_none_m, \
     ##__VA_ARGS__ \
 }
-
-#define xf_default_node_params_m xf_node_params_m()
 
 typedef struct {
     size_t width;
@@ -356,7 +354,6 @@ typedef struct {
     .view_access = xg_texture_view_access_default_only_m, \
     ##__VA_ARGS__ \
 }
-#define xf_default_texture_params_m ( xf_texture_params_t ) xf_texture_params_m()
 
 typedef struct {
     size_t size;
@@ -376,7 +373,7 @@ typedef struct {
 } xf_multi_texture_params_t;
 
 #define xf_multi_texture_params_m( ... ) ( xf_multi_texture_params_t ) { \
-    .texture = xf_default_texture_params_m, \
+    .texture = xf_texture_params_m(), \
     .multi_texture_count = 2, \
     ##__VA_ARGS__ \
 }

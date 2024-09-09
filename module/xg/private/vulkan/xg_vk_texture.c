@@ -339,28 +339,31 @@ bool xg_texture_destroy ( xg_texture_h texture_handle ) {
 
     const xg_vk_device_t* device = xg_vk_device_get ( texture->params.device );
     
-    if ( ! ( texture->flags & xg_texture_flag_bit_swapchain_texture_m ) ) {
-        vkDestroyImage ( device->vk_handle, texture->vk_handle, NULL );
-        //texture->params.allocator.free ( texture->params.allocator.impl, texture->allocation.handle );
-        xg_free ( texture->allocation.handle );
-    }
-
-    std_bitset_clear ( xg_vk_texture_state->textures_bitset, texture_handle );
-
-    vkDestroyImageView ( device->vk_handle, texture->default_view.vk_handle, NULL );
-
-    if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
-        for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
-            vkDestroyImageView ( device->vk_handle, texture->external_views.mips.array[i].vk_handle, NULL );
+    if ( texture->state == xg_vk_texture_state_created_m ) {
+        if ( ! ( texture->flags & xg_texture_flag_bit_swapchain_texture_m ) ) {
+            vkDestroyImage ( device->vk_handle, texture->vk_handle, NULL );
+            //texture->params.allocator.free ( texture->params.allocator.impl, texture->allocation.handle );
+            xg_free ( texture->allocation.handle );
         }
 
+        vkDestroyImageView ( device->vk_handle, texture->default_view.vk_handle, NULL );
+
+        if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
+            for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
+                vkDestroyImageView ( device->vk_handle, texture->external_views.mips.array[i].vk_handle, NULL );
+            }
+        }
+
+        if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
+            std_not_implemented_m();
+        }
+    }
+
+    if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
         std_virtual_heap_free ( texture->external_views.mips.array );
     }
 
-    if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
-        std_not_implemented_m();
-    }
-
+    std_bitset_clear ( xg_vk_texture_state->textures_bitset, texture_handle );
     std_list_push ( &xg_vk_texture_state->textures_freelist, texture );
     std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
 
@@ -388,6 +391,7 @@ xg_texture_h xg_vk_texture_register_swapchain_texture ( const xg_texture_params_
     texture->allocation = xg_null_alloc_m;
     texture->params = *params;
     texture->flags = xg_texture_flag_bit_swapchain_texture_m | xg_texture_flag_bit_render_target_texture_m;
+    texture->state = xg_vk_texture_state_created_m; // TODO
     xg_texture_create_view ( &texture->default_view, texture_handle, xg_default_texture_view_m );
 
     return texture_handle;

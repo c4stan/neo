@@ -6,6 +6,7 @@ typedef struct {
     void ( *cmd_begin_debug_region ) ( VkCommandBuffer, const VkDebugUtilsLabelEXT* );
     void ( *cmd_end_debug_region ) ( VkCommandBuffer );
 
+    // vkSetDebugUtilsObjectNameEXT
     void ( *set_debug_name ) ( VkDevice, const VkDebugUtilsObjectNameInfoEXT* );
 
 #if xg_vk_enable_sync2_m
@@ -29,7 +30,6 @@ typedef struct {
     
     // vkGetAccelerationStructureDeviceAddressKHR
     VkDeviceAddress ( *get_acceleration_structure_device_address ) ( VkDevice, const VkAccelerationStructureDeviceAddressInfoKHR* );
-    //
 #endif
 } xg_vk_instance_ext_api_i;
 

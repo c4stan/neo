@@ -38,8 +38,9 @@
 #define std_fmt_u32_pad_m(X) "%0" std_pp_string_m(X) PRIu32
 #define std_fmt_u64_pad_m(X) "%0" std_pp_string_m(X) PRIu64
 
-// TODO make these bits (1, 2, 4, ...), delete std_log_level_bit_..., and remove bitflag from std_log_enabled_levels_bitflag_m ?
 
+
+// TODO make these bits (1, 2, 4, ...), delete std_log_level_bit_..., and remove bitflag from std_log_enabled_levels_bitflag_m ?
 typedef enum {
     std_log_level_info_m = 0,
     std_log_level_debug_m = 1,
@@ -97,38 +98,46 @@ typedef struct {
 void    std_log_print              ( std_log_msg_t msg, ... ); // msg, format
 #define std_log_msg_m( level, fmt )  ( std_log_msg_t ) { std_log_scope_m(), (fmt), (level) }
 #define std_log_m( level, fmt, ... ) std_log_print ( std_log_msg_m ( (level), (fmt) ), ##__VA_ARGS__ )
+#define std_log_once_m( level, fmt, ... ) \
+    static bool std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) = false; \
+    if ( !std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) ) { \
+        std_log_m ( level, fmt, ##__VA_ARGS__ ); \
+        std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) = true; \
+    }
 
 // Callback caller wrappers with static log level check.
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
-    #define std_log_info_m(fmt, ...)     std_log_m(std_log_level_info_m, (fmt), ##__VA_ARGS__)
+    #define std_log_info_m( fmt, ... )      std_log_m ( std_log_level_info_m, fmt, ##__VA_ARGS__ )
+    #define std_log_info_once_m( fmt, ... ) std_log_once_m ( std_log_level_info_m, fmt, ##__VA_ARGS__ )
 #else
     #define std_log_info_m(...)
+    #define std_log_info_once_m( fmt, ... )
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_warn_m
-    #define std_log_warn_m(fmt, ...)     std_log_m(std_log_level_warn_m, (fmt), ##__VA_ARGS__)
+    #define std_log_warn_m(fmt, ...)     std_log_m(std_log_level_warn_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_warn_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_debug_m
-    #define std_log_debug_m(fmt, ...)     std_log_m(std_log_level_debug_m, (fmt), ##__VA_ARGS__)
+    #define std_log_debug_m(fmt, ...)     std_log_m(std_log_level_debug_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_debug_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_error_m
-    #define std_log_error_m(fmt, ...)     std_log_m(std_log_level_error_m, (fmt), ##__VA_ARGS__)
+    #define std_log_error_m(fmt, ...)     std_log_m(std_log_level_error_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_error_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_crash_m
-    #define std_log_crash_m(fmt, ...)     std_log_m(std_log_level_crash_m, (fmt), ##__VA_ARGS__)
-
+    #define std_log_crash_m(fmt, ...)     std_log_m(std_log_level_crash_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_crash_m(...)
 #endif
+
 
 // Verify is the same as assert when asserts are enabled, and different in the fact that
 // it still executes the condition expression when asserts are disabled
@@ -179,3 +188,5 @@ void std_log_os_error ( std_log_scope_t scope );
 #else
 // TODO
 #endif
+
+void std_log_print_callstack ( void );

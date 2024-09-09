@@ -7,10 +7,14 @@
 
 static xg_vk_buffer_state_t* xg_vk_buffer_state;
 
+#define xg_vk_buffer_bitset_u64_count_m std_div_ceil_m ( xg_vk_max_buffers_m, 64 )
+
 void xg_vk_buffer_load ( xg_vk_buffer_state_t* state ) {
     xg_vk_buffer_state = state;
-    state->buffers_array = std_virtual_heap_alloc_array_m ( xg_vk_buffer_t, xg_vk_max_buffers_m );
-    state->buffers_freelist = std_freelist_m ( state->buffers_array, xg_vk_max_buffers_m );
+    state->buffer_array = std_virtual_heap_alloc_array_m ( xg_vk_buffer_t, xg_vk_max_buffers_m );
+    state->buffer_freelist = std_freelist_m ( state->buffer_array, xg_vk_max_buffers_m );
+    state->buffer_bitset = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_buffer_bitset_u64_count_m );
+    std_mem_zero_array_m ( state->buffer_bitset, xg_vk_buffer_bitset_u64_count_m );
     std_mutex_init ( &state->buffers_mutex );
 }
 
@@ -19,7 +23,17 @@ void xg_vk_buffer_reload ( xg_vk_buffer_state_t* state ) {
 }
 
 void xg_vk_buffer_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_buffer_state->buffers_array );
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xg_vk_buffer_state->buffer_bitset, idx, xg_vk_buffer_bitset_u64_count_m ) ) {
+        xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[idx];
+        std_log_info_m ( "Destroying buffer " std_fmt_u64_m ": " std_fmt_str_m, idx, buffer->params.debug_name );
+        xg_buffer_h handle = idx;
+        xg_buffer_destroy ( handle );
+        ++idx;
+    }
+
+    std_virtual_heap_free ( xg_vk_buffer_state->buffer_array );
+    std_virtual_heap_free ( xg_vk_buffer_state->buffer_bitset );
     std_mutex_deinit ( &xg_vk_buffer_state->buffers_mutex );
 }
 
@@ -59,10 +73,10 @@ xg_buffer_h xg_buffer_create ( const xg_buffer_params_t* params ) {
 
     // Store xg_vk_buffer
     std_mutex_lock ( &xg_vk_buffer_state.buffers_mutex );
-    xg_vk_buffer_t* buffer = std_list_pop_m ( &xg_vk_buffer_state.buffers_freelist );
+    xg_vk_buffer_t* buffer = std_list_pop_m ( &xg_vk_buffer_state.buffer_freelist );
     std_mutex_unlock ( &xg_vk_buffer_state.buffers_mutex );
     std_assert_m ( buffer );
-    xg_buffer_h buffer_handle = ( xg_buffer_h ) ( buffer - xg_vk_buffer_state.buffers_array );
+    xg_buffer_h buffer_handle = ( xg_buffer_h ) ( buffer - xg_vk_buffer_state.buffer_array );
 
     buffer->vk_handle = vk_buffer;
     buffer->allocation = alloc;
@@ -80,10 +94,12 @@ xg_buffer_h xg_buffer_create ( const xg_buffer_params_t* params ) {
 
 xg_buffer_h xg_buffer_reserve ( const xg_buffer_params_t* params ) {
     std_mutex_lock ( &xg_vk_buffer_state->buffers_mutex );
-    xg_vk_buffer_t* buffer = std_list_pop_m ( &xg_vk_buffer_state->buffers_freelist );
+    xg_vk_buffer_t* buffer = std_list_pop_m ( &xg_vk_buffer_state->buffer_freelist );
+    uint64_t idx = buffer - xg_vk_buffer_state->buffer_array;
+    std_bitset_set ( xg_vk_buffer_state->buffer_bitset, idx );
     std_mutex_unlock ( &xg_vk_buffer_state->buffers_mutex );
     std_assert_m ( buffer );
-    xg_buffer_h buffer_handle = ( xg_buffer_h ) ( buffer - xg_vk_buffer_state->buffers_array );
+    xg_buffer_h buffer_handle = ( xg_buffer_h ) idx;
 
     buffer->vk_handle = VK_NULL_HANDLE;
     buffer->allocation.handle = xg_null_memory_handle_m;
@@ -94,7 +110,7 @@ xg_buffer_h xg_buffer_reserve ( const xg_buffer_params_t* params ) {
 }
 
 bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
-    xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffers_array[buffer_handle];
+    xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[buffer_handle];
 
     std_assert_m ( buffer->state == xg_vk_buffer_state_reserved_m );
 
@@ -108,7 +124,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     vk_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     vk_buffer_info.pNext = NULL;
     vk_buffer_info.flags = 0;
-    vk_buffer_info.size = params->size;
+    vk_buffer_info.size = std_max ( params->size, 1 ); // TODO what's better, default 0 size to 1 or error?
     vk_buffer_info.usage = xg_buffer_usage_to_vk ( params->allowed_usage );
     vk_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vk_buffer_info.queueFamilyIndexCount = 0;
@@ -123,7 +139,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
         debug_name.objectType = VK_OBJECT_TYPE_BUFFER;
         debug_name.objectHandle = ( uint64_t ) vk_buffer;
         debug_name.pObjectName = params->debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+        xg_vk_device_ext_api ( params->device )->set_debug_name ( device->vk_handle, &debug_name );
     }
 
     // Query for memory requiremens, allocate and bind
@@ -169,7 +185,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
 }
 
 bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
-    const xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffers_array[buffer_handle];
+    const xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[buffer_handle];
 
     if ( buffer == NULL ) {
         return false;
@@ -185,20 +201,23 @@ bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
 }
 
 bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
+    uint64_t idx = buffer_handle;
     std_mutex_lock ( &xg_vk_buffer_state->buffers_mutex );
-    xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffers_array[buffer_handle];
+    xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[idx];
 
     const xg_vk_device_t* device = xg_vk_device_get ( buffer->params.device );
     vkDestroyBuffer ( device->vk_handle, buffer->vk_handle, NULL );
     //buffer->params.allocator.free ( buffer->params.allocator.impl, buffer->allocation.handle );
     xg_free ( buffer->allocation.handle );
 
-    std_list_push ( &xg_vk_buffer_state->buffers_freelist, buffer );
+    std_bitset_clear ( xg_vk_buffer_state->buffer_bitset, idx );
+
+    std_list_push ( &xg_vk_buffer_state->buffer_freelist, buffer );
     std_mutex_unlock ( &xg_vk_buffer_state->buffers_mutex );
 
     return true;
 }
 
 const xg_vk_buffer_t* xg_vk_buffer_get ( xg_buffer_h buffer_handle ) {
-    return &xg_vk_buffer_state->buffers_array[buffer_handle];
+    return &xg_vk_buffer_state->buffer_array[buffer_handle];
 }

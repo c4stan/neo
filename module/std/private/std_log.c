@@ -22,14 +22,42 @@ static std_log_state_t* std_log_state;
 //==============================================================================
 
 #if defined(std_platform_linux_m)
-void std_log_print_stacktrace ( void ) {
+void std_log_print_callstack ( void ) {
     void* array[1024];
     size_t size = backtrace ( array, 1024 );
     backtrace_symbols_fd ( array, size, std_process_get_io ( std_process_this() ).stderr_handle );
 }
 #else
-void std_log_print_stacktrace ( void ) {
-    // TODO
+void std_log_print_callstack ( void ) {
+    HANDLE process = GetCurrentProcess();
+    SymInitialize ( process, NULL, TRUE );
+
+    void* stack[100];
+    uint32_t frame_count = CaptureStackBackTrace ( 0, 100, stack, NULL );
+    
+    char symbol_buffer[sizeof ( SYMBOL_INFO ) + 256];
+    std_auto_m symbol = ( SYMBOL_INFO* ) symbol_buffer;
+    symbol->MaxNameLen = 255;
+    symbol->SizeOfStruct = sizeof ( SYMBOL_INFO );
+
+    IMAGEHLP_LINE line = {0};
+    line.SizeOfStruct = sizeof ( IMAGEHLP_LINE );
+
+    char buffer[512] = "BACKTRACE ------------\n";
+    WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
+
+    for ( uint32_t i = 0; i < frame_count; ++i ) {
+        SymFromAddr ( process, ( DWORD64 ) ( stack[i] ), 0, symbol );
+        DWORD displacement;
+        SymGetLineFromAddr ( process, ( DWORD64 ) ( stack[i] ), &displacement, &line );
+        std_str_format_m ( buffer, std_fmt_str_m ":" std_fmt_u32_m std_fmt_newline_m, symbol->Name, line.LineNumber );
+        WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
+    }
+
+    std_str_copy_static_m ( buffer, "----------------------\n" );
+    WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
+
+    SymCleanup ( process );
 }
 #endif
 
@@ -45,6 +73,7 @@ void std_log_print_stacktrace ( void ) {
     //#define std_terminal_color_white_m    "\x1B[1m\x1B[37m"
 #endif
 
+// TODO avoid printf, print to actual std_process out/err handles
 static void std_log_default_callback ( const std_log_msg_t* msg ) {
     const char* type_prefix = "";
 
@@ -92,7 +121,7 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
         std_terminal_color_reset_m );
 
     if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
-        std_log_print_stacktrace();
+        std_log_print_callstack();
     }
 
     if ( ( 1 << msg->level ) & ( std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {

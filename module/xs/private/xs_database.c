@@ -24,23 +24,24 @@ void xs_database_load ( xs_database_state_t* state ) {
     }
 #endif
 
-    xs_database_state->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
+    //xs_database_state->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
 
-    xs_database_state->folders_count = 0;
-    xs_database_state->pipeline_states_count = 0;
+    //xs_database_state->folders_count = 0;
+    //xs_database_state->pipeline_states_count = 0;
 
     std_assert_m ( sizeof ( xs_string_hash_t ) <= sizeof ( uint64_t ) );
     std_assert_m ( sizeof ( xg_graphics_pipeline_state_h ) <= sizeof ( uint64_t ) );
-    static uint64_t pipeline_name_hash_array[xs_database_max_pipeline_states_m * 2];
-    static uint64_t pipeline_name_hash_payload_array[xs_database_max_pipeline_states_m * 2];
-    //static uint64_t pipeline_handle_array[xs_database_max_pipeline_states_m * 2];
-    //static uint64_t pipeline_handle_payload_array[xs_database_max_pipeline_states_m * 2];
+    //static uint64_t pipeline_name_hash_array[xs_database_max_pipeline_states_m * 2];
+    //static uint64_t pipeline_name_hash_payload_array[xs_database_max_pipeline_states_m * 2];
 
-    xs_database_state->pipeline_name_hash_to_state_map = std_hash_map ( pipeline_name_hash_array, pipeline_name_hash_payload_array, xs_database_max_pipeline_states_m * 2 );
-    //xs_database_state.pipeline_handle_to_state_map = std_hash_map ( std_static_buffer_m ( pipeline_handle_array ), std_static_buffer_m ( pipeline_handle_payload_array ) );
+    //xs_database_state->pipeline_name_hash_to_state_map = std_hash_map ( pipeline_name_hash_array, pipeline_name_hash_payload_array, xs_database_max_pipeline_states_m * 2 );
 
-    xs_database_state->output_path[0] = '\0';
-    xs_database_state->pipeline_state_headers_last_build_timestamp = std_timestamp_zero_m;
+    //xs_database_state->output_path[0] = '\0';
+    //xs_database_state->pipeline_state_headers_last_build_timestamp = std_timestamp_zero_m;
+
+    xs_database_state->database_array = std_virtual_heap_alloc_array_m ( xs_database_t, xs_database_max_databases_m );
+    xs_database_state->database_freelist = std_freelist_m ( xs_database_state->database_array, xs_database_max_databases_m );
+    std_mem_zero_m ( &xs_database_state->database_bitset );
 }
 
 void xs_database_reload ( xs_database_state_t* state ) {
@@ -48,10 +49,17 @@ void xs_database_reload ( xs_database_state_t* state ) {
 }
 
 void xs_database_unload ( void ) {
-    
+    uint64_t db_idx = 0;
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, xs_database_bitset_u64_count_m ) ) {
+        xs_database_h db_handle = db_idx;
+        xs_database_destroy ( db_handle );
+        ++db_idx;
+    }
+
+    std_virtual_heap_free ( xs_database_state->database_array );
 }
 
-static char* xs_database_alloc_string ( size_t size ) {
+static char* xs_database_alloc_string ( xs_database_t* db, size_t size ) {
 #if 0
     xs_database_memory_page_t* memory_page = NULL;
 
@@ -78,12 +86,13 @@ static char* xs_database_alloc_string ( size_t size ) {
 
     return dest;
 #endif
-    void* alloc = std_virtual_stack_alloc ( &xs_database_state->stack, size );
+    void* alloc = std_virtual_stack_alloc ( &db->stack, size );
     return ( char* ) alloc;
 }
 
 typedef struct {
     fs_i* fs;
+    xs_database_t* db;
     char* base;
 } xs_database_folder_iterator_params_t;
 
@@ -110,6 +119,10 @@ static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flag
             type = xg_pipeline_graphics_m;
         } else if ( std_str_cmp ( params->base + extension_base, ".xsc" ) == 0 ) {
             type = xg_pipeline_compute_m;
+#if xg_enable_raytracing_m
+        } else if ( std_str_cmp ( params->base + extension_base, ".xsr" ) == 0 ) {
+            type = xg_pipeline_raytrace_m;
+#endif
         } else if ( std_str_cmp ( params->base + extension_base, ".glsl" ) == 0 ) {
             is_header = true;
         } else {
@@ -118,14 +131,14 @@ static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flag
         }
     }
 
-    char* dest = xs_database_alloc_string ( path_len + 1 );
+    char* dest = xs_database_alloc_string ( params->db, path_len + 1 );
     std_str_copy ( dest, path_len + 1, params->base );
 
     if ( is_header ) {
-        xs_database_pipeline_state_header_t* header = &xs_database_state->pipeline_state_headers[xs_database_state->pipeline_state_headers_count++];
+        xs_database_pipeline_state_header_t* header = &params->db->pipeline_state_headers_array[params->db->pipeline_state_headers_count++];
         header->path = dest;
     } else {
-        xs_database_pipeline_state_t* pipeline_state = &xs_database_state->pipeline_states[xs_database_state->pipeline_states_count++];
+        xs_database_pipeline_state_t* pipeline_state = &params->db->pipeline_states[params->db->pipeline_states_count++];
         pipeline_state->path = dest;
         pipeline_state->name = params->fs->get_path_name_ptr ( dest );
         pipeline_state->type = type;
@@ -142,35 +155,40 @@ static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flag
         pipeline_state->name_hash = hash;
 
         // TODO insert here when the shader is built
-        bool unique = std_hash_map_insert ( &xs_database_state->pipeline_name_hash_to_state_map, hash, ( uint64_t ) pipeline_state );
+        bool unique = std_hash_map_insert ( &params->db->pipeline_name_hash_to_state_map, hash, ( uint64_t ) pipeline_state );
         std_assert_m ( unique );
     }
 
     params->fs->pop_path ( params->base );
 }
 
-bool xs_database_add_folder ( const char* input_path ) {
+bool xs_database_add_folder ( xs_database_h db_handle, const char* input_path ) {
     fs_i* fs = std_module_get_m ( fs_module_name_m );
+
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
 
     char path[fs_path_size_m] = { 0 };
     size_t path_len = fs->get_absolute_path ( path, fs_path_size_m, input_path );
 
     // TODO check that the path exists and is a folder
 
-    char* dest = xs_database_alloc_string ( path_len + 1 );
+    char* dest = xs_database_alloc_string ( db, path_len + 1 );
     std_str_copy ( dest, path_len + 1, path );
-    xs_database_state->folders[xs_database_state->folders_count++] = dest;
+    db->folders[db->folders_count++] = dest;
 
     xs_database_folder_iterator_params_t args;
     args.fs = fs;
+    args.db = db;
     args.base = path;
     fs->iterate_dir ( path, xs_database_folder_iterator, &args );
 
     return true;
 }
 
-bool xs_database_set_output_folder ( const char* input_path ) {
+bool xs_database_set_output_folder ( xs_database_h db_handle, const char* input_path ) {
     fs_i* fs = std_module_get_m ( fs_module_name_m );
+
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
 
     fs_path_info_t info;
     fs->get_path_info ( &info, input_path );
@@ -183,12 +201,12 @@ bool xs_database_set_output_folder ( const char* input_path ) {
     char path[fs_path_size_m] = { 0 };
     fs->get_absolute_path ( path, fs_path_size_m, input_path );
 
-    std_str_copy ( xs_database_state->output_path, fs_path_size_m, path );
+    std_str_copy ( db->output_path, fs_path_size_m, path );
 
     return result;
 }
 
-void xs_database_clear ( void ) {
+void xs_database_clear ( xs_database_h db_handle ) {
 #if 0
     for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
         xs_database_memory_page_t* page = &xs_database_state->memory_pages[i];
@@ -202,24 +220,62 @@ void xs_database_clear ( void ) {
         }
     }
 #endif
-    std_virtual_stack_clear ( &xs_database_state->stack );
+    // TODO is this ever used? missing some stuff?
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
+    
+    std_virtual_stack_clear ( &db->stack );
 
-    xs_database_state->folders_count = 0;
-    xs_database_state->pipeline_states_count = 0;
+    db->folders_count = 0;
+    db->pipeline_states_count = 0;
 }
 
-xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const xs_database_build_params_t* build_params ) {
-    xs_database_build_result_t result;
-    result.successful_shaders = 0;
-    result.failed_shaders = 0;
-    result.skipped_shaders = 0;
-    result.successful_pipeline_states = 0;
-    result.failed_pipeline_states = 0;
+void xs_database_set_build_params ( xs_database_h db_handle, const xs_database_build_params_t* params ) {
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
+
+    if ( params->base_graphics_state ) {
+        db->base_graphics_state = *params->base_graphics_state;
+    }
+
+    if ( params->base_compute_state ) {
+        db->base_compute_state = *params->base_compute_state;
+    }
+
+    if ( params->base_raytrace_state ) {
+        db->base_raytrace_state = *params->base_raytrace_state;
+    }
+
+    db->global_definition_count = params->global_definition_count;
+    for ( uint32_t i = 0; i < params->global_definition_count; ++i ) {
+        db->global_definitions[i] = params->global_definitions[i];
+    }
+
+    db->dirty_build_params = true;
+}
+
+void xs_database_rebuild_all ( void ) {
+    uint64_t db_idx = 0;
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, xs_database_bitset_u64_count_m ) ) {
+        xs_database_h db_handle = db_idx;
+        xs_database_build ( db_handle );
+        ++db_idx;
+    }
+}
+
+static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* shader, std_buffer_t bytecode ) {
+    shader->enable = true;
+    shader->hash = std_hash_metro ( bytecode.base, bytecode.size );
+    shader->buffer = bytecode;
+}
+
+xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
+
+    xs_database_build_result_t result = xs_database_build_result_m();
 
     fs_i* fs = std_module_get_m ( fs_module_name_m );
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-    std_log_info_m ( "Building shader database..." );
+    //std_log_info_m ( "Building shader database " std_fmt_str_m "...", std_debug_string_get ( &db->debug_name ) );
 
     // check headers, froce rebuild all shaders if one changed
     // TODO try to take dependencies into account and avoid rebuilding everything?
@@ -227,13 +283,13 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
     bool dirty_headers = false;
     std_timestamp_t most_recent_header_edit = std_timestamp_zero_m;
 
-    for ( size_t header_it = 0; header_it < xs_database_state->pipeline_state_headers_count && !dirty_headers; ++header_it ) {
-        xs_database_pipeline_state_header_t* header = &xs_database_state->pipeline_state_headers[header_it];
+    for ( size_t header_it = 0; header_it < db->pipeline_state_headers_count && !dirty_headers; ++header_it ) {
+        xs_database_pipeline_state_header_t* header = &db->pipeline_state_headers_array[header_it];
 
         fs_file_info_t info;
         std_verify_m ( fs->get_file_path_info ( &info, header->path ) );
 
-        dirty_headers |= xs_database_state->pipeline_state_headers_last_build_timestamp.count < info.last_write_time.count;
+        dirty_headers |= db->pipeline_state_headers_last_build_timestamp.count < info.last_write_time.count;
     
         if ( info.last_write_time.count > most_recent_header_edit.count ) {
             most_recent_header_edit = info.last_write_time;
@@ -241,12 +297,12 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
     }
 
     if ( dirty_headers ) {
-        xs_database_state->pipeline_state_headers_last_build_timestamp = std_timestamp_now_utc();
+        db->pipeline_state_headers_last_build_timestamp = std_timestamp_now_utc();
     }
 
     // check pipeline states
-    for ( size_t state_it = 0; state_it < xs_database_state->pipeline_states_count; ++state_it ) {
-        xs_database_pipeline_state_t* pipeline_state = &xs_database_state->pipeline_states[state_it];
+    for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
+        xs_database_pipeline_state_t* pipeline_state = &db->pipeline_states[state_it];
 
         fs_file_h pipeline_state_file = fs->open_file ( pipeline_state->path, fs_file_read_m );
         std_assert_m ( pipeline_state_file != fs_null_handle_m );
@@ -261,6 +317,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         typedef union {
             xs_parser_graphics_pipeline_state_t graphics;
             xs_parser_compute_pipeline_state_t compute;
+            xs_parser_raytrace_pipeline_state_t raytrace;
         } xs_parsed_pipeline_state_t;
 
         xs_parsed_pipeline_state_t parsed_pipeline_state;
@@ -271,29 +328,39 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
 
         switch ( pipeline_state->type ) {
             case xg_pipeline_graphics_m:
-                parsed_pipeline_state.graphics.params = xg_default_graphics_pipeline_params_m;
+                parsed_pipeline_state.graphics.params = xg_graphics_pipeline_params_m (
+                    .state = db->base_graphics_state
+                );
                 std_str_copy_static_m ( parsed_pipeline_state.graphics.params.debug_name, pipeline_state->name );
-
-                // Initialize viewport size with param values, the xss can override it if desired
-                parsed_pipeline_state.graphics.params.state.viewport_state.width = ( uint32_t ) build_params->viewport_width;
-                parsed_pipeline_state.graphics.params.state.viewport_state.height = ( uint32_t ) build_params->viewport_height;
 
                 state_parse_result = xs_parser_parse_graphics_pipeline_state_from_path ( &parsed_pipeline_state.graphics, pipeline_state->path );
 
                 shader_references = &parsed_pipeline_state.graphics.shader_references;
                 shader_definitions = &parsed_pipeline_state.graphics.shader_definitions;
-
                 break;
 
             case xg_pipeline_compute_m:
-                parsed_pipeline_state.compute.params = xg_default_compute_pipeline_params_m;
+                parsed_pipeline_state.compute.params = xg_compute_pipeline_params_m (
+                    .state = db->base_compute_state
+                );
                 std_str_copy_static_m ( parsed_pipeline_state.compute.params.debug_name, pipeline_state->name );
 
                 state_parse_result = xs_parser_parse_compute_pipeline_state_from_path ( &parsed_pipeline_state.compute, pipeline_state->path );
 
                 shader_references = &parsed_pipeline_state.compute.shader_references;
                 shader_definitions = &parsed_pipeline_state.compute.shader_definitions;
+                break;
 
+            case xg_pipeline_raytrace_m:
+                parsed_pipeline_state.raytrace.params = xg_raytrace_pipeline_params_m (
+                    .state = db->base_raytrace_state
+                );
+                std_str_copy_static_m ( parsed_pipeline_state.raytrace.params.debug_name, pipeline_state->name );
+
+                state_parse_result = xs_parser_parse_raytrace_pipeline_state_from_path ( &parsed_pipeline_state.raytrace, pipeline_state->path );
+
+                shader_references = &parsed_pipeline_state.raytrace.shader_references;
+                shader_definitions = &parsed_pipeline_state.raytrace.shader_definitions;
                 break;
         }
 
@@ -308,8 +375,8 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
 
         char output_path[fs_path_size_m];
 
-        if ( xs_database_state->output_path[0] ) {
-            std_str_copy ( output_path, fs_path_size_m, xs_database_state->output_path );
+        if ( db->output_path[0] ) {
+            std_str_copy ( output_path, fs_path_size_m, db->output_path );
         } else {
             std_str_copy ( output_path, fs_path_size_m, input_path );
         }
@@ -326,8 +393,7 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         char binary_path[fs_path_size_m];
 
         // check if the pipeline state needs to be (re)built
-        // TODO move further up, no need to parse the file if it doesn't need to be rebuilt?
-        bool needs_to_build = dirty_headers || pipeline_state->last_build_timestamp.count < pipeline_state_file_info.last_write_time.count;
+        bool needs_to_build = dirty_headers || pipeline_state->last_build_timestamp.count < pipeline_state_file_info.last_write_time.count || db->dirty_build_params;
 
         if ( !needs_to_build ) {
             for ( xg_shading_stage_e stage = 0; stage < xg_shading_stage_count_m; ++stage ) {
@@ -348,12 +414,15 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         }
 
         if ( !needs_to_build ) {
+            result.skipped_shaders += std_bit_count_32 ( shader_references->referenced_stages );
+            result.skipped_pipeline_states += 1;
             continue;
         }
 
         {
             xs_parser_graphics_pipeline_state_t* graphics_state = &parsed_pipeline_state.graphics;
             xs_parser_compute_pipeline_state_t* compute_state = &parsed_pipeline_state.compute;
+            xs_parser_raytrace_pipeline_state_t* raytrace_state = &parsed_pipeline_state.raytrace;
 
             size_t shader_success = 0;
             size_t shader_fail = 0;
@@ -387,6 +456,12 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                         stage_tag = "fs";
                     } else if ( stage == xg_shading_stage_compute_m ) {
                         stage_tag = "cs";
+                    } else if ( stage == xg_shading_stage_ray_gen_m ) {
+                        stage_tag = "rg";
+                    } else if ( stage == xg_shading_stage_ray_miss_m ) {
+                        stage_tag = "rm";
+                    } else if ( stage == xg_shading_stage_ray_hit_closest_m ) {
+                        stage_tag = "rhc";
                     }
 
                     //std_str_append ( binary_path, &array, "-" );
@@ -416,7 +491,8 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
                         xs_shader_compiler_params_t params;
                         params.binary_path = binary_path;
                         params.shader_path = shader_path;
-                        params.global_definitions = NULL;
+                        params.global_definitions = db->global_definitions;
+                        params.global_definition_count = db->global_definition_count;
                         params.shader_definitions = shader_definitions->array;
                         params.shader_definition_count = shader_definitions->count;
 
@@ -475,38 +551,41 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
             switch ( pipeline_state->type ) {
                 case xg_pipeline_graphics_m:
                     if ( shader_references->referenced_stages & xg_shading_stage_bit_vertex_m ) {
-                        xg_pipeline_state_shader_t* shader = &graphics_state->params.state.vertex_shader;
-                        shader->enable = true;
-                        shader->buffer = shader_bytecode[xg_shading_stage_vertex_m];
-                        shader->hash = std_hash_metro ( shader_bytecode[xg_shading_stage_vertex_m].base, shader_bytecode[xg_shading_stage_vertex_m].size );
+                        xs_database_set_pipeline_state_shader ( &graphics_state->params.state.vertex_shader, shader_bytecode[xg_shading_stage_vertex_m] );
                     }
 
                     if ( shader_references->referenced_stages & xg_shading_stage_bit_fragment_m ) {
-                        xg_pipeline_state_shader_t* shader = &graphics_state->params.state.fragment_shader;
-                        shader->enable = true;
-                        shader->buffer = shader_bytecode[xg_shading_stage_fragment_m];
-                        shader->hash = std_hash_metro ( shader_bytecode[xg_shading_stage_fragment_m].base, shader_bytecode[xg_shading_stage_fragment_m].size );
+                        xs_database_set_pipeline_state_shader ( &graphics_state->params.state.fragment_shader, shader_bytecode[xg_shading_stage_fragment_m] );
                     }
 
-                    pipeline_handle = xg->create_graphics_pipeline ( device, &graphics_state->params );
-
+                    pipeline_handle = xg->create_graphics_pipeline ( db->device, &graphics_state->params );
                     break;
 
                 case xg_pipeline_compute_m:
                     if ( shader_references->referenced_stages & xg_shading_stage_bit_compute_m ) {
-                        xg_pipeline_state_shader_t* shader = &compute_state->params.state.compute_shader;
-                        shader->enable = true;
-                        shader->buffer = shader_bytecode[xg_shading_stage_compute_m];
-                        shader->hash = std_hash_metro ( shader_bytecode[xg_shading_stage_compute_m].base, shader_bytecode[xg_shading_stage_compute_m].size );
+                        xs_database_set_pipeline_state_shader ( &compute_state->params.state.compute_shader, shader_bytecode[xg_shading_stage_compute_m] );
                     }
 
-                    pipeline_handle = xg->create_compute_pipeline ( device, &compute_state->params );
+                    pipeline_handle = xg->create_compute_pipeline ( db->device, &compute_state->params );
+                    break;
 
+                case xg_pipeline_raytrace_m:
+                    if ( shader_references->referenced_stages & xg_shading_stage_bit_ray_gen_m ) {
+                        xs_database_set_pipeline_state_shader ( &raytrace_state->params.state.ray_gen_shader, shader_bytecode[xg_shading_stage_ray_gen_m] );
+                    }
+
+                    if ( shader_references->referenced_stages & xg_shading_stage_bit_ray_miss_m ) {
+                        xs_database_set_pipeline_state_shader ( &raytrace_state->params.state.ray_miss_shader, shader_bytecode[xg_shading_stage_ray_miss_m] );
+                    }
+
+                    if ( shader_references->referenced_stages & xg_shading_stage_bit_ray_hit_closest_m ) {
+                        xs_database_set_pipeline_state_shader ( &raytrace_state->params.state.ray_hit_closest_shader, shader_bytecode[xg_shading_stage_ray_hit_closest_m] );
+                    }
+
+                    pipeline_handle = xg->create_raytrace_pipeline ( db->device, &raytrace_state->params );
                     break;
             }
 
-            // TODO
-            //xg_graphics_pipeline_state_h pipeline_handle = xg->create_graphics_pipeline ( device, &pipeline_params );
             std_assert_m ( pipeline_handle != xg_null_handle_m );
 
             // TODO add these pipelines to a separate list, to avoid having to iterate all pipelines in update_pipelines
@@ -525,8 +604,12 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
         }
     }
 
-    std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders built, " std_fmt_size_m " shaders cached", 
-        result.successful_pipeline_states, result.successful_shaders, result.skipped_shaders );
+    std_log_info_m ( "Shader database build " std_fmt_str_m std_fmt_newline_m 
+        "Pipeline states: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached" std_fmt_newline_m 
+        "Shader references: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", 
+        std_debug_string_get ( &db->debug_name ),
+        result.failed_pipeline_states, result.successful_pipeline_states, result.skipped_pipeline_states,
+        result.failed_shaders, result.successful_shaders, result.skipped_shaders );
 
     if ( result.failed_shaders || result.failed_pipeline_states ) {
         std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
@@ -535,14 +618,9 @@ xs_database_build_result_t xs_database_build_shaders ( xg_device_h device, const
     return result;
 }
 
-xs_pipeline_state_h xs_database_pipeline_lookup ( const char* name ) {
-    xs_string_hash_t hash = xs_hash_string_m ( name, std_str_len ( name ) );
-    xs_pipeline_state_h state = xs_database_pipeline_lookup_hash ( hash );
-    return state;
-}
-
-xs_pipeline_state_h xs_database_pipeline_lookup_hash ( xs_string_hash_t hash ) {
-    uint64_t* lookup = std_hash_map_lookup ( &xs_database_state->pipeline_name_hash_to_state_map, hash );
+xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h db_handle, xs_string_hash_t hash ) {
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
+    uint64_t* lookup = std_hash_map_lookup ( &db->pipeline_name_hash_to_state_map, hash );
 
     if ( !lookup ) {
         std_log_error_m ( "Lookup for pipeline state failed" );
@@ -550,11 +628,11 @@ xs_pipeline_state_h xs_database_pipeline_lookup_hash ( xs_string_hash_t hash ) {
     }
 
     xs_database_pipeline_state_t** state = ( xs_database_pipeline_state_t** ) lookup;
-    xs_pipeline_state_h handle = ( xs_pipeline_state_h ) ( *state );
+    xs_database_pipeline_h handle = ( xs_database_pipeline_h ) ( *state );
     return handle;
 }
 
-xg_graphics_pipeline_state_h xs_database_pipeline_get ( xs_pipeline_state_h handle ) {
+xg_graphics_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h handle ) {
     xs_database_pipeline_state_t* state = ( xs_database_pipeline_state_t* ) handle;
     return state->pipeline_handle;
 }
@@ -562,29 +640,91 @@ xg_graphics_pipeline_state_h xs_database_pipeline_get ( xs_pipeline_state_h hand
 void xs_database_update_pipelines ( xg_workload_h last_workload ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-    for ( size_t state_it = 0; state_it < xs_database_state->pipeline_states_count; ++state_it ) {
-        xs_database_pipeline_state_t* pipeline_state = &xs_database_state->pipeline_states[state_it];
+    uint64_t db_idx = 0;
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, xs_database_bitset_u64_count_m ) ) {
+        xs_database_t* db = &xs_database_state->database_array[db_idx];
 
-        xg_graphics_pipeline_state_h old_pipeline_handle = pipeline_state->old_pipeline_handle;
+        for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
+            xs_database_pipeline_state_t* pipeline_state = &db->pipeline_states[state_it];
 
-        if ( old_pipeline_handle != xg_null_handle_m ) {
-            xg_workload_h workload = pipeline_state->old_pipeline_workload;
+            xg_graphics_pipeline_state_h old_pipeline_handle = pipeline_state->old_pipeline_handle;
 
-            if ( workload == xg_null_handle_m ) {
-                pipeline_state->old_pipeline_workload = last_workload;
-                workload = last_workload;
-            }
+            if ( old_pipeline_handle != xg_null_handle_m ) {
+                xg_workload_h workload = pipeline_state->old_pipeline_workload;
 
-            if ( xg->is_workload_complete ( workload ) ) {
-                if ( pipeline_state->type == xg_pipeline_graphics_m ) {
-                    xg->destroy_graphics_pipeline ( pipeline_state->old_pipeline_handle );
-                } else {
-                    xg->destroy_compute_pipeline ( pipeline_state->old_pipeline_handle );
+                if ( workload == xg_null_handle_m ) {
+                    pipeline_state->old_pipeline_workload = last_workload;
+                    workload = last_workload;
                 }
 
-                pipeline_state->old_pipeline_handle = xg_null_handle_m;
-                pipeline_state->old_pipeline_workload = xg_null_handle_m;
+                if ( xg->is_workload_complete ( workload ) ) {
+                    if ( pipeline_state->type == xg_pipeline_graphics_m ) {
+                        xg->destroy_graphics_pipeline ( pipeline_state->old_pipeline_handle );
+                    } else {
+                        xg->destroy_compute_pipeline ( pipeline_state->old_pipeline_handle );
+                    }
+
+                    pipeline_state->old_pipeline_handle = xg_null_handle_m;
+                    pipeline_state->old_pipeline_workload = xg_null_handle_m;
+                }
+            }
+        }
+
+        ++db_idx;
+    }
+}
+
+xs_database_h xs_database_create ( const xs_database_params_t* params ) {
+    xs_database_t* db = std_list_pop_m ( &xs_database_state->database_freelist );
+
+    std_mem_zero_m ( db );
+    db->device = params->device;
+    db->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
+    db->pipeline_name_hash_to_state_map = std_hash_map_create ( xs_database_max_pipeline_states_m * 2 );
+    db->pipeline_state_headers_array = std_virtual_heap_alloc_array_m ( xs_database_pipeline_state_header_t, xs_database_max_pipeline_state_headers_m );
+    std_debug_string_copy ( &db->debug_name, &params->debug_name );
+
+    db->base_graphics_state = xg_graphics_pipeline_state_m();
+    db->base_compute_state = xg_compute_pipeline_state_m();
+    db->base_raytrace_state = xg_raytrace_pipeline_state_m();
+    std_mem_zero_static_array_m ( db->global_definitions );
+    db->global_definition_count = 0;
+    db->dirty_build_params = false;
+
+    uint64_t db_idx = db - xs_database_state->database_array;
+    std_bitset_set ( xs_database_state->database_bitset, db_idx );
+
+    xs_database_h db_handle = db_idx;
+
+    return db_handle;
+}
+
+void xs_database_destroy ( xs_database_h db_handle ) {
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    
+    xs_database_t* db = &xs_database_state->database_array[db_handle];
+
+    for ( uint32_t i = 0; i < db->pipeline_states_count; ++i ) {
+        xs_database_pipeline_state_t* state = &db->pipeline_states[i];
+
+        if ( state->pipeline_handle != xg_null_handle_m ) {
+            switch ( state->type ) {
+            case xg_pipeline_graphics_m:
+                xg->destroy_graphics_pipeline ( state->pipeline_handle );
+                break;
+            case xg_pipeline_compute_m:
+                xg->destroy_compute_pipeline ( state->pipeline_handle );
+                break;
+            case xg_pipeline_raytrace_m:
+                xg->destroy_raytrace_pipeline ( state->pipeline_handle );
+                break;
             }
         }
     }
+
+    std_virtual_heap_free ( db->pipeline_state_headers_array );
+    std_hash_map_destroy ( &db->pipeline_name_hash_to_state_map );
+    std_virtual_stack_destroy ( &db->stack );
+
+    std_bitset_clear ( xs_database_state->database_bitset, db_handle );
 }

@@ -3,7 +3,7 @@
 #include <viewapp_state.h>
 
 typedef struct {
-    xs_pipeline_state_h pipeline;
+    xs_database_pipeline_h pipeline;
     uint32_t particle_count;
 } rainfall_spawn_pass_data_t;
 

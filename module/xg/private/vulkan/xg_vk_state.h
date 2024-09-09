@@ -12,6 +12,7 @@
 #include "xg_vk_sampler.h"
 #include "xg_vk_swapchain.h"
 #include "xg_vk_workload.h"
+#include "xg_vk_raytrace.h"
 
 typedef struct {
     xg_vk_instance_state_t instance;
@@ -24,4 +25,5 @@ typedef struct {
     xg_vk_sampler_state_t sampler;
     xg_vk_swapchain_state_t swapchain;
     xg_vk_workload_state_t workload;
+    xg_vk_raytrace_state_t raytrace;
 } xg_vk_state_t;

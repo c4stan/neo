@@ -133,7 +133,7 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_buffer_params_t pos_staging_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m ),
+        .memory_type = xg_memory_type_upload_m,
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_source_m,
@@ -142,7 +142,7 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_buffer_h pos_staging = xg->create_buffer ( &pos_staging_params );
 
     xg_buffer_params_t nor_staging_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m ),
+        .memory_type = xg_memory_type_upload_m,
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_source_m,
@@ -151,7 +151,7 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_buffer_h nor_staging = xg->create_buffer ( &nor_staging_params );
 
     xg_buffer_params_t idx_staging_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_upload_m ),
+        .memory_type = xg_memory_type_upload_m,
         .device = device,
         .size = geo->index_count * sizeof ( uint32_t ),
         .allowed_usage = xg_buffer_usage_bit_copy_source_m,
@@ -190,7 +190,7 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     xg_buffer_params_t pos_buffer_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m,
@@ -199,7 +199,7 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_buffer_h pos_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &pos_buffer_params );
 
     xg_buffer_params_t nor_buffer_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m,
@@ -208,7 +208,7 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
     xg_buffer_h nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &nor_buffer_params );
 
     xg_buffer_params_t idx_buffer_params = xg_buffer_params_m (
-        .allocator = xg->get_default_allocator ( device, xg_memory_type_gpu_only_m ),
+        .memory_type = xg_memory_type_gpu_only_m,
         .device = device,
         .size = geo->index_count * sizeof ( uint32_t ),
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_index_buffer_m,
