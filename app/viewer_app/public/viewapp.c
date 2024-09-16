@@ -156,6 +156,7 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 
 }
 
+// TODO move out into simple_pass
 typedef struct {
     xg_sampler_filter_e filter;
 } copy_pass_args_t;
@@ -248,13 +249,17 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m ( 
-        .width = 1024,
-        .height = 1024,
+        .width = resolution_x,
+        .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "color_texture"
     ));
 
+    // raytrace
     xf_node_h raytrace_node = add_raytrace_pass ( graph, color_texture );
+
+    // ui
+    xf_node_h ui_node = add_ui_pass ( graph, color_texture );
 
     // present
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
@@ -653,12 +658,42 @@ static void viewapp_boot_raster_graph ( void ) {
 }
 
 static void viewapp_boot_scene_raytrace ( void ) {
+    xg_device_h device = m_state->render.device;
     xg_i* xg = m_state->modules.xg;
+
+    geometry_data_t geo = generate_plane ( 1 );
+    geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+
+    xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
+        .vertex_buffer = gpu_data.rt_buffer,
+        .vertex_format = xg_format_r32g32b32_sfloat_m,
+        .vertex_count = geo.vertex_count,
+        .vertex_stride = 12 * 2,
+        .index_buffer = gpu_data.idx_buffer,
+        .index_count = geo.index_count,
+        .debug_name = "rt_geo_data"
+    );
+
+    xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &xg_raytrace_geometry_params_m (
+        .device = device,
+        .geometries = &rt_data,
+        .geometries_count = 1,
+        .debug_name = "rt_geo"
+    ) );
+
+    xg_raytrace_geometry_instance_t instance = xg_raytrace_geometry_instance_m ( 
+        .geometry = rt_geo,
+        .id = 0,
+    );
 
     xg_raytrace_world_h world = xg->create_raytrace_world ( &xg_raytrace_world_params_m (
         .device = m_state->render.device,
-        .debug_name = "raytrace_world",
+        .instance_array = &instance,
+        .instance_count = 1,
+        .debug_name = "rt_world",
     ) );
+
+    free_gpu_data ( &gpu_data );
 
     m_state->render.raytrace_world = world;
 }
@@ -1279,7 +1314,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             const char* memory_type_name;
             switch ( i ) {
                 case xg_memory_type_gpu_only_m:     memory_type_name = "gpu"; break;
-                case xg_memory_type_gpu_mappable_m: memory_type_name = "mapped"; break;
+                case xg_memory_type_gpu_mapped_m: memory_type_name = "mapped"; break;
                 case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
                 case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
             }
@@ -1462,7 +1497,7 @@ static std_app_state_e viewapp_update ( void ) {
     wm_window_info_t new_window_info;
     wm->get_window_info ( window, &new_window_info );
 
-    //viewapp_update_ui ( &new_window_info, &new_input_state );
+    viewapp_update_ui ( &new_window_info, &new_input_state );
 
     m_state->render.window_info = new_window_info;
     m_state->render.input_state = new_input_state;
@@ -1493,6 +1528,7 @@ void* viewer_app_load ( void* runtime ) {
 
     state->api.tick = viewapp_tick;
 
+    state->modules.tk = std_module_load_m ( tk_module_name_m );
     state->modules.fs = std_module_load_m ( fs_module_name_m );
     state->modules.wm = std_module_load_m ( wm_module_name_m );
     state->modules.xg = std_module_load_m ( xg_module_name_m );
@@ -1518,6 +1554,7 @@ void viewer_app_unload ( void ) {
     std_module_unload_m ( xg_module_name_m );
     std_module_unload_m ( wm_module_name_m );
     std_module_unload_m ( fs_module_name_m );
+    std_module_unload_m ( tk_module_name_m );
 
     viewapp_state_free();
 

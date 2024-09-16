@@ -57,6 +57,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->write_workload_uniform = xg_workload_write_uniform;
     xg->wait_all_workload_complete = xg_workload_wait_all_workload_complete;
     // Raytrace
+    xg->create_raytrace_geometry = xg_vk_raytrace_geometry_create;
     xg->create_raytrace_world = xg_vk_raytrace_world_create;
     xg->cmd_set_raytrace_pipeline_state = xg_cmd_buffer_raytrace_pipeline_state_bind;
     xg->cmd_trace_rays = xg_cmd_buffer_raytrace_trace_rays;

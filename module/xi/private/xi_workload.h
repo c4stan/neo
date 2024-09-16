@@ -110,6 +110,7 @@ typedef struct {
     //std_ring_t submit_ring;
     xi_workload_device_context_t device_contexts[xg_max_active_devices_m];
 
+    xs_database_pipeline_h render_pipeline_rgba8;
     xs_database_pipeline_h render_pipeline_bgra8;
     xs_database_pipeline_h render_pipeline_a2bgr10;
 

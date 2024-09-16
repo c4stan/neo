@@ -56,6 +56,7 @@ void xf_reload ( void* std_runtime, void* api ) {
     xf_graph_reload ( &state->graph );
 
     xf_api_init ( &state->api );
+    xf_state_bind ( state );
 }
 
 void xf_unload ( void ) {

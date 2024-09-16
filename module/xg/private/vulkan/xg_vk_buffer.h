@@ -15,6 +15,7 @@ typedef struct {
     VkBuffer                vk_handle;
     xg_alloc_t              allocation;
     uint64_t                offset;
+    VkDeviceAddress         gpu_address;
     xg_buffer_params_t      params;
     xg_vk_buffer_state_e    state;
 } xg_vk_buffer_t;
@@ -27,10 +28,9 @@ typedef struct {
 } xg_vk_buffer_state_t;
 
 typedef enum {
-    xg_vk_buffer_usage_bit_acceleration_structure_build_input_read_only_m   = 1 << 8,
-    xg_vk_buffer_usage_bit_acceleration_structure_storage_m                 = 1 << 9,
-    xg_vk_buffer_usage_bit_shader_device_address_m                          = 1 << 10,
-    xg_vk_buffer_usage_bit_shader_binding_table_m                           = 1 << 11,
+    xg_vk_buffer_usage_bit_acceleration_structure_build_input_read_only_m   = 1 << 10,
+    xg_vk_buffer_usage_bit_acceleration_structure_storage_m                 = 1 << 11,
+    xg_vk_buffer_usage_bit_shader_binding_table_m                           = 1 << 12,
 } xg_vk_buffer_usage_bit_e;
 
 void xg_vk_buffer_load ( xg_vk_buffer_state_t* state );

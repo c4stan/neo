@@ -125,6 +125,7 @@ typedef struct {
     VkPhysicalDeviceProperties          generic_properties;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceProperties.html
     VkPhysicalDeviceFeatures            supported_features;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR raytrace_properties; //
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties;
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR supported_raytrace_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRayTracingPipelineFeaturesKHR.html
     VkPhysicalDeviceBufferDeviceAddressFeatures supported_device_address_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
     VkPhysicalDeviceAccelerationStructureFeaturesKHR supported_acceleration_structure_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html

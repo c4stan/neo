@@ -463,7 +463,7 @@ typedef struct {
 // TODO does non-coherent memory mean write-combine? e.g. a read after a write on host doesn't return the written value? https://fgiesen.wordpress.com/2013/01/29/write-combining-is-not-your-friend/
 typedef enum {
     xg_memory_type_bit_device_m   = 1 << 0,
-    xg_memory_type_bit_mappable_m = 1 << 1,
+    xg_memory_type_bit_mapped_m = 1 << 1,
     xg_memory_type_bit_cached_m   = 1 << 2,
     xg_memory_type_bit_coherent_m = 1 << 3,
     //xg_memory_type_for_gpu_only_m = xg_memory_type_device_m,
@@ -521,7 +521,7 @@ typedef struct {
 
 typedef enum {
     xg_memory_type_gpu_only_m,
-    xg_memory_type_gpu_mappable_m,
+    xg_memory_type_gpu_mapped_m,
     xg_memory_type_upload_m,
     xg_memory_type_readback_m,
     xg_memory_type_count_m,
@@ -1238,14 +1238,16 @@ typedef struct {
 */
 
 typedef enum {
-    xg_buffer_usage_bit_copy_source_m           = 1 << 0,
-    xg_buffer_usage_bit_copy_dest_m             = 1 << 1,
-    xg_buffer_usage_bit_texel_uniform_m         = 1 << 2,
-    xg_buffer_usage_bit_texel_storage_m         = 1 << 3,
-    xg_buffer_usage_bit_uniform_m               = 1 << 4,
-    xg_buffer_usage_bit_storage_m               = 1 << 5,
-    xg_buffer_usage_bit_index_buffer_m          = 1 << 6,
-    xg_buffer_usage_bit_vertex_buffer_m         = 1 << 7,
+    xg_buffer_usage_bit_copy_source_m                   = 1 << 0,
+    xg_buffer_usage_bit_copy_dest_m                     = 1 << 1,
+    xg_buffer_usage_bit_texel_uniform_m                 = 1 << 2,
+    xg_buffer_usage_bit_texel_storage_m                 = 1 << 3,
+    xg_buffer_usage_bit_uniform_m                       = 1 << 4,
+    xg_buffer_usage_bit_storage_m                       = 1 << 5,
+    xg_buffer_usage_bit_index_buffer_m                  = 1 << 6,
+    xg_buffer_usage_bit_vertex_buffer_m                 = 1 << 7,
+    xg_buffer_usage_bit_shader_device_address_m         = 1 << 8,
+    xg_buffer_usage_bit_raytrace_geometry_buffer_m      = 1 << 9,
     // Note: internal code might extend this, check before adding something
 } xg_buffer_usage_bit_e;
 
@@ -1666,6 +1668,7 @@ typedef struct {
     xg_memory_type_e memory_type;
     xg_device_h device;
     size_t size;
+    size_t align;
     // TODO rename to allowed_gpu_usage?
     xg_buffer_usage_bit_e allowed_usage;
     char debug_name[xg_debug_name_size_m];
@@ -1675,6 +1678,7 @@ typedef struct {
     .memory_type = xg_memory_type_null_m, \
     .device = xg_null_handle_m, \
     .size = 0, \
+    .align = 0, \
     .allowed_usage = 0, \
     .debug_name = {0}, \
     ##__VA_ARGS__ \
@@ -1797,6 +1801,7 @@ typedef struct {
     xg_alloc_t allocation;
     xg_device_h device;
     size_t size;
+    uint64_t gpu_address;
     xg_buffer_usage_bit_e allowed_usage;
     char debug_name[xg_debug_name_size_m];
 } xg_buffer_info_t;
@@ -1857,6 +1862,7 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+// TODO process multiple copies at once? (sources[] and destinations[] instead of single textures)
 typedef struct {
     xg_texture_copy_resource_t source;
     xg_texture_copy_resource_t destination;
@@ -1948,6 +1954,21 @@ typedef struct {
     char debug_name[xg_debug_name_size_m];
 } xg_raytrace_geometry_data_t;
 
+#define xg_raytrace_geometry_data_m( ... ) ( xg_raytrace_geometry_data_t ) { \
+    .vertex_buffer = xg_null_handle_m, \
+    .vertex_buffer_offset = 0, \
+    .vertex_format = xg_format_undefined_m, \
+    .vertex_count = 0, \
+    .vertex_stride = 0, \
+    .index_buffer = xg_null_handle_m, \
+    .index_buffer_offset = 0, \
+    .index_count = 0, \
+    .transform_buffer = xg_null_handle_m, \
+    .transform_buffer_offset = 0, \
+    .debug_name = {0}, \
+    ##__VA_ARGS__ \
+}
+
 typedef struct {
     xg_device_h device;
     xg_raytrace_geometry_data_t* geometries;
@@ -1959,11 +1980,12 @@ typedef struct {
     .device = device, \
     .geometries = NULL, \
     .geometries_count = 0, \
-    .debug_name = "", \
+    .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
 
 // Row major storage
+//                  R     | T
 // r0 = m[0] = e00 e01 e02 e03
 // r1 = m[1] = e04 e05 e06 e07
 // r2 = m[2] = e08 e09 e10 e11
@@ -1977,6 +1999,12 @@ typedef union {
     };
 } xg_matrix_3x4_t;
 
+#define xg_matrix_3x4_m( ... ) ( xg_matrix_3x4_t ) { \
+    .r0 = { 1, 0, 0, 0 }, \
+    .r1 = { 0, 1, 0, 0 }, \
+    .r2 = { 0, 0, 1, 0 }, \
+}
+
 typedef enum {
     xg_raytrace_instance_flag_bit_disable_face_cull_m = 1 << 0,
 } xg_raytrace_instance_flag_bit_e;
@@ -1984,9 +2012,19 @@ typedef enum {
 typedef struct {
     xg_raytrace_geometry_h geometry;
     xg_matrix_3x4_t transform;
+    uint32_t id;
     uint8_t visibility_mask;
     xg_raytrace_instance_flag_bit_e flags;
 } xg_raytrace_geometry_instance_t;
+
+#define xg_raytrace_geometry_instance_m( ... ) ( xg_raytrace_geometry_instance_t ) { \
+    .geometry = xg_null_handle_m, \
+    .transform = xg_matrix_3x4_m(), \
+    .id = 0xffffffff, \
+    .visibility_mask = 0xff, \
+    .flags = 0, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_device_h device;
@@ -1999,7 +2037,7 @@ typedef struct {
     .device = xg_null_handle_m, \
     .instance_array = NULL,  \
     .instance_count = 0, \
-    .debug_name = "", \
+    .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
 

@@ -168,7 +168,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     xg_vk_alloc_params_t alloc_params = xg_vk_alloc_params_m ( 
         .device = params->device,
         .size = vk_buffer_memory.size,
-        .align = vk_buffer_memory.alignment,
+        .align = std_max ( vk_buffer_memory.alignment, params->align ),
         .type = params->memory_type,
     );
     std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
@@ -176,6 +176,16 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     xg_alloc_t alloc = xg_alloc ( &alloc_params );
     result = vkBindBufferMemory ( device->vk_handle, vk_buffer, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
     std_assert_m ( result == VK_SUCCESS );
+
+    if ( params->allowed_usage & xg_buffer_usage_bit_shader_device_address_m ) {
+        VkBufferDeviceAddressInfoKHR address_info = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+            .buffer = vk_buffer
+        };
+        buffer->gpu_address = vkGetBufferDeviceAddress ( device->vk_handle, &address_info );
+    } else {
+        buffer->gpu_address = 0;
+    }
 
     buffer->vk_handle = vk_buffer;
     buffer->allocation = alloc;
@@ -195,6 +205,7 @@ bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
     info->device = buffer->params.device;
     info->size = buffer->params.size;
     info->allowed_usage = buffer->params.allowed_usage;
+    info->gpu_address = buffer->gpu_address;
     std_str_copy_static_m ( info->debug_name, buffer->params.debug_name );
 
     return true;

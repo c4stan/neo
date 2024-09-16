@@ -1072,6 +1072,7 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
             type = xg_resource_binding_buffer_texel_uniform_m;
         }
     } else {
+        // TODO redesign this... no way to specify a read only storage buffer but in practice it is useful
         if ( buffer.write_access ) {
             type = xg_resource_binding_buffer_storage_m;
         } else {

@@ -21,6 +21,8 @@
             doesn't let the client know how much size is required to complete successfully
 */
 
+// TODO add a string view (char* begin, char* end) type and use that in most places when taking in a string as param instead of a single null terminated char*
+
 bool std_utf8_is_single_byte    ( char c );
 bool std_utf8_is_double_byte    ( char c );
 bool std_utf8_is_triple_byte    ( char c );

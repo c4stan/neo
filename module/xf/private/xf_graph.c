@@ -1069,6 +1069,10 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
             sort_key += node->params.key_space_size;
 
+            if ( node->renderpass != xg_null_handle_m ) {
+                xg->cmd_end_renderpass ( cmd_buffer, node->renderpass, sort_key );
+            }
+
             if ( node->params.presentable_texture != xf_null_handle_m ) {
                 xf_texture_h texture_handle = node->params.presentable_texture;
 
@@ -1088,10 +1092,6 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 barrier_set.texture_memory_barriers = present_barrier;
                 barrier_set.texture_memory_barriers_count = 1;
                 xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
-            }
-
-            if ( node->renderpass != xg_null_handle_m ) {
-                xg->cmd_end_renderpass ( cmd_buffer, node->renderpass, sort_key );
             }
 
             xg->cmd_end_debug_region ( cmd_buffer, sort_key );

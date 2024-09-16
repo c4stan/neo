@@ -185,6 +185,7 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
 
     if ( flags & xg_texture_flag_bit_render_target_texture_m ) {
         texture->params.allowed_usage |= xg_texture_usage_bit_resource_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_storage_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
     } else if ( flags & ( xg_texture_flag_bit_depth_texture_m | xg_texture_flag_bit_stencil_texture_m ) ) {

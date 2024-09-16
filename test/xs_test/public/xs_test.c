@@ -222,7 +222,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         cbuffer_data.color[2] = 1.0;
         //cbuffer_range = xg->write_workload_uniform ( workload, &cbuffer_data, sizeof ( cbuffer_data ) );
         xg_buffer_h buffer_handle = xg->create_buffer ( & xg_buffer_params_m (
-            .memory_type = xg_memory_type_gpu_mappable_m,
+            .memory_type = xg_memory_type_gpu_mapped_m,
             .device = device,
             .size = 128,
             .allowed_usage = xg_buffer_usage_bit_uniform_m,

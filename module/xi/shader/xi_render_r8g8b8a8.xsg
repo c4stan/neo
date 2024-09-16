@@ -1,0 +1,5 @@
+include xi_render_common.xsi
+
+begin render_target 0
+    format R8G8B8A8_UNORM
+end

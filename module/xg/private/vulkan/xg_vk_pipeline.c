@@ -360,6 +360,7 @@ static xg_vk_framebuffer_h xg_vk_framebuffer_create ( xg_device_h device_handle,
             attachment_image_info[i].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
             attachment_image_info[i].usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // see xg_vk_swapchain.c swapchain creation allowed usages comment
             attachment_image_info[i].usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+            attachment_image_info[i].usage |= VK_IMAGE_USAGE_STORAGE_BIT; // see xg_vk_texture.c xg_texture_reserve. TODO take these as parameters instead of tagging all render targets
             attachment_image_info[i].width = width;
             attachment_image_info[i].height = height;
             attachment_image_info[i].layerCount = 1;
@@ -367,6 +368,7 @@ static xg_vk_framebuffer_h xg_vk_framebuffer_create ( xg_device_h device_handle,
             attachment_image_info[i].pViewFormats = &formats[i];
         }
 
+        // depth stencil
         {
             size_t i = renderpass->render_textures_layout.render_targets_count;
 
@@ -978,7 +980,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .memory_type = xg_memory_type_upload_m,
                 .device = device_handle,
                 .size = group_count * sbt_stride,
-                .allowed_usage = xg_buffer_usage_bit_copy_source_m | xg_vk_buffer_usage_bit_shader_device_address_m | xg_vk_buffer_usage_bit_shader_binding_table_m,
+                .allowed_usage = xg_buffer_usage_bit_copy_source_m | xg_buffer_usage_bit_shader_device_address_m | xg_vk_buffer_usage_bit_shader_binding_table_m,
                 .debug_name = "sbt", // TODO
             ));
             const xg_vk_buffer_t* sbt_buffer = xg_vk_buffer_get ( sbt_buffer_handle );

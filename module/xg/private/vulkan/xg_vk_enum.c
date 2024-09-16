@@ -373,16 +373,21 @@ VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_bit_e usage ) {
         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
 
+    if ( usage & xg_buffer_usage_bit_shader_device_address_m ) {
+        flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    }
+
+    if ( usage & xg_buffer_usage_bit_raytrace_geometry_buffer_m ) {
+        flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
+
+
     if ( usage & xg_vk_buffer_usage_bit_acceleration_structure_build_input_read_only_m ) {
         flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     }
 
     if ( usage & xg_vk_buffer_usage_bit_acceleration_structure_storage_m ) {
         flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
-    }
-
-    if ( usage & xg_vk_buffer_usage_bit_shader_device_address_m ) {
-        flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
 
     if ( usage & xg_vk_buffer_usage_bit_shader_binding_table_m ) {
@@ -673,7 +678,7 @@ xg_memory_flag_bit_e xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags ) {
     }
 
     if ( flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ) {
-        result |= xg_memory_type_bit_mappable_m;
+        result |= xg_memory_type_bit_mapped_m;
     }
 
     if ( flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) {

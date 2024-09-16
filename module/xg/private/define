@@ -21,7 +21,7 @@ xg_cmd_buffer_max_resource_cmd_buffers_m            16
 xg_cmd_buffer_preallocated_resource_cmd_buffers_m   8
 
 xg_instance_enabled_runtime_layers_m        (xg_runtime_layer_bit_debug_m | xg_runtime_layer_bit_renderdoc_m)
-xg_instance_crash_on_validation_error_m     false
+xg_instance_crash_on_validation_error_m     true
 
 xg_debug_enable_events_log_m                    0
 xg_debug_enable_flush_gpu_submissions_m         0

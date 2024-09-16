@@ -530,7 +530,6 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     // acquire active
     if ( xi_ui_layer_cursor_test ( x + title_pad_x, y + title_pad_y, triangle_width, triangle_height ) ) {
         xi_ui_acquire_hovered ( state->id, 2 );
-        std_log_info_m ( "hit" );
 
         if ( xi_ui_cursor_click() ) {
             xi_ui_acquire_active ( state->id, 2 );
@@ -660,7 +659,6 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     }
 
     if ( minimize_pressed ) {
-        std_log_info_m ( "flip" );
         state->minimized = !state->minimized;
     }
 

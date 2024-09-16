@@ -7,17 +7,16 @@
 #include <std_allocator.h>
 
 typedef struct {
-    xg_device_h device;
     xg_buffer_h buffer;
     VkAccelerationStructureKHR vk_handle;
     xg_raytrace_geometry_params_t params;
 } xg_vk_raytrace_geometry_t;
 
 typedef struct {
-    xg_device_h device;
     xg_buffer_h buffer;
     VkAccelerationStructureKHR vk_handle;
     xg_raytrace_world_params_t params;
+    xg_buffer_h shader_instance_buffer;
 } xg_vk_raytrace_world_t; // TODO rename to something else?
 
 #define xg_vk_raytrace_max_cmd_buffers_m 32

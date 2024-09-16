@@ -11,6 +11,7 @@
 #include <wm.h>
 #include <xg.h>
 #include <xi.h>
+#include <tk.h>
 
 // Modules
 typedef struct {
@@ -22,6 +23,7 @@ typedef struct {
     se_i* se;
     rv_i* rv;
     xi_i* xi;
+    tk_i* tk;
 } viewapp_modules_state_t;
 
 // Render

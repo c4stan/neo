@@ -70,14 +70,18 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_log_info_m ( "Querying device " std_fmt_size_m " for properties", device->id );
     
     // Properties
-    vkGetPhysicalDeviceProperties ( device->vk_physical_handle, &device->generic_properties );
+    //vkGetPhysicalDeviceProperties ( device->vk_physical_handle, &device->generic_properties );
     device->raytrace_properties = ( VkPhysicalDeviceRayTracingPipelinePropertiesKHR ) {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
         .pNext = NULL
     };
+    device->acceleration_structure_properties = ( VkPhysicalDeviceAccelerationStructurePropertiesKHR ) {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
+        .pNext = &device->raytrace_properties
+    };
     VkPhysicalDeviceProperties2 properties_query = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-        .pNext = &device->raytrace_properties
+        .pNext = &device->acceleration_structure_properties
     };
     vkGetPhysicalDeviceProperties2 ( device->vk_physical_handle, &properties_query );
     device->generic_properties = properties_query.properties;
@@ -110,6 +114,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queues_families_count, device->queues_families_properties );
 
 #if xg_enable_raytracing_m
+    std_assert_m ( device->supported_features.shaderInt64 );
     std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
     std_assert_m ( device->supported_device_address_features.bufferDeviceAddress );
     std_assert_m ( device->supported_acceleration_structure_features.accelerationStructure );
@@ -390,7 +395,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         .size = device->memory_properties.memoryHeaps[device_memory_heap].size,
         .memory_flags = xg_memory_flags_from_vk ( device->memory_properties.memoryTypes[device_memory_type].propertyFlags ),
     };
-    device->memory_heaps[xg_memory_type_gpu_mappable_m] = ( xg_vk_device_memory_heap_t ) { 
+    device->memory_heaps[xg_memory_type_gpu_mapped_m] = ( xg_vk_device_memory_heap_t ) { 
         .vk_memory_type_idx = device_mapped_memory_type,
         .vk_heap_idx = device_mapped_memory_heap,
         .size = device->memory_properties.memoryHeaps[device_mapped_memory_heap].size,
@@ -840,6 +845,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     // Fill Features list
     VkPhysicalDeviceFeatures enabled_features = {
         .geometryShader = VK_TRUE,
+        .shaderInt64 = VK_TRUE,
     };
 
     // Enable sync2 API

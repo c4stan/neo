@@ -25,6 +25,7 @@ typedef struct {
 
 xf_node_h add_simple_screen_pass ( xf_graph_h graph, const char* name, const simple_screen_pass_params_t* params );
 
+
 typedef struct {
     uint32_t color_textures_count;
     xf_texture_h color_textures[xf_node_max_copy_texture_writes_m];
@@ -36,12 +37,30 @@ typedef struct {
 
 #define simple_clear_pass_params_m( ... ) ( simple_clear_pass_params_t ) { \
     .color_textures_count = 0, \
-    .color_textures = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xg_null_handle_m }, \
+    .color_textures = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xf_null_handle_m }, \
     .color_clears = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xg_color_clear_m() }, \
     .depth_stencil_textures_count = 0, \
-    .depth_stencil_textures = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xg_null_handle_m }, \
+    .depth_stencil_textures = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xf_null_handle_m }, \
     .depth_stencil_clears = { [0 ... xf_node_max_copy_texture_writes_m - 1] =  xg_depth_stencil_clear_m() }, \
     ##__VA_ARGS__ \
 }
 
 xf_node_h add_simple_clear_pass ( xf_graph_h graph, const char* name, const simple_clear_pass_params_t* params );
+
+
+typedef struct {
+    xg_sampler_filter_e filter;
+    bool presentable;
+    xf_texture_h source;
+    xf_texture_h dest;
+} simple_copy_pass_params_t;
+
+#define simple_copy_pass_params_m( ... ) ( simple_copy_pass_params_t ) { \
+    .filter = xg_sampler_filter_point_m, \
+    .presentable = false, \
+    .source = xf_null_handle_m, \
+    .dest = xf_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+xf_node_h add_simple_copy_pass ( xf_graph_h graph, const char* name, const simple_copy_pass_params_t* params );

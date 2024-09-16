@@ -85,7 +85,7 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
 
     // map if needed
     void* mapped_address = NULL;
-    if ( memory_flags & xg_memory_type_bit_mappable_m ) {
+    if ( memory_flags & xg_memory_type_bit_mapped_m ) {
         vk_result = vkMapMemory ( device->vk_handle, memory, 0, size, 0, &mapped_address );
         std_assert_m ( vk_result == VK_SUCCESS );
     }
@@ -500,7 +500,7 @@ void xg_vk_allocator_activate_device ( xg_device_h device_handle ) {
             size = size * 0.8;
             size = std_min_u64 ( size, 1024 * 1024 * 512 );
             break;
-        case xg_memory_type_gpu_mappable_m:
+        case xg_memory_type_gpu_mapped_m:
             size = size * 0.8;
             size = std_min_u64 ( size, 1024 * 1024 * 32 );
             break;

@@ -16,3 +16,9 @@ begin texture
     access write
     update per_draw
 end
+
+begin buffer
+    register 2
+    stage ray_hit_closest
+    update per_draw
+end

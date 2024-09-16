@@ -3,5 +3,5 @@ code = public, private
 defs = public.def
 configs = debug, release
 output = app
-deps = std, rv, xs, xf, se, sm, xi, fs
+deps = std, rv, xs, xf, se, sm, xi, fs, tk
 ignores = particle_pass.c

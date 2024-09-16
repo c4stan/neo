@@ -31,6 +31,7 @@ void xi_workload_unload ( void ) {
 }
 
 void xi_workload_load_shaders ( xs_i* xs, xs_database_h sdb ) {
+    xi_workload_state->render_pipeline_rgba8 = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xi_render_r8g8b8a8" ) );
     xi_workload_state->render_pipeline_bgra8 = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xi_render_b8g8r8a8" ) );
     xi_workload_state->render_pipeline_a2bgr10 = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xi_render_a2b10g10r10" ) );
 }
@@ -285,7 +286,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
 
     // create vertex buffer
     xg_buffer_params_t vertex_buffer_params = xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_mappable_m,
+        .memory_type = xg_memory_type_gpu_mapped_m,
         .device = flush_params->device,
         .size = sizeof ( xi_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
         .allowed_usage = xg_buffer_usage_bit_vertex_buffer_m,
@@ -304,7 +305,9 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
     // bind pipeline
     xs_i* xs = std_module_get_m ( xs_module_name_m );
     xg_graphics_pipeline_state_h pipeline_state;
-    if ( flush_params->render_target_format == xg_format_b8g8r8a8_unorm_m ) {
+    if ( flush_params->render_target_format == xg_format_r8g8b8a8_unorm_m ) {
+        pipeline_state = xs->get_pipeline_state ( xi_workload_state->render_pipeline_rgba8 );
+    } else if ( flush_params->render_target_format == xg_format_b8g8r8a8_unorm_m ) {
         pipeline_state = xs->get_pipeline_state ( xi_workload_state->render_pipeline_bgra8 );
     } else if ( flush_params->render_target_format == xg_format_a2b10g10r10_unorm_pack32_m ) {
         pipeline_state = xs->get_pipeline_state ( xi_workload_state->render_pipeline_a2bgr10 );

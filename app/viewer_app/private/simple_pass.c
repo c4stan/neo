@@ -155,3 +155,46 @@ xf_node_h add_simple_clear_pass ( xf_graph_h graph, const char* name, const simp
     xf_node_h node = xf->create_node ( graph, &node_params );
     return node;
 }
+
+typedef struct {
+    simple_copy_pass_params_t params;
+} simple_copy_pass_args_t;
+
+static void simple_copy_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
+    std_auto_m args = ( simple_copy_pass_args_t* ) user_args;
+    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    uint64_t key = node_args->base_key;
+
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+
+    xg_texture_copy_params_t copy_params = xg_texture_copy_params_m (
+        .source = xf_copy_texture_resource_m ( node_args->io->copy_texture_reads[0] ),
+        .destination = xf_copy_texture_resource_m ( node_args->io->copy_texture_writes[0] ),
+        .filter = args->params.filter,
+    );
+
+    xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
+}
+
+xf_node_h add_simple_copy_pass ( xf_graph_h graph, const char* name, const simple_copy_pass_params_t* params ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xf_i* xf = state->modules.xf;
+
+    simple_copy_pass_args_t args = { .params = *params };
+
+    xf_node_params_t node_params = xf_node_params_m (
+        .copy_texture_writes_count = 1,
+        .copy_texture_writes = { xf_copy_texture_dependency_m ( params->dest, xg_default_texture_view_m ) },
+        .copy_texture_reads_count = 1,
+        .copy_texture_reads = { xf_copy_texture_dependency_m ( params->source, xg_default_texture_view_m ) },
+        .presentable_texture = params->presentable ? params->dest : xf_null_handle_m,
+        .execute_routine = simple_copy_pass,
+        .user_args = std_buffer_m ( &args ),
+    );
+
+    std_str_copy_static_m ( node_params.debug_name, name );
+
+    xf_node_h node = xf->create_node ( graph, &node_params );
+    return node;
+}

@@ -267,7 +267,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     workload->submitted = false;
 
     xg_buffer_h buffer_handle = xg_buffer_create ( & xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_mappable_m,
+        .memory_type = xg_memory_type_gpu_mapped_m,
         .device = device_handle,
         .size = xg_vk_workload_uniform_buffer_size_m,
         .allowed_usage = xg_buffer_usage_bit_uniform_m,
@@ -2138,6 +2138,10 @@ static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_c
 
         if ( fence_status == VK_TIMEOUT ) {
             break;
+        }
+
+        if ( fence_status == VK_ERROR_OUT_OF_HOST_MEMORY || fence_status == VK_ERROR_OUT_OF_DEVICE_MEMORY || fence_status == VK_ERROR_DEVICE_LOST ) {
+            std_log_error_m ( "Workload fence returned an error" );
         }
 
         // https://arm-software.github.io/vulkan_best_practice_for_mobile_developers/samples/performance/command_buffer_usage/command_buffer_usage_tutorial.html#:~:text=Resetting%20the%20command%20pool,-Resetting%20the%20pool&text=To%20reset%20the%20pool%20the,pool%20thus%20increasing%20memory%20overhead

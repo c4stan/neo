@@ -73,6 +73,7 @@ void xi_reload ( void* std_runtime, void* api ) {
     xi_font_reload ( &state->font );
 
     xi_api_init ( &state->api );
+    xi_state_bind ( state );
 }
 
 void xi_unload ( void ) {
