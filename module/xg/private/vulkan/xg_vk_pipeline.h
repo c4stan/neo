@@ -91,8 +91,16 @@ typedef struct {
 
 typedef struct {
     xg_vk_pipeline_common_t common;
-    xg_buffer_h sbt_buffer;
-    VkStridedDeviceAddressRegionKHR sbt_raygen_region;
+    //xg_buffer_h sbt_buffer;
+    //VkStridedDeviceAddressRegionKHR sbt_raygen_region;
+    //VkStridedDeviceAddressRegionKHR sbt_miss_region;
+    //VkStridedDeviceAddressRegionKHR sbt_hit_region;
+    void* sbt_handle_buffer;
+    // binding -> handle buffer offset
+    uint32_t gen_offsets[xg_raytrace_shader_state_max_gen_shaders_m];
+    uint32_t miss_offsets[xg_raytrace_shader_state_max_miss_shaders_m];
+    uint32_t hit_offsets[xg_raytrace_shader_state_max_hit_groups_m];
+    VkStridedDeviceAddressRegionKHR sbt_gen_region;
     VkStridedDeviceAddressRegionKHR sbt_miss_region;
     VkStridedDeviceAddressRegionKHR sbt_hit_region;
     xg_raytrace_pipeline_state_t state;

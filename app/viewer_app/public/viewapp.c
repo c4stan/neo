@@ -657,6 +657,98 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->debug_print_graph ( graph );
 }
 
+#if 1
+static void viewapp_boot_build_raytrace_world ( void ) {
+    xg_device_h device = m_state->render.device;
+    xg_i* xg = m_state->modules.xg;
+    xs_i* xs = m_state->modules.xs;
+    se_i* se = m_state->modules.se;
+
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_component_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    uint64_t mesh_count = mesh_query_result.entity_count;
+
+    xg_raytrace_geometry_instance_t* rt_instances = std_virtual_heap_alloc_array_m ( xg_raytrace_geometry_instance_t, mesh_count );
+
+    for ( uint64_t i = 0; i < mesh_count; ++i ) {
+        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+        
+        se_entity_h* entity_handle = se_component_iterator_next ( &entity_iterator );
+        se_entity_properties_t entity_properties;
+        se->get_entity_properties ( &entity_properties, *entity_handle );
+
+        xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
+            .vertex_buffer = mesh_component->pos_buffer,
+            .vertex_format = xg_format_r32g32b32_sfloat_m,
+            .vertex_count = mesh_component->vertex_count,
+            .vertex_stride = 12,
+            .index_buffer = mesh_component->idx_buffer,
+            .index_count = mesh_component->index_count,
+        );
+        std_str_copy_static_m ( rt_data.debug_name, entity_properties.name );
+
+        xg_raytrace_geometry_params_t rt_geo_params = xg_raytrace_geometry_params_m ( 
+            .device = device,
+            .geometries = &rt_data,
+            .geometry_count = 1,
+        );
+        std_str_copy_static_m ( rt_geo_params.debug_name, entity_properties.name );
+        xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &rt_geo_params );
+
+        sm_vec_3f_t up = {
+            .x = mesh_component->up[0],
+            .y = mesh_component->up[1],
+            .z = mesh_component->up[2],
+        };
+
+        sm_vec_3f_t dir = {
+            .x = mesh_component->orientation[0],
+            .y = mesh_component->orientation[1],
+            .z = mesh_component->orientation[2],
+        };
+        dir = sm_vec_3f_norm ( dir );
+        
+        sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+
+        sm_mat_4x4f_t trans = {
+            .r0[0] = 1,
+            .r1[1] = 1,
+            .r2[2] = 1,
+            .r3[3] = 1,
+            .r0[3] = mesh_component->position[0],
+            .r1[3] = mesh_component->position[1],
+            .r2[3] = mesh_component->position[2],
+        };
+
+        sm_mat_4x4f_t world_matrix = sm_matrix_4x4f_mul ( trans, rot );
+        xg_matrix_3x4_t transform;
+        std_mem_copy ( transform.f, world_matrix.e, sizeof ( float ) * 12 );
+
+        rt_instances[i] = xg_raytrace_geometry_instance_m (
+            .geometry = rt_geo,
+            .id = i,
+            .transform = transform,
+            .hit_shader_group_binding = 0,
+        );
+    }
+
+    xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "raytrace" ) );
+    xg_graphics_pipeline_state_h rt_pipeline_state = xs->get_pipeline_state ( rt_pipeline );
+
+    xg_raytrace_world_h rt_world = xg->create_raytrace_world ( &xg_raytrace_world_params_m (
+        .device = device,
+        .pipeline = rt_pipeline_state,
+        .instance_array = rt_instances,
+        .instance_count = mesh_count,
+        .debug_name = "rt_world"
+    ) );
+
+    m_state->render.raytrace_world = rt_world;
+}
+#endif
+
 static void viewapp_boot_scene_raytrace ( void ) {
     xg_device_h device = m_state->render.device;
     xg_i* xg = m_state->modules.xg;
@@ -665,10 +757,10 @@ static void viewapp_boot_scene_raytrace ( void ) {
     geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
     xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
-        .vertex_buffer = gpu_data.rt_buffer,
+        .vertex_buffer = gpu_data.pos_buffer,
         .vertex_format = xg_format_r32g32b32_sfloat_m,
         .vertex_count = geo.vertex_count,
-        .vertex_stride = 12 * 2,
+        .vertex_stride = 12,
         .index_buffer = gpu_data.idx_buffer,
         .index_count = geo.index_count,
         .debug_name = "rt_geo_data"
@@ -677,7 +769,7 @@ static void viewapp_boot_scene_raytrace ( void ) {
     xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &xg_raytrace_geometry_params_m (
         .device = device,
         .geometries = &rt_data,
-        .geometries_count = 1,
+        .geometry_count = 1,
         .debug_name = "rt_geo"
     ) );
 
@@ -1137,28 +1229,31 @@ static void viewapp_boot ( void ) {
         void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
         fs->read_file ( font_data_alloc, font_file_info.size, font_file );
 
-        m_state->ui.font = xi->create_font ( std_buffer ( font_data_alloc, font_file_info.size ),
-                &xi_font_params_m (
-                    .xg_device = device,
-                    .pixel_height = 16,
-                )
-            );
+        m_state->ui.font = xi->create_font ( 
+            std_buffer ( font_data_alloc, font_file_info.size ),
+            &xi_font_params_m (
+                .xg_device = device,
+                .pixel_height = 16,
+            )
+        );
 
         m_state->ui.window_state = xi_window_state_m (
-                .title = "",
-                .x = 50,
-                .y = 100,
-                .width = 350,
-                .height = 500,
-                .padding_x = 10,
-                .padding_y = 2,
-                .style = xi_style_m (
-                    .font = m_state->ui.font
-                )
-            );
+            .title = "debug",
+            .minimized = true,
+            .x = 50,
+            .y = 100,
+            .width = 350,
+            .height = 500,
+            .padding_x = 10,
+            .padding_y = 2,
+            .style = xi_style_m (
+                .font = m_state->ui.font
+            )
+        );
 
+        m_state->ui.frame_section_state = xi_section_state_m ( .title = "frame" );
+        m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "xg allocator" );
         m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
-        m_state->ui.xf_alloc_section_state = xi_section_state_m ( .title = "xg allocator" );
         m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
     }
 
@@ -1192,9 +1287,9 @@ static void viewapp_boot ( void ) {
         se->init_entities ( allocator.entities );
     }
 
-    //viewapp_boot_scene_cornell_box();
+    viewapp_boot_scene_cornell_box();
     //viewapp_boot_scene_field();
-    viewapp_boot_scene_raytrace();
+    viewapp_boot_build_raytrace_world();
 
     //viewapp_boot_raster_graph();
     viewapp_boot_raytrace_graph();
@@ -1304,17 +1399,38 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     xi->begin_update ( window_info, input_state, &input_buffer );
     xi->begin_window ( xi_workload, &m_state->ui.window_state );
     
-    xi->begin_section ( xi_workload, &m_state->ui.xf_alloc_section_state );
+    // frame
+    xi->begin_section ( xi_workload, &m_state->ui.frame_section_state );
+    {
+        xi_label_state_t frame_time_label = xi_label_state_m ( .text = "frame time:" );
+        xi_label_state_t frame_time_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
+        std_f32_to_str ( m_state->render.delta_time_ms, frame_time_value.text, xi_label_text_size );
+        xi->add_label ( xi_workload, &frame_time_label );
+        xi->add_label ( xi_workload, &frame_time_value );
+        xi->newline();
+
+        xi_label_state_t fps_label = xi_label_state_m ( .text = "fps:" );
+        xi_label_state_t fps_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
+        float fps = 1000.f / m_state->render.delta_time_ms;
+        std_f32_to_str ( fps, fps_value.text, xi_label_text_size );
+        xi->add_label ( xi_workload, &fps_label );
+        xi->add_label ( xi_workload, &fps_value );
+        xi->newline();
+    }
+    xi->end_section ( xi_workload );
+
+    // xg allocator
+    xi->begin_section ( xi_workload, &m_state->ui.xg_alloc_section_state );
     for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
         xg_allocator_info_t info;
         xg->get_allocator_info ( &info, m_state->render.device, i );
         {
-            xi_label_state_t type_label = xi_label_state_m( .height = 14 );
+            xi_label_state_t type_label = xi_label_state_m();
             std_stack_t stack = std_static_stack_m ( type_label.text );
             const char* memory_type_name;
             switch ( i ) {
                 case xg_memory_type_gpu_only_m:     memory_type_name = "gpu"; break;
-                case xg_memory_type_gpu_mapped_m: memory_type_name = "mapped"; break;
+                case xg_memory_type_gpu_mapped_m:   memory_type_name = "mapped"; break;
                 case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
                 case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
             }
@@ -1323,7 +1439,6 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         }
         {
             xi_label_state_t size_label = xi_label_state_m ( 
-                .height = 14,
                 .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
             );
             std_stack_t stack = std_static_stack_m ( size_label.text );
@@ -1342,6 +1457,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
     xi->end_section ( xi_workload );
     
+    // xf graph
     xi->begin_section ( xi_workload, &m_state->ui.xf_graph_section_state );
     xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
     if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
@@ -1370,6 +1486,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
     xi->end_section ( xi_workload );
 
+    // se entities
     xi->begin_section ( xi_workload, &m_state->ui.entities_section_state );
     {
         se_i* se = m_state->modules.se;
@@ -1379,7 +1496,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         
         for ( uint32_t i = 0; i < entity_count; ++i ) {
             se_entity_properties_t props;
-            se->get_entity_properties ( entity_list[i], &props );
+            se->get_entity_properties ( &props, entity_list[i] );
 
             // entity label
             xi_label_state_t label = xi_label_state_m();
@@ -1465,6 +1582,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     time_ms += delta_ms;
     m_state->render.time_ms = time_ms;
+    m_state->render.delta_time_ms = delta_ms;
 
     frame_tick = new_tick;
     m_state->render.frame_tick = frame_tick;

@@ -503,8 +503,27 @@ void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count ) {
     std_unused_m ( count );
 }
 
+static void se_entity_extract_stream ( se_component_stream_t* result,  const se_entity_family_stream_t* stream, uint32_t entity_count ) {
+    uint32_t capacity = stream->items_per_page;
+    
+    result->page_capacity = capacity;
+    result->data_stride = stream->stride;
+
+    uint32_t base = result->page_count;
+    uint32_t count = 0;
+
+    for ( uint32_t k = 0; k < stream->page_count; ++k ) {
+        result->pages[base + k].data = stream->pages[k];
+        result->pages[base + k].count += count + capacity <= entity_count ? capacity : entity_count - count;
+        
+        count += capacity;
+    }
+
+    result->page_count += stream->page_count;
+    std_assert_m ( result->page_count <= se_entity_family_max_pages_per_stream_m );
+}
+
 void se_entity_query ( se_query_result_t* result, const se_query_params_t* params ) {
-#if 1
     // fill query mask from query components
     se_component_mask_t query_mask;
     std_mem_zero_m ( &query_mask );
@@ -512,9 +531,6 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
     for ( uint32_t i = 0; i < params->component_count; ++i ) {
         std_bitset_set ( query_mask.u64, params->components[i] );
     }
-#else
-    se_component_mask_t query_mask = params->mask;
-#endif
 
     // clear result
     std_mem_zero_m ( result );
@@ -540,15 +556,8 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
         se_entity_family_t* family = &se_entity_state->family_array[family_idx];
         uint32_t entity_count = family->entity_count;
 
-#if 1
         for ( uint32_t i = 0; i < params->component_count; ++i ) {
             uint32_t component_id = params->components[i];
-#else
-        uint64_t component_idx = 0;
-        uint32_t i = 0;
-        while ( std_bitset_scan ( &component_idx, query_mask.u64, component_idx, se_component_mask_block_count_m ) ) {
-            uint32_t component_id = component_idx;
-#endif
             uint8_t family_slot = family->component_slots[component_id];
             std_assert_m ( family_slot != 0xff );
             se_entity_family_component_t* component = &family->components[family_slot];
@@ -558,6 +567,7 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
             result_component->stream_count = component->stream_count;
 
             for ( uint32_t j = 0; j < component->stream_count; ++j ) {
+                #if 0
                 const se_entity_family_stream_t* stream = &component->streams[j];
                 
                 uint32_t capacity = stream->items_per_page;
@@ -577,8 +587,14 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
 
                 result_component->streams[j].page_count += stream->page_count;
                 std_assert_m ( result_component->streams[j].page_count <= se_entity_family_max_pages_per_stream_m );
+                #else
+                se_entity_extract_stream ( &result_component->streams[j], &component->streams[j], entity_count );
+                #endif
             }
         }
+
+        // TODO make this conditional? have separate APIs for components and components+entities?
+        se_entity_extract_stream ( &result->entities, &family->entity_stream, entity_count );
 
         result->entity_count += entity_count;
     
@@ -649,7 +665,7 @@ size_t se_entity_list ( se_entity_h* out_entities, size_t cap ) {
     return count;
 }
 
-void se_entity_property_get ( se_entity_h entity_handle, se_entity_properties_t* out_props ) {
+void se_entity_property_get ( se_entity_properties_t* out_props, se_entity_h entity_handle ) {
     uint64_t entity_idx = entity_handle;
     std_assert_m ( std_bitset_test ( se_entity_state->entity_meta->used_entities, entity_idx ) );
 

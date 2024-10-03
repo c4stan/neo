@@ -167,7 +167,7 @@ size_t fs_dir_iterate ( const char* path, fs_iterator_callback_f callback, void*
             continue;
         }
 
-        std_ignore_warning_m ( fs_path_flags_t flags = 0, "-Wassign-enum" )
+        fs_path_flags_t flags = 0;
 
         if ( fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
             flags |= fs_path_is_dir_m;
@@ -193,7 +193,7 @@ size_t fs_dir_iterate ( const char* path, fs_iterator_callback_f callback, void*
     struct dirent* item = readdir ( dir );
 
     while ( item ) {
-        std_ignore_warning_m ( fs_path_flags_t flags = 0, "-Wassign-enum" )
+        fs_path_flags_t flags = 0;
 
         if ( item->d_type == DT_DIR ) {
             flags |= fs_path_is_dir_m;
@@ -358,7 +358,7 @@ bool fs_dir_get_info ( fs_dir_info_t* info, const char* path ) {
     fs_filetime_to_timestamp ( last_access_time, &info->last_access_time );
     fs_filetime_to_timestamp ( last_write_time, &info->last_write_time );
 
-    std_ignore_warning_m ( info->flags = 0, "-Wassign-enum" )
+    info->flags = 0;
 
     if ( data.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED ) {
         info->flags |= fs_dir_compressed_m;
@@ -386,7 +386,7 @@ bool fs_dir_get_info ( fs_dir_info_t* info, const char* path ) {
     fs_filetime_to_timestamp ( data.st_atim, &info->last_access_time );
     fs_filetime_to_timestamp ( data.st_mtim, &info->last_write_time );
 
-    std_ignore_warning_m ( info->flags = 0, "-Wassign-enum" )
+    info->flags = 0;
 
     return true;
 #endif

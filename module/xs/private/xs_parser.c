@@ -907,17 +907,31 @@ static void xs_parser_parse_depth_stencil ( xs_parser_parsing_context_t* context
     context->graphics_pipeline->render_textures.depth_stencil_enabled = depth_stencil_enabled;
 }
 
-static void xs_parser_parse_shader ( xs_parser_parsing_context_t* context, xg_shading_stage_e stage ) {
+static uint32_t xs_parser_parse_shader ( xs_parser_parsing_context_t* context, xg_shading_stage_e stage ) {
     char token[xs_shader_parser_max_token_size_m];
+
+    uint32_t idx = -1;
 
     if ( context->head < context->eof ) {
         xs_parser_skip_to_text ( context );
         size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len > 0 );
 
-        std_str_copy ( context->shader_references->shaders[stage], xs_shader_name_max_len_m, token );
-        context->shader_references->referenced_stages |= xg_shading_stage_enum_to_bit_m ( stage );
+        uint64_t hash = std_hash_djb2_64 ( token, len );
+        if ( std_hash_set_lookup ( &context->shader_references->set, hash ) ) {
+            // TODO optional?
+            return idx;
+        } else {
+            std_hash_set_insert ( &context->shader_references->set, hash );
+        }
+
+        idx = context->shader_references->count++;
+        xs_parser_shader_reference_t* shader = &context->shader_references->array[idx];
+        shader->stage = stage;
+        std_str_copy_static_m ( shader->name, token );
     }
+
+    return idx;
 }
 
 static void xs_parser_parse_constant ( xs_parser_parsing_context_t* context ) {
@@ -1248,8 +1262,112 @@ static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
     binding_point->set = texture.update_set;
 }
 
+static void xs_parser_parse_ray_gen_shader ( xs_parser_parsing_context_t* context ) {
+    uint32_t binding;
+    {
+        xs_parser_skip_spaces ( context );
+        size_t len = xs_parser_read_u32 ( context, &binding );
+        std_assert_m ( len > 0 );
+        std_assert_m ( binding < xg_raytrace_shader_state_max_gen_shaders_m );
+    }
+
+    char token[xs_shader_parser_max_token_size_m];
+    uint32_t shader_idx = -1;
+
+    while ( context->head < context->eof ) {
+        xs_parser_skip_to_text ( context );
+        size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+        std_assert_m ( len > 0 );
+
+        if ( std_str_cmp ( token, "shader" ) == 0 ) {
+            shader_idx = xs_parser_parse_shader ( context, xg_shading_stage_ray_gen_m );
+        } else {
+            std_assert_m ( std_str_cmp ( token, "end" ) == 0 );
+            break;
+        }
+    }
+
+    std_assert_m ( shader_idx != -1 );
+    uint32_t gen_idx = context->raytrace_pipeline->state.shader_state.gen_shader_count++;
+    xg_raytrace_pipeline_gen_shader_t* gen_shader = &context->raytrace_pipeline->state.shader_state.gen_shaders[gen_idx];
+    gen_shader->binding = binding;
+    gen_shader->shader = shader_idx;
+}
+
+static void xs_parser_parse_ray_miss_shader ( xs_parser_parsing_context_t* context ) {
+    uint32_t binding;
+    {
+        xs_parser_skip_spaces ( context );
+        size_t len = xs_parser_read_u32 ( context, &binding );
+        std_assert_m ( len > 0 );
+        std_assert_m ( binding < xg_raytrace_shader_state_max_miss_shaders_m );
+    }
+
+    char token[xs_shader_parser_max_token_size_m];
+    uint32_t shader_idx = -1;
+
+    while ( context->head < context->eof ) {
+        xs_parser_skip_to_text ( context );
+        size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+        std_assert_m ( len > 0 );
+
+        if ( std_str_cmp ( token, "shader" ) == 0 ) {
+            shader_idx = xs_parser_parse_shader ( context, xg_shading_stage_ray_miss_m );
+        } else {
+            std_assert_m ( std_str_cmp ( token, "end" ) == 0 );
+            break;
+        }
+    }
+
+    std_assert_m ( shader_idx != -1 );
+    uint32_t miss_idx = context->raytrace_pipeline->state.shader_state.miss_shader_count++;
+    xg_raytrace_pipeline_miss_shader_t* miss_shader = &context->raytrace_pipeline->state.shader_state.miss_shaders[miss_idx];
+    miss_shader->binding = binding;
+    miss_shader->shader = shader_idx;
+}
+
+static void xs_parser_parse_ray_hit_shader_group ( xs_parser_parsing_context_t* context ) {
+    uint32_t binding;
+    {
+        xs_parser_skip_spaces ( context );
+        size_t len = xs_parser_read_u32 ( context, &binding );
+        std_assert_m ( len > 0 );
+        std_assert_m ( binding < xg_raytrace_shader_state_max_miss_shaders_m );
+    }
+
+    char token[xs_shader_parser_max_token_size_m];
+    uint32_t closest_idx = -1;
+    uint32_t any_idx = -1;
+    uint32_t intersection_idx = -1;
+
+    while ( context->head < context->eof ) {
+        xs_parser_skip_to_text ( context );
+        size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+        std_assert_m ( len > 0 );
+
+        if ( std_str_cmp ( token, "hit_closest_shader" ) == 0 ) {
+            closest_idx = xs_parser_parse_shader ( context, xg_shading_stage_ray_hit_closest_m );
+        } else if ( std_str_cmp ( token, "hit_any_shader" ) == 0 ) {
+            any_idx = xs_parser_parse_shader ( context, xg_shading_stage_ray_hit_any_m );
+        } else if ( std_str_cmp ( token, "intersect_shader" ) == 0 ) {
+            intersection_idx = xs_parser_parse_shader ( context, xg_shading_stage_ray_intersect_m );
+        } else {
+            std_assert_m ( std_str_cmp ( token, "end" ) == 0 );
+            break;
+        }
+    }
+
+    std_assert_m ( closest_idx != -1 );
+    uint32_t group_idx = context->raytrace_pipeline->state.shader_state.hit_group_count++;
+    xg_raytrace_pipeline_hit_shader_group_t* hit_group = &context->raytrace_pipeline->state.shader_state.hit_groups[group_idx];
+    hit_group->binding = binding;
+    hit_group->closest_shader = closest_idx;
+    hit_group->any_shader = any_idx;
+    hit_group->intersection_shader = intersection_idx;
+}
+
 static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
-    char token [xs_shader_parser_max_token_size_m];
+    char token[xs_shader_parser_max_token_size_m];
 
     struct {
         xg_shading_stage_bit_e stages;
@@ -1419,6 +1537,8 @@ static void xs_parser_parsing_context_init ( xs_parser_parsing_context_t* contex
     } else {
         std_assert_m ( false );
     }
+
+    context->shader_references->set = std_static_hash_set_m ( context->shader_references->set_array );
 
     context->begin = ( const char* ) buffer.base;
     context->eof = ( const char* ) ( buffer.base + buffer.size );
@@ -1601,15 +1721,25 @@ static void xs_parser_parse_raytrace_pipeline_state ( xs_parser_parsing_context_
                 xs_parser_parse_constant ( context );
             } else if ( std_str_cmp ( token, "ray_world" ) == 0 ) {
                 xs_parser_parse_ray_world ( context );
+            } else if ( std_str_cmp ( token, "ray_gen" ) == 0 ) {
+                xs_parser_parse_ray_gen_shader ( context );
+            } else if ( std_str_cmp ( token, "ray_miss" ) == 0 ) {
+                xs_parser_parse_ray_miss_shader ( context );
+            } else if ( std_str_cmp ( token, "ray_hit" ) == 0 ) {
+                xs_parser_parse_ray_hit_shader_group ( context );
             } else {
                 std_log_error_m ( "Unknown token" );
             }
-        } else if ( std_str_cmp ( token, "ray_gen_shader" ) == 0 ) {
-            xs_parser_parse_shader ( context, xg_shading_stage_ray_gen_m );
-        } else if ( std_str_cmp ( token, "ray_hit_closest_shader" ) == 0 ) {
-            xs_parser_parse_shader ( context, xg_shading_stage_ray_hit_closest_m );
-        } else if ( std_str_cmp ( token, "ray_miss_shader" ) == 0 ) {
-            xs_parser_parse_shader ( context, xg_shading_stage_ray_miss_m );
+        //} else if ( std_str_cmp ( token, "ray_gen_shader" ) == 0 ) {
+        //    xs_parser_parse_ray_gen_shader ( context );
+        //} else if ( std_str_cmp ( token, "ray_miss_shader" ) == 0 ) {
+        //    xs_parser_parse_ray_miss_shader ( context );
+        //} else if ( std_str_cmp ( token, "ray_gen_shader" ) == 0 ) {
+        //    xs_parser_parse_shader ( context, xg_shading_stage_ray_gen_m );
+        //} else if ( std_str_cmp ( token, "ray_hit_closest_shader" ) == 0 ) {
+        //    xs_parser_parse_shader ( context, xg_shading_stage_ray_hit_closest_m );
+        //} else if ( std_str_cmp ( token, "ray_miss_shader" ) == 0 ) {
+        //    xs_parser_parse_shader ( context, xg_shading_stage_ray_miss_m );
         } else if ( std_str_cmp ( token, "include" ) == 0 ) {
             xs_parser_parse_include ( context );
         } else if ( std_str_cmp ( token, "define" ) == 0 ) {

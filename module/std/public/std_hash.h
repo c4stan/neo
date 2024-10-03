@@ -132,4 +132,6 @@ bool                std_hash_set_insert ( std_hash_set_t* set, uint64_t hash );
 bool                std_hash_set_remove ( std_hash_set_t* set, uint64_t hash );
 bool                std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash );
 
+#define std_static_hash_set_m( array ) std_hash_set ( array, std_static_array_capacity_m ( array ) )
+
 // TODO https://github.com/RonPieket/BinaryRelations

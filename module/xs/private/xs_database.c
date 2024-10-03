@@ -261,10 +261,16 @@ void xs_database_rebuild_all ( void ) {
     }
 }
 
-static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* shader, std_buffer_t bytecode ) {
+typedef struct {
+    xg_shading_stage_e stage;
+    std_buffer_t buffer;
+} shader_bytecode_t; 
+
+static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* shader, const shader_bytecode_t* bytecode ) {
     shader->enable = true;
-    shader->hash = std_hash_metro ( bytecode.base, bytecode.size );
-    shader->buffer = bytecode;
+    shader->stage = bytecode->stage;
+    shader->hash = std_hash_metro ( bytecode->buffer.base, bytecode->buffer.size );
+    shader->buffer = bytecode->buffer;
 }
 
 xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
@@ -320,8 +326,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             xs_parser_raytrace_pipeline_state_t raytrace;
         } xs_parsed_pipeline_state_t;
 
-        xs_parsed_pipeline_state_t parsed_pipeline_state;
-        std_mem_zero_m ( &parsed_pipeline_state );
+        xs_parsed_pipeline_state_t parsed_pipeline_state = {};
 
         xs_parser_shader_references_t* shader_references;
         xs_parser_shader_definitions_t* shader_definitions;
@@ -383,12 +388,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
         fs->create_dir ( output_path );
 
-        std_buffer_t shader_bytecode[xg_shading_stage_count_m];
-
-        for ( size_t i = 0; i < xg_shading_stage_count_m; ++i ) {
-            shader_bytecode[i] = std_null_buffer_m;
-        }
-
+        shader_bytecode_t shader_bytecode[xs_shader_parser_max_shader_references_m];
         char shader_path[fs_path_size_m];
         char binary_path[fs_path_size_m];
 
@@ -396,6 +396,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
         bool needs_to_build = dirty_headers || pipeline_state->last_build_timestamp.count < pipeline_state_file_info.last_write_time.count || db->dirty_build_params;
 
         if ( !needs_to_build ) {
+            #if 0
             for ( xg_shading_stage_e stage = 0; stage < xg_shading_stage_count_m; ++stage ) {
                 if ( shader_references->referenced_stages & xg_shading_stage_enum_to_bit_m ( stage ) ) {
                     std_str_copy ( shader_path, fs_path_size_m, input_path );
@@ -411,10 +412,26 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     }
                 }
             }
+            #else
+            for ( uint32_t i = 0; i < shader_references->count; ++i ) {
+                xs_parser_shader_reference_t* shader = &shader_references->array[i];
+                std_str_copy ( shader_path, fs_path_size_m, input_path );
+                fs->append_path ( shader_path, fs_path_size_m, shader->name );
+
+                // check shader source edit time
+                fs_file_info_t shader_source_info;
+                std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
+
+                if ( pipeline_state->last_build_timestamp.count < shader_source_info.last_write_time.count ) {
+                    needs_to_build = true;
+                    break;
+                }
+            }
+            #endif
         }
 
         if ( !needs_to_build ) {
-            result.skipped_shaders += std_bit_count_32 ( shader_references->referenced_stages );
+            result.skipped_shaders += shader_references->count;
             result.skipped_pipeline_states += 1;
             continue;
         }
@@ -428,16 +445,20 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             size_t shader_fail = 0;
             size_t shader_skip = 0;
 
-            for ( xg_shading_stage_e stage = 0; stage < xg_shading_stage_count_m; ++stage ) {
-                if ( shader_references->referenced_stages & xg_shading_stage_enum_to_bit_m ( stage ) ) {
+            //for ( xg_shading_stage_e stage = 0; stage < xg_shading_stage_count_m; ++stage ) {
+            //    if ( shader_references->referenced_stages & xg_shading_stage_enum_to_bit_m ( stage ) ) {
+            for ( uint32_t i = 0; i < shader_references->count; ++i ) {
+                    xs_parser_shader_reference_t* shader = &shader_references->array[i];
+
+                    shader_bytecode_t* bytecode = &shader_bytecode[i];
 
                     // prepare shader code input path
                     std_str_copy ( shader_path, fs_path_size_m, input_path );
-                    fs->append_path ( shader_path, fs_path_size_m, shader_references->shaders[stage] );
+                    fs->append_path ( shader_path, fs_path_size_m, shader->name );
 
                     // prepare shader bytecode output path
                     std_str_copy ( binary_path, fs_path_size_m, output_path );
-                    fs->append_path ( binary_path, fs_path_size_m, shader_references->shaders[stage] );
+                    fs->append_path ( binary_path, fs_path_size_m, shader->name );
                     size_t len = std_str_len ( binary_path );
                     size_t len2 = std_str_find_reverse ( binary_path, len, "." );
 
@@ -450,6 +471,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                     const char* stage_tag = "";
 
+                    xg_shading_stage_e stage = shader->stage;
                     if ( stage == xg_shading_stage_vertex_m ) {
                         stage_tag = "vs";
                     } else if ( stage == xg_shading_stage_fragment_m ) {
@@ -526,10 +548,10 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     }
                     fs->close_file ( bytecode_file );
                     #else
-                    shader_bytecode[stage] = fs->read_file_path_to_heap ( binary_path );
-                    std_assert_m ( shader_bytecode[stage].base );
+                    bytecode->stage = stage;
+                    bytecode->buffer = fs->read_file_path_to_heap ( binary_path );
                     #endif
-                }
+                //}
             }
 
             // TODO does this leak when there are multiple permutations?
@@ -537,8 +559,8 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 ++result.failed_pipeline_states;
                 result.failed_shaders += shader_fail;
 
-                for ( size_t i = 0; i < xg_shading_stage_count_m; ++i ) {
-                    std_virtual_heap_free ( shader_bytecode[i].base );
+                for ( size_t i = 0; i < shader_references->count; ++i ) {
+                    std_virtual_heap_free ( shader_bytecode[i].buffer.base );
                 }
 
                 continue;
@@ -548,40 +570,44 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
             xg_pipeline_state_h pipeline_handle = xg_null_handle_m;
 
+            for ( uint32_t i = 0; i < shader_references->count; ++i ) {
+                shader_bytecode_t* shader = &shader_bytecode[i];
+                std_assert_m ( shader->buffer.size > 0 );
+
+                switch ( shader->stage ) {
+                case xg_shading_stage_vertex_m:
+                    std_assert_m ( pipeline_state->type == xg_pipeline_graphics_m );
+                    xs_database_set_pipeline_state_shader ( &graphics_state->params.state.vertex_shader, shader );
+                    break;
+                case xg_shading_stage_fragment_m:
+                    std_assert_m ( pipeline_state->type == xg_pipeline_graphics_m );
+                    xs_database_set_pipeline_state_shader ( &graphics_state->params.state.fragment_shader, shader );
+                    break;
+                case xg_shading_stage_compute_m:
+                    std_assert_m ( pipeline_state->type == xg_pipeline_compute_m );
+                    xs_database_set_pipeline_state_shader ( &compute_state->params.state.compute_shader, shader );
+                    break;
+                case xg_shading_stage_ray_gen_m:
+                case xg_shading_stage_ray_hit_closest_m:
+                case xg_shading_stage_ray_miss_m:
+                    std_assert_m ( pipeline_state->type == xg_pipeline_raytrace_m );
+                    xg_pipeline_state_shader_t* pipeline_shader = &raytrace_state->params.state.shader_state.shaders[raytrace_state->params.state.shader_state.shader_count++];
+                    xs_database_set_pipeline_state_shader ( pipeline_shader, shader );
+                    break;
+                default:
+                    std_assert_m ( false );
+                    break;
+                }
+            }
+
             switch ( pipeline_state->type ) {
                 case xg_pipeline_graphics_m:
-                    if ( shader_references->referenced_stages & xg_shading_stage_bit_vertex_m ) {
-                        xs_database_set_pipeline_state_shader ( &graphics_state->params.state.vertex_shader, shader_bytecode[xg_shading_stage_vertex_m] );
-                    }
-
-                    if ( shader_references->referenced_stages & xg_shading_stage_bit_fragment_m ) {
-                        xs_database_set_pipeline_state_shader ( &graphics_state->params.state.fragment_shader, shader_bytecode[xg_shading_stage_fragment_m] );
-                    }
-
                     pipeline_handle = xg->create_graphics_pipeline ( db->device, &graphics_state->params );
                     break;
-
                 case xg_pipeline_compute_m:
-                    if ( shader_references->referenced_stages & xg_shading_stage_bit_compute_m ) {
-                        xs_database_set_pipeline_state_shader ( &compute_state->params.state.compute_shader, shader_bytecode[xg_shading_stage_compute_m] );
-                    }
-
                     pipeline_handle = xg->create_compute_pipeline ( db->device, &compute_state->params );
                     break;
-
                 case xg_pipeline_raytrace_m:
-                    if ( shader_references->referenced_stages & xg_shading_stage_bit_ray_gen_m ) {
-                        xs_database_set_pipeline_state_shader ( &raytrace_state->params.state.ray_gen_shader, shader_bytecode[xg_shading_stage_ray_gen_m] );
-                    }
-
-                    if ( shader_references->referenced_stages & xg_shading_stage_bit_ray_miss_m ) {
-                        xs_database_set_pipeline_state_shader ( &raytrace_state->params.state.ray_miss_shader, shader_bytecode[xg_shading_stage_ray_miss_m] );
-                    }
-
-                    if ( shader_references->referenced_stages & xg_shading_stage_bit_ray_hit_closest_m ) {
-                        xs_database_set_pipeline_state_shader ( &raytrace_state->params.state.ray_hit_closest_shader, shader_bytecode[xg_shading_stage_ray_hit_closest_m] );
-                    }
-
                     pipeline_handle = xg->create_raytrace_pipeline ( db->device, &raytrace_state->params );
                     break;
             }
@@ -594,8 +620,8 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             pipeline_state->old_pipeline_handle = pipeline_state->pipeline_handle;
             pipeline_state->pipeline_handle = pipeline_handle;
 
-            for ( size_t i = 0; i < xg_shading_stage_count_m; ++i ) {
-                std_virtual_heap_free ( shader_bytecode[i].base );
+            for ( size_t i = 0; i < shader_references->count; ++i ) {
+                std_virtual_heap_free ( shader_bytecode[i].buffer.base );
             }
 
             ++result.successful_pipeline_states;

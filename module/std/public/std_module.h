@@ -91,6 +91,7 @@ void* std_module_get ( const char* module_name );
 // Decreases the refcount of the module that owns the specified api. When refcount reaches 0 the module DLL gets unloaded.
 //void std_module_release ( void* api );
 
+// TODO: automatically unload all loaded modules in the right order inside std_shutdown
 void* std_module_load ( const char* name );
 void std_module_unload ( const char* name );
 //void std_module_unload ( const char* name );

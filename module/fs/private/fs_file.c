@@ -508,7 +508,7 @@ bool fs_file_get_info ( fs_file_info_t* info, fs_file_h file ) {
     info->size = ( uint64_t ) os_file_info.nFileSizeHigh << 32 | os_file_info.nFileSizeLow;
     info->file_id = ( uint64_t ) os_file_info.nFileIndexHigh << 32 | os_file_info.nFileIndexLow;
     info->volume_id = ( uint32_t ) os_file_info.dwVolumeSerialNumber;
-    std_ignore_warning_m ( info->flags = 0, "-Wassign-enum" )
+    info->flags = 0;
 
     if ( os_file_info.dwFileAttributes & FILE_ATTRIBUTE_COMPRESSED ) {
         info->flags |= fs_file_compressed_m;

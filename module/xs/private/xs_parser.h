@@ -3,8 +3,17 @@
 #include <xs.h>
 
 typedef struct {
-    xg_shading_stage_bit_e referenced_stages;
-    char shaders[xg_shading_stage_count_m][xs_shader_name_max_len_m];
+    xg_shading_stage_e stage;
+    char name[xs_shader_name_max_len_m];
+} xs_parser_shader_reference_t;
+
+typedef struct {
+    //xg_shading_stage_bit_e referenced_stages;
+    //char shaders[xg_shading_stage_count_m][xs_shader_name_max_len_m];
+    uint32_t count;
+    xs_parser_shader_reference_t array[xs_shader_parser_max_shader_references_m];
+    uint64_t set_array[xs_shader_parser_max_shader_references_m * 2];
+    std_hash_set_t set;
 } xs_parser_shader_references_t;
 
 typedef struct {

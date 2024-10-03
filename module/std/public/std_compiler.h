@@ -2,13 +2,15 @@
 
 #include <std_platform.h>
 
-#if 0
+#if 1
 #if defined(__GNUC__)
     #define std_compiler_gcc_m
 #elif defined(__clang__)
     #define std_compiler_clang_m
 #elif defined(_MSC_VER)
     #define std_compiler_ms_m
+#else
+    #error Unknown compiler
 #endif
 #else
     #define std_compiler_clang_m
@@ -100,11 +102,13 @@
 
     #define std_warnings_save_state_m()                           _Pragma ( "GCC diagnostic push" )
     #define std_warnings_restore_state_m()                        _Pragma ( "GCC diagnostic pop" )
-    #define std_warnings_ignore_m( x )                            _Pragma ( std_pp_eval_concat_m ( std_pp_eval_concat_m ( std_pp_string_m ( GCC diagnostic ignored ), " " ), x ) )
+    #define std_warnings_ignore_m( x )                            _Pragma ( std_pp_string_m ( GCC diagnostic ignored x ) )
+    //#define std_warnings_ignore_m( x )                            _Pragma ( "GCC diagnostic ignored " x )
+    //#define std_warnings_ignore_m( x )                            _Pragma ( std_pp_eval_concat_m ( std_pp_eval_concat_m ( std_pp_string_m ( GCC diagnostic ignored ), " " ), x ) )
     //#define std_ignore_warning_begin_m( x )                       _Pragma ( "clang diagnostic push" ) _Pragma ( std_pp_string_m ( clang diagnostic ignored x ) )
     //#define std_ignore_warning_end_m()                            _Pragma ( "clang diagnostic pop" )
     // TODO remove this
-    #define std_ignore_warning_m( exp, warning )                  std_warnings_save_state_m() std_warnings_ignore_m(warning) exp; std_warnings_restore_state_m()
+    #define std_ignore_warning_m( exp, warning )                  std_warnings_save_state_m() std_warnings_ignore_m ( warning ) exp; std_warnings_restore_state_m()
     #define std_disable_optimization_begin_m()                    _Pragma ( "GCC optimize off")
     #define std_disable_optimization_end_m()                      _Pragma ( "GCC optimize on")
     #define std_set_packing_m( n )                                _Pragma ( "pack(n)" )
@@ -161,6 +165,7 @@
         #define std_debug_break_m()                                 __builtin_trap()
     #endif
 
+    #define std_div_ceil_m( dividend, divisor )                     ( ( (dividend) + (divisor) - 1 ) / (divisor) )
 #else
 
     #error The only currently supported compiler is Clang.

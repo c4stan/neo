@@ -786,10 +786,27 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
     char state_buffer[sizeof ( params->state ) + sizeof ( params->resource_bindings )];
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
+    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.shader_count );
+    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.gen_shader_count );
+    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.miss_shader_count );
+    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.hit_group_count );
+
     // Shaders
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.ray_gen_shader.hash );
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.ray_miss_shader.hash );
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.ray_hit_closest_shader.hash );
+    for ( uint32_t i = 0; i < params->state.shader_state.shader_count; ++i ) {
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.shaders[i].hash );
+    }
+
+    for ( uint32_t i = 0; i < params->state.shader_state.gen_shader_count; ++i ) {
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.gen_shaders[i] );
+    }
+
+    for ( uint32_t i = 0; i < params->state.shader_state.miss_shader_count; ++i ) {
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.miss_shaders[i] );
+    }
+
+    for ( uint32_t i = 0; i < params->state.shader_state.hit_group_count; ++i ) {
+        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.hit_groups[i] );
+    }
 
     // Resources layout
     xg_vk_pipeline_bindings_layout_t bindings_layout;
@@ -808,72 +825,132 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         xg_vk_pipeline->common.reference_count += 1;
     } else {
         // Shaders
-        VkShaderModule vk_shader_handles[xg_shading_stage_count_m] = { [0 ... xg_shading_stage_count_m-1] = VK_NULL_HANDLE };
-        VkPipelineShaderStageCreateInfo shader_info[xg_shading_stage_count_m];
-        size_t shader_count = 0;
-        {
-            VkShaderModuleCreateInfo module_info[xg_shading_stage_count_m];
+        VkShaderModule vk_shader_handles[xg_raytrace_shader_state_max_shaders_m] = { [0 ... xg_raytrace_shader_state_max_shaders_m-1] = VK_NULL_HANDLE };
+        VkPipelineShaderStageCreateInfo shader_info[xg_raytrace_shader_state_max_shaders_m];
+        
+        for ( uint32_t i = 0; i < params->state.shader_state.shader_count; ++i ) {
+            const xg_pipeline_state_shader_t* shader = &params->state.shader_state.shaders[i];
 
-            std_hash_metro_state_t hash_state;
-            std_hash_metro_begin ( &hash_state );
+            VkShaderModuleCreateInfo module_info = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .pNext = NULL,
+                .flags = 0,
+                .pCode = ( const uint32_t* ) shader->buffer.base,
+                .codeSize = shader->buffer.size,
+            };
+            vkCreateShaderModule ( device->vk_handle, &module_info, NULL, &vk_shader_handles[i] );
 
-            if ( params->state.ray_gen_shader.enable ) {
-                module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-                module_info[shader_count].pNext = NULL;
-                module_info[shader_count].flags = 0;
-                module_info[shader_count].pCode = ( const uint32_t* ) params->state.ray_gen_shader.buffer.base;
-                module_info[shader_count].codeSize = params->state.ray_gen_shader.buffer.size;
-                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
-
-                shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-                shader_info[shader_count].pNext = NULL;
-                shader_info[shader_count].flags = 0;
-                shader_info[shader_count].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-                shader_info[shader_count].module = vk_shader_handles[shader_count];
-                shader_info[shader_count].pName = "main";
-                shader_info[shader_count].pSpecializationInfo = NULL;
-
-                ++shader_count;
-            }
-
-            if ( params->state.ray_miss_shader.enable ) {
-                module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-                module_info[shader_count].pNext = NULL;
-                module_info[shader_count].flags = 0;
-                module_info[shader_count].pCode = ( const uint32_t* ) params->state.ray_miss_shader.buffer.base;
-                module_info[shader_count].codeSize = params->state.ray_miss_shader.buffer.size;
-                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
-
-                shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-                shader_info[shader_count].pNext = NULL;
-                shader_info[shader_count].flags = 0;
-                shader_info[shader_count].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-                shader_info[shader_count].module = vk_shader_handles[shader_count];
-                shader_info[shader_count].pName = "main";
-                shader_info[shader_count].pSpecializationInfo = NULL;
-                
-                ++shader_count;
-            }
-
-            if ( params->state.ray_hit_closest_shader.enable ) {
-                module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-                module_info[shader_count].pNext = NULL;
-                module_info[shader_count].flags = 0;
-                module_info[shader_count].pCode = ( const uint32_t* ) params->state.ray_hit_closest_shader.buffer.base;
-                module_info[shader_count].codeSize = params->state.ray_hit_closest_shader.buffer.size;
-                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
-
-                shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-                shader_info[shader_count].pNext = NULL;
-                shader_info[shader_count].flags = 0;
-                shader_info[shader_count].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-                shader_info[shader_count].module = vk_shader_handles[shader_count];
-                shader_info[shader_count].pName = "main";
-                shader_info[shader_count].pSpecializationInfo = NULL;
-                
-                ++shader_count;
-            }
+            shader_info[i] = ( VkPipelineShaderStageCreateInfo ) {
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .pNext = NULL,
+                .flags = 0,
+                .stage = xg_shader_stage_to_vk ( xg_shading_stage_enum_to_bit_m ( shader->stage ) ),
+                .module = vk_shader_handles[i],
+                .pName = "main",
+                .pSpecializationInfo = NULL,
+            };
         }
+
+#if 0
+        {
+            uint32_t shader_count = 0;
+
+            for ( uint32_t i = 0; i < params->state.shader_state.gen_shader_count; ++i ) {
+                shader_info[shader_count] = ( VkPipelineShaderStageCreateInfo ) {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = NULL,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+                    .module = vk_shader_handles[shader_count],
+                    .pName = "main",
+                    .pSpecializationInfo = NULL,
+                };
+                ++shader_count;
+            }
+
+            for ( uint32_t i = 0; i < params->state.shader_state.miss_shader_count; ++i ) {
+                shader_info[shader_count] = ( VkPipelineShaderStageCreateInfo ) {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = NULL,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_MISS_BIT_KHR,
+                    .module = vk_shader_handles[shader_count],
+                    .pName = "main",
+                    .pSpecializationInfo = NULL,
+                };
+                ++shader_count;
+            }
+
+            for ( uint32_t i = 0; i < params->state.shader_state.hit_group_count; ++i ) {
+                shader_info[shader_count] = ( VkPipelineShaderStageCreateInfo ) {
+                    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                    .pNext = NULL,
+                    .flags = 0,
+                    .stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+                    .module = vk_shader_handles[shader_count],
+                    .pName = "main",
+                    .pSpecializationInfo = NULL,
+                };
+                ++shader_count;
+            }
+        }        
+
+        if ( params->state.ray_gen_shader.enable ) {
+            module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            module_info[shader_count].pNext = NULL;
+            module_info[shader_count].flags = 0;
+            module_info[shader_count].pCode = ( const uint32_t* ) params->state.ray_gen_shader.buffer.base;
+            module_info[shader_count].codeSize = params->state.ray_gen_shader.buffer.size;
+
+            shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            shader_info[shader_count].pNext = NULL;
+            shader_info[shader_count].flags = 0;
+            shader_info[shader_count].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+            shader_info[shader_count].module = vk_shader_handles[shader_count];
+            shader_info[shader_count].pName = "main";
+            shader_info[shader_count].pSpecializationInfo = NULL;
+
+            ++shader_count;
+        }
+
+        if ( params->state.ray_miss_shader.enable ) {
+            module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            module_info[shader_count].pNext = NULL;
+            module_info[shader_count].flags = 0;
+            module_info[shader_count].pCode = ( const uint32_t* ) params->state.ray_miss_shader.buffer.base;
+            module_info[shader_count].codeSize = params->state.ray_miss_shader.buffer.size;
+            vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
+
+            shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            shader_info[shader_count].pNext = NULL;
+            shader_info[shader_count].flags = 0;
+            shader_info[shader_count].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+            shader_info[shader_count].module = vk_shader_handles[shader_count];
+            shader_info[shader_count].pName = "main";
+            shader_info[shader_count].pSpecializationInfo = NULL;
+            
+            ++shader_count;
+        }
+
+        if ( params->state.ray_hit_closest_shader.enable ) {
+            module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            module_info[shader_count].pNext = NULL;
+            module_info[shader_count].flags = 0;
+            module_info[shader_count].pCode = ( const uint32_t* ) params->state.ray_hit_closest_shader.buffer.base;
+            module_info[shader_count].codeSize = params->state.ray_hit_closest_shader.buffer.size;
+            vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
+
+            shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            shader_info[shader_count].pNext = NULL;
+            shader_info[shader_count].flags = 0;
+            shader_info[shader_count].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+            shader_info[shader_count].module = vk_shader_handles[shader_count];
+            shader_info[shader_count].pName = "main";
+            shader_info[shader_count].pSpecializationInfo = NULL;
+            
+            ++shader_count;
+        }
+#endif
 
         // Resource layout
         xg_vk_pipeline_layout_creation_result_t pipeline_layout_result;
@@ -881,12 +958,53 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
 
         // Pipeline
         // TODO
-        std_assert_m ( shader_count == 3 );
-        uint32_t group_count = shader_count;
+        //std_assert_m ( shader_count == 3 );
+        //uint32_t group_count = shader_count;
         VkPipeline pipeline;
+        uint32_t group_count = 0;
         {
 #if xg_vk_enable_nv_raytracing_ext_m
-            VkRayTracingShaderGroupCreateInfoNV groups[3] = {
+            // TODO have a separate define for max_groups
+            VkRayTracingShaderGroupCreateInfoNV groups[xg_raytrace_shader_state_max_shaders_m];
+
+            for ( uint32_t i = 0; i < params->state.shader_state.gen_shader_count; ++i ) {
+                groups[group_count++] = ( VkRayTracingShaderGroupCreateInfoNV ) {
+                    .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
+                    .pNext = NULL,
+                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+                    .generalShader = params->state.shader_state.gen_shaders[i].shader,
+                    .closestHitShader = VK_SHADER_UNUSED_KHR,
+                    .anyHitShader = VK_SHADER_UNUSED_KHR,
+                    .intersectionShader = VK_SHADER_UNUSED_KHR,
+                };
+            }
+
+            for ( uint32_t i = 0; i < params->state.shader_state.miss_shader_count; ++i ) {
+                groups[group_count++] = ( VkRayTracingShaderGroupCreateInfoNV ) {
+                    .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
+                    .pNext = NULL,
+                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+                    .generalShader = params->state.shader_state.miss_shaders[i].shader,
+                    .closestHitShader = VK_SHADER_UNUSED_KHR,
+                    .anyHitShader = VK_SHADER_UNUSED_KHR,
+                    .intersectionShader = VK_SHADER_UNUSED_KHR,
+                };
+            }
+
+            for ( uint32_t i = 0; i < params->state.shader_state.hit_group_count; ++i ) {
+                groups[group_count++] = ( VkRayTracingShaderGroupCreateInfoNV ) {
+                    .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
+                    .pNext = NULL,
+                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
+                    .generalShader = VK_SHADER_UNUSED_KHR,
+                    .closestHitShader = params->state.shader_state.hit_groups[i].closest_shader,
+                    .anyHitShader = params->state.shader_state.hit_groups[i].any_shader != -1 ? params->state.shader_state.hit_groups[i].any_shader : VK_SHADER_UNUSED_KHR,
+                    .intersectionShader = params->state.shader_state.hit_groups[i].intersection_shader != -1 ? params->state.shader_state.hit_groups[i].intersection_shader : VK_SHADER_UNUSED_KHR,
+                };
+            }
+
+#if 0
+            VkRayTracingShaderGroupCreateInfoNV groups[] = {
                 {
                     .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
                     .pNext = NULL,
@@ -915,16 +1033,17 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                     .intersectionShader = VK_SHADER_UNUSED_KHR,
                 }
             };
+#endif
 
             VkRayTracingPipelineCreateInfoNV info = {
                 .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV,
                 .pNext = NULL,
                 .flags = 0,
-                .stageCount = shader_count,
+                .stageCount = params->state.shader_state.shader_count,
                 .pStages = shader_info,
                 .groupCount = group_count,
                 .pGroups = groups,
-                .maxRecursionDepth = 1, // TODO
+                .maxRecursionDepth = 8,//params->state.max_recursion, // TODO
                 .layout = pipeline_layout_result.pipeline_layout,
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = 0,
@@ -963,6 +1082,35 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
             }
         }
 
+        void* groups_buffer;
+        uint32_t gen_offsets[xg_raytrace_shader_state_max_gen_shaders_m] = { -1 };
+        uint32_t miss_offsets[xg_raytrace_shader_state_max_miss_shaders_m] = { -1 };
+        uint32_t hit_offsets[xg_raytrace_shader_state_max_hit_groups_m] = { -1 };
+        {
+            uint32_t group_size = device->raytrace_properties.shaderGroupHandleSize;
+            //uint32_t sbt_stride = std_align ( group_size, device->raytrace_properties.shaderGroupBaseAlignment );
+            //std_assert_m ( sbt_stride <= device->raytrace_properties.maxShaderGroupStride );
+            groups_buffer = std_virtual_heap_alloc ( group_count * group_size, 16 );
+            VkResult result = xg_vk_device_ext_api ( device_handle )->get_shader_group_handles ( device->vk_handle, pipeline, 0, group_count, group_count * group_size, groups_buffer );
+            std_verify_m ( result == VK_SUCCESS );
+
+            uint32_t g = 0;
+            for ( uint32_t i = 0; i < params->state.shader_state.gen_shader_count; ++i ) {
+                gen_offsets[params->state.shader_state.gen_shaders[i].binding] = group_size * g++;
+            }
+
+            for ( uint32_t i = 0; i < params->state.shader_state.miss_shader_count; ++i ) {
+                miss_offsets[params->state.shader_state.miss_shaders[i].binding] = group_size * g++;
+            }
+
+            for ( uint32_t i = 0; i < params->state.shader_state.hit_group_count; ++i ) {
+                hit_offsets[params->state.shader_state.hit_groups[i].binding] = group_size * g++;
+            }
+
+            std_assert_m ( g == group_count );
+        }
+
+#if 0
         // Shader Binding Table
         xg_buffer_h sbt_buffer_handle;
         VkStridedDeviceAddressRegionKHR sbt_raygen_region;
@@ -1012,6 +1160,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .size = sbt_stride,
             };
         }
+#endif
 
         // Allocate
         std_mutex_lock ( &xg_vk_pipeline_state->raytrace_pipelines_freelist_mutex );
@@ -1021,10 +1170,14 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
 
         // Store raytrace state
         xg_vk_pipeline->state = params->state;
-        xg_vk_pipeline->sbt_buffer = sbt_buffer_handle;
-        xg_vk_pipeline->sbt_raygen_region = sbt_raygen_region;
-        xg_vk_pipeline->sbt_miss_region = sbt_miss_region;
-        xg_vk_pipeline->sbt_hit_region = sbt_hit_region;
+        //xg_vk_pipeline->sbt_buffer = sbt_buffer_handle;
+        //xg_vk_pipeline->sbt_raygen_region = sbt_raygen_region;
+        //xg_vk_pipeline->sbt_miss_region = sbt_miss_region;
+        //xg_vk_pipeline->sbt_hit_region = sbt_hit_region;
+        xg_vk_pipeline->sbt_handle_buffer = groups_buffer;
+        std_mem_copy_static_array_m ( xg_vk_pipeline->gen_offsets, gen_offsets );
+        std_mem_copy_static_array_m ( xg_vk_pipeline->miss_offsets, miss_offsets );
+        std_mem_copy_static_array_m ( xg_vk_pipeline->hit_offsets, hit_offsets );
 
         // Store common state
         for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
@@ -1642,6 +1795,21 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                 shader_info[shader_count].pName = "main";
                 shader_info[shader_count].pSpecializationInfo = NULL;
 
+                if ( params->debug_name[0] ) {
+                    char module_name[xg_debug_name_size_m] = {};
+                    std_stack_t stack = std_static_stack_m ( module_name );
+                    std_stack_string_append ( &stack, params->debug_name );
+                    std_stack_string_append ( &stack, "-vs" );
+
+                    VkDebugUtilsObjectNameInfoEXT debug_name_info;
+                    debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+                    debug_name_info.pNext = NULL;
+                    debug_name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE ;
+                    debug_name_info.objectHandle = ( uint64_t ) vk_shader_handles[shader_count];
+                    debug_name_info.pObjectName = module_name;
+                    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                }
+
                 ++shader_count;
             }
 
@@ -1660,6 +1828,21 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                 shader_info[shader_count].module = vk_shader_handles[shader_count];
                 shader_info[shader_count].pName = "main";
                 shader_info[shader_count].pSpecializationInfo = NULL;
+
+                if ( params->debug_name[0] ) {
+                    char module_name[xg_debug_name_size_m] = {};
+                    std_stack_t stack = std_static_stack_m ( module_name );
+                    std_stack_string_append ( &stack, params->debug_name );
+                    std_stack_string_append ( &stack, "-fs" );
+
+                    VkDebugUtilsObjectNameInfoEXT debug_name_info;
+                    debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+                    debug_name_info.pNext = NULL;
+                    debug_name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE ;
+                    debug_name_info.objectHandle = ( uint64_t ) vk_shader_handles[shader_count];
+                    debug_name_info.pObjectName = module_name;
+                    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                }
                 
                 ++shader_count;
             }

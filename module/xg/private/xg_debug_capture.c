@@ -4,7 +4,9 @@
 #include <std_log.h>
 
 std_warnings_save_state_m()
+#if defined ( std_compiler_clang_m )
 std_warnings_ignore_m ( "-Wmicrosoft-enum-value" )
+#endif
 std_warnings_ignore_m ( "-Wstrict-prototypes" )
 
 #include "renderdoc_app.h"

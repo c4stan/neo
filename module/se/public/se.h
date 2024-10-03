@@ -136,21 +136,9 @@ typedef struct {
 }
 
 typedef struct {
-#if 0
-    uint32_t read_components_count;
-    uint32_t read_components[se_entity_max_components_per_entity_m];
-
-    uint32_t write_components_count;
-    uint32_t write_components[se_entity_max_components_per_entity_m];
-#else
-#if 1
     // Take component list instead of mask so that the user can define the components ordering to expect in the result
     uint32_t component_count;
     uint32_t components[se_entity_max_components_per_entity_m];
-#else
-    se_component_mask_t mask;
-#endif
-#endif
 } se_query_params_t;
 
 #define se_query_params_m( ... ) ( se_query_params_t ) { \
@@ -165,28 +153,24 @@ typedef struct {
 typedef struct {
     void* data;
     uint32_t count;
-} se_component_stream_page_t;
+} se_component_stream_page_t; // se_data_stream_page_t
 
 typedef struct {
     uint32_t page_count;
     uint32_t page_capacity;
     uint32_t data_stride;
     se_component_stream_page_t pages[se_entity_family_max_pages_per_stream_m];
-} se_component_stream_t;
+} se_component_stream_t; // se_data_stream_t
 
 typedef struct {
     uint32_t stream_count;
     se_component_stream_t streams[se_component_max_streams_m];
-} se_component_t;
+} se_component_t; // se_component_data_t
 
 typedef struct {
     uint32_t entity_count;
-#if 0
-    se_component_t read_components[se_entity_max_components_per_entity_m];
-    se_component_t write_components[se_entity_max_components_per_entity_m];
-#else
+    se_component_stream_t entities;
     se_component_t components[se_entity_max_components_per_entity_m];
-#endif
 } se_query_result_t;
 
 // TODO
@@ -291,7 +275,7 @@ typedef struct {
     void ( *set_entity_name ) ( se_entity_h entity, const char* name );
     void ( *set_component_properties ) ( se_component_e component, const char* name, const se_component_properties_params_t* params );
     size_t ( *get_entity_list ) ( se_entity_h* out_entities, size_t cap );
-    void ( *get_entity_properties ) ( se_entity_h entity_handle, se_entity_properties_t* out_props );
+    void ( *get_entity_properties ) ( se_entity_properties_t* out_props, se_entity_h entity_handle );
 
 #if 0
     // TODO remove individual calls?

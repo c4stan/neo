@@ -1427,7 +1427,7 @@ static void test_file ( void ) {
 }
 
 #if defined ( std_compiler_gcc_m )
-static void test_array_fun ( std_array_decl_m ( int )* int_array ) {
+static void test_array_fun ( std_array_type_m ( int )* int_array ) {
     int_array->data[int_array->count++] = 2;
 }
 
@@ -1442,6 +1442,14 @@ static void test_array ( void ) {
     std_assert_m ( static_int_array.data[0] == 1 );
     std_assert_m ( static_int_array.data[1] == 2 );
     std_assert_m ( heap_int_array.data[0] == 2 );
+
+    typedef struct {
+        char data[32];
+    } string_t;
+
+    std_auto_m string_array = std_array_m ( string_t );
+    string_array = std_heap_array_m ( string_t, 32 );
+
     std_log_info_m ( "std_array test complete." );
 }
 #endif

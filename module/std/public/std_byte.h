@@ -19,6 +19,7 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 #define     std_mem_zero_static_array_m( array ) std_mem_zero ( array, sizeof ( array ) )
 #define     std_mem_copy_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) )
 #define     std_mem_copy_array_m( dest, source, count ) std_mem_copy( (dest), (source), sizeof ( std_typeof_m ( *(source) ) ) * (count) )
+#define     std_mem_copy_static_array_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( source ) )
 #define     std_mem_cmp_array_m(a, b, count) std_mem_cmp( (a), (b), sizeof ( std_typeof_m ( *(a) ) ) * (count) )
 #define     std_mem_set_m( dest, value ) std_mem_set_m ( dest, sizeof ( *dest ), value )
 

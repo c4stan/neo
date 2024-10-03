@@ -145,6 +145,7 @@ void test_http_server ( void ) {
 #endif
 
 void std_main ( void ) {
+    std_module_load_m ( net_module_name_m );
 #if 1
     test_udp_msg();
     test_tcp_msg();

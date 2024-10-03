@@ -98,7 +98,7 @@ void main ( void ) {
         }
     #endif
 
-        float shadow_occlusion = 1.f - shadow;
+        float light_visibility = 1.f - shadow;
         //float shadow_occlusion = shadow_depth + 0.001 > shadow_proj.z ? 1.f : 0.f;
 
         vec3 view_light_pos = ( view_cbuffer.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
@@ -106,7 +106,7 @@ void main ( void ) {
         float nl = clamp ( dot ( view_light_dir, view_normal ), 0, 1 );
         float d = distance ( view_geo_pos, view_light_pos );
 
-        irradiance += shadow_occlusion * light_emissive * light_color * base_color * nl / ( d * d );
+        irradiance += light_visibility * light_emissive * light_color * base_color * nl / ( d * d );
     }
 
     float ambient_emissive = 0;

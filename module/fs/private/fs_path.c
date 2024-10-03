@@ -203,7 +203,7 @@ bool fs_path_get_info ( fs_path_info_t* info, const char* path ) {
 
     uint64_t creation_time = ( uint64_t ) data.ftCreationTime.dwHighDateTime << 32 | data.ftCreationTime.dwLowDateTime;
     fs_filetime_to_timestamp ( creation_time, &info->creation_time );
-    std_ignore_warning_m ( info->flags = 0, "-Wassign-enum" )
+    info->flags = 0;
 
     if ( data.dwFileAttributes & INVALID_FILE_ATTRIBUTES ) {
         info->flags |= fs_path_non_existent_m;
@@ -223,7 +223,7 @@ bool fs_path_get_info ( fs_path_info_t* info, const char* path ) {
     }
 
     info->creation_time.count = 0;
-    std_ignore_warning_m ( info->flags = 0, "-Wassign-enum" )
+    info->flags = 0;
 
     if ( stat_result == -1 && errno == ENOENT ) {
         info->flags |= fs_path_non_existent_m;

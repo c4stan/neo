@@ -406,15 +406,19 @@ size_t std_str_replace ( char* str, const char* token, const char* new_token ) {
     size_t token_len = std_str_len ( token );
     size_t new_token_len = std_str_len ( new_token );
 
+    // TODO support this?
     if ( token_len != new_token_len ) {
         return 0;
     }
 
     size_t count = 0;
     size_t i = 0;
+    size_t find_result;
 
-    while ( ( i = std_str_find ( str + i, token ) ) != std_str_find_null_m ) {
-        std_str_copy ( str + i, token_len, new_token );
+    while ( ( find_result = std_str_find ( str + i, token ) ) != std_str_find_null_m ) {
+        //std_str_copy ( str + i, token_len, new_token );
+        i += find_result;
+        std_mem_copy ( str + i, new_token, token_len );
         i += token_len;
     }
 

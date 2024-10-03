@@ -975,12 +975,13 @@ typedef enum {
     xg_shading_stage_fragment_m,
     // compute
     xg_shading_stage_compute_m,
+    xg_shading_stage_count_no_raytrace_m = xg_shading_stage_compute_m,
     // raytrace
     xg_shading_stage_ray_gen_m,
     xg_shading_stage_ray_miss_m,
     xg_shading_stage_ray_hit_closest_m,
-    //xg_shading_stage_ray_hit_any_m,
-    //xg_shading_stage_ray_intersection_m,
+    xg_shading_stage_ray_hit_any_m,
+    xg_shading_stage_ray_intersect_m,
     //
     xg_shading_stage_count_m,
     xg_shading_stage_null_m
@@ -1066,12 +1067,14 @@ typedef struct {
 
 typedef struct {
     bool enable;
+    xg_shading_stage_e stage;
     uint64_t hash;
     std_buffer_t buffer;
 } xg_pipeline_state_shader_t;
 
 #define xg_pipeline_state_shader_m(...) ( xg_pipeline_state_shader_t ) { \
     .enable = false, \
+    .stage = xg_shading_stage_null_m, \
     .hash = 0, \
     .buffer = std_null_buffer_m, \
     ##__VA_ARGS__ \
@@ -1161,18 +1164,85 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+#if 0
 typedef struct {
-    xg_pipeline_state_shader_t ray_gen_shader;
-    xg_pipeline_state_shader_t ray_hit_closest_shader;
-    xg_pipeline_state_shader_t ray_miss_shader;
-    //xg_pipeline_state_shader_t ray_intersection_shader;
-    //xg_pipeline_state_shader_t ray_any_hit_shader;
+    uint32_t closest;
+    uint32_t any;
+    uint32_t intersect;
+} xg_raytrace_pipeline_hit_shader_group_t;
+
+#define xg_raytrace_pipeline_hit_shader_group_m( ... ) ( xg_raytrace_pipeline_hit_shader_group_t ) {\
+    .closest = -1, \
+    .any = -1, \
+    .intersect = -1, \
+    ##__VA_ARGS__ \
+}
+#else
+typedef struct {
+    uint32_t binding;
+    uint32_t shader;
+} xg_raytrace_pipeline_gen_shader_t;
+
+#define xg_raytrace_pipeline_gen_shader_m( ... ) ( xg_raytrace_pipeline_gen_shader_t ) { \
+    .binding = -1, \
+    .shader = -1, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t binding;
+    uint32_t shader;
+} xg_raytrace_pipeline_miss_shader_t;
+
+#define xg_raytrace_pipeline_miss_shader_m( ... ) ( xg_raytrace_pipeline_miss_shader_t ) { \
+    .binding = -1, \
+    .shader = -1, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t binding;
+    uint32_t closest_shader;
+    uint32_t any_shader;
+    uint32_t intersection_shader;
+} xg_raytrace_pipeline_hit_shader_group_t;
+
+#define xg_raytrace_pipeline_hit_shader_group_m( ... ) ( xg_raytrace_pipeline_hit_shader_group_t ) { \
+    .binding = -1, \
+    .closest_shader = -1, \
+    .any_shader = -1, \
+    .intersection_shader = -1, \
+    ##__VA_ARGS__ \
+}
+#endif
+
+typedef struct {
+    int32_t shader_count;
+    xg_pipeline_state_shader_t shaders[xg_raytrace_shader_state_max_shaders_m];
+    uint32_t gen_shader_count;
+    uint32_t miss_shader_count;
+    uint32_t hit_group_count;
+    xg_raytrace_pipeline_gen_shader_t gen_shaders[xg_raytrace_shader_state_max_gen_shaders_m];
+    xg_raytrace_pipeline_miss_shader_t miss_shaders[xg_raytrace_shader_state_max_miss_shaders_m];
+    xg_raytrace_pipeline_hit_shader_group_t hit_groups[xg_raytrace_shader_state_max_hit_groups_m];
+} xg_raytrace_shader_state_t;
+
+#define xg_raytrace_shader_state_m( ... ) ( xg_raytrace_shader_state_t ) { \
+    .shader_count = 0, \
+    .gen_shaders[0 ... xg_raytrace_shader_state_max_gen_shaders_m-1] = xg_raytrace_pipeline_gen_shader_m(), \
+    .miss_shaders[0 ... xg_raytrace_shader_state_max_miss_shaders_m-1] = xg_raytrace_pipeline_miss_shader_m(), \
+    .hit_groups[0 ... xg_raytrace_shader_state_max_hit_groups_m-1] = xg_raytrace_pipeline_hit_shader_group_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_raytrace_shader_state_t shader_state;
+    uint32_t max_recursion;
 } xg_raytrace_pipeline_state_t;
 
 #define xg_raytrace_pipeline_state_m( ... ) ( xg_raytrace_pipeline_state_t ) { \
-    .ray_gen_shader = xg_pipeline_state_shader_m(), \
-    .ray_miss_shader = xg_pipeline_state_shader_m(), \
-    .ray_hit_closest_shader = xg_pipeline_state_shader_m(), \
+    .shader_state = xg_raytrace_shader_state_m(), \
+    .max_recursion = 1, \
     ##__VA_ARGS__ \
 }
 
@@ -1322,6 +1392,8 @@ typedef struct {
 } xg_execution_barrier_t;
 */
 
+// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccessFlagBits.html
+// TODO add and use acceleration_structure related bits
 typedef enum {
     xg_memory_access_bit_none_m                       = 0,
     xg_memory_access_bit_command_read_m               = 0x00000001,
@@ -1972,14 +2044,14 @@ typedef struct {
 typedef struct {
     xg_device_h device;
     xg_raytrace_geometry_data_t* geometries;
-    uint32_t geometries_count;
+    uint32_t geometry_count;
     char debug_name[xg_debug_name_size_m];
 } xg_raytrace_geometry_params_t;
 
 #define xg_raytrace_geometry_params_m( ... ) ( xg_raytrace_geometry_params_t ) { \
     .device = device, \
     .geometries = NULL, \
-    .geometries_count = 0, \
+    .geometry_count = 0, \
     .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
@@ -2015,6 +2087,7 @@ typedef struct {
     uint32_t id;
     uint8_t visibility_mask;
     xg_raytrace_instance_flag_bit_e flags;
+    uint32_t hit_shader_group_binding; // TODO have one per geometry? optional override of geometry binding?
 } xg_raytrace_geometry_instance_t;
 
 #define xg_raytrace_geometry_instance_m( ... ) ( xg_raytrace_geometry_instance_t ) { \
@@ -2023,11 +2096,13 @@ typedef struct {
     .id = 0xffffffff, \
     .visibility_mask = 0xff, \
     .flags = 0, \
+    .hit_shader_group_binding = 0, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
     xg_device_h device;
+    xg_raytrace_pipeline_state_h pipeline; // TODO is this ok?
     xg_raytrace_geometry_instance_t* instance_array;
     uint32_t instance_count;
     char debug_name[xg_debug_name_size_m];
@@ -2035,6 +2110,7 @@ typedef struct {
 
 #define xg_raytrace_world_params_m( ... ) ( xg_raytrace_world_params_t ) { \
     .device = xg_null_handle_m, \
+    .pipeline = xg_null_handle_m, \
     .instance_array = NULL,  \
     .instance_count = 0, \
     .debug_name = { 0 }, \

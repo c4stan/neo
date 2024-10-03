@@ -16,7 +16,7 @@ typedef struct {
     xg_buffer_h pos_buffer;
     xg_buffer_h nor_buffer;
     xg_buffer_h idx_buffer;
-    xg_buffer_h rt_buffer;
+    //xg_buffer_h rt_buffer;
 } geometry_gpu_data_t;
 
 geometry_data_t generate_sphere ( float rad, uint32_t meridians_count, uint32_t parallels_count );

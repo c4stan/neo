@@ -2,16 +2,22 @@
 
 #include <std_allocator.h>
 
-// Component iterator
+// Iterators
 
 typedef struct {
     se_component_stream_t* stream;
     uint32_t page;
     uint32_t page_count;
-} se_component_iterator_t;
+} se_component_iterator_t; // TODO se_stream_iterator_t
 
 #define se_component_iterator_m( component, stream_id ) ( se_component_iterator_t ) { \
     .stream = &(component)->streams[stream_id], \
+    .page = 0, \
+    .page_count = 0 \
+}
+
+#define se_entity_iterator_m( data_stream ) ( se_component_iterator_t ) { \
+    .stream = data_stream, \
     .page = 0, \
     .page_count = 0 \
 }

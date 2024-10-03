@@ -232,12 +232,39 @@ Vulkan
         Some pipeline state can be flagged as dynamnic, meaning that the values in the pipeline state params will be *ignored*. The user is instead expected to set them
         manually before any relevant drawing command. So dynamic does not mean overridable, it means completely ignored in the provided state and left to the user at runtime.
 
-    Raytrace
-        To be able to HW raytrace, vulkan requires to declare and build all geometry upfront into acceleration structure vulkan resources. There are 2 types of those, top (TLAS)
-        and bottom (BLAS) level. A TLAS represents a scene, or a portion of it, and a BLAS represents an individual 3D model. A TLAS contains a number of references to BLAS and
-        a transform matrix for each of those. A BLAS contains the actual geometry data.
+Vulkan Raytrace
 
-    
+    Acceleration Structures
+        To be able to HW raytrace, vulkan requires to declare and build all geometry upfront into acceleration structure vulkan resources. There are 2 types of those, top (TLAS)
+        and bottom (BLAS) level. A TLAS represents a scene, or a portion of it, and a BLAS represents one or more 3D geometries. A TLAS contains a number of BLAS instances and
+        a transform matrix for each of those. BLASes owns the actual geometry data, and once the BLAS is built, the geometry used as parameter for the build could be free'd.
+        TODO how to handle dynamic updates
+
+    Shader Binding Table
+        A raytrace pipeline needs access to all shaders that could possibly be triggered by a ray hitting any object in the TLAS. Multiple hit or miss shaders can be provided
+        at pipeline construction. The mapping from TLAS instance to shader to execute is contained in the Shader Binding Table. Specifically, it can contain three kind of items:
+            Ray generation record
+                Single reference to a Ray gen shader. When tracing rays, a single ray gen record has to be selected to run the ray generation for the dispatch. 
+            Hit group record
+                One reference to a Closest hit shader, and optionally one Any hit and one Intersection shaders. The hit group record shaders get called on ray geo intersection and 
+                is dependent on the geo and can likely vary from one geo to another. The hit group record index to call is computed as follows: 
+                                                        trace_offset + sbt_stride * ( instance_offset + trace_stride * geo_id )
+                - trace_offset and trace_stride are specified as parameters when calling into traceRayEXT from inside a shader.
+                - instance_offset is the offset specific to the BLAS instance intersected by the ray, specified at TLAS build time.
+                - geo_id is the index of the intersected geometry inside the geometry array that was used at BLAS creation to build the specific BLAS that was intersected.
+                - sbt_stride is the stride of the handles in the sbt, meaning that the remaining offsets are indexes and not byte values.
+                Following the indexing rules, one way to lay down the hit group records is to group them in a flat 2D array by instance first, by geo second, and by ray type last.
+                For example, all records belonging to an instance will be laid down together as a single segment. Then, inside that segment, first will come the records belonging
+                to the first geometry that makes up the BLAS instance, then the second (if there is any) and so on. Finally, for each geo, the records will be sorted by ray type,
+                for example the hit group dedicated to primary rays first, the one dedicated to occlusion rays second, and so on.
+                In this case, trace_offset would effectively specify the ray type enum value that is to be dispatched and trace_stride the number of total ray types to support.
+            Miss record
+                Single reference to a Ray miss shader. The shader gets called when a ray fails to intersect a geometry. When calling into traceRayEXT an offset for the miss record
+                to pick can be passed as parameter. In the example before, this offset too would indicate the ray type.
+        In addition to shader references, each SBT record can contain additional parameters. They can be accessed from the shader by declaring a layout(shaderRecordNV) buffer. 
+        Only static parameters should be stored here. Parameters taht change every frame or more should go through regular shader parameter bindings.
+        Source: https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
+                https://www.realtimerendering.com/raytracinggems/rtg2/index.html - THE SHADER BINDING TABLE DEMYSTIFIED
 
 xg_vk
     Command buffers

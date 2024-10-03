@@ -18,3 +18,4 @@ xs_database_max_databases_m             32
 xs_database_build_max_global_definitions_m  32
 
 xs_shader_parser_max_token_size_m       32
+xs_shader_parser_max_shader_references_m 32

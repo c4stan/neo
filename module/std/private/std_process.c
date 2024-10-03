@@ -130,18 +130,7 @@ void std_process_init ( std_process_state_t* state, char** args, size_t args_cou
         int result = WideCharToMultiByte ( CP_UTF8, 0, path_buffer, -1, state->working_path, std_process_path_max_len_m, NULL, NULL );
         std_unused_m ( result );
         std_assert_m ( result > 0 );
-
-        // convert \ to /. TODO fix std_str_replace?
-        #if 0
-        for ( int i = 0; i < result; ++i ) {
-            if ( state->working_path[i] == '\\' ) {
-                state->working_path[i] = '/';
-            }
-        }
-        #else
         std_str_replace ( state->working_path, "\\", "/" );
-        #endif
-
         state->working_path[result - 1] = '/';
         state->working_path[result] = '\0';
     }

@@ -129,7 +129,7 @@ typedef struct {
 } vertex_cbuffer_data_t;
 
 typedef struct {
-    xg_graphics_pipeline_state_h pipeline_state;
+    xs_database_pipeline_h pipeline_state;
     //xg_buffer_h vertex_cbuffer;
     vertex_cbuffer_data_t vertex_cbuffer_data;
 } se_test_pass_component_t;
@@ -143,6 +143,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
     uint64_t key = node_args->base_key;
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xs_i* xs = std_module_get_m ( xs_module_name_m );
 
     // Bind swapchain texture as render target
     {
@@ -171,7 +172,8 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
         se_test_pass_component_t* test_pass_component = ( se_test_pass_component_t* ) se_component_iterator_next ( &it );
 
         // Set pipeline
-        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, test_pass_component->pipeline_state, key );
+        xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( test_pass_component->pipeline_state );
+        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
 #if 0
         // Bind resources
@@ -204,10 +206,11 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
         xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .type = xg_buffer_binding_type_uniform_m, .range = vert_uniform_range );
 
-        xg_pipeline_resource_bindings_t bindings = xg_default_pipeline_resource_bindings_m;
-        bindings.set = xg_resource_binding_set_per_draw_m;
-        bindings.buffer_count = 1;
-        bindings.buffers = &buffer;
+        xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
+            .set = xg_resource_binding_set_per_draw_m,
+            .buffer_count = 1,
+            .buffers = { buffer },
+        );
 
         xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
 
@@ -257,49 +260,46 @@ static void run_se_test_2 ( void ) {
         std_assert_m ( swapchain != xg_null_handle_m );
     }
 
-    xg_graphics_pipeline_state_h pipeline_state;
-    {
-        xs->add_database_folder ( "shader/" );
-        xs->set_output_folder ( "output/shader/" );
+    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "se_test_sdb" ) );
+    xs->add_database_folder ( sdb, "shader/" );
+    xs->set_output_folder ( sdb, "output/shader/" );
+        xs->set_build_params ( sdb, &xs_database_build_params_m (
+            .base_graphics_state = &xg_graphics_pipeline_state_m ( 
+            .viewport_state.width = 600,
+            .viewport_state.height = 400,
+        ),
+    ) );
+    xs->build_database ( sdb );
 
-        xs_database_build_params_t build_params;
-        build_params.viewport_width = 600;
-        build_params.viewport_height = 400;
-        xs_database_build_result_t result = xs->build_database_shaders ( device, &build_params );
-        std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders built", result.successful_pipeline_states, result.successful_shaders );
-
-        if ( result.failed_shaders || result.failed_pipeline_states ) {
-            std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
-        }
-
-        const char* pipeline_name = "main";
-        xs_string_hash_t pipeline_hash = xs_hash_string_m ( pipeline_name, std_str_len ( pipeline_name ) );
-        pipeline_state = xs->get_pipeline_state ( xs->lookup_pipeline_state_hash ( pipeline_hash ) );
-        std_assert_m ( pipeline_state != xg_null_handle_m );
-    }
+    xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "main") );
+    std_assert_m ( pipeline_state != xg_null_handle_m );
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
     xf_graph_h graph = xf->create_graph ( device, swapchain );
     {
         xf_node_h clear_pass;
         {
-            xf_node_params_t node_params = xf_default_node_params_m;
-            node_params.copy_texture_writes[node_params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
-            node_params.execute_routine = se_clear_pass;
-            node_params.user_args = std_null_buffer_m;
-            std_str_copy_static_m ( node_params.debug_name, "clear_pass" );
+            xf_node_params_t node_params = xf_node_params_m (
+                .copy_texture_writes_count = 1,
+                .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
+                .execute_routine = se_clear_pass,
+                .user_args = std_null_buffer_m,
+                .debug_name = "clear_pass",
+            );
 
             clear_pass = xf->create_node ( graph, &node_params );
         }
 
         xf_node_h test_pass;
         {
-            xf_node_params_t node_params = xf_default_node_params_m;
-            node_params.render_targets[node_params.render_targets_count++] = xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m );
-            node_params.presentable_texture = swapchain_multi_texture;
-            node_params.execute_routine = se_test_pass;
-            node_params.user_args = std_null_buffer_m;
-            std_str_copy_static_m ( node_params.debug_name, "se_pass" );
+            xf_node_params_t node_params = xf_node_params_m (
+                .render_targets_count = 1,
+                .render_targets = { xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
+                .presentable_texture = swapchain_multi_texture,
+                .execute_routine = se_test_pass,
+                .user_args = std_null_buffer_m,
+                .debug_name = "se_pass",
+            );
 
             test_pass = xf->create_node ( graph, &node_params );
         }
@@ -372,10 +372,10 @@ static void run_se_test_2 ( void ) {
         xg->present_swapchain ( swapchain, workload );
     }
 
-    std_module_unload_m ( wm_module_name_m );
-    std_module_unload_m ( xg_module_name_m );
-    std_module_unload_m ( xs_module_name_m );
     std_module_unload_m ( xf_module_name_m );
+    std_module_unload_m ( xs_module_name_m );
+    std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
     std_module_unload_m ( se_module_name_m );
 }
 #endif

@@ -138,7 +138,7 @@ const char* se_entity_name ( se_entity_h entity_handle );
 void se_entity_set_name ( se_entity_h entity, const char* name );
 void se_entity_set_component_properties ( se_component_e component, const char* name, const se_component_properties_params_t* params );
 size_t se_entity_list ( se_entity_h* out_entities, size_t cap );
-void se_entity_property_get ( se_entity_h entity_handle, se_entity_properties_t* out_props );
+void se_entity_property_get ( se_entity_properties_t* out_props, se_entity_h entity_handle );
 
 #if 0
 se_entity_h se_entity_create ( const se_entity_params_t* params );

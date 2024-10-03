@@ -455,8 +455,7 @@ VkImageLayout xg_image_layout_to_vk ( xg_texture_layout_e layout ) {
         case xg_texture_layout_copy_source_m:
             return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
-        case xg_texture_layout_undefined_m:
-            return VK_IMAGE_LAYOUT_UNDEFINED;
+        
 
         case xg_texture_layout_all_m:
         case xg_texture_layout_shader_write_m:
@@ -482,6 +481,10 @@ VkImageLayout xg_image_layout_to_vk ( xg_texture_layout_e layout ) {
 
         case xg_texture_layout_depth_target_stencil_read_m:
             return VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
+    
+        case xg_texture_layout_undefined_m:
+        default:
+            return VK_IMAGE_LAYOUT_UNDEFINED;
     }
 }
 

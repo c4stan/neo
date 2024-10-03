@@ -6,5 +6,5 @@
 layout ( location = 0 ) rayPayloadInNV vec4 payload;
 
 void main ( void ) {
-    payload = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+    payload = vec4 ( 0.0, 0.0, 0.0, 1.0 );
 }

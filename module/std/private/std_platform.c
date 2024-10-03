@@ -76,7 +76,8 @@ void std_platform_load_state_info ( std_platform_state_t* state ) {
                         cache_type = std_platform_cache_type_unknown_m;
                         break;
 
-                    case CacheUnknown:
+                    //case CacheUnknown: // mingw64 GCC doesn't have this defined?
+                    default:
                         cache_type = std_platform_cache_type_unknown_m;
                         break;
                 }

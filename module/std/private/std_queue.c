@@ -6,6 +6,8 @@
 
 #include <std_platform.h>
 
+#include <memoryapi.h>
+
 #if defined ( std_platform_win32_m )
 // https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples

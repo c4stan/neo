@@ -33,6 +33,7 @@ typedef struct {
     uint32_t frame_id;
     bool capture_frame;
     float time_ms;
+    float delta_time_ms;
 
     wm_window_h window;
 
@@ -60,19 +61,17 @@ typedef struct {
     xi_window_state_t window_state;
     xi_style_t window_style;
 
+    xi_section_state_t frame_section_state;
+    xi_section_state_t xg_alloc_section_state;
     xi_section_state_t xf_graph_section_state;
-    xi_section_state_t xf_alloc_section_state;
     xi_section_state_t entities_section_state;
-
-    xi_style_t graph_label_style;
-    xi_style_t graph_switch_style;
 } viewapp_ui_state_t;
 
 // Components
 #define viewapp_mesh_component_id_m 0
 #define viewapp_camera_component_id_m 1
 #define viewapp_light_component_id_m 2
-#define viewapp_model_component_id_m 3
+#define viewapp_raytrace_mesh_component_id 3
 
 typedef struct {
     float base_color[3];
@@ -103,6 +102,9 @@ typedef struct {
     float orientation[3];
     float up[3];
     viewapp_material_data_t material;
+
+    xg_raytrace_geometry_h rt_geo_handle;
+    uint32_t rt_instance_id;
 } viewapp_mesh_component_t;
 
 #define viewapp_mesh_component_m( ... ) ( viewapp_mesh_component_t ) { \

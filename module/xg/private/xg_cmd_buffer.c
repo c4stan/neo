@@ -4,6 +4,7 @@
 #include <std_list.h>
 #include <std_queue.h>
 #include <std_hash.h>
+#include <std_compiler.h>
 
 // PRIVATE
 typedef struct {

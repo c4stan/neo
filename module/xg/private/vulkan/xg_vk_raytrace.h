@@ -17,6 +17,11 @@ typedef struct {
     VkAccelerationStructureKHR vk_handle;
     xg_raytrace_world_params_t params;
     xg_buffer_h shader_instance_buffer;
+
+    xg_buffer_h shader_binding_table_buffer;
+    VkStridedDeviceAddressRegionKHR sbt_gen_region;
+    VkStridedDeviceAddressRegionKHR sbt_miss_region;
+    VkStridedDeviceAddressRegionKHR sbt_hit_region;
 } xg_vk_raytrace_world_t; // TODO rename to something else?
 
 #define xg_vk_raytrace_max_cmd_buffers_m 32

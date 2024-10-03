@@ -19,7 +19,7 @@ BUILD_CHANGES_OUTPUT_PIPE_NAME = 'std_module_update_pipe'
 
 # -- WINNT target version
 # https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt
-WINNT_VERSION = '0x0A00' # win10
+WINNT_VERSION = '0x0A000005' # win10
 
 # -- Warnings
 CORE_WARNINGS_FLAGS = (
@@ -49,6 +49,7 @@ CORE_WARNINGS_FLAGS = (
     ' -Wno-comment'
     ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
     ' -Wno-missing-braces'                      # suggested braces warnings?
+    ' -Wno-assign-enum'                         # only exists on CLANG
 )
 
 EXTENDED_WARNINGS_FLAGS = (
@@ -698,9 +699,6 @@ class Project:
 
         compiler = COMPILER_CLANG
 
-        if compiler == COMPILER_GCC:
-            compiler_name = 'gcc-14'
-
         if compiler == COMPILER_CLANG:
             std = 'c99'
         elif compiler == COMPILER_GCC:
@@ -741,10 +739,10 @@ class Project:
                     main_target.cmd += '\t@ar crus $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + compiler_name + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@gcc -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@' + compiler_name + ' -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
+                    main_target.cmd += '\t@gcc -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-stack,' + stack_size
             elif platform.system() == 'Linux':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
@@ -752,16 +750,23 @@ class Project:
                     main_target.cmd += '\t@ar crs $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + compiler_name + ' -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@gcc -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@' + compiler_name + ' ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
+                    main_target.cmd += '\t@gcc ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
 
         # When target is LIB, ignore the other .lib dependency. It will get linked in by the final target (DLL or EXE) that also includes this lib
         if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP: # or self.output == OUTPUT_LIB:
             if platform.system() == 'Windows':
                 for lib in self.external_libs:
-                    main_target.cmd += ' -l' + '"' + lib + '"'
+                    if compiler == COMPILER_CLANG:
+                        main_target.cmd += ' -l' + '"' + lib + '"'
+                    elif compiler == COMPILER_GCC:
+                        base, name, ext = parse_path(lib)
+                        if base == '':
+                            main_target.cmd += ' -l' + '' + name + ''
+                        else:
+                            main_target.cmd += ' -L' + '' + base + '' + ' -l' + '' + name + ''
             elif platform.system() == 'Linux': # TODO not sure if this is a win32/linux or clang/gcc thing... ?
                 for lib in self.external_libs:
                     base, name, ext = parse_path(lib)
@@ -867,7 +872,7 @@ class Project:
             elif compiler == COMPILER_GCC:
                 if platform.system() == 'Windows':
                     # TODO make asm output optional?
-                    target.cmd = '\t@' + compiler_name + ' -std=' + std + ' -g'# -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@gcc -std=' + std + ' -gcodeview'# --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                     for path in self.external_paths:
@@ -885,7 +890,7 @@ class Project:
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
                 elif platform.system() == 'Linux':
-                    target.cmd = '\t@' + compiler_name + ' -std=' + std + ' ' + config_flags
+                    target.cmd = '\t@gcc -std=' + std + ' ' + config_flags
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -S'
                         target.cmd += ' -mllvm --x86-asm-syntax=intel'
@@ -912,7 +917,11 @@ class Project:
             #TODO test this, is it working?
             if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP):
                 #if platform.system() == 'Linux':
-                target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                if compiler == COMPILER_CLANG:
+                    target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                elif compiler == COMPILER_GCC:
+                    target.cmd = '\t@gcc -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+
                 for path in self.project_paths:
                     target.cmd += ' -I' + path
                 for path in self.external_paths:

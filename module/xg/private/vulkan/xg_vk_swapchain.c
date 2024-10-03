@@ -166,6 +166,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     xg_texture_usage_bit_e allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m; // TODO probably need more allowed usages
     allowed_usage |= xg_texture_usage_bit_copy_source_m; // Looks like this gets added automatically once copy_dest is in? and if it's not accounted for in the attachments info it will cause a warning to spam
     allowed_usage |= xg_texture_usage_bit_resource_m; // For now defaulting all render targets to render_target/copy_source/copy_dest/shader_resource. TODO create and cache framebuffers on the fly
+    allowed_usage |= xg_texture_usage_bit_storage_m; // Because storage usage was added by default to framebuffer creation, becuase of raytracing...
 
     VkSwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;

@@ -22,6 +22,10 @@
 
 static xg_vk_workload_state_t* xg_vk_workload_state;
 
+#if defined ( std_compiler_gcc_m )
+std_warnings_ignore_m ( "-Wint-to-pointer-cast" )
+#endif
+
 // ======================================================================================= //
 //                                     W O R K L O A D
 // ======================================================================================= //
@@ -366,7 +370,7 @@ bool xg_workload_is_complete ( xg_workload_h workload_handle ) {
     return workload->gen > handle_gen;
 }
 
-static void xg_workload_destroy ( xg_workload_h workload_handle ) {
+void xg_workload_destroy ( xg_workload_h workload_handle ) {
     std_mutex_lock ( &xg_vk_workload_state->workloads_mutex );
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_vk_workload_destroy_ptr ( workload );
@@ -639,7 +643,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
             vkCmdBindPipeline ( vk_cmd_buffer, vk_pipeline_type, common_pipeline->vk_handle );
 
-            if ( vk_pipeline_type == xg_pipeline_graphics_m ) {
+            if ( vk_pipeline_type == VK_PIPELINE_BIND_POINT_GRAPHICS ) {
                 if ( state->dynamic_state.pending_states[xg_graphics_pipeline_dynamic_state_viewport_m] ) {
                     VkViewport vk_viewport;
                     vk_viewport.x = state->dynamic_state.viewport.x;
@@ -833,9 +837,12 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                 write->pBufferInfo = info;
 
                 switch ( binding_type ) {
-                    //case xg_buffer_binding_type_uniform_m:
                     case xg_resource_binding_buffer_uniform_m:
                         write->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                        break;
+
+                    case xg_resource_binding_buffer_storage_m:
+                        write->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                         break;
 
                     default:
@@ -1389,6 +1396,8 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
 
             // -----------------------------------------------------------------------
             case xg_cmd_raytrace_trace_rays_m: {
+                // TODO
+                #if 1
                 std_auto_m args = ( xg_cmd_raytrace_trace_rays_t* ) header->args;
 
                 xg_vk_translation_state_cache_flush ( &state, context, device_handle, vk_cmd_buffer );
@@ -1397,8 +1406,9 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 std_assert_m ( pipeline );
                 VkStridedDeviceAddressRegionKHR callable_region = { 0 };
                 xg_vk_device_ext_api ( device_handle )->trace_rays ( vk_cmd_buffer,
-                    &pipeline->sbt_raygen_region, &pipeline->sbt_miss_region, &pipeline->sbt_hit_region, &callable_region,
+                    &pipeline->sbt_gen_region, &pipeline->sbt_miss_region, &pipeline->sbt_hit_region, &callable_region,
                     args->ray_count_x, args->ray_count_y, args->ray_count_z );
+                #endif
             }
             break;
 
