@@ -159,7 +159,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     xf_node_params_t params = xf_node_params_m (
         .depth_stencil_target = target,
         .passthrough.enable = true,
-        .passthrough.render_targets = { xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_clear_m ) },
+        .passthrough.render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
         .execute_routine = shadow_pass_routine,
         .debug_name = "shadows",
     );

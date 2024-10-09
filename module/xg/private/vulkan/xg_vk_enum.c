@@ -373,6 +373,7 @@ VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_bit_e usage ) {
         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
 
+#if xg_enable_raytracing_m
     if ( usage & xg_buffer_usage_bit_shader_device_address_m ) {
         flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
@@ -393,6 +394,7 @@ VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_bit_e usage ) {
     if ( usage & xg_vk_buffer_usage_bit_shader_binding_table_m ) {
         flags |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
     }
+#endif
 
     return flags;
 }

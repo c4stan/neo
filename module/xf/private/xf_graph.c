@@ -481,6 +481,11 @@ static void xf_graph_build_texture ( xf_graph_t* graph, xf_texture_h texture_han
                     params.allowed_usage |= xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m;
                 }
 
+                // Tag storage textures as copy src/dest to allow aliasing passthrough. TODO more fine grained tagging
+                if ( texture->required_usage & xg_texture_usage_bit_storage_m ) {
+                    params.allowed_usage |= xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m;
+                }
+
                 params.initial_layout = xg_texture_layout_undefined_m;
                 xg_texture_h new_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params );
                 xf_resource_texture_map_to_new ( texture_handle, new_texture );
@@ -818,6 +823,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
     // Execute
     {
+        // TODO take this as param
         uint64_t sort_key = 0;
 
         for ( size_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
@@ -834,7 +840,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
             if ( !node->enabled ) {
                 for ( uint32_t i = 0; i < params->render_targets_count; ++i ) {
-                    if ( params->passthrough.render_targets[i].mode == xf_node_passthrough_mode_clear_m ) {
+                    if ( params->passthrough.render_targets[i].mode == xf_passthrough_mode_clear_m ) {
                         xf_node_render_target_dependency_t* target = &node->params.render_targets[i];
 
                         xf_texture_execution_state_t state = xf_texture_execution_state_m (
@@ -857,11 +863,83 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                         xg->cmd_clear_texture ( cmd_buffer, texture->xg_handle, params->passthrough.render_targets[i].clear, sort_key );
 
                         xg->cmd_end_debug_region ( cmd_buffer, sort_key );
-                    } else if ( params->passthrough.render_targets[i].mode == xf_node_passthrough_mode_alias_m ) {
+                    } else if ( params->passthrough.render_targets[i].mode == xf_passthrough_mode_alias_m ) {
                         xf_resource_texture_alias ( params->render_targets[i].texture, params->passthrough.render_targets[i].alias );
-                    } else if ( params->passthrough.render_targets[i].mode == xf_node_passthrough_mode_copy_m ) {
+                    } else if ( params->passthrough.render_targets[i].mode == xf_passthrough_mode_copy_m ) {
                         xf_node_render_target_dependency_t* target = &node->params.render_targets[i];
                         xf_node_copy_texture_dependency_t* source = &params->passthrough.render_targets[i].copy_source;
+                        const xf_texture_t* target_texture = xf_resource_texture_get ( target->texture );
+                        const xf_texture_t* source_texture = xf_resource_texture_get ( source->texture );
+
+                        xf_texture_execution_state_t target_state = xf_texture_execution_state_m (
+                            .layout = xg_texture_layout_copy_dest_m,
+                            .stage = xg_pipeline_stage_bit_transfer_m,
+                            .access = xg_memory_access_bit_transfer_write_m
+                        );
+                        xf_resource_texture_state_barrier ( &texture_barriers_stack, target->texture, target->view, &target_state );
+                        xf_texture_execution_state_t source_state = xf_texture_execution_state_m (
+                            .layout = xg_texture_layout_copy_source_m,
+                            .stage = xg_pipeline_stage_bit_transfer_m,
+                            .access = xg_memory_access_bit_transfer_read_m
+                        );
+                        xf_resource_texture_state_barrier ( &texture_barriers_stack, source->texture, source->view, &source_state );
+
+                        xg->cmd_begin_debug_region ( cmd_buffer, node->params.debug_name, node->params.debug_color, sort_key );
+
+                        {
+                            xg_barrier_set_t barrier_set = xg_barrier_set_m();
+                            barrier_set.texture_memory_barriers = texture_barriers;
+                            barrier_set.texture_memory_barriers_count = std_stack_array_count_m ( &texture_barriers_stack, xg_texture_memory_barrier_t );
+                            xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
+                        }
+
+                        xg_texture_copy_params_t copy_params;
+                        copy_params.source.texture = source_texture->xg_handle;
+                        copy_params.source.mip_base = source->view.mip_base;
+                        copy_params.source.array_base = source->view.array_base;
+                        copy_params.destination.texture = target_texture->xg_handle;
+                        copy_params.destination.mip_base = target->view.mip_base;
+                        copy_params.destination.array_base = target->view.array_base;
+                        copy_params.mip_count = source->view.mip_count;
+                        copy_params.array_count = source->view.array_count;
+                        copy_params.aspect = source->view.aspect;
+                        copy_params.filter = xg_sampler_filter_point_m;
+                        xg->cmd_copy_texture ( cmd_buffer, &copy_params, sort_key );
+
+                        xg->cmd_end_debug_region ( cmd_buffer, sort_key );
+                    }
+                }
+
+                // TODO factor this into an outer function and call twice? need to share/wrap a bunch of local state...
+                for ( uint32_t i = 0; i < params->shader_texture_writes_count; ++i ) {
+                    if ( params->passthrough.shader_texture_writes[i].mode == xf_passthrough_mode_clear_m ) {
+                        xf_node_shader_texture_dependency_t* texture_write = &node->params.shader_texture_writes[i];
+
+                        xf_texture_execution_state_t state = xf_texture_execution_state_m (
+                            .layout = xg_texture_layout_copy_dest_m,
+                            .stage = xg_pipeline_stage_bit_transfer_m,
+                            .access = xg_memory_access_bit_transfer_write_m
+                        );
+                        xf_resource_texture_state_barrier ( &texture_barriers_stack, texture_write->texture, texture_write->view, &state );
+
+                        xg->cmd_begin_debug_region ( cmd_buffer, node->params.debug_name, node->params.debug_color, sort_key );
+
+                        {
+                            xg_barrier_set_t barrier_set = xg_barrier_set_m();
+                            barrier_set.texture_memory_barriers = texture_barriers;
+                            barrier_set.texture_memory_barriers_count = std_stack_array_count_m ( &texture_barriers_stack, xg_texture_memory_barrier_t );
+                            xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key );
+                        }
+
+                        const xf_texture_t* texture = xf_resource_texture_get ( texture_write->texture );
+                        xg->cmd_clear_texture ( cmd_buffer, texture->xg_handle, params->passthrough.shader_texture_writes[i].clear, sort_key );
+
+                        xg->cmd_end_debug_region ( cmd_buffer, sort_key );
+                    } else if ( params->passthrough.shader_texture_writes[i].mode == xf_passthrough_mode_alias_m ) {
+                        xf_resource_texture_alias ( params->shader_texture_writes[i].texture, params->passthrough.shader_texture_writes[i].alias );
+                    } else if ( params->passthrough.shader_texture_writes[i].mode == xf_passthrough_mode_copy_m ) {
+                        xf_node_shader_texture_dependency_t* target = &node->params.shader_texture_writes[i];
+                        xf_node_copy_texture_dependency_t* source = &params->passthrough.shader_texture_writes[i].copy_source;
                         const xf_texture_t* target_texture = xf_resource_texture_get ( target->texture );
                         const xf_texture_t* source_texture = xf_resource_texture_get ( source->texture );
 
@@ -1063,6 +1141,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 node_args.workload = xg_workload;
                 node_args.base_key = sort_key;
                 node_args.io = &io;
+                node_args.debug_name = node->params.debug_name;
                 //node_args.params = &node->params;
                 node->params.execute_routine ( &node_args, node->user_args );
             }

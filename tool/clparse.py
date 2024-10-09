@@ -663,6 +663,17 @@ def git_pull():
 def git_status():
     os.system('git status')
 
+def show_committed_version(workspace, filename):
+    path = get_workspace_path(workspace)
+    base = '\\neo\\'
+    offset = path.find(base) + len(base)
+    path = path[offset:]
+    if platform.system() == 'Windows':
+        path += '/' + filename
+        path = path.replace('\\', '/')
+    #print('git show HEAD:' + path)
+    os.system('git show HEAD:' + path + ' | subl.exe -')
+
 def make_title(words):
     title = format_title_string(words)
     print(title)
@@ -731,6 +742,8 @@ def parse(string):
         makegen_workspace(tokens[1], tokens[2:])
     elif cmd == 'debug-fixup':
         fixup_debug_app(tokens[1], tokens[2:])
+    elif cmd == 'recover':
+        show_committed_version(tokens[1], tokens[2])
     elif cmd == '':
         pass
     else:

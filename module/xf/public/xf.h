@@ -152,6 +152,8 @@ typedef struct {
 
 // TODO provide xg bindings directly?
 typedef struct {
+    // TODO differentiate between readonly storage and sampled textures
+    // TODO differentiate between readonly storage and uniform buffers
     xf_shader_texture_resource_t shader_texture_reads[xf_node_max_shader_texture_reads_m];
     xf_shader_texture_resource_t shader_texture_writes[xf_node_max_shader_texture_writes_m];
     xg_buffer_h shader_buffer_reads[xf_node_max_shader_buffer_reads_m];
@@ -174,6 +176,7 @@ typedef struct {
     xg_workload_h workload;
     xg_pipeline_state_h pipeline_state;
     uint64_t base_key;
+    const char* debug_name;
 } xf_node_execute_args_t;
 
 typedef void ( xf_node_execute_f ) ( const xf_node_execute_args_t* node_args, void* user_args );
@@ -181,36 +184,38 @@ typedef void ( xf_node_execute_f ) ( const xf_node_execute_args_t* node_args, vo
 #define xf_node_pass_f_m(name) void name ( const xf_node_execute_args_t* node_args, void* user_args )
 
 typedef enum {
-    xf_node_passthrough_mode_ignore_m,
-    xf_node_passthrough_mode_clear_m,
-    xf_node_passthrough_mode_alias_m,
-    xf_node_passthrough_mode_copy_m,
-    // xf_node_passthrough_mode_execute_flag_m, // todo: call execute anyway and pass a flag in node_args indicating that it's a passthrough
-} xf_node_passthrough_mode_e;
+    xf_passthrough_mode_ignore_m,
+    xf_passthrough_mode_clear_m,
+    xf_passthrough_mode_alias_m,
+    xf_passthrough_mode_copy_m,
+    // xf_passthrough_mode_execute_flag_m, // todo: call execute anyway and pass a flag in node_args indicating that it's a passthrough
+} xf_passthrough_mode_e;
 
 typedef struct {
-    xf_node_passthrough_mode_e mode;
+    xf_passthrough_mode_e mode;
     union {
         xg_color_clear_t clear;
         xf_texture_h alias;
         xf_node_copy_texture_dependency_t copy_source;
     };
-} xf_node_render_target_passthrough_t;
+} xf_texture_passthrough_t;
 
-#define xf_node_render_target_passthrough_m( ... ) ( xf_node_render_target_passthrough_t ) { \
-    .mode = xf_node_passthrough_mode_ignore_m, \
+#define xf_texture_passthrough_m( ... ) ( xf_texture_passthrough_t ) { \
+    .mode = xf_passthrough_mode_ignore_m, \
     .clear = xg_color_clear_m(), \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
     bool enable;
-    xf_node_render_target_passthrough_t render_targets[xf_node_max_render_targets_m];
+    xf_texture_passthrough_t render_targets[xf_node_max_render_targets_m];
+    xf_texture_passthrough_t shader_texture_writes[xf_node_max_shader_texture_writes_m];
 } xf_node_passthrough_params_t;
 
 #define xf_node_passthrough_params_m( ... ) ( xf_node_passthrough_params_t ) { \
     .enable = false, \
-    .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_node_render_target_passthrough_m() }, \
+    .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_texture_passthrough_m() }, \
+    .shader_texture_writes = { [0 ... xf_node_max_shader_texture_writes_m - 1] = xf_texture_passthrough_m() }, \
     ##__VA_ARGS__ \
 }
 

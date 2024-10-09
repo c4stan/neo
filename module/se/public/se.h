@@ -19,26 +19,15 @@ typedef uint64_t se_entity_group_h;
 typedef uint32_t se_component_e;
 typedef uint64_t se_component_h;
 
-typedef struct {
-    /*const*/ uint64_t entity;
-    // TODO limit these to uint16_t and make the handle a u64?
-    /*const*/ uint32_t component;
-    /*const*/ uint32_t property;
-} se_property_h;
-
 #define se_null_handle_m UINT64_MAX
-
-#define se_null_property_handle_m( component_id ) ( ( uint64_t ) component_id )
-
-//typedef struct {
-//    uint32_t stride;
-//} se_component_stream_layout_t;
+#define se_null_component_id_m UINT32_MAX
+#define se_null_stream_id_m UINT8_MAX
 
 typedef struct {
     se_component_e id;
     uint32_t stream_count;
     //se_component_stream_layout_t streams[se_component_max_streams_m];
-    uint32_t streams[se_component_max_streams_m];
+    uint32_t streams[se_component_max_streams_m]; // stride of each stream
 } se_component_layout_t;
 
 #define se_component_layout_m( ... ) ( se_component_layout_t ) { \
@@ -50,12 +39,12 @@ typedef struct {
 
 typedef struct {
     uint32_t component_count;
-    se_component_layout_t components[se_entity_max_components_per_entity_m];
+    se_component_layout_t components[se_max_components_per_entity_m];
 } se_entity_family_params_t;
 
 #define se_entity_family_params_m( ... ) ( se_entity_family_params_t ) { \
     .component_count = 0, \
-    .components = { [0 ... se_entity_max_components_per_entity_m - 1] = se_component_layout_m() }, \
+    .components = { [0 ... se_max_components_per_entity_m - 1] = se_component_layout_m() }, \
     ##__VA_ARGS__ \
 }
 
@@ -64,6 +53,7 @@ typedef struct {
     uint64_t u64[se_component_mask_block_count_m];
 } se_component_mask_t;
 
+#if 0
 // TODO allow for inlining data instead of providing a pointer to it
 typedef struct {
     uint8_t has_inline_data;
@@ -120,7 +110,7 @@ typedef struct se_entity_update_t {
 
 #define se_entity_update_m( ... ) ( se_entity_update_t ) { \
     .component_count = 0, \
-    .components = { [0 ... se_entity_max_components_per_entity_m - 1] = se_component_update_m() }, \
+    .components = { [0 ... se_max_components_per_entity_m - 1] = se_component_update_m() }, \
     ##__VA_ARGS__ \
 }
 
@@ -134,11 +124,61 @@ typedef struct {
     .update = se_entity_update_m(), \
     ##__VA_ARGS__ \
 }
+#else
+
+typedef struct {
+    uint8_t id;
+    //std_buffer_t data;
+    void* data;
+} se_stream_update_t;
+
+#define se_stream_update_m( ... ) ( se_stream_update_t ) { \
+    .id = 0, \
+    .data = NULL, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    se_component_e id;
+    uint32_t stream_count;
+    se_stream_update_t streams[se_component_max_streams_m];
+} se_component_update_t;
+
+#define se_component_update_m( ... ) ( se_component_update_t ) { \
+    .id = se_null_component_id_m, \
+    .stream_count = 1, \
+    .streams = {}, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t component_count;
+    se_component_update_t components[se_max_components_per_entity_m];
+} se_entity_update_t;
+
+#define se_entity_update_m( ... ) ( se_entity_update_t ) { \
+    .component_count = 1, \
+    .components = {}, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    char debug_name[se_debug_name_size_m];
+    se_entity_update_t update;
+} se_entity_params_t;
+
+#define se_entity_params_m( ... ) ( se_entity_params_t ) { \
+    .debug_name = {}, \
+    .update = se_entity_update_m(), \
+    ##__VA_ARGS__ \
+}
+
+#endif
 
 typedef struct {
     // Take component list instead of mask so that the user can define the components ordering to expect in the result
     uint32_t component_count;
-    uint32_t components[se_entity_max_components_per_entity_m];
+    uint32_t components[se_max_components_per_entity_m];
 } se_query_params_t;
 
 #define se_query_params_m( ... ) ( se_query_params_t ) { \
@@ -170,14 +210,14 @@ typedef struct {
 typedef struct {
     uint32_t entity_count;
     se_component_stream_t entities;
-    se_component_t components[se_entity_max_components_per_entity_m];
+    se_component_t components[se_max_components_per_entity_m];
 } se_query_result_t;
 
 // TODO
 #if 0
 typedef struct {
-    se_component_t* read_components[se_entity_max_components_per_entity_m];
-    se_component_t* write_components[se_entity_max_components_per_entity_m];
+    se_component_t* read_components[se_max_components_per_entity_m];
+    se_component_t* write_components[se_max_components_per_entity_m];
 
     se_entity_h delete_entities[se_max_entities_m];
     uint64_t delete_count;
@@ -188,9 +228,9 @@ typedef struct {
 typedef void ( se_node_execute_f ) ( se_node_execute_args_t* node_args );
 
 typedef struct {
-    uint32_t read_components[se_entity_max_components_per_entity_m];
+    uint32_t read_components[se_max_components_per_entity_m];
     uint32_t read_components_count;
-    uint32_t write_components[se_entity_max_components_per_entity_m];
+    uint32_t write_components[se_max_components_per_entity_m];
     uint32_t write_components_count;
 
     se_node_execute_f * execute_routine;
@@ -237,6 +277,13 @@ typedef struct {
 }
 
 typedef struct {
+    /*const*/ uint64_t entity;
+    // TODO limit these to uint16_t and make the handle a u64?
+    /*const*/ uint32_t component;
+    /*const*/ uint32_t property;
+} se_property_h;
+
+typedef struct {
     uint32_t id;
     uint32_t property_count;
     char name[se_debug_name_size_m];
@@ -247,21 +294,21 @@ typedef struct {
 typedef struct {
     uint32_t component_count;
     char name[se_debug_name_size_m];
-    se_component_properties_t components[se_entity_max_components_per_entity_m];
+    se_component_properties_t components[se_max_components_per_entity_m];
 } se_entity_properties_t;
 
 typedef struct {
     void ( *create_entity_family ) ( const se_entity_family_params_t* params );
     void ( *destroy_entity_family ) ( se_component_mask_t mask );
 
-    se_entity_h ( *create_entity ) ( void );
+    //se_entity_h ( *create_entity ) ( void );
     const char* ( *get_entity_name ) ( se_entity_h entity );
 
-    void ( *init_entities ) ( const se_entity_params_t* params );
+    //void ( *init_entities ) ( const se_entity_params_t* params );
 
     void ( *destroy_entities ) ( const se_entity_h* entities, uint64_t count );
 
-    //se_entity_h ( *create_entity ) ( const se_entity_update_t* update );
+    se_entity_h ( *create_entity ) ( const se_entity_params_t* params );
     //void ( *destroy_entity ) ( se_entity_h entity );
 
     // TODO is this a good idea?

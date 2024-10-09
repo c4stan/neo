@@ -864,6 +864,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         .imagelessFramebuffer = VK_TRUE,
     };
 
+#if xg_enable_raytracing_m
     // Enable buffer device address
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_feature = {
@@ -880,11 +881,16 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         .accelerationStructure = VK_TRUE,
         //.accelerationStructureHostCommands = VK_TRUE,
     };
+#endif
 
     // Create Device
     VkDeviceCreateInfo device_create_info;
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+#if xg_enable_raytracing_m
     device_create_info.pNext = &acceleration_strucutre_feature;
+#else
+    device_create_info.pNext = &imageless_framebuffer_feature;
+#endif
     device_create_info.flags = 0;
     device_create_info.queueCreateInfoCount = device->queue_create_info_count;
     device_create_info.pQueueCreateInfos = queue_create_info;

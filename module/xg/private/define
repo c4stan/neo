@@ -82,7 +82,7 @@ xg_vk_workload_max_texture_barriers_per_cmd_m       16
 xg_vk_max_sets_per_descriptor_pool_m                    1024*10
 xg_vk_max_samplers_per_descriptor_pool_m                1024
 xg_vk_max_sampled_texture_per_descriptor_pool_m         1024
-xg_vk_max_storage_texture_per_descriptor_pool_m         8
+xg_vk_max_storage_texture_per_descriptor_pool_m         1024
 xg_vk_max_uniform_buffer_per_descriptor_pool_m          1024*10
 xg_vk_max_storage_buffer_per_descriptor_pool_m          8
 xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m    8

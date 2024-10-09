@@ -4,9 +4,10 @@
 
 static void se_api_init ( se_i* se ) {
     se->create_entity_family = se_entity_family_create;
-    se->init_entities = se_entity_create;
+    //se->init_entities = se_entity_create;
     se->query_entities = se_entity_query;
-    se->create_entity = se_entity_reserve;
+    //se->create_entity = se_entity_reserve;
+    se->create_entity = se_entity_create_init;
 
     se->get_entity_component = se_entity_get_component;
 

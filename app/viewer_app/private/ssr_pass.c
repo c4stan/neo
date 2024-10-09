@@ -27,9 +27,11 @@ static void xf_ssr_trace_pass ( const xf_node_execute_args_t* node_args, void* u
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
     uint64_t key = node_args->base_key;
 
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+    xs_i* xs = state->modules.xs;
 
+#if 0
     xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
         .render_targets_count = 1,
         .render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] ),
@@ -68,6 +70,37 @@ static void xf_ssr_trace_pass ( const xf_node_execute_args_t* node_args, void* u
     xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
+#else
+    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
+    xg->cmd_set_compute_pipeline_state ( cmd_buffer, pipeline_state, key );
+
+    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
+        .set = xg_resource_binding_set_per_draw_m,
+        .texture_count = 4,
+        .sampler_count = 1,
+        .buffer_count = 1,
+        .textures = {
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_writes[0], 5 ),
+        },
+        .samplers = { xg_sampler_resource_binding_m (
+            .shader_register = 3,
+            .sampler = pass_args->sampler,
+        ) },
+        .buffers = { xg_buffer_resource_binding_m (
+            .shader_register = 4,
+            .type = xg_buffer_binding_type_uniform_m,
+            .range = xg->write_workload_uniform ( node_args->workload, &pass_args->draw_data, sizeof ( ssr_draw_data_t ) ),
+        ) },
+    );
+    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
+
+    uint32_t workgroup_count_x = std_div_ceil_u32 ( pass_args->width, 8 );
+    uint32_t workgroup_count_y = std_div_ceil_u32 ( pass_args->height, 8 );
+    xg->cmd_dispatch_compute ( cmd_buffer, workgroup_count_x, workgroup_count_y, 1, key );
+#endif
 }
 
 xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, xf_texture_h normals, xf_texture_h color, xf_texture_h hiz ) {
@@ -95,6 +128,7 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
         .draw_data.hiz_mip_count = ( uint32_t ) hiz_info.mip_levels,
     };
 
+#if 0
     xf_node_params_t params = xf_node_params_m (
         .render_targets_count = 1,
         .render_targets = { xf_render_target_dependency_m ( ssr_raymarch, xg_default_texture_view_m ) },
@@ -108,8 +142,29 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
         .user_args = std_buffer_m ( &args ),
         .debug_name = "ssr",
         .passthrough.enable = true,
-        .passthrough.render_targets = { xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_clear_m ) },
+        .passthrough.render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
     );
+#else
+    xf_node_params_t params = xf_node_params_m (
+        //.render_targets_count = 1,
+        //.render_targets = { xf_render_target_dependency_m ( ssr_raymarch, xg_default_texture_view_m ) },
+        .shader_texture_reads_count = 3,
+        .shader_texture_reads = {
+            xf_sampled_texture_dependency_m ( normals, xg_pipeline_stage_bit_compute_shader_m ),
+            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_compute_shader_m ),
+            xf_sampled_texture_dependency_m ( hiz, xg_pipeline_stage_bit_compute_shader_m ),
+        },
+        .shader_texture_writes_count = 1,
+        .shader_texture_writes = {
+            xf_storage_texture_dependency_m ( ssr_raymarch, xg_default_texture_view_m, xg_pipeline_stage_bit_compute_shader_m )
+        },
+        .execute_routine = xf_ssr_trace_pass,
+        .user_args = std_buffer_m ( &args ),
+        .debug_name = "ssr",
+        .passthrough.enable = true,
+        .passthrough.shader_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
+    );
+#endif
     xf_node_h ssr_trace_node = xf->create_node ( graph, &params );
     return ssr_trace_node;
 }

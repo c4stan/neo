@@ -10,18 +10,20 @@ layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture
 
 layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
 
-layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform draw_uniforms_t {
     vec2 resolution_f32;
     uint hiz_mip_count;
-} draw_cbuffer;
+} draw_uniforms;
 
-layout ( location = 0 ) out vec4 out_color;
+layout ( binding = 5, set = xs_resource_binding_set_per_draw_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+
+layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 // ---
 // TODO: try: downsample depth & normals -> raytrace in half-resolution -> upsample result back using a bi-filter (read half res depth and normals)
 void main ( void ) {
     // Compute screen uv
-    vec2 screen_uv = vec2 ( gl_FragCoord.xy / draw_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( gl_GlobalInvocationID.xy / draw_uniforms.resolution_f32 ) + vec2(0.5) / draw_uniforms.resolution_f32;
     //screen_uv = dejitter_uv ( screen_uv );
 
     // Sample
@@ -37,7 +39,7 @@ void main ( void ) {
     // Trace
     vec3 view_ray_dir = reflect ( normalize ( view_pos ), view_normal );
 
-    uint rng_state = rng_wang_init ( gl_FragCoord.xy );
+    uint rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
     float ex = rng_wang ( rng_state );
     float ey = rng_wang ( rng_state );
     vec2 e2 = vec2 ( ex, ey );
@@ -64,7 +66,7 @@ void main ( void ) {
         vec3 hit_screen_pos;
         float hit_depth;
 
-        if ( trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_cbuffer.hiz_mip_count, sampler_point, 300 ) ) {
+        if ( trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 300 ) ) {
             vec3 hit_color = texture ( sampler2D ( tex_color, sampler_point ), hit_screen_pos.xy ).xyz;
             float depth_delta = -(linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ));
             float depth_threshold = 0.4;
@@ -74,5 +76,6 @@ void main ( void ) {
     }
 
     // TODO should the attenuation depend on the specular of the reflecting surface?
-    out_color = vec4 ( sample_color, 1 );
+    //out_color = vec4 ( sample_color, 1 );
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( sample_color, 1 ) );
 }

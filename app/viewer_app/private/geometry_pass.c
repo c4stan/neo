@@ -235,9 +235,9 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
         .debug_name = "geometry",
         .passthrough.enable = true,
         .passthrough.render_targets = {
-            xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_ignore_m ),
-            xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_ignore_m ),
-            xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_ignore_m ),
+            xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
+            xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
+            xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
         }
     );
     xf_node_h node = xf->create_node ( graph, &node_params );

@@ -1,0 +1,39 @@
+compute_shader ssgi.comp
+
+include common.xsi
+
+begin texture
+    register 0
+    stage compute
+end
+
+begin texture
+    register 1
+    stage compute
+end
+
+begin texture
+    register 2
+    stage compute
+end
+
+begin texture
+    register 3
+    stage compute
+end
+
+begin sampler
+    register 4
+    stage compute
+end
+
+begin buffer
+    register 5
+    stage compute
+end
+
+begin texture
+    register 6
+    stage compute
+    access write
+end

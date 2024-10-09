@@ -242,6 +242,12 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xf_graph_h graph = xf->create_graph ( device, xg_null_handle_m );
     m_state->render.graph = graph;
 
+    // frame setup
+    xf_node_h frame_setup_node = xf->create_node ( graph, &xf_node_params_m (
+        .execute_routine = frame_setup_pass,
+        .debug_name = "frame_setup"
+    ) );
+
     // view setup
     xf_node_h view_setup_node = xf->create_node ( graph, &xf_node_params_m (
         .execute_routine = view_setup_pass,
@@ -289,7 +295,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_graph_h graph = xf->create_graph ( device, xg_null_handle_m );
     m_state->render.graph = graph;
 
-    // setup
+    // frame setup
     xf_node_h frame_setup_node = xf->create_node ( graph, &xf_node_params_m (
         .execute_routine = frame_setup_pass,
         .debug_name = "frame_setup"
@@ -449,8 +455,8 @@ static void viewapp_boot_raster_graph ( void ) {
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { xf_node_render_target_passthrough_m (
-                    .mode = xf_node_passthrough_mode_alias_m,
+            .shader_texture_writes = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_alias_m,
                     .alias = ssgi_blur_y_texture
                 )
             }
@@ -505,8 +511,8 @@ static void viewapp_boot_raster_graph ( void ) {
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { xf_node_render_target_passthrough_m (
-                    .mode = xf_node_passthrough_mode_alias_m,
+            .shader_texture_writes = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_alias_m,
                     .alias = ssgi_2_blur_y_texture
                 )
             }
@@ -559,9 +565,9 @@ static void viewapp_boot_raster_graph ( void ) {
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { 
-                xf_node_render_target_passthrough_m (
-                    .mode = xf_node_passthrough_mode_alias_m,
+            .shader_texture_writes = { 
+                xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_alias_m,
                     .alias = ssr_blur_y_texture,
                 )
             }
@@ -605,8 +611,8 @@ static void viewapp_boot_raster_graph ( void ) {
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { xf_node_render_target_passthrough_m (
-                    .mode = xf_node_passthrough_mode_alias_m,
+            .shader_texture_writes = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_alias_m,
                     .alias = combine_texture
                 )
             }
@@ -631,8 +637,8 @@ static void viewapp_boot_raster_graph ( void ) {
         .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { xf_node_render_target_passthrough_m (
-                    .mode = xf_node_passthrough_mode_copy_m,
+            .shader_texture_writes = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_copy_m,
                     .copy_source = xf_copy_texture_dependency_m ( taa_accumulation_texture, xg_default_texture_view_m ),
                 )
             },
@@ -802,14 +808,13 @@ static void viewapp_boot_scene_cornell_box ( void ) {
 
     xg_device_h device = m_state->render.device;
 
-    std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
-    se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
+    //std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
+    //se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
 
     // sphere
     {
-        se_entity_h sphere = se->create_entity();
-        se->set_entity_name ( sphere, "sphere" );
-        se_entity_params_alloc_entity ( &allocator, sphere );
+        //se->set_entity_name ( sphere, "sphere" );
+        //se_entity_params_alloc_entity ( &allocator, sphere );
         
         geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
@@ -834,8 +839,18 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 .metalness = 0,
             )
         );
+
+        se_entity_h sphere = se->create_entity( &se_entity_params_m (
+            .debug_name = "sphere",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ) }
+            )
+        ) );
         
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_id_m, &mesh_component );
+        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_id_m, &mesh_component );
     }
 
     // planes
@@ -872,9 +887,9 @@ static void viewapp_boot_scene_cornell_box ( void ) {
     };
 
     for ( uint32_t i = 0; i < 5; ++i ) {
-        se_entity_h plane = se->create_entity();
-        se->set_entity_name ( plane, "plane" );
-        se_entity_params_alloc_entity ( &allocator, plane );
+        //se_entity_h plane = se->create_entity();
+        //se->set_entity_name ( plane, "plane" );
+        //se_entity_params_alloc_entity ( &allocator, plane );
 
         geometry_data_t geo = generate_plane ( 5.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
@@ -913,15 +928,50 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 .metalness = 0,
             ),
         );
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_id_m, &mesh_component );
+
+        if ( i == 3 ) { // top plane
+            mesh_component.material.emissive = 1;
+        }
+
+        se_entity_h plane = se->create_entity ( &se_entity_params_m (
+            .debug_name = "plane",
+            .update = se_entity_update_m ( 
+                .components = { se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ) }
+            )
+        ) );
+
+        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_id_m, &mesh_component );
     }
 
     // light
-    se_entity_h light_entity;
     {
-        se_entity_h light = se->create_entity();
-        se->set_entity_name ( light, "light" );
-        se_entity_params_alloc_entity ( &allocator, light );
+        geometry_data_t geo = generate_sphere ( 1.f, 100, 100 );
+        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geometry_pipeline = geometry_pipeline_state,
+            .shadow_pipeline = shadow_pipeline_state,
+            .pos_buffer = gpu_data.pos_buffer,
+            .nor_buffer = gpu_data.nor_buffer,
+            .idx_buffer = gpu_data.idx_buffer,
+            .vertex_count = geo.vertex_count,
+            .index_count = geo.index_count,
+            .position = { 0, 1.45, 0 },
+            .material = viewapp_material_data_m (
+                .base_color = { 
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 250 / 255.f, 2.2 )
+                },
+                .ssr = true,
+                .roughness = 0.1,
+                .metalness = 0,
+                .emissive = 1,
+            )
+        );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
             .position = { 0, 1.45, 0 },
@@ -950,32 +1000,46 @@ static void viewapp_boot_scene_cornell_box ( void ) {
         );
         light_component.view = rv->create_view ( &view_params );
 
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_light_component_id_m, &light_component );
+        se_entity_h light = se->create_entity ( &se_entity_params_m (
+            .debug_name = "light",
+            .update = se_entity_update_m (
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_light_component_id_m,
+                        .streams = ( se_stream_update_m ( .data = &light_component ) )
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = ( se_stream_update_m ( .data = &mesh_component ) )
+                    )
+                }
+            )
+        ) );
+
+        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_light_component_id_m, &light_component );
     }
 
-    se->init_entities ( allocator.entities );
+    //se->init_entities ( allocator.entities );
 }
 
-#if 0
-static void viewapp_scene_setup_field ( void ) {
+#if 1
+static void viewapp_boot_scene_field ( void ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
     rv_i* rv = m_state->modules.rv;
 
-    xs_database_pipeline_h geometry_pipeline_state = xs->lookup_pipeline_state ( "geometry" );
-    xs_database_pipeline_h shadow_pipeline_state = xs->lookup_pipeline_state ( "shadow" );
+    xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
+    xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
 
     xg_device_h device = m_state->render.device;
 
     // plane
     {
-        se_entity_h entity = se->create_entity ( &se_entity_params_m() );
-
         geometry_data_t geo = generate_plane ( 100.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
-        viewapp_mesh_component_t* mesh_component = &m_state->components.mesh_components[0];
-        *mesh_component = viewapp_mesh_component_m (
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -993,20 +1057,27 @@ static void viewapp_scene_setup_field ( void ) {
                 .roughness = 0,
             ),          
         );
-        se->add_component ( entity, viewapp_mesh_component_id_m, ( se_component_h ) mesh_component );
+        //se->add_component ( entity, viewapp_mesh_component_id_m, ( se_component_h ) mesh_component );
+
+        se_entity_h entity = se->create_entity ( &se_entity_params_m(
+            .debug_name = "plane",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ) }
+            )            
+        ) );
     }
 
     float x = -50;
 
     // quads
     for ( uint32_t i = 0; i < 10; ++i ) {
-        se_entity_h entity = se->create_entity ( &se_entity_params_m() );
-
         geometry_data_t geo = generate_plane ( 10.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
-        viewapp_mesh_component_t* mesh_component = &m_state->components.mesh_components[i + 1];
-        *mesh_component = viewapp_mesh_component_m (
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1027,32 +1098,63 @@ static void viewapp_scene_setup_field ( void ) {
                 .roughness = 0.01,
             )
         );
-        se->add_component ( entity, viewapp_mesh_component_id_m, ( se_component_h ) mesh_component );
+
+        se_entity_h entity = se->create_entity ( &se_entity_params_m (
+            .debug_name = "quad",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ) }
+            )
+        ) );
 
         x += 20;
     }
 
     // lights
     {
-        se_entity_h entity = se->create_entity ( &se_entity_params_m() );
+        geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
+        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
-        viewapp_light_component_t* light_component = &m_state->components.light_components[0];
-        *light_component = viewapp_light_component_m(
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geometry_pipeline = geometry_pipeline_state,
+            .shadow_pipeline = shadow_pipeline_state,
+            .pos_buffer = gpu_data.pos_buffer,
+            .nor_buffer = gpu_data.nor_buffer,
+            .idx_buffer = gpu_data.idx_buffer,
+            .vertex_count = geo.vertex_count,
+            .index_count = geo.index_count,
+            .position = { 10, 10, -10 },
+            .material = viewapp_material_data_m (
+                .base_color = { 
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 250 / 255.f, 2.2 )
+                },
+                .ssr = true,
+                .roughness = 0.1,
+                .metalness = 0,
+                .emissive = 1,
+            )
+        );
+
+        viewapp_light_component_t light_component = viewapp_light_component_m(
             .position = { 10, 10, -10 },
             .intensity = 20,
             .color = { 1, 1, 1 },
             .shadow_casting = true,
         );
-        light_component->view = rv->create_view( &rv_view_params_m (
+        light_component.view = rv->create_view( &rv_view_params_m (
             .position = {
-                light_component->position[0],
-                light_component->position[1],
-                light_component->position[2],
+                light_component.position[0],
+                light_component.position[1],
+                light_component.position[2],
             },
             .focus_point = {
-                light_component->position[0],
-                light_component->position[1] - 1.f,
-                light_component->position[2],
+                light_component.position[0],
+                light_component.position[1] - 1.f,
+                light_component.position[2],
             },
             .proj_params = rv_projection_params_m ( 
                 .aspect_ratio = 1,
@@ -1061,29 +1163,67 @@ static void viewapp_scene_setup_field ( void ) {
                 .reverse_z = false,
             ),
         ) );
-        se->add_component ( entity, viewapp_light_component_id_m, ( se_component_h ) light_component );
+
+        se_entity_h entity = se->create_entity ( &se_entity_params_m ( 
+            .debug_name = "light",
+            .update = se_entity_update_m (
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_light_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &light_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    )
+                }
+            )
+        ) );
     }
 
     {
-        se_entity_h entity = se->create_entity ( &se_entity_params_m() );
+        geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
+        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
-        viewapp_light_component_t* light_component = &m_state->components.light_components[1];
-        *light_component = viewapp_light_component_m (
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geometry_pipeline = geometry_pipeline_state,
+            .shadow_pipeline = shadow_pipeline_state,
+            .pos_buffer = gpu_data.pos_buffer,
+            .nor_buffer = gpu_data.nor_buffer,
+            .idx_buffer = gpu_data.idx_buffer,
+            .vertex_count = geo.vertex_count,
+            .index_count = geo.index_count,
+            .position = { -10, 10, -10 },
+            .material = viewapp_material_data_m (
+                .base_color = { 
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 250 / 255.f, 2.2 )
+                },
+                .ssr = true,
+                .roughness = 0.1,
+                .metalness = 0,
+                .emissive = 1,
+            )
+        );
+
+        viewapp_light_component_t light_component = viewapp_light_component_m (
             .position = { -10, 10, -10 },
             .intensity = 20,
             .color = { 1, 1, 1 },
             .shadow_casting = true,
         );        
-        light_component->view = rv->create_view ( &rv_view_params_m (
+        light_component.view = rv->create_view ( &rv_view_params_m (
             .position = {
-                light_component->position[0],
-                light_component->position[1],
-                light_component->position[2],
+                light_component.position[0],
+                light_component.position[1],
+                light_component.position[2],
             },
             .focus_point = {
-                light_component->position[0],
-                light_component->position[1] - 1.f,
-                light_component->position[2],
+                light_component.position[0],
+                light_component.position[1] - 1.f,
+                light_component.position[2],
             },
             .proj_params = rv_projection_params_m (
                 .aspect_ratio = 1,
@@ -1092,7 +1232,23 @@ static void viewapp_scene_setup_field ( void ) {
                 .reverse_z = false,
             ),
         ) );
-        se->add_component ( entity, viewapp_light_component_id_m, ( se_component_h ) light_component );
+
+        se_entity_h entity = se->create_entity ( &se_entity_params_m ( 
+            .debug_name = "light",
+            .update = se_entity_update_m (
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_light_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &light_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    )
+                }
+            )
+        ) );
     }
 }
 #endif
@@ -1203,12 +1359,19 @@ static void viewapp_boot ( void ) {
 #endif
 
     se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 1,
-        .components = { se_component_layout_m (
-            .id = viewapp_light_component_id_m,
-            .stream_count = 1,
-            .streams = { sizeof ( viewapp_light_component_t ) }
-        ) }
+        .component_count = 2,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_light_component_id_m,
+                .stream_count = 1,
+                .streams = { sizeof ( viewapp_light_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_mesh_component_id_m,
+                .stream_count = 1,
+                .streams = { sizeof ( viewapp_mesh_component_t ) }
+            )
+        }
     ) );
 
     xs_i* xs = m_state->modules.xs;
@@ -1276,23 +1439,32 @@ static void viewapp_boot ( void ) {
         camera_component.view = rv->create_view ( &view_params );
 
         // camera
-        se_entity_h camera_entity = se->create_entity();
-        se->set_entity_name ( camera_entity, "camera" );
+        //se_entity_h camera_entity = se->create_entity();
+        //se->set_entity_name ( camera_entity, "camera" );
 
-        std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
-        se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-        se_entity_params_alloc_entity ( &allocator, camera_entity );
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_camera_component_id_m, &camera_component );
+        //std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
+        //se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
+        //se_entity_params_alloc_entity ( &allocator, camera_entity );
+        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_camera_component_id_m, &camera_component );
 
-        se->init_entities ( allocator.entities );
+        //se->init_entities ( allocator.entities );
+        se->create_entity ( &se_entity_params_m (
+            .debug_name = "camera",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m (
+                    .id = viewapp_camera_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &camera_component ) }
+                ) }
+            )
+        ) );
     }
 
-    viewapp_boot_scene_cornell_box();
-    //viewapp_boot_scene_field();
-    viewapp_boot_build_raytrace_world();
+    //viewapp_boot_scene_cornell_box();
+    viewapp_boot_scene_field();
+    //viewapp_boot_build_raytrace_world();
 
-    //viewapp_boot_raster_graph();
-    viewapp_boot_raytrace_graph();
+    viewapp_boot_raster_graph();
+    //viewapp_boot_raytrace_graph();
 }
 
 static void viewapp_update_cameras ( wm_input_state_t* input_state, wm_input_state_t* new_input_state ) {

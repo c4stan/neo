@@ -1,0 +1,14 @@
+include common.xsi
+
+compute_shader light_cluster_build.comp
+
+begin buffer
+    register 0
+    stage compute
+end
+
+begin buffer
+    register 1
+    stage compute
+    access write
+end

@@ -15,6 +15,7 @@ typedef struct {
     uint64_t pos_buffer;
     uint64_t nor_buffer;
     float albedo[3];
+    float emissive;
 } raytrace_shader_instance_t;
 
 #define MAX_LIGHTS_COUNT 32
@@ -117,6 +118,8 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
         instances[i].albedo[0] = mesh_component->material.base_color[0];
         instances[i].albedo[1] = mesh_component->material.base_color[1];
         instances[i].albedo[2] = mesh_component->material.base_color[2];
+
+        instances[i].emissive = mesh_component->material.emissive;
     }
 
     // Bind

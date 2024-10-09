@@ -4,15 +4,17 @@
 
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
-layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_history;
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_id;
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
 
-layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
-layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_linear;
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
+layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
+layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_history;
+layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_id;
 
-layout ( location = 0 ) out vec4 out_color;
+layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
+layout ( binding = 6, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_linear;
+
+layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 // https://alextardif.com/TAA.html
 // https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/
@@ -43,7 +45,7 @@ vec4 clip_aabb ( vec4 color, float p, vec3 minimum, vec3 maximum ) {
 }
 
 void main ( void ) {
-    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_cbuffer.resolution_f32 );
     vec2 texel_size = 1.0 / frame_cbuffer.resolution_f32;
 
     // Sample
@@ -110,5 +112,5 @@ void main ( void ) {
 
     // Blend
     vec3 blend = mix ( history, color, blend_factor );
-    out_color = vec4 ( blend, 1 );
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( blend, 1 ) );
 }

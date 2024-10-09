@@ -27,7 +27,7 @@ static inline void* se_component_iterator_next ( se_component_iterator_t* iterat
         if ( iterator->page == iterator->stream->page_count - 1 ) { 
             return NULL;
         } else {
-            iterator->page = 0;
+            iterator->page += 1;
             iterator->page_count = 0;
         }
     }
@@ -39,6 +39,7 @@ static inline void* se_component_iterator_next ( se_component_iterator_t* iterat
 
 // Entity params allocator
 
+#if 0
 typedef struct {
     std_virtual_stack_t* stack;
     se_entity_params_t* entities;
@@ -114,3 +115,4 @@ static inline void se_entity_params_alloc_monostream_component_inline ( se_entit
 }
 
 #define se_entity_params_alloc_monostream_component_inline_m( allocator, id, data ) se_entity_params_alloc_monostream_component_inline ( allocator, id, data, sizeof ( *data ) )
+#endif

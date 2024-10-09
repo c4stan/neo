@@ -337,7 +337,7 @@ static se_entity_h* se_entity_family_get_entity ( se_entity_family_t* family, ui
 static void* se_entity_family_get_component ( se_entity_family_t* family, uint32_t entity_idx, uint32_t component_id, uint8_t stream_id ) {
     std_assert_m ( component_id < se_max_component_types_m );
     uint8_t component_family_slot = family->component_slots[component_id];
-    std_assert_m ( component_family_slot < se_entity_max_components_per_entity_m );
+    std_assert_m ( component_family_slot < se_max_components_per_entity_m );
     se_entity_family_component_t* family_component = &family->components[component_family_slot];
     se_entity_family_stream_t* family_stream = &family_component->streams[stream_id];
 
@@ -359,56 +359,6 @@ static void* se_entity_family_get_component_stream_data ( se_entity_t* entity, s
     uint32_t page_sub_idx = idx % items_per_page;   
 
     return stream->pages[page_idx] + page_sub_idx * stride;
-}
-
-static const void* se_entity_update ( const se_entity_update_t* update ) {
-    //for ( uint64_t update_it = 0; update_it < update_count; ++update_it ) {
-    //se_entity_update_t* update = &updates[update_it];
-    se_entity_t* entity = &se_entity_state->entity_array[update->entity];
-    //se_entity_family_t* family = se_entity_family_get ( entity->mask );
-    se_entity_family_t* family = &se_entity_state->family_array[entity->family];
-
-    const se_component_update_t* component = update->components;
-    const void* ptr = component;
-
-    for ( uint32_t i = 0; i < update->component_count; ++i ) {
-        //const se_component_update_t* component = &update->components[i];
-        
-        uint32_t id = component->id;
-        std_assert_m ( id < se_max_component_types_m );
-
-        uint8_t family_slot = family->component_slots[id];
-        std_assert_m ( family_slot < se_entity_max_components_per_entity_m );
-        se_entity_family_component_t* family_component = &family->components[family_slot];
-
-        ptr += sizeof ( se_component_update_t );
-
-        for ( uint32_t j = 0; j < component->stream_count; ++j ) {
-            const se_component_stream_update_t* stream = &component->streams[j];
-            bool has_inline_data = stream->has_inline_data;
-            void* src_data_ptr = stream->data;
-
-            se_entity_family_stream_t* family_stream = &family_component->streams[stream->id];
-            void* dst_data = se_entity_family_get_component_stream_data ( entity, family_stream );
-            uint32_t stride = family_stream->stride;
-
-            if ( !has_inline_data ) {
-                if ( src_data_ptr ) {
-                    std_mem_copy ( dst_data, src_data_ptr, stride );
-                }
-                ptr += sizeof ( se_component_stream_update_t );
-            } else {
-                std_mem_copy ( dst_data, stream->inline_data, stride );
-                ptr += 8 + stride;
-            }
-        }
-
-        //ptr += sizeof ( se_component_update_t ) + component->stream_count * sizeof ( se_component_stream_update_t );
-        component = ( const se_component_update_t* ) ptr;
-    }
-
-    return ptr;
-    //}
 }
 
 void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t mask ) {
@@ -459,6 +409,7 @@ se_entity_h se_entity_reserve ( void ) {
     return  ( se_entity_h ) entity_idx;
 }
 
+#if 0
 se_entity_h se_entity_alloc ( se_component_mask_t mask ) {
     // make sure entity faimly exists
     //se_entity_family_t* family = se_entity_family_get ( mask );
@@ -481,9 +432,54 @@ se_entity_h se_entity_alloc ( se_component_mask_t mask ) {
     return entity_handle;
 }
 
-const char* se_entity_name ( se_entity_h entity_handle ) {
-    se_entity_name_t* name = &se_entity_state->entity_meta->names[entity_handle];
-    return name->string;
+static const void* se_entity_update ( const se_entity_update_t* update ) {
+    //for ( uint64_t update_it = 0; update_it < update_count; ++update_it ) {
+    //se_entity_update_t* update = &updates[update_it];
+    se_entity_t* entity = &se_entity_state->entity_array[update->entity];
+    //se_entity_family_t* family = se_entity_family_get ( entity->mask );
+    se_entity_family_t* family = &se_entity_state->family_array[entity->family];
+
+    const se_component_update_t* component = update->components;
+    const void* ptr = component;
+
+    for ( uint32_t i = 0; i < update->component_count; ++i ) {
+        //const se_component_update_t* component = &update->components[i];
+        
+        uint32_t id = component->id;
+        std_assert_m ( id < se_max_component_types_m );
+
+        uint8_t family_slot = family->component_slots[id];
+        std_assert_m ( family_slot < se_max_components_per_entity_m );
+        se_entity_family_component_t* family_component = &family->components[family_slot];
+
+        ptr += sizeof ( se_component_update_t );
+
+        for ( uint32_t j = 0; j < component->stream_count; ++j ) {
+            const se_component_stream_update_t* stream = &component->streams[j];
+            bool has_inline_data = stream->has_inline_data;
+            void* src_data_ptr = stream->data;
+
+            se_entity_family_stream_t* family_stream = &family_component->streams[stream->id];
+            void* dst_data = se_entity_family_get_component_stream_data ( entity, family_stream );
+            uint32_t stride = family_stream->stride;
+
+            if ( !has_inline_data ) {
+                if ( src_data_ptr ) {
+                    std_mem_copy ( dst_data, src_data_ptr, stride );
+                }
+                ptr += sizeof ( se_component_stream_update_t );
+            } else {
+                std_mem_copy ( dst_data, stream->inline_data, stride );
+                ptr += 8 + stride;
+            }
+        }
+
+        //ptr += sizeof ( se_component_update_t ) + component->stream_count * sizeof ( se_component_stream_update_t );
+        component = ( const se_component_update_t* ) ptr;
+    }
+
+    return ptr;
+    //}
 }
 
 void se_entity_create ( const se_entity_params_t* params ) {
@@ -495,6 +491,59 @@ void se_entity_create ( const se_entity_params_t* params ) {
         se_entity_alloc_components ( entity_update->entity, entity_update->mask );
         entity_update = ( se_entity_update_t* ) se_entity_update ( entity_update );
     }
+}
+
+#else
+
+void se_entity_update ( se_entity_h entity_handle,  const se_entity_update_t* update ) {
+    se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
+    se_entity_family_t* family = &se_entity_state->family_array[entity->family];
+    uint32_t family_idx = entity->idx;
+
+    for ( uint32_t i = 0; i < update->component_count; ++i ) {
+        const se_component_update_t* component = &update->components[i];
+        
+        uint32_t id = component->id;
+        std_assert_m ( id < se_max_component_types_m );
+
+        uint8_t family_slot = family->component_slots[id];
+        std_assert_m ( family_slot < se_max_components_per_entity_m );
+        se_entity_family_component_t* family_component = &family->components[family_slot];
+
+        for ( uint32_t j = 0; j < component->stream_count; ++j ) {
+            const se_stream_update_t* stream = &component->streams[j];
+
+            se_entity_family_stream_t* family_stream = &family_component->streams[stream->id];
+
+            uint32_t stride = family_stream->stride;
+            uint32_t items_per_page = family_stream->items_per_page;
+            uint32_t page_idx = family_idx / items_per_page;
+            uint32_t page_sub_idx = family_idx % items_per_page;
+
+            std_mem_copy ( family_stream->pages[page_idx] + page_sub_idx * stride, stream->data, stride );
+        }
+    }
+}
+
+se_entity_h se_entity_create_init ( const se_entity_params_t* params ) {
+    se_component_mask_t mask = {};
+    for ( uint32_t i = 0; i < params->update.component_count; ++i ) {
+        uint32_t id = params->update.components[i].id;
+        std_assert_m ( id < se_max_component_types_m );
+        std_bitset_set ( mask.u64, id );
+    }
+    se_entity_h entity = se_entity_reserve();
+    se_entity_alloc_components ( entity, mask );
+    se_entity_update ( entity, &params->update );
+    se_entity_set_name ( entity, params->debug_name );
+    return entity;
+}
+
+#endif
+
+const char* se_entity_name ( se_entity_h entity_handle ) {
+    se_entity_name_t* name = &se_entity_state->entity_meta->names[entity_handle];
+    return name->string;
 }
 
 void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count ) {

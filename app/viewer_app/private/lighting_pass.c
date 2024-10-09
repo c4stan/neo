@@ -156,7 +156,7 @@ xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_
         .user_args = std_buffer_m ( &args ),
         .debug_name = "lighting",
         .passthrough.enable = true,
-        .passthrough.render_targets = { xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_alias_m, .alias = color ) },
+        .passthrough.render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) },
     );
     xf_node_h lighting_node = xf->create_node ( graph, &params );
 

@@ -1781,7 +1781,7 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
             } else if ( std_str_cmp ( token, "constant" ) == 0 ) {
                 xs_parser_parse_constant ( context );
             } else {
-                std_log_error_m ( "Unknown token" );
+                std_log_error_m ( "Unknown token " std_fmt_str_m, token );
             }
         } else if ( std_str_cmp ( token, "compute_shader" ) == 0 ) {
             xs_parser_parse_shader ( context, xg_shading_stage_compute_m );

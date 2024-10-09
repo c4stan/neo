@@ -48,6 +48,7 @@ static void run_se_test_1 ( void ) {
     se_component_h c0 = 1;
     se_component_h c1 = 2;
 
+#if 0
     std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 16 );
     se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
 
@@ -56,6 +57,58 @@ static void run_se_test_1 ( void ) {
     se_entity_params_alloc_entity ( &allocator, entity );
     se_entity_params_alloc_monostream_component_inline ( &allocator, se_test_component_0_m, &c0, sizeof ( se_component_h ) );
     se_entity_params_alloc_monostream_component_inline ( &allocator, se_test_component_1_m, &c1, sizeof ( se_component_h ) );
+    
+    se->init_entities ( allocator.entities );
+#else
+    se_entity_h entity = se->create_entity ( &se_entity_params_m (
+        .debug_name = "entity",
+        .update = se_entity_update_m (
+            .component_count = 2,
+            .components = { 
+                se_component_update_m ( 
+                    .id = se_test_component_0_m,
+                    .streams = { se_stream_update_m (
+                        .data = &c0
+                    ) }
+                ),
+                se_component_update_m (
+                    .id = se_test_component_1_m,
+                    .streams = { se_stream_update_m (
+                        .data = &c1
+                    ) }
+                )
+            }
+        )
+    ) );
+#endif
+
+    /*
+    se_alloc_entity ( entity_params_m (
+        .component_count 2
+        .components = {
+            component_m (
+                .id = se_test_component_0_m,
+                .stream_count = 1,
+                .streams = {
+                    stream_m (
+                        .id = 0, 
+                        .data = &c0,
+                        .size = sizeof ( se_component_h )
+                    )    
+                }
+            ),
+            component_m (
+                .id = se_test_component_1_m,
+                .stream_count = 1,
+                .streams = { 
+                    .id = 0,
+                    .data = &c1,
+                    .size = sizeof ( se_component_h )
+                }
+            )
+        }
+    ) )
+    */
 
 #if 0
     se_entity_params_t entity_params = se_entity_params_m (
@@ -71,7 +124,6 @@ static void run_se_test_1 ( void ) {
     //std_bitset_set ( entity_params.mask.u64, se_test_component_1_m );
 #endif
 
-    se->init_entities ( allocator.entities );
 
     se_query_result_t query_result;
     se->query_entities ( &query_result, &se_query_params_m (
@@ -324,10 +376,11 @@ static void run_se_test_2 ( void ) {
 
 #define N (1024*4)
 
+    srand ( ( unsigned int ) std_tick_now() );
+
+#if 0
     std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 1024 );
     se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-
-    srand ( ( unsigned int ) std_tick_now() );
 
     for ( uint64_t i = 0; i < N; ++i ) {
         se_test_pass_component_t component_data;
@@ -344,6 +397,27 @@ static void run_se_test_2 ( void ) {
 
     se->init_entities ( allocator.entities );
     std_virtual_stack_destroy ( &stack );
+#else
+    for ( uint64_t i = 0; i < N; ++i ) {
+        se_test_pass_component_t component_data;
+        component_data.vertex_cbuffer_data.pos_x = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
+        component_data.vertex_cbuffer_data.pos_y = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
+        component_data.vertex_cbuffer_data.scale = 0.2f;
+        component_data.pipeline_state = pipeline_state;
+
+        se_entity_h entity = se->create_entity ( &se_entity_params_m (
+            .debug_name = "entity",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m ( 
+                    .id = se_test_pass_component_m, 
+                    .streams = { se_stream_update_m ( 
+                        .data = &component_data 
+                    ) } 
+                ) }
+            )
+        ) );
+    }    
+#endif
 
 #undef N
 

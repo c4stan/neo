@@ -1,3 +1,5 @@
+#include <xs.glsl>
+
 #define PI 3.1415f
 #define REVERSE_Z 1
 
@@ -31,6 +33,8 @@ layout ( binding = 0, set = xs_resource_binding_set_per_view_m ) uniform view_cb
 struct ray_payload_t {
     vec3 color;
     float distance;
+    vec3 normal;
+    float emissive;
 };
 
 struct shadow_ray_payload_t {
@@ -96,6 +100,16 @@ float proj_depth_diff ( float a, float b ) {
 //                             T R A N S F O R M   S P A C E S
 // ======================================================================================= //
 
+/*
+    model:      vbuffer pos.
+    world:      world_matrix * model. transform applied pos.
+    view:       view_matrix * world. camera is at origin.
+    proj/clip:  proj_matrix * view. pre w divide.
+    ndc:        post w divide proj pos.
+    screen/uv:  ndc remapped from [-1,1] to [0,1].
+    viewport:   screen remapped to pixel coordinates via viewport transform.
+*/
+
 // https://stackoverflow.com/questions/51108596/linearize-depth
 float linearize_depth ( float d ) {
     float z_near = view_cbuffer.z_near;
@@ -118,6 +132,10 @@ vec3 screen_from_view ( vec3 view ) {
     proj /= proj.w;
     vec3 screen = vec3 ( proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, proj.z );
     return screen;
+}
+
+vec3 view_from_screen ( vec3 screen ) {
+    return view_from_depth ( screen.xy, screen.z );
 }
 
 // https://mynameismjp.wordpress.com/the-museum/samples-tutorials-tools/motion-blur-sample/

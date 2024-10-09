@@ -643,9 +643,14 @@ void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h cmd_buffer_handle, uint32_
     cmd_args->workgroup_count_z = workgroup_count_z;
 }
 
+#include <vulkan/xg_vk_pipeline.h>
+
 void xg_cmd_buffer_compute_pipeline_state_bind ( xg_cmd_buffer_h cmd_buffer_handle, xg_graphics_pipeline_state_h pipeline, uint64_t key ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_compute_pipeline_state_bind_m, key, xg_cmd_compute_pipeline_state_bind_t );
+
+    const xg_vk_compute_pipeline_t* pipe = xg_vk_compute_pipeline_get ( pipeline );
+    std_unused_m ( pipe );
 
     cmd_args->pipeline = pipeline;
 }

@@ -113,7 +113,11 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
             info.pNext = NULL;
             info.flags = 0;
             info.maxSets = xg_vk_max_sets_per_descriptor_pool_m;
+#if xg_enable_raytracing_m
             info.poolSizeCount = xg_resource_binding_count_m;
+#else
+            info.poolSizeCount = xg_resource_binding_count_m - 1;
+#endif
             VkDescriptorPoolSize sizes[xg_resource_binding_count_m];
             sizes[xg_resource_binding_sampler_m].type = VK_DESCRIPTOR_TYPE_SAMPLER;
             sizes[xg_resource_binding_sampler_m].descriptorCount = xg_vk_max_samplers_per_descriptor_pool_m;
@@ -130,12 +134,14 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
             sizes[xg_resource_binding_buffer_texel_uniform_m].descriptorCount = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
             sizes[xg_resource_binding_buffer_texel_storage_m].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
             sizes[xg_resource_binding_buffer_texel_storage_m].descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
+#if xg_enable_raytracing_m
 #if xg_vk_enable_nv_raytracing_ext_m
             sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
 #else
             sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 #endif
             sizes[xg_resource_binding_raytrace_world_m].descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m;
+#endif
             info.pPoolSizes = sizes;
             VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &allocator->vk_desc_pool );
             xg_vk_assert_m ( result );
@@ -472,6 +478,7 @@ typedef struct {
     const xg_vk_compute_pipeline_t* compute_pipeline;
     const xg_vk_raytrace_pipeline_t* raytrace_pipeline;
     bool dirty_pipeline;
+    bool pipeline_type_change; // TODO make sure to properly handle this, avoid triggering on bound and unused pipelines, ...
 
     const xg_vk_graphics_renderpass_t* graphics_renderpass;
     bool dirty_renderpass;
@@ -703,7 +710,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
     }
 
     // Pipeline resources
-    for ( uint32_t set_it = 0; set_it < xg_resource_binding_set_count_m; ++set_it ) {
+    for ( xg_resource_binding_set_e set_it = 0; set_it < xg_resource_binding_set_count_m; ++set_it ) {
         xg_vk_descriptor_set_layout_h set_layout_handle = common_pipeline->descriptor_set_layouts[set_it];
         xg_vk_translation_resource_binding_set_cache_t* set = &state->sets[set_it];
 
@@ -718,7 +725,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
         }
 
         bool is_dirty = set->is_dirty;
-        bool is_active = set->is_active;
+        bool is_active = set->is_active && !state->pipeline_type_change;
         bool is_compatible = set->layout == set_layout_handle;
 
         // One of these 2 conditions needs to match for the resource binding to be executed
@@ -1008,6 +1015,8 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             vkCmdBindDescriptorSets ( vk_cmd_buffer, pipeline_type, common_pipeline->vk_layout_handle, set_it, 1, &vk_set, 0, NULL );
         }
     }
+
+    state->pipeline_type_change = false;
 }
 
 
@@ -1140,6 +1149,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
 
                 const xg_vk_graphics_pipeline_t* pipeline = xg_vk_graphics_pipeline_get ( args->pipeline );
 
+                state.pipeline_type_change = state.pipeline_type != xg_pipeline_graphics_m;
                 state.graphics_pipeline = pipeline;
                 state.dirty_pipeline = true;
                 state.pipeline_type = xg_pipeline_graphics_m;
@@ -1193,6 +1203,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
 
                 const xg_vk_compute_pipeline_t* pipeline = xg_vk_compute_pipeline_get ( args->pipeline );
 
+                state.pipeline_type_change = state.pipeline_type != xg_pipeline_compute_m;
                 state.compute_pipeline = pipeline;
                 state.dirty_pipeline = true;
                 state.pipeline_type = xg_pipeline_compute_m;

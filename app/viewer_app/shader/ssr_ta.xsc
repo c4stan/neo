@@ -1,0 +1,57 @@
+compute_shader ssr_ta.comp
+
+include common.xsi
+
+begin texture
+    stage compute
+    register 0
+    access write
+end
+
+// color
+begin texture
+    stage compute
+    register 1
+end
+
+// history
+begin texture
+    stage compute
+    register 2
+end
+
+// depth
+begin texture
+    stage compute
+    register 3
+end
+
+// prev depth
+begin texture
+    stage compute
+    register 4
+end
+
+// normal + roughness
+begin texture
+    stage compute
+    register 5
+end
+
+// object id
+begin texture
+    stage compute
+    register 6
+end
+
+// prev object id
+begin texture
+    stage compute
+    register 7
+end
+
+// point sampler
+begin sampler
+    stage compute
+    register 8
+end

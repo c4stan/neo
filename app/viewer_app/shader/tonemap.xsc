@@ -1,0 +1,19 @@
+include common.xsi
+
+compute_shader tonemap.comp
+
+begin texture
+    stage compute
+    register 0
+    access write
+end
+
+begin texture
+    stage compute
+    register 1
+end
+
+begin sampler
+    stage compute
+    register 2
+end

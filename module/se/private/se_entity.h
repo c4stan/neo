@@ -21,7 +21,7 @@ typedef struct {
 } se_entity_family_component_t;
 
 // for component_slots
-std_static_assert_m ( se_entity_max_components_per_entity_m < UINT8_MAX );
+std_static_assert_m ( se_max_components_per_entity_m < UINT8_MAX );
 
 typedef struct {
     //se_component_mask_t component_mask;
@@ -29,7 +29,7 @@ typedef struct {
     uint32_t component_count; // count of component types used by this entity family. set at family creation time.
     se_entity_family_stream_t entity_stream; // stores handles to the entities that own the components
     uint8_t component_slots[se_max_component_types_m]; // component type id -> idx in components array. TODO replace with hash_map?
-    se_entity_family_component_t components[se_entity_max_components_per_entity_m];
+    se_entity_family_component_t components[se_max_components_per_entity_m];
 } se_entity_family_t;
 
 #if 0
@@ -57,8 +57,8 @@ typedef struct {
 
 typedef struct {
     //se_component_mask_t mask;
-    uint32_t family;
-    uint32_t idx;
+    uint32_t family; // family idx
+    uint32_t idx; // entity idx in the family
 } se_entity_t;
 
 #define std_entity_family_bitset_block_count_m ( std_div_ceil_m(se_entity_max_families_m, 64) )
@@ -127,7 +127,10 @@ void se_entity_family_destroy ( se_component_mask_t mask );
 
 se_entity_h se_entity_reserve ( void );
 
-void se_entity_create ( const se_entity_params_t* params );
+void se_entity_update ( se_entity_h entity, const se_entity_update_t* update );
+se_entity_h se_entity_create_init ( const se_entity_params_t* params );
+
+//void se_entity_create ( const se_entity_params_t* params );
 void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count );
 
 void se_entity_query ( se_query_result_t* result, const se_query_params_t* params );

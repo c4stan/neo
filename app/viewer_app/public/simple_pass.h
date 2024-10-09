@@ -3,6 +3,40 @@
 #include <xf.h>
 #include <xs.h>
 
+// TODO move this into xf?
+
+#if 0
+typedef struct {
+    xs_database_pipeline_h pipeline;
+    uint32_t texture_writes_count;
+    xf_texture_h texture_writes[xf_node_max_shader_texture_writes_m];
+    uint32_t texture_reads_count;
+    xf_texture_h texture_reads[xf_node_max_shader_texture_reads_m];
+    uint32_t buffer_writes_count;
+    xf_buffer_h buffer_writes[xf_node_max_shader_buffer_writes_m];
+    uint32_t buffer_reads_count;
+    xf_buffer_h buffer_reads[xf_node_max_shader_buffer_reads_m];
+    uint32_t samplers_count;
+    xg_sampler_h samplers[xg_pipeline_resource_max_samplers_per_set_m];
+    std_buffer_t uniform_buffer;
+    uint32_t workgroup_count[3];
+    xf_node_passthrough_params_t passthrough;
+} simple_compute_pass_params_t;
+
+#define simple_compute_pass_params_m( ... ) ( simple_compute_pass_params_t ) { \
+    .pipeline = xs_null_handle_m, \
+    .texture_writes_count = 0, \
+    .texture_reads_count = 0, \
+    .buffer_writes_count = 0, \
+    .buffer_reads_count = 0, \
+    .samplers_count = 0, \
+    .uniform_buffer = std_buffer_m(), \
+    .workgroup_count = { 0, 0, 0 }, \
+    .passthrough = xf_node_passthrough_params_m(), \
+    ##__VA_ARGS__ \
+}
+#endif
+
 typedef struct {
     xs_database_pipeline_h pipeline;
     uint32_t render_targets_count;
@@ -19,7 +53,7 @@ typedef struct {
     .render_targets_count = 0, \
     .texture_reads_count = 0, \
     .samplers_count = 0, \
-    .passthrough = xf_node_default_passthrough_params_m, \
+    .passthrough = xf_node_passthrough_params_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -53,6 +87,8 @@ typedef struct {
     bool presentable;
     xf_texture_h source;
     xf_texture_h dest;
+    xg_texture_view_t source_view;
+    xg_texture_view_t dest_view;
 } simple_copy_pass_params_t;
 
 #define simple_copy_pass_params_m( ... ) ( simple_copy_pass_params_t ) { \
@@ -60,6 +96,8 @@ typedef struct {
     .presentable = false, \
     .source = xf_null_handle_m, \
     .dest = xf_null_handle_m, \
+    .source_view = xg_texture_view_m(), \
+    .dest_view = xg_texture_view_m(), \
     ##__VA_ARGS__ \
 }
 

@@ -14,6 +14,7 @@ static xg_vk_raytrace_state_t* xg_vk_raytrace_state;
 #define xg_vk_raytrace_world_bitset_u64_count_m     std_div_ceil_m ( xg_vk_raytrace_max_worlds_m, 64 )
 
 void xg_vk_raytrace_load ( xg_vk_raytrace_state_t* state ) {
+#if xg_enable_raytracing_m
     state->geometries_array = std_virtual_heap_alloc_array_m ( xg_vk_raytrace_geometry_t, xg_vk_raytrace_max_geometries_m );
     state->geometries_freelist = std_freelist_m ( state->geometries_array, xg_vk_raytrace_max_geometries_m );
     state->geometries_bitset = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_raytrace_geometry_bitset_u64_count_m );
@@ -25,13 +26,17 @@ void xg_vk_raytrace_load ( xg_vk_raytrace_state_t* state ) {
     std_mem_zero_array_m ( state->worlds_bitset, xg_vk_raytrace_world_bitset_u64_count_m );
 
     xg_vk_raytrace_state = state;
+#endif
 }
 
 void xg_vk_raytrace_reload ( xg_vk_raytrace_state_t* state ) {
+#if xg_enable_raytracing_m
     xg_vk_raytrace_state = state;
+#endif
 }
 
 void xg_vk_raytrace_unload ( void ) {
+#if xg_enable_raytracing_m
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, xg_vk_raytrace_state->worlds_bitset, idx, xg_vk_raytrace_world_bitset_u64_count_m ) ) {
         xg_vk_raytrace_world_t* world = &xg_vk_raytrace_state->worlds_array[idx];
@@ -60,6 +65,7 @@ void xg_vk_raytrace_unload ( void ) {
     std_virtual_heap_free ( xg_vk_raytrace_state->geometries_bitset );
     std_virtual_heap_free ( xg_vk_raytrace_state->worlds_array );
     std_virtual_heap_free ( xg_vk_raytrace_state->worlds_bitset );
+#endif
 }
 
 xg_raytrace_geometry_h xg_vk_raytrace_geometry_create ( const xg_raytrace_geometry_params_t* params ) {
@@ -465,5 +471,9 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
 }
 
 const xg_vk_raytrace_world_t* xg_vk_raytrace_world_get ( xg_raytrace_world_h world ) {
+#if xg_enable_raytracing_m
     return &xg_vk_raytrace_state->worlds_array[world];
+#else
+    return NULL;
+#endif
 }

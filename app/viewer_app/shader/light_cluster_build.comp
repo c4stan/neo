@@ -1,0 +1,75 @@
+#version 460
+
+#include "common.glsl"
+
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform_buffer_t {
+    uvec3 grid_size;
+} uniform_buffer;
+
+struct cluster_t {
+    vec4 min;
+    vec4 max;
+};
+
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer writeonly cluster_buffer_t {
+    cluster_t clusters[];
+} cluster_buffer;
+
+layout ( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
+
+// Intersect line passing by p0 and p1 with a front-facing plane at z distance
+vec3 intersect_line_z_plane ( vec3 p0, vec3 p1, float z ) {
+    vec3 n = vec3 ( 0, 0, 1 );
+    vec3 p01 = normalize ( p1 - p0 );
+    float t = ( z - dot ( n, p0 ) ) / dot ( n, p01 );
+    vec3 p2 = p0 + t * p01;
+    return p2;
+}
+
+void main ( void ) {
+    uint cluster_idx = gl_GlobalInvocationID.x;
+    uint cluster_count = uniform_buffer.grid_size.x * uniform_buffer.grid_size.y * uniform_buffer.grid_size.z;
+    if ( cluster_idx >= cluster_count ) {
+        return;
+    }
+
+#if 0
+    vec2 tile_size = frame_cbuffer.resolution_f32.xy / uniform_buffer.grid_size.xy;
+    
+    uvec3 cluster_3d_idx;
+    cluster_3d_idx.z = cluster_idx / ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y );
+    cluster_3d_idx.y = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) / uniform_buffer.grid_size.x;
+    cluster_3d_idx.z = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
+
+    vec2 tile_start = tile_size * cluster_3d_idx.xy;
+    vec2 tile_end = tile_size * ( cluster_3d_idx.xy + vec2 ( 1, 1 ) );
+
+    //uvec2 tile_start_px = round ( tile_start );
+    //uvec2 tile_end_px = round ( tile_end );
+#else
+    uvec3 cluster_3d_idx;
+    cluster_3d_idx.z = cluster_idx / ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y );
+    cluster_3d_idx.y = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) / uniform_buffer.grid_size.x;
+    cluster_3d_idx.z = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
+
+    vec2 screen_tile_start = cluster_3d_idx.xy / uniform_buffer.grid_size.xy;
+    vec2 screen_tile_end = ( cluster_3d_idx.xy + vec2 ( 1, 1 ) ) / uniform_buffer.grid_size.xy;
+
+    vec3 view_cluster_start = view_from_screen ( vec3 ( screen_tile_start, 1 ) );
+    vec3 view_cluster_end = view_from_screen ( vec3 ( screen_tile_end, 1 ) );
+    float view_cluster_near = view_cbuffer.z_near * pow ( view_cbuffer.z_far / view_cbuffer.z_near, cluster_3d_idx.z / uniform_buffer.grid_size.z );
+    float view_cluster_far = view_cbuffer.z_near * pow ( view_cbuffer.z_far / view_cbuffer.z_near, ( cluster_3d_idx.z + 1 ) / uniform_buffer.grid_size.z );
+
+    vec3 p0 = vec3 ( 0 );
+    vec3 view_cluster_start_near = intersect_line_z_plane ( p0, view_cluster_start, view_cluster_near );
+    vec3 view_cluster_start_far = intersect_line_z_plane ( p0, view_cluster_start, view_cluster_far );
+    vec3 view_cluster_end_near = intersect_line_z_plane ( p0, view_cluster_end, view_cluster_near );
+    vec3 view_cluster_end_far = intersect_line_z_plane ( p0, view_cluster_end, view_cluster_far );
+
+    vec3 aabb_min = min ( min ( view_cluster_start_near, view_cluster_start_far ), min ( view_cluster_end_near, view_cluster_end_far ) );
+    vec3 aabb_max = max ( max ( view_cluster_start_near, view_cluster_start_far ), max ( view_cluster_end_near, view_cluster_end_far ) );
+
+    cluster_buffer.clusters[cluster_idx].min = vec4 ( aabb_min, 0 );
+    cluster_buffer.clusters[cluster_idx].min = vec4 ( aabb_max, 0 );
+#endif
+}

@@ -1,17 +1,13 @@
 begin ray_gen 0
-    shader raygen.rgen
+    shader ray_gen.rgen
 end
 
 begin ray_miss 0
-    shader raymiss.rmiss
-end
-
-begin ray_miss 1
-    shader raymiss_shadow.rmiss
+    shader ray_miss.rmiss
 end
 
 begin ray_hit 0
-    hit_closest_shader rayhit.rchit
+    hit_closest_shader ray_hit.rchit
 end
 
 include common.xsi

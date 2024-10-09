@@ -32,6 +32,8 @@ typedef struct {
       also want to be part of the thread pool.
 */
 
+// TODO allow for specifying a CPU CCD/tag on workload dispatch? https://x.com/SebAaltonen/status/1842486240697786795
+
 typedef enum {
     tk_release_condition_user_request_m = 1 << 0,
     // Checked every time a task is completed. If the worker notices that there's no other active or pending

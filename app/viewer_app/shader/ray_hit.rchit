@@ -6,6 +6,8 @@
 
 #include <xs.glsl>
 
+#include "common.glsl"
+
 hitAttributeNV vec2 bary_uv;
 
 struct instance_t {
@@ -13,13 +15,13 @@ struct instance_t {
     uint64_t pos_buffer;
     uint64_t nor_buffer;
     float albedo[3];
+    float emissive;
 };
 
 layout ( buffer_reference, scalar ) buffer float3_buffer_t { float[3] data[]; };
 layout ( buffer_reference, scalar ) buffer uint3_buffer_t { uint[3] data[]; };
 
-layout ( location = 0 ) rayPayloadInNV vec4 payload;
-layout ( location = 1 ) rayPayloadNV bool is_shadowed;
+layout ( location = 0 ) rayPayloadInNV ray_payload_t ray_payload;
 
 layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform accelerationStructureNV scene;
 
@@ -81,51 +83,10 @@ void main ( void ) {
     world_normal = normalize ( world_normal );
 
     vec3 base_color = load_vec3 ( instance.albedo );
+    float emissive = instance.emissive;
 
-    vec3 irradiance = vec3 ( 0, 0, 0 );
-
-    uint i = 0;
-    for ( uint i = 0; i < draw_cbuffer.light_count; ++i ) {
-        vec3 world_light_pos = draw_cbuffer.lights[i].pos;
-        float light_emissive = draw_cbuffer.lights[i].emissive;
-        vec3 light_color = draw_cbuffer.lights[i].color;
-
-        vec3 world_light_dir = normalize ( world_light_pos - world_pos );
-        float nl = clamp ( dot ( world_light_dir, world_normal ), 0, 1 );
-        float d = distance ( world_pos, world_light_pos );
-
-        if ( dot ( world_light_dir, world_normal ) > 0 )
-        {
-            float tMin   = 0.001;
-            float tMax   = d;
-            vec3  origin = gl_WorldRayOriginNV + gl_WorldRayDirectionNV * gl_HitTNV;
-            vec3  rayDir = world_light_dir;
-            uint  flags  = gl_RayFlagsTerminateOnFirstHitNV | gl_RayFlagsOpaqueNV | gl_RayFlagsSkipClosestHitShaderNV;
-            is_shadowed  = true;
-            traceNV ( scene,        // acceleration structure
-                        flags,      // rayFlags
-                        0xFF,       // cullMask
-                        0,          // sbtRecordOffset
-                        0,          // sbtRecordStride
-                        1,          // missIndex
-                        origin,     // ray origin
-                        tMin,       // ray min range
-                        rayDir,     // ray direction
-                        tMax,       // ray max range
-                        1           // payload (location = 1)
-            );
-        }
-
-        float light_visibility = 1;
-
-        if ( is_shadowed ) {
-            light_visibility = 0.3;
-        }
-
-        irradiance += light_visibility * light_emissive * light_color * base_color * nl / ( d * d );
-    }
-
-    vec3 direct = irradiance;
-
-    payload = vec4 ( direct, 1.0 );
+    ray_payload.color = base_color;
+    ray_payload.distance = gl_HitTNV;
+    ray_payload.normal = world_normal;
+    ray_payload.emissive = emissive;
 }

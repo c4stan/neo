@@ -102,7 +102,7 @@ xf_node_h add_temporal_accumulation_pass ( xf_graph_h graph, xf_texture_h accumu
         .execute_routine = temporal_accumulation_pass,
         .user_args = std_buffer_m ( &args ),
         .passthrough.enable = true,
-        .passthrough.render_targets = { xf_node_render_target_passthrough_m ( .mode = xf_node_passthrough_mode_alias_m, .alias = color ) },
+        .passthrough.render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) },
     );
     std_str_copy_static_m ( params.debug_name, debug_name );
     xf_node_h temporal_accumulation_node = xf->create_node ( graph, &params );

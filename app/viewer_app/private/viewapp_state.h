@@ -78,10 +78,12 @@ typedef struct {
     bool ssr;
     float roughness;
     float metalness;
+    float emissive;
 } viewapp_material_data_t;
 
 #define viewapp_material_data_m( ... ) ( viewapp_material_data_t ) { \
     .base_color = { 1, 1, 1 }, \
+    .emissive = 0, \
     .ssr = false, \
     .roughness = 0.5, \
     .metalness = 0, \

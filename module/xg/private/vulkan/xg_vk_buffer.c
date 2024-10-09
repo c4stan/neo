@@ -177,6 +177,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     result = vkBindBufferMemory ( device->vk_handle, vk_buffer, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
     std_assert_m ( result == VK_SUCCESS );
 
+#if xg_enable_raytracing_m
     if ( params->allowed_usage & xg_buffer_usage_bit_shader_device_address_m ) {
         VkBufferDeviceAddressInfoKHR address_info = {
             .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
@@ -186,6 +187,9 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     } else {
         buffer->gpu_address = 0;
     }
+#else
+    buffer->gpu_address = 0;
+#endif
 
     buffer->vk_handle = vk_buffer;
     buffer->allocation = alloc;

@@ -58,34 +58,35 @@ static void blur_pass_routine ( const xf_node_execute_args_t* node_args, void* u
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
-    xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
-        .render_targets_count = 1,
-        .render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] ),
-    );
-    xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
+    //xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
+    //    .render_targets_count = 1,
+    //    .render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] ),
+    //);
+    //xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
 
-    xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
-    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
+    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
+    xg->cmd_set_compute_pipeline_state ( cmd_buffer, pipeline_state, key );
 
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
         .set = xg_resource_binding_set_per_draw_m,
-        .texture_count = 3,
+        .texture_count = 4,
         .sampler_count = 1,
         .buffer_count = 1,
         .textures = {
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_writes[0], 0 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 1 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 2 ),
+            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 3 ),
         },
         .samplers = {
             xg_sampler_resource_binding_m (
-                .shader_register = 3,
+                .shader_register = 4,
                 .sampler = pass_args->sampler,
             )
         },
         .buffers = {
             xg_buffer_resource_binding_m (
-                .shader_register = 4,
+                .shader_register = 5,
                 .type = xg_buffer_binding_type_uniform_m,
                 .range = xg->write_workload_uniform ( node_args->workload, &pass_args->draw_data, sizeof ( blur_draw_data_t ) ),
             )
@@ -94,13 +95,17 @@ static void blur_pass_routine ( const xf_node_execute_args_t* node_args, void* u
 
     xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
 
-    xg_viewport_state_t viewport = xg_viewport_state_m (
-        .width = pass_args->width,
-        .height = pass_args->height,
-    );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
+    //xg_viewport_state_t viewport = xg_viewport_state_m (
+    //    .width = pass_args->width,
+    //    .height = pass_args->height,
+    //);
+    //xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
 
-    xg->cmd_draw ( cmd_buffer, 3, 0, key );
+    //xg->cmd_draw ( cmd_buffer, 3, 0, key );
+
+    uint32_t workgroup_count_x = std_div_ceil_u32 ( pass_args->width, 8 );
+    uint32_t workgroup_count_y = std_div_ceil_u32 ( pass_args->height, 8 );
+    xg->cmd_dispatch_compute ( cmd_buffer, workgroup_count_x, workgroup_count_y, 1, key );
 }
 
 xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_texture_h color, xf_texture_h normals, xf_texture_h depth, uint32_t kernel_size, float sigma, blur_pass_direction_e direction, const char* debug_name ) {
@@ -159,8 +164,8 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
         .user_args_alloc_size = sizeof ( args ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { xf_node_render_target_passthrough_m (
-                    .mode = xf_node_passthrough_mode_alias_m,
+            .render_targets = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_alias_m,
                     .alias = color,
                 )
             },
@@ -168,18 +173,22 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
     ) );
 #endif
     xf_node_params_t params = xf_node_params_m (
-        .render_targets_count = 1,
-        .render_targets = { xf_render_target_dependency_m ( dst, xg_default_texture_view_m ) },
+        //.render_targets_count = 1,
+        //.render_targets = { xf_render_target_dependency_m ( dst, xg_default_texture_view_m ) },
         .shader_texture_reads_count = 3,
         .shader_texture_reads =  {
-            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_fragment_shader_m ),
-            xf_sampled_texture_dependency_m ( normals, xg_pipeline_stage_bit_fragment_shader_m ),
-            xf_sampled_texture_dependency_m ( depth, xg_pipeline_stage_bit_fragment_shader_m ),
+            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_compute_shader_m ),
+            xf_sampled_texture_dependency_m ( normals, xg_pipeline_stage_bit_compute_shader_m ),
+            xf_sampled_texture_dependency_m ( depth, xg_pipeline_stage_bit_compute_shader_m ),
+        },
+        .shader_texture_writes_count = 1,
+        .shader_texture_writes = {
+            xf_storage_texture_dependency_m ( dst, xg_default_texture_view_m, xg_pipeline_stage_bit_compute_shader_m )
         },
         .execute_routine = blur_pass_routine,
         .user_args = std_buffer_m ( &args ),
         .passthrough.enable = true,
-        .passthrough.render_targets[0] = { .mode = xf_node_passthrough_mode_alias_m, .alias = color }
+        .passthrough.render_targets[0] = { .mode = xf_passthrough_mode_alias_m, .alias = color }
     );
     std_str_copy_static_m ( params.debug_name, debug_name );
     xf_node_h blur_node = xf->create_node ( graph, &params );

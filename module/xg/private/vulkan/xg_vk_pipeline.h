@@ -2,6 +2,8 @@
 
 #include <xg.h>
 
+#include "xg_vk.h"
+
 #include <std_mutex.h>
 #include <std_hash.h>
 #include <std_allocator.h>
