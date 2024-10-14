@@ -502,6 +502,7 @@ static void xf_graph_build_texture ( xf_graph_t* graph, xf_texture_h texture_han
                 create_new = true;
 
                 if ( texture->xg_handle != xg_null_handle_m ) {
+                    std_assert_m ( false );
                     xg->cmd_destroy_texture ( resource_cmd_buffer, texture->xg_handle, xg_resource_cmd_buffer_time_workload_start_m );
                 }
             }

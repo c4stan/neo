@@ -426,6 +426,7 @@ typedef struct {
         xg_depth_stencil_clear_t depth_stencil;
     } clear;
     xg_texture_view_access_e view_access;
+    xg_texture_usage_bit_e usage;
 } xf_texture_params_t;
 
 #define xf_texture_params_m( ... ) ( xf_texture_params_t ) { \
@@ -441,6 +442,7 @@ typedef struct {
     .debug_name = {0}, \
     .clear_on_create = false, \
     .view_access = xg_texture_view_access_default_only_m, \
+    .usage = 0, \
     ##__VA_ARGS__ \
 }
 

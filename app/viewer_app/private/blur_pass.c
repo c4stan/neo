@@ -112,7 +112,7 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) }
         ),
     );
     std_str_copy_static_m ( params.debug_name, debug_name );

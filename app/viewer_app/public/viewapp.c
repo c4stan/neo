@@ -509,7 +509,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
-        .debug_name = "ssr_blur_y_texture",
+        .debug_name = "ssr_blur_x_texture",
     ) );
     xf_node_h ssr_blur_x_node = add_bilateral_blur_pass ( graph, ssr_blur_x_texture, ssr_raymarch_texture, normal_texture, depth_stencil_texture, 1, 5, blur_pass_direction_horizontal_m, "ssr_blur_x" );
 
