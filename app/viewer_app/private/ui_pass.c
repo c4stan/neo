@@ -67,14 +67,19 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
     };
 
     xf_node_params_t params = xf_node_params_m (
-        .render_targets_count = 1,
-        .render_targets = { xf_render_target_dependency_m ( color, xg_default_texture_view_m ) },
-        .execute_routine = ui_pass_routine,
         .debug_name = "ui",
         .debug_color = xg_debug_region_color_green_m,
-        .key_space_size = 128,
-        .user_args = std_buffer_m ( &args ),
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = ui_pass_routine,
+            .key_space_size = 128,
+            .user_args = std_buffer_m ( &args ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = color ) },
+        ),
     );
-    xf_node_h ui_node = xf->create_node ( graph, &params );
+    xf_node_h ui_node = xf->add_node ( graph, &params );
     return ui_node;
 }

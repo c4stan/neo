@@ -184,12 +184,12 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     texture->default_aspect = default_aspect;
 
     if ( flags & xg_texture_flag_bit_render_target_texture_m ) {
-        texture->params.allowed_usage |= xg_texture_usage_bit_resource_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_sampled_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_storage_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
     } else if ( flags & ( xg_texture_flag_bit_depth_texture_m | xg_texture_flag_bit_stencil_texture_m ) ) {
-        texture->params.allowed_usage |= xg_texture_usage_bit_resource_m;
+        texture->params.allowed_usage |= xg_texture_usage_bit_sampled_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
         texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
     }
@@ -291,7 +291,7 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     texture->vk_handle = vk_image;
     texture->allocation = alloc;
 
-    xg_texture_create_view ( &texture->default_view, texture_handle, xg_default_texture_view_m );
+    xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
 
     if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
         for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
@@ -393,7 +393,7 @@ xg_texture_h xg_vk_texture_register_swapchain_texture ( const xg_texture_params_
     texture->params = *params;
     texture->flags = xg_texture_flag_bit_swapchain_texture_m | xg_texture_flag_bit_render_target_texture_m;
     texture->state = xg_vk_texture_state_created_m; // TODO
-    xg_texture_create_view ( &texture->default_view, texture_handle, xg_default_texture_view_m );
+    xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
 
     return texture_handle;
 }
@@ -420,7 +420,7 @@ void xg_vk_texture_update_swapchain_texture ( xg_texture_h texture_handle, const
 
     texture->vk_handle = image;
     texture->params = *params;
-    xg_texture_create_view ( &texture->default_view, texture_handle, xg_default_texture_view_m );
+    xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
 }
 
 const xg_vk_texture_t* xg_vk_texture_get ( xg_texture_h texture_handle ) {
@@ -439,7 +439,7 @@ const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture_handle
             std_assert_m ( view.mip_count == 1 );
             view.mip_base = 0;
             view.mip_count = xg_texture_all_mips_m;
-            std_assert_m ( view.u64 == xg_default_texture_view_m.u64 );
+            std_assert_m ( view.u64 == ( xg_texture_view_m() ).u64 );
 
             return &texture->external_views.mips.array[mip_idx];
         } else {

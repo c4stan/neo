@@ -328,34 +328,31 @@ static void run_se_test_2 ( void ) {
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
     xf_graph_h graph = xf->create_graph ( device, swapchain );
-    {
-        xf_node_h clear_pass;
-        {
-            xf_node_params_t node_params = xf_node_params_m (
-                .copy_texture_writes_count = 1,
-                .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
-                .execute_routine = se_clear_pass,
-                .user_args = std_null_buffer_m,
-                .debug_name = "clear_pass",
-            );
+    
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { 0, 0, 1, 1 } ) ) }
+        ),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+        )
+    ) );
 
-            clear_pass = xf->create_node ( graph, &node_params );
-        }
-
-        xf_node_h test_pass;
-        {
-            xf_node_params_t node_params = xf_node_params_m (
-                .render_targets_count = 1,
-                .render_targets = { xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
-                .presentable_texture = swapchain_multi_texture,
-                .execute_routine = se_test_pass,
-                .user_args = std_null_buffer_m,
-                .debug_name = "se_pass",
-            );
-
-            test_pass = xf->create_node ( graph, &node_params );
-        }
-    }
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "se_pass",
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = se_test_pass,
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = swapchain_multi_texture ) },
+            .presentable_texture = swapchain_multi_texture,
+        ),
+    ) );
 
     se->create_entity_family ( &se_entity_family_params_m ( 
         .component_count = 1,
@@ -402,7 +399,7 @@ static void run_se_test_2 ( void ) {
         se_test_pass_component_t component_data;
         component_data.vertex_cbuffer_data.pos_x = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
         component_data.vertex_cbuffer_data.pos_y = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
-        component_data.vertex_cbuffer_data.scale = 0.2f;
+        component_data.vertex_cbuffer_data.scale = 0.05f;
         component_data.pipeline_state = pipeline_state;
 
         se_entity_h entity = se->create_entity ( &se_entity_params_m (

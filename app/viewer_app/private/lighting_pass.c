@@ -95,11 +95,11 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
         .set = xg_resource_binding_set_per_draw_m,
         .texture_count = 5,
         .textures = {
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[3], 3 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[4], 4 ),
+            xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ),
+            xf_shader_texture_binding_m ( node_args->io->sampled_textures[1], 1 ),
+            xf_shader_texture_binding_m ( node_args->io->sampled_textures[2], 2 ),
+            xf_shader_texture_binding_m ( node_args->io->sampled_textures[3], 3 ),
+            xf_shader_texture_binding_m ( node_args->io->sampled_textures[4], 4 ),
         },
         .sampler_count = 1,
         .samplers = { xg_sampler_resource_binding_m ( .sampler = args->sampler, .shader_register = 5 ) },
@@ -141,24 +141,30 @@ xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_
         .height = color_info.height,
     };
 
-    xf_node_params_t params = xf_node_params_m (
-        .render_targets_count = 1,
-        .render_targets = { xf_render_target_dependency_m ( target, xg_default_texture_view_m ) },
-        .shader_texture_reads_count = 5,
-        .shader_texture_reads = { 
-            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_fragment_shader_m ),
-            xf_sampled_texture_dependency_m ( normal, xg_pipeline_stage_bit_fragment_shader_m ),
-            xf_sampled_texture_dependency_m ( material, xg_pipeline_stage_bit_fragment_shader_m ),
-            xf_sampled_texture_dependency_m ( depth, xg_pipeline_stage_bit_fragment_shader_m ),
-            xf_sampled_texture_dependency_m ( shadows, xg_pipeline_stage_bit_fragment_shader_m ),
-        },
-        .execute_routine = lighting_pass,
-        .user_args = std_buffer_m ( &args ),
+    xf_node_h lighting_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
-        .passthrough.enable = true,
-        .passthrough.render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) },
-    );
-    xf_node_h lighting_node = xf->create_node ( graph, &params );
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = lighting_pass,
+            .user_args = std_buffer_m ( &args ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = target ) },
+            .sampled_textures_count = 5,
+            .sampled_textures = { 
+                xf_fragment_texture_dependency_m ( .texture = color ),
+                xf_fragment_texture_dependency_m ( .texture = normal ),
+                xf_fragment_texture_dependency_m ( .texture = material ),
+                xf_fragment_texture_dependency_m ( .texture = depth ),
+                xf_fragment_texture_dependency_m ( .texture = shadows ),
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) },
+        )
+    ) );
 
     return lighting_node;
 }

@@ -2,10 +2,9 @@ compute_shader bi_blur.comp
 
 include common.xsi
 
-begin texture
+begin buffer
     stage compute
     register 0
-    access write
 end
 
 begin texture
@@ -23,12 +22,14 @@ begin texture
     register 3
 end
 
-begin sampler
+begin texture
     stage compute
     register 4
+    access write
 end
 
-begin buffer
+begin sampler
     stage compute
     register 5
 end
+

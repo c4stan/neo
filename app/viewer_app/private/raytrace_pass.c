@@ -1,4 +1,4 @@
-#include <shadow_pass.h>
+#include <xf.h>
 
 #include <viewapp_state.h>
 
@@ -132,14 +132,14 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
         )},
         .texture_count = 1,
         .textures = {  
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_writes[0], 1 ),
+            xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[0], 1 ),
         },
         .buffer_count = 2,
         .buffers = {
             xg_buffer_resource_binding_m ( 
                 .shader_register = 2,
                 .type = xg_buffer_binding_type_storage_m,
-                .range = xg_buffer_range_m ( shader_instance_buffer, 0, shader_instance_buffer_size ),
+                .range = xg_buffer_range_m ( .handle = shader_instance_buffer, .offset = 0, .size = shader_instance_buffer_size ),
             ),
             xg_buffer_resource_binding_m ( 
                 .shader_register = 3,
@@ -175,15 +175,17 @@ xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target ) {
     };
 
     xf_node_params_t node_params = xf_node_params_m (
-        .shader_texture_writes_count = 1,
-        .shader_texture_writes = { xf_storage_texture_dependency_m ( target, xg_default_texture_view_m, xg_pipeline_stage_bit_raytrace_shader_m ) },
-        .execute_routine = raytrace_pass,
-        .user_args = std_buffer_m ( &args ),
         .debug_name = "raytrace",
-        .passthrough = {
-            .enable = false
-        }
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = raytrace_pass,
+            .user_args = std_buffer_m ( &args ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = target, .stage = xg_pipeline_stage_bit_raytrace_shader_m ) },
+        ),
     );
-    xf_node_h raytrace_node = xf->create_node ( graph, &node_params );
+    xf_node_h raytrace_node = xf->add_node ( graph, &node_params );
     return raytrace_node;
 }

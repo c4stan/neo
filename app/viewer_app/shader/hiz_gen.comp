@@ -4,16 +4,14 @@
 
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m, r32f ) uniform writeonly image2D img_color;
-
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
-
-layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
-
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
     vec2 src_resolution_f32;
     vec2 dst_resolution_f32;
 } draw_cbuffer;
+
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
+layout ( binding = 2, set = xs_resource_binding_set_per_draw_m, r32f ) uniform writeonly image2D img_color;
+layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 

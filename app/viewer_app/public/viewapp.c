@@ -10,17 +10,13 @@
 #include <sm_matrix.h>
 
 #include <geometry_pass.h>
-#include <downsample_pass.h>
 #include <lighting_pass.h>
 #include <hiz_pass.h>
 #include <ssgi_pass.h>
-#include <temporal_accumulation_pass.h>
 #include <blur_pass.h>
 #include <ssr_pass.h>
 #include <ui_pass.h>
 #include <shadow_pass.h>
-#include <depth_pass.h>
-#include <simple_pass.h>
 #include <raytrace_pass.h>
 
 #include <geometry.h>
@@ -156,77 +152,6 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 
 }
 
-// TODO move out into simple_pass
-typedef struct {
-    xg_sampler_filter_e filter;
-} copy_pass_args_t;
-
-static void copy_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    copy_pass_args_t* args = ( copy_pass_args_t* ) user_args;
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    {
-        xf_copy_texture_resource_t source = node_args->io->copy_texture_reads[0];
-        xf_copy_texture_resource_t dest = node_args->io->copy_texture_writes[0];
-
-        xg_texture_copy_params_t copy_params = xg_texture_copy_params_m (
-            .source = xf_copy_texture_resource_m ( node_args->io->copy_texture_reads[0] ),
-            .destination = xf_copy_texture_resource_m ( node_args->io->copy_texture_writes[0] ),
-            .filter = args ? args->filter : xg_sampler_filter_point_m,
-        );
-
-        xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
-    }
-}
-
-typedef struct {
-    xg_graphics_pipeline_state_h pipeline;
-    xg_sampler_h sampler;
-} combine_pass_args_t;
-
-static void combine_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    combine_pass_args_t* args = ( combine_pass_args_t* ) user_args;
-
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    {
-        xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
-            .render_targets_count = 1,
-            .render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] ),
-        );
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
-
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-    {
-        xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( args->pipeline );
-        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
-
-        xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_resource_binding_set_per_draw_m,
-            .texture_count = 3,
-            .textures = {
-                xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ),
-                xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 1 ),
-                xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 2 )
-            },
-            .sampler_count = 1,
-            .samplers = xg_sampler_resource_binding_m (
-                .shader_register = 3,
-                .sampler = args->sampler,
-            )
-        );
-
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-
-        xg->cmd_draw ( cmd_buffer, 3, 0, key );
-    }
-}
-
 // ---
 
 static void viewapp_boot_raytrace_graph ( void ) {
@@ -243,15 +168,21 @@ static void viewapp_boot_raytrace_graph ( void ) {
     m_state->render.graph = graph;
 
     // frame setup
-    xf_node_h frame_setup_node = xf->create_node ( graph, &xf_node_params_m (
-        .execute_routine = frame_setup_pass,
-        .debug_name = "frame_setup"
+    xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "frame_setup",
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = frame_setup_pass,
+        ),
     ) );
 
     // view setup
-    xf_node_h view_setup_node = xf->create_node ( graph, &xf_node_params_m (
-        .execute_routine = view_setup_pass,
+    xf_node_h view_setup_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "view_setup",
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = view_setup_pass,
+        )
     ) );
 
     xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m ( 
@@ -269,14 +200,16 @@ static void viewapp_boot_raytrace_graph ( void ) {
 
     // present
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
-    xf_node_h present_pass = xf->create_node ( graph, &xf_node_params_m (
-        .copy_texture_writes_count = 1,
-        .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
-        .copy_texture_reads_count = 1,
-        .copy_texture_reads = { xf_copy_texture_dependency_m ( color_texture, xg_default_texture_view_m ) },
-        .presentable_texture = swapchain_multi_texture,
-        .execute_routine = copy_pass,
+    xf_node_h present_pass = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
+        .type = xf_node_type_copy_pass_m,
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+            .copy_texture_reads_count = 1,
+            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+            .presentable_texture = swapchain_multi_texture,
+        )
     ) );
 
     xf->debug_print_graph ( graph );
@@ -296,9 +229,12 @@ static void viewapp_boot_raster_graph ( void ) {
     m_state->render.graph = graph;
 
     // frame setup
-    xf_node_h frame_setup_node = xf->create_node ( graph, &xf_node_params_m (
-        .execute_routine = frame_setup_pass,
-        .debug_name = "frame_setup"
+    xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "frame_setup",
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = frame_setup_pass,
+        ),
     ) );
 
     xf_texture_h shadow_texture = xf->declare_texture ( &xf_texture_params_m (
@@ -308,11 +244,19 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "shadow_texture"
     ) );
 
-    //xf_node_h shadow_clear_node = add_depth_clear_pass ( graph, shadow_texture, "shadow_clear" );
-    xf_node_h shadow_clear_node = add_simple_clear_pass ( graph, "shadow_clear", &simple_clear_pass_params_m ( 
-        .depth_stencil_textures_count = 1,
-        .depth_stencil_textures = { shadow_texture },
-        .depth_stencil_clears = { xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m ) }
+    xf_node_h shadow_clear_node = xf->add_node ( graph, &xf_node_params_m ( 
+        .debug_name = "shadow_clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = {
+            .textures = { xf_texture_clear_m ( 
+                .type = xf_texture_clear_type_depth_stencil_m,
+                .depth_stencil = xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m )
+            ) }
+        },
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = shadow_texture ) }
+        )
     ) );
 
     // shadows
@@ -320,9 +264,12 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h shadow_node = add_shadow_pass ( graph, shadow_texture );
 
     // view setup
-    xf_node_h view_setup_node = xf->create_node ( graph, &xf_node_params_m (
-        .execute_routine = view_setup_pass,
+    xf_node_h view_setup_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "view_setup",
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = view_setup_pass,
+        )
     ) );
 
     // gbuffer laydown
@@ -363,14 +310,26 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    //xf_node_h geometry_clear_node = add_geometry_clear_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );
-    xf_node_h geometry_clear_node = add_simple_clear_pass ( graph, "geometry_clear", &simple_clear_pass_params_m (
-        .color_textures_count = 3,
-        .color_textures = { color_texture, normal_texture, object_id_texture },
-        .color_clears = { xg_color_clear_m(), xg_color_clear_m(), xg_color_clear_m() },
-        .depth_stencil_textures_count = 1,
-        .depth_stencil_textures = { depth_stencil_texture },
-        .depth_stencil_clears = { xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m ) }
+    xf_node_h geometry_clear_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "geometry_clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { 
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .type = xf_texture_clear_type_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() )
+            }
+        ),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 4,
+            .copy_texture_writes = {
+                xf_copy_texture_dependency_m ( .texture = color_texture ),
+                xf_copy_texture_dependency_m ( .texture = normal_texture ),
+                xf_copy_texture_dependency_m ( .texture = object_id_texture ),
+                xf_copy_texture_dependency_m ( .texture = depth_stencil_texture ),
+            }
+        )
     ) );
 
     xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );
@@ -382,6 +341,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "lighting_texture",
     ) );
+
     // todo remove extra normal texture param
     xf_node_h lighting_node = add_lighting_pass ( graph, lighting_texture, color_texture, normal_texture, normal_texture, depth_stencil_texture, shadow_texture );
 
@@ -445,21 +405,29 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_texture_h prev_depth_stencil_texture = xf->get_multi_texture ( depth_stencil_texture, -1 );
     xg_texture_h ssgi_history_texture = xf->get_multi_texture ( ssgi_accumulation_texture, -1 );
-    xf_node_h ssgi_temporal_accumulation_node = add_simple_screen_pass ( graph, "ssgi_ta", &simple_screen_pass_params_m (
-        .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ),
-        .render_targets_count = 1,
-        .render_targets = { ssgi_accumulation_texture },
-        .texture_reads_count = 4,
-        .texture_reads = { ssgi_blur_y_texture, ssgi_history_texture, depth_stencil_texture, prev_depth_stencil_texture },
-        .samplers_count = 1,
-        .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+    xf_node_h ssgi_temporal_accumulation_node = xf->add_node ( graph, &xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .debug_name = "ssgi_ta",
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 4,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = ssgi_blur_y_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssgi_history_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = prev_depth_stencil_texture )
+            },
+        ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .shader_texture_writes = { xf_texture_passthrough_m (
-                    .mode = xf_passthrough_mode_alias_m,
-                    .alias = ssgi_blur_y_texture
-                )
-            }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = ssgi_blur_y_texture ) }
         )
     ) );
 
@@ -501,22 +469,30 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xg_texture_h ssgi_2_history_texture = xf->get_multi_texture ( ssgi_2_accumulation_texture, -1 );
-    xf_node_h ssgi_2_temporal_accumulation_node = add_simple_screen_pass ( graph, "ssgi_2_ta", &simple_screen_pass_params_m (
-        .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ),
-        .render_targets_count = 1,
-        .render_targets = { ssgi_2_accumulation_texture },
-        .texture_reads_count = 4,
-        .texture_reads = { ssgi_2_blur_y_texture, ssgi_2_history_texture, depth_stencil_texture, prev_depth_stencil_texture },
-        .samplers_count = 1,
-        .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+    xf_node_h ssgi_2_temporal_accumulation_node = xf->add_node ( graph, &xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .debug_name = "ssgi_2_ta",
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_2_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 4,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = ssgi_2_blur_y_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssgi_2_history_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = prev_depth_stencil_texture ) 
+            },
+        ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .shader_texture_writes = { xf_texture_passthrough_m (
-                    .mode = xf_passthrough_mode_alias_m,
-                    .alias = ssgi_2_blur_y_texture
-                )
-            }
-        )
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = ssgi_2_blur_y_texture ) }
+        ),
     ) );
 
     // ssr
@@ -555,22 +531,31 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xf_texture_h ssr_history_texture = xf->get_multi_texture ( ssr_accumulation_texture, -1 );
-    xf_node_h ssr_ta_node = add_simple_screen_pass ( graph, "ssr_ta", &simple_screen_pass_params_m (
-        .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ),
-        .render_targets_count = 1,
-        .render_targets = { ssr_accumulation_texture },
-        .texture_reads_count = 7,
-        .texture_reads = { ssr_blur_y_texture, ssr_history_texture, depth_stencil_texture, prev_depth_stencil_texture, normal_texture, object_id_texture, prev_object_id_texture },
-        .samplers_count = 1,
-        .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+    xf_node_h ssr_ta_node = xf->add_node ( graph, &xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .debug_name = "ssr_ta",
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ) ),
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssr_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 7,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = ssr_blur_y_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssr_history_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = prev_depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = normal_texture ), 
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ), 
+                xf_compute_texture_dependency_m ( .texture = prev_object_id_texture ) },
+        ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .shader_texture_writes = { 
-                xf_texture_passthrough_m (
-                    .mode = xf_passthrough_mode_alias_m,
-                    .alias = ssr_blur_y_texture,
-                )
-            }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = ssr_blur_y_texture, ) }
         )
     ) );
 
@@ -581,14 +566,26 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "combine_texture",
     ) );
-    xf_node_h combine_node = add_simple_screen_pass ( graph, "combine", &simple_screen_pass_params_m (
-        .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "combine" ) ),
-        .render_targets_count = 1,
-        .render_targets = { combine_texture },
-        .texture_reads_count = 4,
-        .texture_reads = { lighting_texture, ssr_accumulation_texture, ssgi_accumulation_texture, ssgi_2_accumulation_texture },
-        .samplers_count = 1,
-        .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+    xf_node_h combine_node = xf->add_node ( graph, &xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .debug_name = "combine",
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "combine" ) ) ),
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = combine_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 4,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = lighting_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssr_accumulation_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssgi_accumulation_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssgi_2_accumulation_texture ) 
+            },
+        ),
     ) );
 
     // taa
@@ -601,23 +598,35 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
-    xf_node_h taa_node = add_simple_screen_pass ( graph, "taa", &simple_screen_pass_params_m (
-        .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "taa" ) ),
-        .render_targets_count = 1,
-        .render_targets = { taa_accumulation_texture },
-        .texture_reads_count = 4,
-        .texture_reads = { combine_texture, depth_stencil_texture, taa_history_texture, object_id_texture },
-        .samplers_count = 2,
-        .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+    xf_node_h taa_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "taa",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "taa" ) ) ),
+            .samplers_count = 2,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = taa_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 4,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = combine_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = taa_history_texture ), 
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ) 
+            },
+        ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .shader_texture_writes = { xf_texture_passthrough_m (
+            .storage_texture_writes = { xf_texture_passthrough_m (
                     .mode = xf_passthrough_mode_alias_m,
                     .alias = combine_texture
                 )
             }
         )
-        ) );
+    ) );
     m_state->render.taa_node = taa_node;
 
     // tonemap
@@ -627,19 +636,26 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
         .debug_name = "tonemap_texture",
     ) );
-    xf_node_h tonemap_node = add_simple_screen_pass ( graph, "tonemap", &simple_screen_pass_params_m (
-        .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "tonemap" ) ),
-        .render_targets_count = 1,
-        .render_targets = { tonemap_texture },
-        .texture_reads_count = 1,
-        .texture_reads = { taa_accumulation_texture }, // taa_accumulation_texture
-        .samplers_count = 1,
-        .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+    xf_node_h tonemap_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "tonemap",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "tonemap" ) ) ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = tonemap_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 1,
+            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = taa_accumulation_texture ) }, // taa_accumulation_texture
+        ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .shader_texture_writes = { xf_texture_passthrough_m (
+            .storage_texture_writes = { xf_texture_passthrough_m (
                     .mode = xf_passthrough_mode_copy_m,
-                    .copy_source = xf_copy_texture_dependency_m ( taa_accumulation_texture, xg_default_texture_view_m ),
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = taa_accumulation_texture ),
                 )
             },
         ),
@@ -650,14 +666,16 @@ static void viewapp_boot_raster_graph ( void ) {
 
     // present
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
-    xf_node_h present_pass = xf->create_node ( graph, &xf_node_params_m (
-        .copy_texture_writes_count = 1,
-        .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
-        .copy_texture_reads_count = 1,
-        .copy_texture_reads = { xf_copy_texture_dependency_m ( tonemap_texture, xg_default_texture_view_m ) },
-        .presentable_texture = swapchain_multi_texture,
-        .execute_routine = copy_pass,
+    xf_node_h present_pass = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
+        .type = xf_node_type_copy_pass_m,
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+            .copy_texture_reads_count = 1,
+            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = tonemap_texture ) },
+            .presentable_texture = swapchain_multi_texture,
+        ),
     ) );
 
     xf->debug_print_graph ( graph );
@@ -808,14 +826,8 @@ static void viewapp_boot_scene_cornell_box ( void ) {
 
     xg_device_h device = m_state->render.device;
 
-    //std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
-    //se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-
     // sphere
     {
-        //se->set_entity_name ( sphere, "sphere" );
-        //se_entity_params_alloc_entity ( &allocator, sphere );
-        
         geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
@@ -849,8 +861,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 ) }
             )
         ) );
-        
-        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_id_m, &mesh_component );
     }
 
     // planes
@@ -887,10 +897,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
     };
 
     for ( uint32_t i = 0; i < 5; ++i ) {
-        //se_entity_h plane = se->create_entity();
-        //se->set_entity_name ( plane, "plane" );
-        //se_entity_params_alloc_entity ( &allocator, plane );
-
         geometry_data_t geo = generate_plane ( 5.f );
         geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
 
@@ -942,8 +948,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 ) }
             )
         ) );
-
-        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_mesh_component_id_m, &mesh_component );
     }
 
     // light
@@ -1016,11 +1020,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 }
             )
         ) );
-
-        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_light_component_id_m, &light_component );
     }
-
-    //se->init_entities ( allocator.entities );
 }
 
 #if 1
@@ -1057,7 +1057,6 @@ static void viewapp_boot_scene_field ( void ) {
                 .roughness = 0,
             ),          
         );
-        //se->add_component ( entity, viewapp_mesh_component_id_m, ( se_component_h ) mesh_component );
 
         se_entity_h entity = se->create_entity ( &se_entity_params_m(
             .debug_name = "plane",
@@ -1439,15 +1438,6 @@ static void viewapp_boot ( void ) {
         camera_component.view = rv->create_view ( &view_params );
 
         // camera
-        //se_entity_h camera_entity = se->create_entity();
-        //se->set_entity_name ( camera_entity, "camera" );
-
-        //std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 32 );
-        //se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-        //se_entity_params_alloc_entity ( &allocator, camera_entity );
-        //se_entity_params_alloc_monostream_component_inline_m ( &allocator, viewapp_camera_component_id_m, &camera_component );
-
-        //se->init_entities ( allocator.entities );
         se->create_entity ( &se_entity_params_m (
             .debug_name = "camera",
             .update = se_entity_update_m (
@@ -1459,8 +1449,8 @@ static void viewapp_boot ( void ) {
         ) );
     }
 
-    //viewapp_boot_scene_cornell_box();
-    viewapp_boot_scene_field();
+    viewapp_boot_scene_cornell_box();
+    //viewapp_boot_scene_field();
     //viewapp_boot_build_raytrace_world();
 
     viewapp_boot_raster_graph();

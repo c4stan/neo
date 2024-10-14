@@ -2,10 +2,10 @@ compute_shader hiz_gen.comp
 
 include common.xsi
 
-begin texture
+begin buffer
+    stage vertex
     stage compute
     register 0
-    access write
 end
 
 begin texture
@@ -13,13 +13,13 @@ begin texture
     register 1
 end
 
-begin sampler
+begin texture
     stage compute
     register 2
+    access write
 end
 
-begin buffer
-    stage vertex
+begin sampler
     stage compute
     register 3
 end

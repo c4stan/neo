@@ -5,7 +5,6 @@ include common.xsi
 begin texture
     stage compute
     register 0
-    access write
 end
 
 begin texture
@@ -26,6 +25,7 @@ end
 begin texture
     stage compute
     register 4
+    access write
 end
 
 begin sampler

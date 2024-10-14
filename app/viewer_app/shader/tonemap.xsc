@@ -5,12 +5,12 @@ compute_shader tonemap.comp
 begin texture
     stage compute
     register 0
-    access write
 end
 
 begin texture
     stage compute
     register 1
+    access write
 end
 
 begin sampler

@@ -156,13 +156,20 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
 
-    xf_node_params_t params = xf_node_params_m (
-        .depth_stencil_target = target,
-        .passthrough.enable = true,
-        .passthrough.render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
-        .execute_routine = shadow_pass_routine,
+    xf_node_h node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "shadows",
-    );
-    xf_node_h node = xf->create_node ( graph, &params );
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = shadow_pass_routine
+        ),
+        .resources = xf_node_resource_params_m (
+            .depth_stencil_target = target,
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) }
+        )
+    ) );
+
     return node;
 }

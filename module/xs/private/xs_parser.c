@@ -365,8 +365,8 @@ static xg_resource_binding_set_e xs_parser_resource_binding_set_to_enum ( const 
         return xg_resource_binding_set_per_frame_m;
     } else if ( std_str_cmp ( set, "per_view" ) == 0 || std_str_cmp ( set, "view" ) == 0 ) {
         return xg_resource_binding_set_per_view_m;
-    } else if ( std_str_cmp ( set, "per_material" ) == 0 || std_str_cmp ( set, "material" ) == 0 ) {
-        return xg_resource_binding_set_per_material_m;
+    } else if ( std_str_cmp ( set, "per_pass" ) == 0 || std_str_cmp ( set, "pass" ) == 0 ) {
+        return xg_resource_binding_set_per_pass_m;
     } else if ( std_str_cmp ( set, "per_draw" ) == 0 || std_str_cmp ( set, "draw" ) == 0 ) {
         return xg_resource_binding_set_per_draw_m;
     }

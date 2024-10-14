@@ -879,7 +879,6 @@ typedef union {
     .array_count = xg_texture_whole_array_m, \
     ##__VA_ARGS__ \
 }
-#define xg_default_texture_view_m ( xg_texture_view_m() )
 
 typedef struct {
     size_t slot;
@@ -916,7 +915,7 @@ typedef union {
 
 #define xg_color_clear_m( ... ) ( xg_color_clear_t ) { \
     .u32 = {0, 0, 0, 0}, \
-    __VA_ARGS__ \
+    ##__VA_ARGS__ \
 }
 
 typedef struct {
@@ -1020,11 +1019,10 @@ typedef enum {
 } xg_resource_binding_e;
 
 // TODO rename this to xg_resource_binding_update_frequency_e or xg_resource_binding_usage_e or xg_resource_binding_slot_e
-// TODO reduce the number of these? remove per_shader?
 typedef enum {
     xg_resource_binding_set_per_frame_m,
     xg_resource_binding_set_per_view_m,
-    xg_resource_binding_set_per_material_m,
+    xg_resource_binding_set_per_pass_m,
     xg_resource_binding_set_per_draw_m,
     xg_resource_binding_set_count_m,
     xg_resource_binding_set_invalid_m
@@ -1347,7 +1345,7 @@ typedef enum {
 typedef enum {
     xg_texture_usage_bit_copy_source_m      = 1 << 0,
     xg_texture_usage_bit_copy_dest_m        = 1 << 1,
-    xg_texture_usage_bit_resource_m         = 1 << 2,
+    xg_texture_usage_bit_sampled_m          = 1 << 2,
     xg_texture_usage_bit_storage_m          = 1 << 3,
     xg_texture_usage_bit_render_target_m    = 1 << 4,
     xg_texture_usage_bit_depth_stencil_m    = 1 << 5,
@@ -1553,14 +1551,14 @@ typedef struct {
     uint64_t size;
 } xg_buffer_range_t;
 
-#define xg_buffer_range_m( _handle, _offset, _size ) ( xg_buffer_range_t ) { \
-    .handle = _handle, \
-    .offset = _offset, \
-    .size = _size, \
+#define xg_buffer_range_m( ... ) ( xg_buffer_range_t ) { \
+    .handle = xg_null_handle_m, \
+    .offset = 0, \
+    .size = 0, \
+    ##__VA_ARGS__ \
 }
 
-#define xg_default_buffer_range_m xg_buffer_range_m(xg_null_handle_m, 0, xg_buffer_whole_size_m )
-#define xg_range_whole_buffer_m( handle ) xg_buffer_range_m ( handle, 0, xg_buffer_whole_size_m )
+#define xg_buffer_range_whole_buffer_m( _handle ) xg_buffer_range_m ( .handle = _handle, .offset = 0, .size = xg_buffer_whole_size_m )
 
 typedef enum {
     xg_resource_binding_id_shader_register_m,
@@ -2266,7 +2264,7 @@ typedef struct {
     //void                    ( *unmap_alloc )                        ( const xg_alloc_t* alloc );
 
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
-    xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size );
+    xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size ); // TODO take in a std_buffer_t ?
 
     void                    ( *wait_all_workload_complete )         ( void );
 

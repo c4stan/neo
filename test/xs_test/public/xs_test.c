@@ -107,7 +107,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
                 xg_texture_resource_binding_m (
                     .shader_register = 0,
                     .texture = temp_texture,
-                    .view = xg_default_texture_view_m,
+                    .view = xg_texture_view_m(),
                     .layout = xg_texture_layout_shader_write_m,
                 )
             }
@@ -178,7 +178,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
             .render_targets_count = 1,
             .render_targets[0].texture = swapchain_texture,
-            .render_targets[0].view = xg_default_texture_view_m,
+            .render_targets[0].view = xg_texture_view_m(),
             .depth_stencil.texture = xg_null_handle_m,
         );
         xg->cmd_set_render_textures ( cmd_buffer, &render_textures, 0 );

@@ -7,6 +7,7 @@ typedef struct {
     uint32_t particle_count;
 } rainfall_spawn_pass_data_t;
 
+#if 0
 static void rainfall_spawn_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
     uint64_t key = node_args->base_key;
@@ -47,7 +48,7 @@ xf_node_h add_particle_rainfall_spawn_pass ( xf_graph_h graph, xf_buffer_h parti
         &xf_node_params_m (
             .execute_routine = rainfall_spawn_pass,
             .shader_buffer_writes = {
-                xf_buffer_dependency_m ( .buffer = particles, .shading_stage = xg_shading_stage_compute_m )
+                xf_shader_buffer_dependency_m ( .buffer = particles, .shading_stage = xg_shading_stage_compute_m )
             },
         )
     );
@@ -64,3 +65,4 @@ void particle_rainfall_render_pass ( const xf_node_execute_args_t* node_args, vo
 xf_node_h add_particle_rainfall_render_pass ( xf_graph_h graph, xf_texture_h color, xf_buffer_h particles ) {
 
 }
+#endif

@@ -62,7 +62,7 @@ typedef struct xf_node_t {
     xf_node_params_t params;
     xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
     uint32_t edge_count;
-    void* user_args;
+    void* user_alloc;
     bool enabled;
     //tk_workload_h cpu_workload;
     xg_renderpass_h renderpass;

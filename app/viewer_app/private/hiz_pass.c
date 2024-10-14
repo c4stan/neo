@@ -5,8 +5,6 @@
 
 #include "viewapp_state.h"
 
-#include "simple_pass.h"
-
 typedef struct {
     float src_resolution_x_f32;
     float src_resolution_y_f32;
@@ -80,7 +78,7 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
         .set = xg_resource_binding_set_per_draw_m,
         .texture_count = 1,
-        .textures = { xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 0 ) },
+        .textures = { xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ) },
         .sampler_count = 1,
         .samplers = xg_sampler_resource_binding_m ( .sampler = pass_args->sampler, .shader_register = 1 ),
     );
@@ -97,45 +95,7 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
 }
 #endif
 
-static void hz_gen_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    hz_gen_pass_args_t* pass_args = ( hz_gen_pass_args_t* ) user_args;
-
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-
-    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
-    xg->cmd_set_compute_pipeline_state ( cmd_buffer, pipeline_state, key );
-
-    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_draw_m,
-        .texture_count = 2,
-        .sampler_count = 1,
-        .buffer_count = 1,
-        .textures = { 
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_writes[0], 0 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 1 ),
-        },
-        .samplers = { xg_sampler_resource_binding_m ( .sampler = pass_args->sampler, .shader_register = 2 ) },
-        .buffers = { xg_buffer_resource_binding_m ( 
-            .shader_register = 3,
-            .type = xg_buffer_binding_type_uniform_m,
-            .range = xg->write_workload_uniform ( node_args->workload, &pass_args->draw_data, sizeof ( hz_gen_draw_data_t ) ),
-        ) }
-    );
-
-    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-
-    uint32_t workgroup_count_x = std_div_ceil_u32 ( pass_args->width, 8 );
-    uint32_t workgroup_count_y = std_div_ceil_u32 ( pass_args->height, 8 );
-    xg->cmd_dispatch_compute ( cmd_buffer, workgroup_count_x, workgroup_count_y, 1, key );
-}
-
-#if 1
 xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture_h depth ) {
-#if 1
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
     xs_i* xs = state->modules.xs;
@@ -154,41 +114,23 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
         .width = hiz_info.width,
         .height = hiz_info.height,
     };
-
-    xf_node_params_t params = xf_node_params_m (
-        .render_targets_count = 1,
-        .render_targets = { xf_render_target_dependency_m ( hiz, xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ) },
-        .shader_texture_reads_count = 1,
-        .shader_texture_reads = { xf_shader_texture_dependency_m ( depth, xg_default_texture_view_m, xg_pipeline_stage_bit_fragment_shader_m ) },
-        .execute_routine = hz_gen_mip0_copy_pass,
-        .user_args = std_buffer_m ( &args ),
+;
+    xf_node_h hiz_mip0_gen_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "hiz_gen_mip0",
-    );
-    xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &params );
-    return hiz_mip0_gen_node;
-#else
-    xf_node_h copy_node = add_simple_copy_pass ( graph, "hiz-copy", &simple_copy_pass_params_m (
-        .source = depth,
-        .dest = hiz,
-        .dest_view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ),
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = hz_gen_mip0_copy_pass,
+            .user_args = std_buffer_m ( &args ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = hiz, .view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ) },
+            .sampled_textures_count = 1,
+            .sampled_textures = { xf_fragment_texture_dependency_m ( .texture = depth ) },
+        ),
     ) );
-    return copy_node;
-#endif
-}
-#else
-xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture_h depth ) {
-    xf_i* xf = std_module_get_m ( xf_module_name_m );
-
-    xf_node_params_t params = xf_default_node_params_m;
-    params.copy_texture_reads[params.copy_texture_reads_count++] = xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m );
-    params.copy_texture_writes[params.copy_texture_writes_count++] = xf_copy_texture_dependency_m ( hiz, xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) );
-    params.execute_routine = hz_gen_mip0_copy_pass;
-    std_str_copy_static_m ( params.debug_name, "hiz_gen_mip0" );
-    xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &params );
-
     return hiz_mip0_gen_node;
 }
-#endif
 
 xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t mip_level ) {
     viewapp_state_t* state = viewapp_state_get();
@@ -202,30 +144,42 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
     xf_graph_info_t graph_info;
     xf->get_graph_info ( &graph_info, graph );
 
-    hz_gen_pass_args_t args = {
-        .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "hiz_gen" ) ),
-        .sampler = xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ),
-        .draw_data.src_resolution_x_f32 = ( float ) ( hiz_info.width / ( 1 << ( mip_level - 1 ) ) ),
-        .draw_data.src_resolution_y_f32 = ( float ) ( hiz_info.height / ( 1 << ( mip_level - 1 ) ) ),
-        .draw_data.dst_resolution_x_f32 = ( float ) ( hiz_info.width / ( 1 << mip_level ) ),
-        .draw_data.dst_resolution_y_f32 = ( float ) ( hiz_info.height / ( 1 << mip_level ) ),
-        .width = hiz_info.width / ( 1 << mip_level ),
-        .height = hiz_info.height / ( 1 << mip_level ),
+    uint32_t dst_width = hiz_info.width / ( 1 << mip_level );
+    uint32_t dst_height = hiz_info.height / ( 1 << mip_level );
+
+    hz_gen_draw_data_t uniform_data = {
+        .src_resolution_x_f32 = ( float ) ( hiz_info.width / ( 1 << ( mip_level - 1 ) ) ),
+        .src_resolution_y_f32 = ( float ) ( hiz_info.height / ( 1 << ( mip_level - 1 ) ) ),
+        .dst_resolution_x_f32 = ( float ) ( hiz_info.width / ( 1 << mip_level ) ),
+        .dst_resolution_y_f32 = ( float ) ( hiz_info.height / ( 1 << mip_level ) ),
     };
 
+    xs_database_pipeline_h xs_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "hiz_gen" ) );
+    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( xs_pipeline );
+
     xf_node_params_t params = xf_node_params_m (
-        .shader_texture_reads_count = 1,
-        .shader_texture_reads = { 
-            xf_shader_texture_dependency_m ( hiz, xg_texture_view_m ( .mip_base = mip_level - 1, .mip_count = 1 ), xg_pipeline_stage_bit_compute_shader_m ),
-        },
-        .shader_texture_writes_count = 1,
-        .shader_texture_writes = {
-            xf_shader_texture_dependency_m ( hiz, xg_texture_view_m ( .mip_base = mip_level, .mip_count = 1 ), xg_pipeline_stage_bit_compute_shader_m ),
-        },
-        .execute_routine = hz_gen_pass,
-        .user_args = std_buffer_m ( &args ),
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = pipeline_state,
+            .workgroup_count = { std_div_ceil_u32 ( dst_width, 8 ), std_div_ceil_u32 ( dst_height, 8 ), 1 },
+            .uniform_data = std_buffer_m ( &uniform_data ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ) }
+        ),
+        .resources = xf_node_resource_params_m (
+            .sampled_textures_count = 1,
+            .sampled_textures = { 
+                xf_shader_texture_dependency_m ( .texture = hiz, .view = xg_texture_view_m ( .mip_base = mip_level - 1, .mip_count = 1 ), .stage = xg_pipeline_stage_bit_compute_shader_m ),
+            },
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = {
+                xf_shader_texture_dependency_m ( .texture = hiz, .view = xg_texture_view_m ( .mip_base = mip_level, .mip_count = 1 ), .stage = xg_pipeline_stage_bit_compute_shader_m ),
+            },
+        )
     );
     std_str_format_m ( params.debug_name, "hiz_gen_mip" std_fmt_u32_m, mip_level );
-    xf_node_h hiz_submip_gen_node = xf->create_node ( graph, &params );
+
+    xf_node_h hiz_submip_gen_node = xf->add_node ( graph, &params );
+
     return hiz_submip_gen_node;
 }

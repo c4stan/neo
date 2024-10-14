@@ -9,52 +9,6 @@
 
 #include <viewapp_state.h>
 
-static void clear_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    std_unused_m ( user_args );
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    {
-        xf_copy_texture_resource_t depth_stencil = node_args->io->copy_texture_writes[0];
-        xg_depth_stencil_clear_t ds_clear;
-        ds_clear.depth = 1;
-        ds_clear.stencil = 0;
-        xg->cmd_clear_depth_stencil_texture ( cmd_buffer, depth_stencil.texture, ds_clear, key );
-    }
-
-    {
-        xf_copy_texture_resource_t color_target = node_args->io->copy_texture_writes[1];
-        xg_color_clear_t color_clear;
-        color_clear.f32[0] = 0;
-        color_clear.f32[1] = 0;
-        color_clear.f32[2] = 0;
-        color_clear.f32[3] = 0;
-        xg->cmd_clear_texture ( cmd_buffer, color_target.texture, color_clear, key );
-    }
-
-    {
-        xf_copy_texture_resource_t normal_target = node_args->io->copy_texture_writes[2];
-        xg_color_clear_t normal_clear;
-        normal_clear.f32[0] = 0;
-        normal_clear.f32[1] = 0;
-        normal_clear.f32[2] = 0;
-        normal_clear.f32[3] = 0;
-        xg->cmd_clear_texture ( cmd_buffer, normal_target.texture, normal_clear, key );
-    }
-
-    {
-        xf_copy_texture_resource_t material_target = node_args->io->copy_texture_writes[3];
-        xg_color_clear_t material_clear;
-        material_clear.u32[0] = 0;
-        material_clear.u32[1] = 0;
-        material_clear.u32[2] = 0;
-        material_clear.u32[3] = 0;
-        xg->cmd_clear_texture ( cmd_buffer, material_target.texture, material_clear, key );
-    }
-}
-
 typedef struct {
     sm_mat_4x4f_t world;
 } draw_cbuffer_vs_t;
@@ -193,24 +147,6 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
     }
 }
 
-xf_node_h add_geometry_clear_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth ) {
-    xf_i* xf = std_module_get_m ( xf_module_name_m );
-
-    xf_node_params_t node_params = xf_node_params_m (
-        .copy_texture_writes_count = 4,
-        .copy_texture_writes = { 
-            xf_copy_texture_dependency_m ( depth, xg_default_texture_view_m ),
-            xf_copy_texture_dependency_m ( color, xg_default_texture_view_m ),
-            xf_copy_texture_dependency_m ( normal, xg_default_texture_view_m ),
-            xf_copy_texture_dependency_m ( material, xg_default_texture_view_m ),
-        },
-        .execute_routine = clear_pass,
-        .debug_name = "geometry_clear",
-    );
-    xf_node_h clear_node = xf->create_node ( graph, &node_params );
-    return clear_node;
-}
-
 xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth ) {
     xf_i* xf = std_module_get_m ( xf_module_name_m );
 
@@ -222,24 +158,31 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
         .height = color_info.height,
     };
 
-    xf_node_params_t node_params = xf_node_params_m (
-        .render_targets_count = 3,
-        .render_targets = {
-            xf_render_target_dependency_m ( color, xg_default_texture_view_m ),
-            xf_render_target_dependency_m ( normal, xg_default_texture_view_m ),
-            xf_render_target_dependency_m ( material, xg_default_texture_view_m ),
-        },
-        .depth_stencil_target = depth,
-        .execute_routine = geometry_pass,
-        .user_args = std_buffer_m ( &pass_args ),
+    xf_node_h node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "geometry",
-        .passthrough.enable = true,
-        .passthrough.render_targets = {
-            xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
-            xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
-            xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
-        }
-    );
-    xf_node_h node = xf->create_node ( graph, &node_params );
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = geometry_pass,
+            .user_args = std_buffer_m ( &pass_args ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 3,
+            .render_targets = {
+                xf_render_target_dependency_m ( .texture = color ),
+                xf_render_target_dependency_m ( .texture = normal ),
+                xf_render_target_dependency_m ( .texture = material ),
+            },
+            .depth_stencil_target = depth,
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .render_targets = {
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_ignore_m ),
+            }
+        )
+    ) );
+
     return node;
 }

@@ -2,52 +2,52 @@ compute_shader ssr_ta.comp
 
 include common.xsi
 
-begin texture
-    stage compute
-    register 0
-    access write
-end
-
 // color
 begin texture
     stage compute
-    register 1
+    register 0
 end
 
 // history
 begin texture
     stage compute
-    register 2
+    register 1
 end
 
 // depth
 begin texture
     stage compute
-    register 3
+    register 2
 end
 
 // prev depth
 begin texture
     stage compute
-    register 4
+    register 3
 end
 
 // normal + roughness
 begin texture
     stage compute
-    register 5
+    register 4
 end
 
 // object id
 begin texture
     stage compute
-    register 6
+    register 5
 end
 
 // prev object id
 begin texture
     stage compute
+    register 6
+end
+
+begin texture
+    stage compute
     register 7
+    access write
 end
 
 // point sampler

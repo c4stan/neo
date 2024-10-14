@@ -2,34 +2,34 @@ compute_shader ta.comp
 
 include common.xsi
 
-begin texture
-    stage compute
-    register 0
-    access write
-end
-
 // color
 begin texture
     stage compute
-    register 1
+    register 0
 end
 
 // history
 begin texture
     stage compute
-    register 2
+    register 1
 end
 
 // depth
 begin texture
     stage compute
-    register 3
+    register 2
 end
 
 // prev depth
 begin texture
     stage compute
+    register 3
+end
+
+begin texture
+    stage compute
     register 4
+    access write
 end
 
 // point sampler

@@ -4,12 +4,12 @@
 
 #include "common.glsl"
 
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 0, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_color;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture2D tex_history;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_depth;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_id;
 
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform texture2D tex_color;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 2 ) uniform texture2D tex_history;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 3 ) uniform texture2D tex_depth;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 4 ) uniform texture2D tex_id;
+layout ( set = xs_resource_binding_set_per_draw_m, binding = 4, r11f_g11f_b10f ) uniform writeonly image2D img_color;
 
 layout ( set = xs_resource_binding_set_per_draw_m, binding = 5 ) uniform sampler sampler_point;
 

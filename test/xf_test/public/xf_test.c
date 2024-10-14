@@ -10,6 +10,7 @@
 
 std_warnings_ignore_m ( "-Wunused-function" )
 
+#if 0
 static void xf_clear_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     std_unused_m ( user_args );
     xg_texture_h texture = node_args->io->copy_texture_writes[0].texture;
@@ -30,6 +31,7 @@ static void xf_clear_pass ( const xf_node_execute_args_t* node_args, void* user_
         xg->cmd_clear_texture ( cmd_buffer, texture, color_clear, key++ );
     }
 }
+#endif
 
 typedef struct {
     xs_database_pipeline_h pipeline_state;
@@ -71,6 +73,7 @@ static void xf_triangle_pass ( const xf_node_execute_args_t* node_args, void* us
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
 }
 
+#if 0
 static void copy_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     std_unused_m ( user_args );
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
@@ -87,6 +90,7 @@ static void copy_pass ( const xf_node_execute_args_t* node_args, void* user_args
         xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
     }
 }
+#endif
 
 static void xf_test ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
@@ -150,49 +154,46 @@ static void xf_test ( void ) {
         color_texture = xf->declare_texture ( &color_texture_params );
     }
 
-    xf_node_h clear_pass;
-    {
-        xf_node_params_t node_params = xf_node_params_m (
+    xf->add_node ( graph, &xf_node_params_m ( 
+        .debug_name = "clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { 0, 0, 1, 1 } ) ) }
+        ),
+        .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
-            .copy_texture_writes = { xf_copy_texture_dependency_m ( color_texture, xg_texture_view_m() ) },
-            .execute_routine = xf_clear_pass,
-            .debug_name = "clear",
-            .debug_color = xg_debug_region_color_red_m,
-        );
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+        ),
+    ) );
 
-        clear_pass = xf->create_node ( graph, &node_params );
-    }
-
-    xf_node_h triangle_pass;
     xf_triangle_pass_args_t triangle_pass_args;
     triangle_pass_args.pipeline_state = pipeline_state;
-    {
-        xf_node_params_t node_params = xf_node_params_m (
-            .render_targets_count = 1,
-            .render_targets = { xf_render_target_dependency_m ( color_texture, xg_texture_view_m() ) },
-            .execute_routine = xf_triangle_pass,
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "triangle",
+        .debug_color = xg_debug_region_color_green_m,
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = xf_triangle_pass,
             .user_args = std_buffer_m ( &triangle_pass_args ),
-            .debug_name = "triangle",
-            .debug_color = xg_debug_region_color_green_m,
-        );
-
-        triangle_pass = xf->create_node ( graph, &node_params );
-    }
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = color_texture ) },            
+        ),
+    ) );
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
-    xf_node_h present_pass;
-    {
-        xf_node_params_t node_params = xf_node_params_m (
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "present",
+        .type = xf_node_type_copy_pass_m,
+        .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
-            .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
             .copy_texture_reads_count = 1,
-            .copy_texture_reads = { xf_copy_texture_dependency_m ( color_texture, xg_default_texture_view_m ) },
+            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
             .presentable_texture = swapchain_multi_texture,
-            .execute_routine = copy_pass,
-            .debug_name = "present",
-        );
-        present_pass = xf->create_node ( graph, &node_params );
-    }
+        ),
+    ) );
 
     xf->debug_print_graph ( graph );
 

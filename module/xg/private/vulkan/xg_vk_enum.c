@@ -418,7 +418,7 @@ VkImageUsageFlags xg_image_usage_to_vk ( xg_texture_usage_bit_e usage ) {
         flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     }
 
-    if ( usage & xg_texture_usage_bit_resource_m ) {
+    if ( usage & xg_texture_usage_bit_sampled_m ) {
         flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 

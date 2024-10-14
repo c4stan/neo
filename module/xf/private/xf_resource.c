@@ -243,7 +243,6 @@ void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usa
 }
 
 void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_bit_e usage ) {
-
     if ( xf_resource_buffer_is_multi ( buffer_handle ) ) {
         xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[buffer_handle & 0xffff];
 
@@ -307,7 +306,7 @@ void xf_resource_texture_set_execution_state ( xf_texture_h texture_handle, xg_t
     } else if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count;
 
-        if ( view.u64 == xg_default_texture_view_m.u64 ) {
+        if ( view.u64 == xg_texture_view_m().u64 ) {
             mip_count = texture->params.mip_levels - view.mip_base;
         } else {
             mip_count = view.mip_count;
@@ -329,7 +328,7 @@ void xf_resource_texture_set_execution_layout ( xf_texture_h texture_handle, xg_
     } else if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count;
 
-        if ( view.u64 == xg_default_texture_view_m.u64 ) {
+        if ( view.u64 == xg_texture_view_m().u64 ) {
             mip_count = texture->params.mip_levels - view.mip_base;
         } else {
             mip_count = view.mip_count;
@@ -351,7 +350,7 @@ void xf_resource_texture_add_execution_stage ( xf_texture_h texture_handle, xg_t
     } else if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count;
 
-        if ( view.u64 == xg_default_texture_view_m.u64 ) {
+        if ( view.u64 == xg_texture_view_m().u64 ) {
             mip_count = texture->params.mip_levels - view.mip_base;
         } else {
             mip_count = view.mip_count;
@@ -417,18 +416,19 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     xg_swapchain_info_t info;
     std_verify_m ( xg->get_swapchain_info ( &info, swapchain ) );
 
-    xf_multi_texture_params_t params = xf_default_multi_texture_params_m;
-    params.texture.width = info.width;
-    params.texture.height = info.height;
-    params.texture.depth = 1;
-    params.texture.mip_levels = 1;
-    params.texture.array_layers = 1;
-    params.texture.dimension = xg_texture_dimension_2d_m;
-    params.texture.format = info.format;
-    params.texture.samples_per_pixel = xg_sample_count_1_m;
-    params.texture.allow_aliasing = false;
-    params.texture.view_access = xg_texture_view_access_default_only_m;
-    params.multi_texture_count = ( uint32_t ) info.texture_count;
+    xf_multi_texture_params_t params = xf_multi_texture_params_m (
+        .texture.width = info.width,
+        .texture.height = info.height,
+        .texture.depth = 1,
+        .texture.mip_levels = 1,
+        .texture.array_layers = 1,
+        .texture.dimension = xg_texture_dimension_2d_m,
+        .texture.format = info.format,
+        .texture.samples_per_pixel = xg_sample_count_1_m,
+        .texture.allow_aliasing = false,
+        .texture.view_access = xg_texture_view_access_default_only_m,
+        .multi_texture_count = ( uint32_t ) info.texture_count,
+    );
     std_str_copy_static_m ( params.texture.debug_name, info.debug_name );
 
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );

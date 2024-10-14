@@ -49,65 +49,6 @@ static void generate_blur_kernel ( float* buffer, uint32_t size, float sigma ) {
     }
 }
 
-static void blur_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    blur_pass_args_t* pass_args = ( blur_pass_args_t* ) user_args;
-
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-
-    //xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
-    //    .render_targets_count = 1,
-    //    .render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] ),
-    //);
-    //xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-
-    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
-    xg->cmd_set_compute_pipeline_state ( cmd_buffer, pipeline_state, key );
-
-    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_draw_m,
-        .texture_count = 4,
-        .sampler_count = 1,
-        .buffer_count = 1,
-        .textures = {
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_writes[0], 0 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[0], 1 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[1], 2 ),
-            xf_shader_texture_binding_m ( node_args->io->shader_texture_reads[2], 3 ),
-        },
-        .samplers = {
-            xg_sampler_resource_binding_m (
-                .shader_register = 4,
-                .sampler = pass_args->sampler,
-            )
-        },
-        .buffers = {
-            xg_buffer_resource_binding_m (
-                .shader_register = 5,
-                .type = xg_buffer_binding_type_uniform_m,
-                .range = xg->write_workload_uniform ( node_args->workload, &pass_args->draw_data, sizeof ( blur_draw_data_t ) ),
-            )
-        },
-    );
-
-    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-
-    //xg_viewport_state_t viewport = xg_viewport_state_m (
-    //    .width = pass_args->width,
-    //    .height = pass_args->height,
-    //);
-    //xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
-
-    //xg->cmd_draw ( cmd_buffer, 3, 0, key );
-
-    uint32_t workgroup_count_x = std_div_ceil_u32 ( pass_args->width, 8 );
-    uint32_t workgroup_count_y = std_div_ceil_u32 ( pass_args->height, 8 );
-    xg->cmd_dispatch_compute ( cmd_buffer, workgroup_count_x, workgroup_count_y, 1, key );
-}
-
 xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_texture_h color, xf_texture_h normals, xf_texture_h depth, uint32_t kernel_size, float sigma, blur_pass_direction_e direction, const char* debug_name ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;;
@@ -127,70 +68,54 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
     kernel_size = 11;
     sigma = 5;
 
-    xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "bi_blur" ) );
-    blur_pass_args_t args = {
-        .pipeline = pipeline_state,
-        .sampler = xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ),
-        .width = dst_info.width,
-        .height = dst_info.height,
-        .draw_data.src_resolution_x = ( float ) src_info.width,
-        .draw_data.src_resolution_y = ( float ) src_info.height,
-        .draw_data.dst_resolution_x = ( float ) dst_info.width,
-        .draw_data.dst_resolution_y = ( float ) dst_info.height,
-        .draw_data.kernel_size = kernel_size,
+    xs_database_pipeline_h database_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "bi_blur" ) );
+    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( database_pipeline );
+
+    blur_draw_data_t uniform_data = {
+        .src_resolution_x = ( float ) src_info.width,
+        .src_resolution_y = ( float ) src_info.height,
+        .dst_resolution_x = ( float ) dst_info.width,
+        .dst_resolution_y = ( float ) dst_info.height,
+        .kernel_size = kernel_size,
     };
 
     if ( direction == blur_pass_direction_horizontal_m ) {
-        args.draw_data.direction_x = 1;
-        args.draw_data.direction_y = 0;
+        uniform_data.direction_x = 1;
+        uniform_data.direction_y = 0;
     } else {
-        args.draw_data.direction_x = 0;
-        args.draw_data.direction_y = 1;
+        uniform_data.direction_x = 0;
+        uniform_data.direction_y = 1;
     }
 
-    generate_blur_kernel ( args.draw_data.kernel, kernel_size, sigma );
+    generate_blur_kernel ( uniform_data.kernel, kernel_size, sigma );
 
-#if 0
-    xf_node_h blur_node = xf->create_node ( graph, &xf_node_params_m (
-        .render_targets_count = 1,
-        .shader_texture_reads = {
-            xf_sampled_texture_dependency_m ( color, xg_shading_stage_fragment_m ),
-            xf_sampled_texture_dependency_m ( normals, xg_shading_stage_fragment_m ),
-            xf_sampled_texture_dependency_m ( depth, xg_shading_stage_fragment_m ),
-        },
-        .execute_routine = blur_pass_routine,
-        .user_args = &args,
-        .user_args_allocator = std_virtual_heap_allocator(),
-        .user_args_alloc_size = sizeof ( args ),
-        .passthrough = xf_node_passthrough_params_m (
-            .enable = true,
-            .render_targets = { xf_texture_passthrough_m (
-                    .mode = xf_passthrough_mode_alias_m,
-                    .alias = color,
-                )
+    xf_node_params_t params = xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = pipeline_state,
+            .uniform_data = std_buffer_m ( &uniform_data ),
+            .workgroup_count = { std_div_ceil_u32 ( dst_info.width, 8 ), std_div_ceil_u32 ( dst_info.height, 8 ), 1 },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .sampled_textures_count = 3,
+            .sampled_textures =  {
+                xf_compute_texture_dependency_m ( .texture = color ),
+                xf_compute_texture_dependency_m ( .texture = normals ),
+                xf_compute_texture_dependency_m ( .texture = depth ),
+            },
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = {
+                xf_shader_texture_dependency_m ( .texture = dst, .stage = xg_pipeline_stage_bit_compute_shader_m )
             },
         ),
-    ) );
-#endif
-    xf_node_params_t params = xf_node_params_m (
-        //.render_targets_count = 1,
-        //.render_targets = { xf_render_target_dependency_m ( dst, xg_default_texture_view_m ) },
-        .shader_texture_reads_count = 3,
-        .shader_texture_reads =  {
-            xf_sampled_texture_dependency_m ( color, xg_pipeline_stage_bit_compute_shader_m ),
-            xf_sampled_texture_dependency_m ( normals, xg_pipeline_stage_bit_compute_shader_m ),
-            xf_sampled_texture_dependency_m ( depth, xg_pipeline_stage_bit_compute_shader_m ),
-        },
-        .shader_texture_writes_count = 1,
-        .shader_texture_writes = {
-            xf_storage_texture_dependency_m ( dst, xg_default_texture_view_m, xg_pipeline_stage_bit_compute_shader_m )
-        },
-        .execute_routine = blur_pass_routine,
-        .user_args = std_buffer_m ( &args ),
-        .passthrough.enable = true,
-        .passthrough.render_targets[0] = { .mode = xf_passthrough_mode_alias_m, .alias = color }
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color ) }
+        ),
     );
     std_str_copy_static_m ( params.debug_name, debug_name );
-    xf_node_h blur_node = xf->create_node ( graph, &params );
+    xf_node_h blur_node = xf->add_node ( graph, &params );
     return blur_node;
 }

@@ -52,37 +52,47 @@ xf_graph_h xf_graph_create ( xg_device_h device, xg_swapchain_h swapchain ) {
 */
 
 static void xf_graph_node_accumulate_reads_writes ( xf_node_h node ) {
-    const xf_node_params_t* params = &xf_graph_state->nodes_array[node].params;
+    const xf_node_resource_params_t* params = &xf_graph_state->nodes_array[node].params.resources;
 
     // Shader resources
-    for ( size_t i = 0; i < params->shader_texture_reads_count; ++i ) {
-        const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_reads[i];
+    for ( size_t i = 0; i < params->sampled_textures_count; ++i ) {
+        const xf_shader_texture_dependency_t* dep = &params->sampled_textures[i];
         xf_resource_texture_add_reader ( dep->texture, dep->view, node );
     }
 
-    for ( size_t i = 0; i < params->shader_texture_writes_count; ++i ) {
-        const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_writes[i];
+    for ( size_t i = 0; i < params->storage_texture_reads_count; ++i ) {
+        const xf_shader_texture_dependency_t* dep = &params->storage_texture_reads[i];
+        xf_resource_texture_add_reader ( dep->texture, dep->view, node );
+    }
+
+    for ( size_t i = 0; i < params->storage_texture_writes_count; ++i ) {
+        const xf_shader_texture_dependency_t* dep = &params->storage_texture_writes[i];
         xf_resource_texture_add_writer ( dep->texture, dep->view, node );
     }
 
-    for ( size_t i = 0; i < params->shader_buffer_reads_count; ++i ) {
-        xf_buffer_h buffer = params->shader_buffer_reads[i].buffer;
+    for ( size_t i = 0; i < params->uniform_buffers_count; ++i ) {
+        xf_buffer_h buffer = params->uniform_buffers[i].buffer;
         xf_resource_buffer_add_reader ( buffer, node );
     }
 
-    for ( size_t i = 0; i < params->shader_buffer_writes_count; ++i ) {
-        xf_buffer_h buffer = params->shader_buffer_writes[i].buffer;
+    for ( size_t i = 0; i < params->storage_buffer_reads_count; ++i ) {
+        xf_buffer_h buffer = params->storage_buffer_reads[i].buffer;
+        xf_resource_buffer_add_reader ( buffer, node );
+    }
+
+    for ( size_t i = 0; i < params->storage_buffer_writes_count; ++i ) {
+        xf_buffer_h buffer = params->storage_buffer_writes[i].buffer;
         xf_resource_buffer_add_writer ( buffer, node );
     }
 
     // Copy resources
     for ( size_t i = 0; i < params->copy_texture_reads_count; ++i ) {
-        const xf_node_copy_texture_dependency_t* dep = &params->copy_texture_reads[i];
+        const xf_copy_texture_dependency_t* dep = &params->copy_texture_reads[i];
         xf_resource_texture_add_reader ( dep->texture, dep->view, node );
     }
 
     for ( size_t i = 0; i < params->copy_texture_writes_count; ++i ) {
-        const xf_node_copy_texture_dependency_t* dep = &params->copy_texture_writes[i];
+        const xf_copy_texture_dependency_t* dep = &params->copy_texture_writes[i];
         xf_resource_texture_add_writer ( dep->texture, dep->view, node );
     }
 
@@ -98,49 +108,59 @@ static void xf_graph_node_accumulate_reads_writes ( xf_node_h node ) {
 
     // Render targets and depth stencil
     for ( size_t i = 0; i < params->render_targets_count; ++i ) {
-        const xf_node_render_target_dependency_t* dep = &params->render_targets[i];
+        const xf_render_target_dependency_t* dep = &params->render_targets[i];
         xf_resource_texture_add_writer ( dep->texture, dep->view, node );
     }
 
     if ( params->depth_stencil_target != xf_null_handle_m ) {
         std_assert_m ( params->depth_stencil_target != xf_null_handle_m );
         xf_texture_h texture = params->depth_stencil_target;
-        xf_resource_texture_add_writer ( texture, xg_default_texture_view_m, node );
+        xf_resource_texture_add_writer ( texture, xg_texture_view_m(), node );
     }
 }
 
 static void xf_graph_node_accumulate_resource_usage ( xf_node_h node ) {
-    const xf_node_params_t* params = &xf_graph_state->nodes_array[node].params;
+    const xf_node_resource_params_t* params = &xf_graph_state->nodes_array[node].params.resources;
 
     // Shader resources
-    for ( size_t i = 0; i < params->shader_texture_reads_count; ++i ) {
-        const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_reads[i];
-        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_resource_m );
+    for ( size_t i = 0; i < params->sampled_textures_count; ++i ) {
+        const xf_shader_texture_dependency_t* dep = &params->sampled_textures[i];
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_sampled_m );
     }
 
-    for ( size_t i = 0; i < params->shader_texture_writes_count; ++i ) {
-        const xf_node_shader_texture_dependency_t* dep = &params->shader_texture_writes[i];
+    for ( size_t i = 0; i < params->storage_texture_reads_count; ++i ) {
+        const xf_shader_texture_dependency_t* dep = &params->storage_texture_reads[i];
         xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_storage_m );
     }
 
-    for ( size_t i = 0; i < params->shader_buffer_reads_count; ++i ) {
-        xf_buffer_h buffer = params->shader_buffer_reads[i].buffer;
+    for ( size_t i = 0; i < params->storage_texture_writes_count; ++i ) {
+        const xf_shader_texture_dependency_t* dep = &params->storage_texture_writes[i];
+        xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_storage_m );
+    }
+
+    for ( size_t i = 0; i < params->uniform_buffers_count; ++i ) {
+        xf_buffer_h buffer = params->uniform_buffers[i].buffer;
         xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_uniform_m );
     }
 
-    for ( size_t i = 0; i < params->shader_buffer_writes_count; ++i ) {
-        xf_buffer_h buffer = params->shader_buffer_writes[i].buffer;
+    for ( size_t i = 0; i < params->storage_buffer_reads_count; ++i ) {
+        xf_buffer_h buffer = params->storage_buffer_reads[i].buffer;
+        xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_storage_m );
+    }
+
+    for ( size_t i = 0; i < params->storage_buffer_writes_count; ++i ) {
+        xf_buffer_h buffer = params->storage_buffer_writes[i].buffer;
         xf_resource_buffer_add_usage ( buffer, xg_buffer_usage_bit_storage_m );
     }
 
     // Copy resources
     for ( size_t i = 0; i < params->copy_texture_reads_count; ++i ) {
-        const xf_node_copy_texture_dependency_t* dep = &params->copy_texture_reads[i];
+        const xf_copy_texture_dependency_t* dep = &params->copy_texture_reads[i];
         xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_copy_source_m );
     }
 
     for ( size_t i = 0; i < params->copy_texture_writes_count; ++i ) {
-        const xf_node_copy_texture_dependency_t* dep = &params->copy_texture_writes[i];
+        const xf_copy_texture_dependency_t* dep = &params->copy_texture_writes[i];
         xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_copy_dest_m );
     }
 
@@ -156,7 +176,7 @@ static void xf_graph_node_accumulate_resource_usage ( xf_node_h node ) {
 
     // Render targets and depth stencil
     for ( size_t i = 0; i < params->render_targets_count; ++i ) {
-        const xf_node_render_target_dependency_t* dep = &params->render_targets[i];
+        const xf_render_target_dependency_t* dep = &params->render_targets[i];
         xf_resource_texture_add_usage ( dep->texture, xg_texture_usage_bit_render_target_m );
     }
 
@@ -213,13 +233,24 @@ xf_node_h xf_graph_add_node ( xf_graph_h graph_handle, const xf_node_params_t* p
     node->renderpass_params.resolution_x = 0;
     node->renderpass_params.resolution_y = 0;
 
-    if ( node->params.copy_args && node->params.user_args.base ) {
-        void* alloc = std_virtual_heap_alloc ( node->params.user_args.size, 16 ); // TODO some kind of linear allocator
-        std_mem_copy ( alloc, node->params.user_args.base, node->params.user_args.size );
-        //node->params.user_args = node->user_args; // TODO is this necessary?
-        node->user_args = alloc;
-    } else {
-        node->user_args = node->params.user_args.base;
+    if ( node->params.type == xf_node_type_custom_pass_m) {
+        xf_node_custom_pass_params_t* pass = &node->params.pass.custom;
+        if ( pass->copy_args && pass->user_args.base ) {
+            void* alloc = std_virtual_heap_alloc ( pass->user_args.size, 16 ); // TODO some kind of linear allocator
+            std_mem_copy ( alloc, pass->user_args.base, pass->user_args.size );
+            node->user_alloc = alloc;
+        } else {
+            node->user_alloc = NULL;
+        }
+    } else if ( node->params.type == xf_node_type_compute_pass_m ) {
+        xf_node_compute_pass_params_t* pass = &node->params.pass.compute;
+        if ( pass->copy_uniform_data && pass->uniform_data.base ) {
+            void* alloc = std_virtual_heap_alloc ( pass->uniform_data.size, 16 ); // TODO some kind of linear allocator
+            std_mem_copy ( alloc, pass->uniform_data.base, pass->uniform_data.size );
+            node->user_alloc = alloc;
+        } else {
+            node->user_alloc = NULL;
+        }
     }
 
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
@@ -317,29 +348,48 @@ static void xf_graph_linearize_node ( xf_graph_linearize_data_t* ld, xf_node_h n
 
     xf_node_t* node = &xf_graph_state->nodes_array[node_handle];
 
-    for ( size_t resource_it = 0; resource_it < node->params.shader_texture_reads_count; ++resource_it ) {
+    for ( size_t resource_it = 0; resource_it < node->params.resources.sampled_textures_count; ++resource_it ) {
         //const xf_texture_t* resource = xf_resource_texture_get ( node->params.shader_texture_reads[resource_it].texture );
         xf_resource_dependencies_t t;
         std_mem_zero_m ( &t );
-        const xf_resource_dependencies_t* deps = xf_resource_texture_get_deps ( node->params.shader_texture_reads[resource_it].texture, node->params.shader_texture_reads[resource_it].view, &t );
+        const xf_resource_dependencies_t* deps = xf_resource_texture_get_deps ( 
+            node->params.resources.sampled_textures[resource_it].texture, 
+            node->params.resources.sampled_textures[resource_it].view, &t );
         xf_graph_linearize_resource_dependencies ( ld, deps );
     }
 
-    for ( size_t resource_it = 0; resource_it < node->params.shader_buffer_reads_count; ++resource_it ) {
-        const xf_buffer_t* resource = xf_resource_buffer_get ( node->params.shader_buffer_reads[resource_it].buffer );
+    for ( size_t resource_it = 0; resource_it < node->params.resources.storage_texture_reads_count; ++resource_it ) {
+        //const xf_texture_t* resource = xf_resource_texture_get ( node->params.shader_texture_reads[resource_it].texture );
+        xf_resource_dependencies_t t;
+        std_mem_zero_m ( &t );
+        const xf_resource_dependencies_t* deps = xf_resource_texture_get_deps ( 
+            node->params.resources.storage_texture_reads[resource_it].texture, 
+            node->params.resources.storage_texture_reads[resource_it].view, &t );
+        xf_graph_linearize_resource_dependencies ( ld, deps );
+    }
+
+    for ( size_t resource_it = 0; resource_it < node->params.resources.uniform_buffers_count; ++resource_it ) {
+        const xf_buffer_t* resource = xf_resource_buffer_get ( node->params.resources.uniform_buffers[resource_it].buffer );
         xf_graph_linearize_resource_dependencies ( ld, &resource->deps );
     }
 
-    for ( size_t resource_it = 0; resource_it < node->params.copy_texture_reads_count; ++resource_it ) {
-        //const xf_texture_t* resource = xf_resource_texture_get ( node->params.copy_texture_reads[resource_it].texture );
+    for ( size_t resource_it = 0; resource_it < node->params.resources.storage_buffer_reads_count; ++resource_it ) {
+        const xf_buffer_t* resource = xf_resource_buffer_get ( node->params.resources.storage_buffer_reads[resource_it].buffer );
+        xf_graph_linearize_resource_dependencies ( ld, &resource->deps );
+    }
+
+    for ( size_t resource_it = 0; resource_it < node->params.resources.copy_texture_reads_count; ++resource_it ) {
+        //const xf_texture_t* resource = xf_resource_texture_get ( node->params.resources.copy_texture_reads[resource_it].texture );
         xf_resource_dependencies_t t;
         std_mem_zero_m ( &t );
-        const xf_resource_dependencies_t* deps = xf_resource_texture_get_deps ( node->params.copy_texture_reads[resource_it].texture, node->params.copy_texture_reads[resource_it].view, &t );
+        const xf_resource_dependencies_t* deps = xf_resource_texture_get_deps ( 
+            node->params.resources.copy_texture_reads[resource_it].texture, 
+            node->params.resources.copy_texture_reads[resource_it].view, &t );
         xf_graph_linearize_resource_dependencies ( ld, deps );
     }
 
-    for ( size_t resource_it = 0; resource_it < node->params.copy_buffer_reads_count; ++resource_it ) {
-        const xf_buffer_t* resource = xf_resource_buffer_get ( node->params.copy_buffer_reads[resource_it] );
+    for ( size_t resource_it = 0; resource_it < node->params.resources.copy_buffer_reads_count; ++resource_it ) {
+        const xf_buffer_t* resource = xf_resource_buffer_get ( node->params.resources.copy_buffer_reads[resource_it] );
         xf_graph_linearize_resource_dependencies ( ld, &resource->deps );
     }
 
@@ -589,53 +639,64 @@ static void xf_graph_build_resources ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffe
     // Doesn't matter here if we follow nodes execution order or not
     for ( size_t i = 0; i < graph->nodes_count; ++i ) {
         xf_node_t* node = &xf_graph_state->nodes_array[graph->nodes[i]];
+        xf_node_resource_params_t* params = &node->params.resources;
 
-        for ( size_t resource_it = 0; resource_it < node->params.render_targets_count; ++resource_it ) {
-            xf_node_render_target_dependency_t* resource = &node->params.render_targets[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->render_targets_count; ++resource_it ) {
+            xf_render_target_dependency_t* resource = &params->render_targets[resource_it];
             xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
         }
 
-        if ( node->params.depth_stencil_target != xf_null_handle_m ) {
-            xf_graph_build_texture ( graph, node->params.depth_stencil_target, xg, cmd_buffer, resource_cmd_buffer );
+        if ( params->depth_stencil_target != xf_null_handle_m ) {
+            xf_graph_build_texture ( graph, params->depth_stencil_target, xg, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.shader_texture_writes_count; ++resource_it ) {
-            xf_node_shader_texture_dependency_t* resource = &node->params.shader_texture_writes[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->sampled_textures_count; ++resource_it ) {
+            xf_shader_texture_dependency_t* resource = &params->sampled_textures[resource_it];
             xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.shader_texture_reads_count; ++resource_it ) {
-            xf_node_shader_texture_dependency_t* resource = &node->params.shader_texture_reads[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->storage_texture_reads_count; ++resource_it ) {
+            xf_shader_texture_dependency_t* resource = &params->storage_texture_reads[resource_it];
             xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.shader_buffer_writes_count; ++resource_it ) {
-            xf_buffer_dependency_t* resource = &node->params.shader_buffer_writes[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->storage_texture_writes_count; ++resource_it ) {
+            xf_shader_texture_dependency_t* resource = &params->storage_texture_writes[resource_it];
+            xf_graph_build_texture ( graph, resource->texture, xg, cmd_buffer, resource_cmd_buffer );
+        }
+
+        for ( size_t resource_it = 0; resource_it < params->uniform_buffers_count; ++resource_it ) {
+            xf_shader_buffer_dependency_t* resource = &params->uniform_buffers[resource_it];
             xf_graph_build_buffer ( resource->buffer, xg, graph->device, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.shader_buffer_reads_count; ++resource_it ) {
-            xf_buffer_dependency_t* resource = &node->params.shader_buffer_reads[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->storage_buffer_reads_count; ++resource_it ) {
+            xf_shader_buffer_dependency_t* resource = &params->storage_buffer_reads[resource_it];
             xf_graph_build_buffer ( resource->buffer, xg, graph->device, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.copy_texture_writes_count; ++resource_it ) {
-            xf_texture_h texture_handle = node->params.copy_texture_writes[resource_it].texture;
+        for ( size_t resource_it = 0; resource_it < params->storage_buffer_writes_count; ++resource_it ) {
+            xf_shader_buffer_dependency_t* resource = &params->storage_buffer_writes[resource_it];
+            xf_graph_build_buffer ( resource->buffer, xg, graph->device, cmd_buffer, resource_cmd_buffer );
+        }
+
+        for ( size_t resource_it = 0; resource_it < params->copy_texture_writes_count; ++resource_it ) {
+            xf_texture_h texture_handle = params->copy_texture_writes[resource_it].texture;
             xf_graph_build_texture ( graph, texture_handle, xg, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.copy_texture_reads_count; ++resource_it ) {
-            xf_texture_h texture_handle = node->params.copy_texture_reads[resource_it].texture;
+        for ( size_t resource_it = 0; resource_it < params->copy_texture_reads_count; ++resource_it ) {
+            xf_texture_h texture_handle = params->copy_texture_reads[resource_it].texture;
             xf_graph_build_texture ( graph, texture_handle, xg, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.copy_buffer_writes_count; ++resource_it ) {
-            xf_buffer_h buffer_handle = node->params.copy_buffer_writes[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->copy_buffer_writes_count; ++resource_it ) {
+            xf_buffer_h buffer_handle = params->copy_buffer_writes[resource_it];
             xf_graph_build_buffer ( buffer_handle, xg, graph->device, cmd_buffer, resource_cmd_buffer );
         }
 
-        for ( size_t resource_it = 0; resource_it < node->params.copy_buffer_reads_count; ++resource_it ) {
-            xf_buffer_h buffer_handle = node->params.copy_buffer_reads[resource_it];
+        for ( size_t resource_it = 0; resource_it < params->copy_buffer_reads_count; ++resource_it ) {
+            xf_buffer_h buffer_handle = params->copy_buffer_reads[resource_it];
             xf_graph_build_buffer ( buffer_handle, xg, graph->device, cmd_buffer, resource_cmd_buffer );
         }
     }
@@ -651,8 +712,8 @@ static void xf_graph_build_nodes ( xf_graph_t* graph, xg_i* xg, xg_resource_cmd_
         uint32_t resolution_y = 0;
 
         // check node render targets
-        for ( size_t resource_it = 0; resource_it < node->params.render_targets_count; ++resource_it ) {
-            xf_node_render_target_dependency_t* resource = &node->params.render_targets[resource_it];
+        for ( size_t resource_it = 0; resource_it < node->params.resources.render_targets_count; ++resource_it ) {
+            xf_render_target_dependency_t* resource = &node->params.resources.render_targets[resource_it];
             const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
 
             uint32_t mip_level = resource->view.mip_base;
@@ -678,7 +739,7 @@ static void xf_graph_build_nodes ( xf_graph_t* graph, xg_i* xg, xg_resource_cmd_
 
         // check node depth stencil
         {
-            xf_texture_h depth_stencil = node->params.depth_stencil_target;
+            xf_texture_h depth_stencil = node->params.resources.depth_stencil_target;
             render_textures.depth_stencil_enabled = depth_stencil != xf_null_handle_m;
 
             if ( depth_stencil != xf_null_handle_m ) {
@@ -788,6 +849,149 @@ static void xf_graph_build ( xf_graph_t* graph, xg_i* xg, xg_cmd_buffer_h cmd_bu
     xf_graph_build_nodes ( graph, xg, resource_cmd_buffer );
 }
 
+typedef struct {
+    xg_i* xg;
+    const xf_node_params_t* params;
+} xf_graph_clear_pass_routine_args_t;
+
+void xf_graph_clear_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
+    std_auto_m pass_args = ( const xf_graph_clear_pass_routine_args_t* ) user_args;
+    
+    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    uint64_t key = node_args->base_key;
+
+    xg_i* xg = pass_args->xg;
+    const xf_node_resource_params_t* resources = &pass_args->params->resources;
+
+    for ( uint32_t i = 0; i < resources->copy_texture_writes_count; ++i ) {
+        xg_texture_h texture = node_args->io->copy_texture_writes[i].texture;
+        const xf_texture_clear_t* clear = &pass_args->params->pass.clear.textures[i];
+        
+        if ( clear->type == xf_texture_clear_type_color_m ) {
+            xg->cmd_clear_texture ( cmd_buffer, texture, clear->color, key );
+        } else if ( clear->type == xf_texture_clear_type_depth_stencil_m ) {
+            xg->cmd_clear_depth_stencil_texture ( cmd_buffer, texture, clear->depth_stencil, key );
+        } else {
+            std_assert_m ( false );
+        }
+    }
+}
+
+typedef struct {
+    xg_i* xg;
+    const xf_node_params_t* params;
+} xf_graph_copy_pass_routine_args_t;
+
+void xf_graph_copy_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
+    std_auto_m pass_args = ( const xf_graph_copy_pass_routine_args_t* ) user_args;
+    
+    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    uint64_t key = node_args->base_key;
+
+    xg_i* xg = pass_args->xg;
+    const xf_node_resource_params_t* resources = &pass_args->params->resources;
+
+    std_assert_m ( resources->copy_texture_reads_count == resources->copy_texture_writes_count );
+
+    for ( uint32_t i = 0; i < resources->copy_texture_writes_count; ++i ) {
+        xg_texture_copy_params_t copy_params = xg_texture_copy_params_m (
+            .source = xf_copy_texture_resource_m ( node_args->io->copy_texture_reads[i] ),
+            .destination = xf_copy_texture_resource_m ( node_args->io->copy_texture_writes[i] ),
+            .filter = xg_sampler_filter_point_m, // TODO use linear for not same-size textures? expose a param?
+        );
+        xg->cmd_copy_texture ( cmd_buffer, &copy_params, key );
+    }
+}
+
+typedef struct {
+    xg_i* xg;
+    xg_compute_pipeline_state_h pipeline;
+    uint32_t workgroup_count[3];
+    std_buffer_t uniform_data;
+    const xf_node_params_t* params;
+} xf_graph_compute_pass_routine_args_t;
+
+void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
+    std_auto_m pass_args = ( const xf_graph_compute_pass_routine_args_t* ) user_args;
+
+    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    uint64_t key = node_args->base_key;
+
+    xg_i* xg = pass_args->xg;
+    const xf_node_resource_params_t* resources = &pass_args->params->resources;
+
+    xg->cmd_set_compute_pipeline_state ( cmd_buffer, pass_args->pipeline, key );
+
+    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
+        .set = xg_resource_binding_set_per_draw_m,
+        .texture_count = resources->sampled_textures_count + resources->storage_texture_reads_count + resources->storage_texture_writes_count,
+        .buffer_count = resources->uniform_buffers_count + resources->storage_buffer_reads_count + resources->storage_buffer_writes_count + pass_args->uniform_data.base ? 1 : 0,
+        .sampler_count = pass_args->params->pass.compute.samplers_count,
+    );
+
+    uint32_t binding_id = 0;
+    uint32_t buffer_idx = 0;
+    uint32_t texture_idx = 0;
+
+    if ( pass_args->uniform_data.base ) {
+        draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m (
+            .shader_register = binding_id++,
+            .type = xg_buffer_binding_type_uniform_m,
+            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data.base, pass_args->uniform_data.size ),
+        );
+    }
+
+    for ( uint32_t i = 0; i < resources->uniform_buffers_count; ++i ) {
+        draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m ( 
+            .shader_register = binding_id++,
+            .type = xg_buffer_binding_type_uniform_m,
+            .range = xg_buffer_range_whole_buffer_m ( node_args->io->uniform_buffers[i] )
+        );
+    }
+
+    for ( uint32_t i = 0; i < resources->storage_buffer_reads_count; ++i ) {
+        draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m ( 
+            .shader_register = binding_id++,
+            .type = xg_buffer_binding_type_storage_m,
+            .range = xg_buffer_range_whole_buffer_m ( node_args->io->storage_buffer_reads[i] )
+        );
+    }
+
+    for ( uint32_t i = 0; i < resources->storage_buffer_writes_count; ++i ) {
+        draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m ( 
+            .shader_register = binding_id++,
+            .type = xg_buffer_binding_type_storage_m,
+            .range = xg_buffer_range_whole_buffer_m ( node_args->io->storage_buffer_writes[i] )
+        );
+    }
+
+    for ( uint32_t i = 0; i < resources->sampled_textures_count; ++i ) {
+        draw_bindings.textures[texture_idx++] = xf_shader_texture_binding_m ( node_args->io->sampled_textures[i], binding_id++ );
+    }
+
+    for ( uint32_t i = 0; i < resources->storage_texture_reads_count; ++i ) {
+        draw_bindings.textures[texture_idx++] = xf_shader_texture_binding_m ( node_args->io->storage_texture_reads[i], binding_id++ );
+    }
+
+    for ( uint32_t i = 0; i < resources->storage_texture_writes_count; ++i ) {
+        draw_bindings.textures[texture_idx++] = xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[i], binding_id++ );
+    }
+
+    for ( uint32_t i = 0; i < pass_args->params->pass.compute.samplers_count; ++i ) {
+        draw_bindings.samplers[i] = xg_sampler_resource_binding_m ( 
+            .shader_register = binding_id++,
+            .sampler = pass_args->params->pass.compute.samplers[i]
+        );
+    }
+
+    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
+
+    uint32_t workgroup_count_x = pass_args->params->pass.compute.workgroup_count[0];
+    uint32_t workgroup_count_y = pass_args->params->pass.compute.workgroup_count[1];
+    uint32_t workgroup_count_z = pass_args->params->pass.compute.workgroup_count[2];
+    xg->cmd_dispatch_compute ( cmd_buffer, workgroup_count_x, workgroup_count_y, workgroup_count_z, key );
+}
+
 void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     std_assert_m ( graph );
@@ -839,9 +1043,9 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
             std_stack_t buffer_barriers_stack = std_static_stack_m ( buffer_barriers );
 
             if ( !node->enabled ) {
-                for ( uint32_t i = 0; i < params->render_targets_count; ++i ) {
+                for ( uint32_t i = 0; i < params->resources.render_targets_count; ++i ) {
                     if ( params->passthrough.render_targets[i].mode == xf_passthrough_mode_clear_m ) {
-                        xf_node_render_target_dependency_t* target = &node->params.render_targets[i];
+                        xf_render_target_dependency_t* target = &node->params.resources.render_targets[i];
 
                         xf_texture_execution_state_t state = xf_texture_execution_state_m (
                             .layout = xg_texture_layout_copy_dest_m,
@@ -864,10 +1068,10 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
                         xg->cmd_end_debug_region ( cmd_buffer, sort_key );
                     } else if ( params->passthrough.render_targets[i].mode == xf_passthrough_mode_alias_m ) {
-                        xf_resource_texture_alias ( params->render_targets[i].texture, params->passthrough.render_targets[i].alias );
+                        xf_resource_texture_alias ( params->resources.render_targets[i].texture, params->passthrough.render_targets[i].alias );
                     } else if ( params->passthrough.render_targets[i].mode == xf_passthrough_mode_copy_m ) {
-                        xf_node_render_target_dependency_t* target = &node->params.render_targets[i];
-                        xf_node_copy_texture_dependency_t* source = &params->passthrough.render_targets[i].copy_source;
+                        xf_render_target_dependency_t* target = &node->params.resources.render_targets[i];
+                        xf_copy_texture_dependency_t* source = &params->passthrough.render_targets[i].copy_source;
                         const xf_texture_t* target_texture = xf_resource_texture_get ( target->texture );
                         const xf_texture_t* source_texture = xf_resource_texture_get ( source->texture );
 
@@ -911,9 +1115,9 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 }
 
                 // TODO factor this into an outer function and call twice? need to share/wrap a bunch of local state...
-                for ( uint32_t i = 0; i < params->shader_texture_writes_count; ++i ) {
-                    if ( params->passthrough.shader_texture_writes[i].mode == xf_passthrough_mode_clear_m ) {
-                        xf_node_shader_texture_dependency_t* texture_write = &node->params.shader_texture_writes[i];
+                for ( uint32_t i = 0; i < params->resources.storage_texture_writes_count; ++i ) {
+                    if ( params->passthrough.storage_texture_writes[i].mode == xf_passthrough_mode_clear_m ) {
+                        xf_shader_texture_dependency_t* texture_write = &node->params.resources.storage_texture_writes[i];
 
                         xf_texture_execution_state_t state = xf_texture_execution_state_m (
                             .layout = xg_texture_layout_copy_dest_m,
@@ -932,14 +1136,14 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                         }
 
                         const xf_texture_t* texture = xf_resource_texture_get ( texture_write->texture );
-                        xg->cmd_clear_texture ( cmd_buffer, texture->xg_handle, params->passthrough.shader_texture_writes[i].clear, sort_key );
+                        xg->cmd_clear_texture ( cmd_buffer, texture->xg_handle, params->passthrough.storage_texture_writes[i].clear, sort_key );
 
                         xg->cmd_end_debug_region ( cmd_buffer, sort_key );
-                    } else if ( params->passthrough.shader_texture_writes[i].mode == xf_passthrough_mode_alias_m ) {
-                        xf_resource_texture_alias ( params->shader_texture_writes[i].texture, params->passthrough.shader_texture_writes[i].alias );
-                    } else if ( params->passthrough.shader_texture_writes[i].mode == xf_passthrough_mode_copy_m ) {
-                        xf_node_shader_texture_dependency_t* target = &node->params.shader_texture_writes[i];
-                        xf_node_copy_texture_dependency_t* source = &params->passthrough.shader_texture_writes[i].copy_source;
+                    } else if ( params->passthrough.storage_texture_writes[i].mode == xf_passthrough_mode_alias_m ) {
+                        xf_resource_texture_alias ( params->resources.storage_texture_writes[i].texture, params->passthrough.storage_texture_writes[i].alias );
+                    } else if ( params->passthrough.storage_texture_writes[i].mode == xf_passthrough_mode_copy_m ) {
+                        xf_shader_texture_dependency_t* target = &node->params.resources.storage_texture_writes[i];
+                        xf_copy_texture_dependency_t* source = &params->passthrough.storage_texture_writes[i].copy_source;
                         const xf_texture_t* target_texture = xf_resource_texture_get ( target->texture );
                         const xf_texture_t* source_texture = xf_resource_texture_get ( source->texture );
 
@@ -987,8 +1191,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
             xf_node_io_t io;
 
-            for ( size_t i = 0; i < node->params.shader_texture_reads_count; ++i ) {
-                xf_node_shader_texture_dependency_t* resource = &node->params.shader_texture_reads[i];
+            for ( size_t i = 0; i < node->params.resources.sampled_textures_count; ++i ) {
+                xf_shader_texture_dependency_t* resource = &node->params.resources.sampled_textures[i];
                 const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
                 xg_texture_layout_e layout = xg_texture_layout_shader_read_m;
 
@@ -998,66 +1202,97 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = layout,
-                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
                     .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_read_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
 
-                io.shader_texture_reads[i].texture = texture->xg_handle;
-                io.shader_texture_reads[i].view = resource->view;
-                io.shader_texture_reads[i].layout = layout;
+                io.sampled_textures[i].texture = texture->xg_handle;
+                io.sampled_textures[i].view = resource->view;
+                io.sampled_textures[i].layout = layout;
             }
 
-            for ( size_t i = 0; i < node->params.shader_texture_writes_count; ++i ) {
-                xf_node_shader_texture_dependency_t* resource = &node->params.shader_texture_writes[i];
+            for ( size_t i = 0; i < node->params.resources.storage_texture_reads_count; ++i ) {
+                xf_shader_texture_dependency_t* resource = &node->params.resources.storage_texture_reads[i];
+                const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
+                xg_texture_layout_e layout = xg_texture_layout_shader_read_m;
+
+                if ( texture->allowed_usage & xg_texture_usage_bit_depth_stencil_m ) {
+                    layout = xg_texture_layout_depth_stencil_read_m;
+                }
+
+                xf_texture_execution_state_t state = xf_texture_execution_state_m (
+                    .layout = layout,
+                    .stage = resource->stage,
+                    .access = xg_memory_access_bit_shader_read_m
+                );
+
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
+
+                io.storage_texture_reads[i].texture = texture->xg_handle;
+                io.storage_texture_reads[i].view = resource->view;
+                io.storage_texture_reads[i].layout = layout;
+            }
+
+            for ( size_t i = 0; i < node->params.resources.storage_texture_writes_count; ++i ) {
+                xf_shader_texture_dependency_t* resource = &node->params.resources.storage_texture_writes[i];
                 const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
                 xg_texture_layout_e layout = xg_texture_layout_shader_write_m;
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = layout,
-                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
                     .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_write_m
                 );
 
                 xf_resource_texture_state_barrier ( &texture_barriers_stack, resource->texture, resource->view, &state );
 
-                io.shader_texture_writes[i].texture = texture->xg_handle;
-                io.shader_texture_writes[i].view = resource->view;
-                io.shader_texture_writes[i].layout = layout;
+                io.storage_texture_writes[i].texture = texture->xg_handle;
+                io.storage_texture_writes[i].view = resource->view;
+                io.storage_texture_writes[i].layout = layout;
             }
 
-            for ( size_t i = 0; i < node->params.shader_buffer_reads_count; ++i ) {
-                xf_buffer_dependency_t* resource = &node->params.shader_buffer_reads[i];
+            for ( size_t i = 0; i < node->params.resources.uniform_buffers_count; ++i ) {
+                xf_shader_buffer_dependency_t* resource = &node->params.resources.uniform_buffers[i];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
                 xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
                     .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_read_m
                 );
 
                 xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
 
-                io.shader_buffer_reads[i] = buffer->xg_handle;
+                io.uniform_buffers[i] = buffer->xg_handle;
             }
 
-            for ( size_t i = 0; i < node->params.shader_buffer_writes_count; ++i ) {
-                xf_buffer_dependency_t* resource = &node->params.shader_buffer_writes[i];
+            for ( size_t i = 0; i < node->params.resources.storage_buffer_reads_count; ++i ) {
+                xf_shader_buffer_dependency_t* resource = &node->params.resources.storage_buffer_reads[i];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
                 xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-                    //.stage = xg_shading_stage_to_pipeline_stage ( resource->shading_stage ),
+                    .stage = resource->stage,
+                    .access = xg_memory_access_bit_shader_read_m
+                );
+
+                xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
+
+                io.storage_buffer_reads[i] = buffer->xg_handle;
+            }
+
+            for ( size_t i = 0; i < node->params.resources.storage_buffer_writes_count; ++i ) {
+                xf_shader_buffer_dependency_t* resource = &node->params.resources.storage_buffer_writes[i];
+                const xf_buffer_t* buffer = xf_resource_buffer_get ( resource->buffer );
+                xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
                     .stage = resource->stage,
                     .access = xg_memory_access_bit_shader_write_m
                 );
 
                 xf_resource_buffer_state_barrier ( &buffer_barriers_stack, resource->buffer, &state );
 
-                io.shader_buffer_writes[i] = buffer->xg_handle;
+                io.storage_buffer_writes[i] = buffer->xg_handle;
             }
 
-            for ( size_t i = 0; i < node->params.copy_texture_reads_count; ++i ) {
-                xf_node_copy_texture_dependency_t* copy = &node->params.copy_texture_reads[i];
+            for ( size_t i = 0; i < node->params.resources.copy_texture_reads_count; ++i ) {
+                xf_copy_texture_dependency_t* copy = &node->params.resources.copy_texture_reads[i];
                 const xf_texture_t* texture = xf_resource_texture_get ( copy->texture );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_copy_source_m,
@@ -1072,8 +1307,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 //io.copy_texture_reads[i].layout = xg_texture_layout_copy_source_m;
             }
 
-            for ( size_t i = 0; i < node->params.copy_texture_writes_count; ++i ) {
-                xf_node_copy_texture_dependency_t* copy = &node->params.copy_texture_writes[i];
+            for ( size_t i = 0; i < node->params.resources.copy_texture_writes_count; ++i ) {
+                xf_copy_texture_dependency_t* copy = &node->params.resources.copy_texture_writes[i];
                 const xf_texture_t* texture = xf_resource_texture_get ( copy->texture );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_copy_dest_m,
@@ -1088,8 +1323,8 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 //io.copy_texture_writes[i].layout = xg_texture_layout_copy_dest_m;
             }
 
-            for ( size_t i = 0; i < node->params.render_targets_count; ++i ) {
-                xf_node_render_target_dependency_t* target = &node->params.render_targets[i];
+            for ( size_t i = 0; i < node->params.resources.render_targets_count; ++i ) {
+                xf_render_target_dependency_t* target = &node->params.resources.render_targets[i];
                 const xf_texture_t* texture = xf_resource_texture_get ( target->texture );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_render_target_m,
@@ -1103,9 +1338,9 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 io.render_targets[i].view = target->view;
             }
 
-            if ( node->params.depth_stencil_target != xf_null_handle_m ) {
-                std_assert_m ( node->params.depth_stencil_target != xf_null_handle_m );
-                xf_texture_h texture_handle = node->params.depth_stencil_target;
+            if ( node->params.resources.depth_stencil_target != xf_null_handle_m ) {
+                std_assert_m ( node->params.resources.depth_stencil_target != xf_null_handle_m );
+                xf_texture_h texture_handle = node->params.resources.depth_stencil_target;
                 const xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
                 xf_texture_execution_state_t state = xf_texture_execution_state_m (
                     .layout = xg_texture_layout_depth_stencil_target_m,
@@ -1114,13 +1349,16 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 );
 
                 // TODO support early fragment test
-                xf_resource_texture_state_barrier ( &texture_barriers_stack, texture_handle, xg_default_texture_view_m, &state );
+                xf_resource_texture_state_barrier ( &texture_barriers_stack, texture_handle, xg_texture_view_m(), &state );
 
                 io.depth_stencil_target = texture->xg_handle;
+            } else {
+                io.depth_stencil_target = xg_null_handle_m;
             }
 
             xg->cmd_begin_debug_region ( cmd_buffer, node->params.debug_name, node->params.debug_color, sort_key );
 
+            // TODO move renderpass cmds inside the custom execute mode block?
             if ( node->renderpass != xg_null_handle_m ) {
                 xg->cmd_begin_renderpass ( cmd_buffer, node->renderpass, sort_key );
             }
@@ -1133,27 +1371,68 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                 xg->cmd_barrier_set ( cmd_buffer, &barrier_set, sort_key++ );
             }
 
-            {
-                xf_node_execute_args_t node_args;
-                node_args.device = graph->device;
-                node_args.cmd_buffer = cmd_buffer;
-                node_args.resource_cmd_buffer = resource_cmd_buffer;
-                node_args.workload = xg_workload;
-                node_args.base_key = sort_key;
-                node_args.io = &io;
-                node_args.debug_name = node->params.debug_name;
-                //node_args.params = &node->params;
-                node->params.execute_routine ( &node_args, node->user_args );
-            }
+            xf_node_execute_args_t node_args;
+            node_args.device = graph->device;
+            node_args.cmd_buffer = cmd_buffer;
+            node_args.resource_cmd_buffer = resource_cmd_buffer;
+            node_args.workload = xg_workload;
+            node_args.base_key = sort_key;
+            node_args.io = &io;
+            node_args.debug_name = node->params.debug_name;
 
-            sort_key += node->params.key_space_size;
+            if ( node->params.type == xf_node_type_custom_pass_m ) {
+                void* user_args = node->params.pass.custom.user_args.base;
+
+                if ( node->user_alloc ) {
+                    user_args = node->user_alloc;
+                }
+
+                node->params.pass.custom.routine ( &node_args, user_args );
+                sort_key += node->params.pass.custom.key_space_size;
+            } else if ( node->params.type == xf_node_type_compute_pass_m ) {
+                std_buffer_t uniform_data = node->params.pass.compute.uniform_data;
+
+                if ( node->user_alloc ) {
+                    uniform_data.base = node->user_alloc;
+                }
+
+                std_assert_m ( node->params.pass.compute.pipeline != xg_null_handle_m );
+
+                xf_graph_compute_pass_routine_args_t user_args = {
+                    .xg = xg,
+                    .pipeline = node->params.pass.compute.pipeline,
+                    .workgroup_count[0] = node->params.pass.compute.workgroup_count[0],
+                    .workgroup_count[1] = node->params.pass.compute.workgroup_count[1],
+                    .workgroup_count[2] = node->params.pass.compute.workgroup_count[2],
+                    .uniform_data = uniform_data,
+                    .params = &node->params,
+                };
+
+                xf_graph_compute_pass_routine ( &node_args, &user_args );
+            } else if ( node->params.type == xf_node_type_copy_pass_m ) {
+                xf_graph_copy_pass_routine_args_t user_args = {
+                    .xg = xg,
+                    .params = &node->params,
+                };
+
+                xf_graph_copy_pass_routine ( &node_args, &user_args );
+            } else if ( node->params.type == xf_node_type_clear_pass_m ) {
+                xf_graph_clear_pass_routine_args_t user_args = {
+                    .xg = xg,
+                    .params = &node->params,
+                };
+
+                xf_graph_clear_pass_routine ( &node_args, &user_args );
+            } else {
+                std_assert_m ( false );
+            }
 
             if ( node->renderpass != xg_null_handle_m ) {
                 xg->cmd_end_renderpass ( cmd_buffer, node->renderpass, sort_key );
             }
 
-            if ( node->params.presentable_texture != xf_null_handle_m ) {
-                xf_texture_h texture_handle = node->params.presentable_texture;
+            if ( node->params.resources.presentable_texture != xf_null_handle_m ) {
+                xf_texture_h texture_handle = node->params.resources.presentable_texture;
 
                 xg_texture_memory_barrier_t present_barrier[1];
                 std_stack_t present_barrier_stack = std_static_stack_m ( present_barrier );
@@ -1164,7 +1443,7 @@ void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
                     .access = xg_memory_access_bit_none_m
                 );
 
-                xf_resource_texture_state_barrier ( &present_barrier_stack, texture_handle, xg_default_texture_view_m, &state );
+                xf_resource_texture_state_barrier ( &present_barrier_stack, texture_handle, xg_texture_view_m(), &state );
                 std_assert_m ( present_barrier_stack.top == present_barrier + 1 );
 
                 xg_barrier_set_t barrier_set = xg_barrier_set_m();

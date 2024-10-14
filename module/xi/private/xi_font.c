@@ -104,7 +104,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .width = xi_font_texture_atlas_width_m,
             .height = xi_font_texture_atlas_height_m,
             .format = xg_format_r8_uint_m,
-            .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_resource_m,
+            .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_sampled_m,
         );
         std_str_copy_static_m ( texture_params.debug_name, "font atlas temp" );
         raster_texture = xg->create_texture ( &texture_params );
@@ -172,7 +172,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .width = xi_font_texture_atlas_width_m,
             .height = xi_font_texture_atlas_height_m,
             .format = xg_format_r8g8b8a8_unorm_m,
-            .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_resource_m,
+            .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m,
         );
         std_str_copy_static_m ( texture_params.debug_name, "font atlas" );
         atlas_texture = xg->create_texture ( &texture_params );
@@ -232,7 +232,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         cmd_buffer,
         &xg_render_textures_binding_m (
             .render_targets_count = 1,
-            .render_targets[0] = { atlas_texture, xg_default_texture_view_m },
+            .render_targets[0] = { atlas_texture, xg_texture_view_m() },
         ),
         key );
 
@@ -258,7 +258,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
                     .shader_register = 1,
                     .layout = xg_texture_layout_shader_read_m,
                     .texture = raster_texture,
-                    .view = xg_default_texture_view_m
+                    .view = xg_texture_view_m()
                 ),
             },
             .sampler_count = 1,

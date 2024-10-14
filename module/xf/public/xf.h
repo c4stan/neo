@@ -68,43 +68,47 @@ typedef uint64_t xf_graph_h;
 typedef struct {
     xf_texture_h texture;
     xg_texture_view_t view;
-    //xg_shading_stage_e shading_stage;
     xg_pipeline_stage_bit_e stage;
-} xf_node_shader_texture_dependency_t;
+} xf_shader_texture_dependency_t;
 
-#define xf_shader_texture_dependency_m( _texture, _view, _shading_stage ) ( xf_node_shader_texture_dependency_t ) { \
-    .stage = _shading_stage, \
-    .texture = _texture, \
-    .view = _view, \
+#define xf_shader_texture_dependency_m( ... ) ( xf_shader_texture_dependency_t ) { \
+    .stage = xg_pipeline_stage_bit_none_m, \
+    .texture = xf_null_handle_m, \
+    .view = xg_texture_view_m(), \
+    ##__VA_ARGS__ \
 }
-#define xf_default_shader_texture_dependency_m xf_shader_texture_dependency_m ( xf_null_handle_m, xg_default_texture_view_m, xg_pipeline_stage_bit_none_m )
 
-#define xf_sampled_texture_dependency_m( _texture, _shading_stage ) xf_shader_texture_dependency_m ( _texture, xg_default_texture_view_m, _shading_stage )
-#define xf_storage_texture_dependency_m( _texture, _view, _shading_stage ) xf_shader_texture_dependency_m ( _texture, _view, _shading_stage )
-
-typedef struct {
-    xf_texture_h texture;
-    xg_texture_view_t view;
-} xf_node_copy_texture_dependency_t;
-
-#define xf_copy_texture_dependency_m( _texture, _view ) ( xf_node_copy_texture_dependency_t ) { .texture = _texture, .view = _view }
-#define xf_default_copy_texture_dependency_m xf_copy_texture_dependency_m( xf_null_handle_m, xg_default_texture_view_m )
+#define xf_compute_texture_dependency_m( ... ) xf_shader_texture_dependency_m ( .stage = xg_pipeline_stage_bit_compute_shader_m, ##__VA_ARGS__ )
+#define xf_fragment_texture_dependency_m( ... ) xf_shader_texture_dependency_m ( .stage = xg_pipeline_stage_bit_fragment_shader_m, ##__VA_ARGS__ )
 
 typedef struct {
     xf_texture_h texture;
     xg_texture_view_t view;
-} xf_node_render_target_dependency_t;
+} xf_copy_texture_dependency_t;
 
-#define xf_render_target_dependency_m( _texture, _view ) ( xf_node_render_target_dependency_t ) { .texture = _texture, .view = _view }
-#define xf_default_render_target_dependency_m xf_render_target_dependency_m( xf_null_handle_m, xg_default_texture_view_m )
+#define xf_copy_texture_dependency_m( ... ) ( xf_copy_texture_dependency_t ) { \
+    .texture = xf_null_handle_m, \
+    .view = xg_texture_view_m(), \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
-    xf_buffer_h buffer;
-    //xg_shading_stage_e shading_stage;
+    xf_texture_h texture;
+    xg_texture_view_t view;
+} xf_render_target_dependency_t;
+
+#define xf_render_target_dependency_m( ... ) ( xf_render_target_dependency_t ) { \
+    .texture = xf_null_handle_m, \
+    .view = xg_texture_view_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_buffer_h buffer; // TODO range ( need to add support to xf_resource? )
     xg_pipeline_stage_bit_e stage;
-} xf_buffer_dependency_t;
+} xf_shader_buffer_dependency_t;
 
-#define xf_buffer_dependency_m( ... ) ( xf_buffer_dependency_t ) { \
+#define xf_shader_buffer_dependency_m( ... ) ( xf_shader_buffer_dependency_t ) { \
     .buffer = xg_null_handle_m, \
     .stage = xg_pipeline_stage_bit_none_m, \
     ##__VA_ARGS__ \
@@ -150,14 +154,13 @@ typedef struct {
     .view = _resource.view, \
 }
 
-// TODO provide xg bindings directly?
 typedef struct {
-    // TODO differentiate between readonly storage and sampled textures
-    // TODO differentiate between readonly storage and uniform buffers
-    xf_shader_texture_resource_t shader_texture_reads[xf_node_max_shader_texture_reads_m];
-    xf_shader_texture_resource_t shader_texture_writes[xf_node_max_shader_texture_writes_m];
-    xg_buffer_h shader_buffer_reads[xf_node_max_shader_buffer_reads_m];
-    xg_buffer_h shader_buffer_writes[xf_node_max_shader_buffer_writes_m];
+    xf_shader_texture_resource_t sampled_textures[xf_node_max_sampled_textures_m];
+    xf_shader_texture_resource_t storage_texture_reads[xf_node_max_storage_texture_reads_m];
+    xf_shader_texture_resource_t storage_texture_writes[xf_node_max_storage_texture_writes_m];
+    xg_buffer_h uniform_buffers[xf_node_max_uniform_buffers_m]; // TODO buffer_range ( need to add support to xf_resource first? )
+    xg_buffer_h storage_buffer_reads[xf_node_max_storage_buffer_reads_m];
+    xg_buffer_h storage_buffer_writes[xf_node_max_storage_buffer_writes_m];
 
     xf_copy_texture_resource_t copy_texture_reads[xf_node_max_copy_texture_reads_m];
     xf_copy_texture_resource_t copy_texture_writes[xf_node_max_copy_texture_writes_m];
@@ -196,7 +199,7 @@ typedef struct {
     union {
         xg_color_clear_t clear;
         xf_texture_h alias;
-        xf_node_copy_texture_dependency_t copy_source;
+        xf_copy_texture_dependency_t copy_source;
     };
 } xf_texture_passthrough_t;
 
@@ -209,17 +212,16 @@ typedef struct {
 typedef struct {
     bool enable;
     xf_texture_passthrough_t render_targets[xf_node_max_render_targets_m];
-    xf_texture_passthrough_t shader_texture_writes[xf_node_max_shader_texture_writes_m];
+    xf_texture_passthrough_t storage_texture_writes[xf_node_max_storage_texture_writes_m];
 } xf_node_passthrough_params_t;
 
+// TODO add depth_stencil?
 #define xf_node_passthrough_params_m( ... ) ( xf_node_passthrough_params_t ) { \
     .enable = false, \
     .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_texture_passthrough_m() }, \
-    .shader_texture_writes = { [0 ... xf_node_max_shader_texture_writes_m - 1] = xf_texture_passthrough_m() }, \
+    .storage_texture_writes = { [0 ... xf_node_max_storage_texture_writes_m - 1] = xf_texture_passthrough_m() }, \
     ##__VA_ARGS__ \
 }
-
-#define xf_node_default_passthrough_params_m xf_node_passthrough_params_m()
 
 typedef struct {
     // IO Dependency
@@ -238,90 +240,172 @@ typedef struct {
     //      at the end of the list. api would need to provide macro overload for all resource counts. probably messy and wont look nice but could work
     //      for now just leave explicit counts and get it to work
     //
-    xf_node_shader_texture_dependency_t shader_texture_reads[xf_node_max_shader_texture_reads_m];
-    size_t shader_texture_reads_count;
-    xf_buffer_dependency_t shader_buffer_reads[xf_node_max_shader_buffer_reads_m];
-    size_t shader_buffer_reads_count;
+    xf_shader_texture_dependency_t sampled_textures[xf_node_max_sampled_textures_m];
+    uint32_t sampled_textures_count;
+    xf_shader_texture_dependency_t storage_texture_reads[xf_node_max_storage_texture_reads_m];
+    uint32_t storage_texture_reads_count;
+    xf_shader_texture_dependency_t storage_texture_writes[xf_node_max_storage_texture_writes_m];
+    uint32_t storage_texture_writes_count;
 
-    xf_node_shader_texture_dependency_t shader_texture_writes[xf_node_max_shader_texture_writes_m];
-    size_t shader_texture_writes_count;
-    xf_buffer_dependency_t shader_buffer_writes[xf_node_max_shader_buffer_writes_m];
-    size_t shader_buffer_writes_count;
+    xf_shader_buffer_dependency_t uniform_buffers[xf_node_max_uniform_buffers_m];
+    uint32_t uniform_buffers_count;
+    xf_shader_buffer_dependency_t storage_buffer_reads[xf_node_max_storage_buffer_reads_m];
+    uint32_t storage_buffer_reads_count;
+    xf_shader_buffer_dependency_t storage_buffer_writes[xf_node_max_storage_buffer_writes_m];
+    uint32_t storage_buffer_writes_count;
 
-    xf_node_copy_texture_dependency_t copy_texture_reads[xf_node_max_copy_texture_reads_m];
+    xf_copy_texture_dependency_t copy_texture_reads[xf_node_max_copy_texture_reads_m];
     size_t copy_texture_reads_count;
+    xf_copy_texture_dependency_t copy_texture_writes[xf_node_max_copy_texture_writes_m];
+    size_t copy_texture_writes_count;
+
     xf_buffer_h copy_buffer_reads[xf_node_max_copy_buffer_reads_m];
     size_t copy_buffer_reads_count;
-
-    xf_node_copy_texture_dependency_t copy_texture_writes[xf_node_max_copy_texture_writes_m];
-    size_t copy_texture_writes_count;
     xf_buffer_h copy_buffer_writes[xf_node_max_copy_buffer_writes_m];
     size_t copy_buffer_writes_count;
 
-    xf_node_render_target_dependency_t render_targets[xf_node_max_render_targets_m];
+    xf_render_target_dependency_t render_targets[xf_node_max_render_targets_m];
     size_t render_targets_count;
     xf_texture_h depth_stencil_target;
 
     xf_texture_h presentable_texture;
 
+#if 0
     // TODO remove? keep? currently unused
     xf_node_h node_dependencies[xf_node_max_node_dependencies_m];
     size_t node_dependencies_count;
+#endif
+} xf_node_resource_params_t;
 
-    xf_node_passthrough_params_t passthrough;
-
-    // At execution time the pass is given a base key that can be used for render (xg) submission.
-    // Here is specified how many key values should be reserved for this node, starting at that base key.
-    uint64_t key_space_size;
-
-    // User routine and args
-    xf_node_execute_f* execute_routine;
-    std_buffer_t user_args;
-    bool copy_args;
-
-    char debug_name[xf_debug_name_size_m];
-    uint32_t debug_color;
-} xf_node_params_t;
-
-#define xf_node_params_m( ... ) ( xf_node_params_t ) { \
-    .shader_texture_reads = { [0 ... xf_node_max_shader_texture_reads_m - 1] = xf_default_shader_texture_dependency_m }, \
-    .shader_texture_reads_count = 0, \
-    .shader_buffer_reads = { [0 ... xf_node_max_shader_buffer_reads_m - 1] = xf_buffer_dependency_m() }, \
-    .shader_buffer_reads_count = 0, \
+#define xf_node_resource_params_m( ... ) ( xf_node_resource_params_t ) { \
+    .sampled_textures = { [0 ... xf_node_max_sampled_textures_m - 1] = xf_shader_texture_dependency_m() }, \
+    .sampled_textures_count = 0, \
+    .storage_texture_reads = { [0 ... xf_node_max_storage_texture_reads_m - 1] = xf_shader_texture_dependency_m() }, \
+    .storage_texture_reads_count = 0, \
+    .storage_texture_writes = { [0 ... xf_node_max_storage_texture_writes_m - 1] = xf_shader_texture_dependency_m() }, \
+    .storage_texture_writes_count = 0, \
     \
-    .shader_texture_writes = { [0 ... xf_node_max_shader_texture_writes_m - 1] = xf_default_shader_texture_dependency_m }, \
-    .shader_texture_writes_count = 0, \
-    .shader_buffer_writes = { [0 ... xf_node_max_shader_buffer_writes_m - 1] = xf_buffer_dependency_m() }, \
-    .shader_buffer_writes_count = 0, \
+    .uniform_buffers = { [0 ... xf_node_max_uniform_buffers_m - 1] = xf_shader_buffer_dependency_m() }, \
+    .uniform_buffers_count = 0, \
+    .storage_buffer_reads = { [0 ... xf_node_max_storage_buffer_reads_m - 1] = xf_shader_buffer_dependency_m() }, \
+    .storage_buffer_reads_count = 0, \
+    .storage_buffer_writes = { [0 ... xf_node_max_storage_buffer_writes_m - 1] = xf_shader_buffer_dependency_m() }, \
+    .storage_buffer_writes_count = 0, \
     \
-    .copy_texture_reads = { [0 ... xf_node_max_copy_texture_reads_m - 1] = xf_default_copy_texture_dependency_m }, \
+    .copy_texture_reads = { [0 ... xf_node_max_copy_texture_reads_m - 1] = xf_copy_texture_dependency_m() }, \
     .copy_texture_reads_count = 0, \
+    .copy_texture_writes = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xf_copy_texture_dependency_m() }, \
+    .copy_texture_writes_count = 0, \
+    \
     .copy_buffer_reads = { [0 ... xf_node_max_copy_buffer_reads_m - 1] = xf_null_handle_m }, \
     .copy_buffer_reads_count = 0, \
-    \
-    .copy_texture_writes = { [0 ... xf_node_max_copy_texture_writes_m - 1] = xf_default_copy_texture_dependency_m }, \
-    .copy_texture_writes_count = 0, \
     .copy_buffer_writes = { [0 ... xf_node_max_copy_buffer_writes_m - 1] = xf_null_handle_m }, \
     .copy_buffer_writes_count = 0,\
     \
-    .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_default_render_target_dependency_m }, \
+    .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_render_target_dependency_m() }, \
     .render_targets_count = 0, \
     .depth_stencil_target = xf_null_handle_m, \
+    \
     .presentable_texture = xf_null_handle_m, \
-    \
-    .node_dependencies = { [0 ... xf_node_max_node_dependencies_m - 1] = xf_null_handle_m }, \
-    .node_dependencies_count = 0, \
-    \
-    .passthrough = xf_node_default_passthrough_params_m, \
-    \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    // At execution time the pass is given a base key that can be used for render (xg) submission.
+    // Here is specified how many key values should be reserved for this node, starting at that base key.
+    uint64_t key_space_size;
+    xf_node_execute_f* routine;
+    std_buffer_t user_args;
+    bool copy_args;
+} xf_node_custom_pass_params_t;
+
+#define xf_node_custom_pass_params_m( ... ) ( xf_node_custom_pass_params_t ) { \
     .key_space_size = 0, \
-    \
-    .execute_routine = NULL, \
+    .routine = NULL, \
     .user_args = std_null_buffer_m, \
     .copy_args = true, \
-    \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_compute_pipeline_state_h pipeline;
+    uint32_t workgroup_count[3];
+    std_buffer_t uniform_data;
+    bool copy_uniform_data;
+    xg_sampler_h samplers[xg_pipeline_resource_max_samplers_per_set_m];
+    uint32_t samplers_count;
+} xf_node_compute_pass_params_t;
+
+#define xf_node_compute_pass_params_m( ... ) ( xf_node_compute_pass_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .workgroup_count = { 1, 1, 1 }, \
+    .uniform_data = std_null_buffer_m, \
+    .copy_uniform_data = true, \
+    .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
+    .samplers_count = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef enum {
+    xf_texture_clear_type_color_m,
+    xf_texture_clear_type_depth_stencil_m,
+} xf_texture_clear_type_e;
+
+typedef struct {
+    xf_texture_clear_type_e type;
+    union {
+        xg_color_clear_t color;
+        xg_depth_stencil_clear_t depth_stencil;
+    };
+} xf_texture_clear_t;
+
+#define xf_texture_clear_m( ... ) ( xf_texture_clear_t ) { \
+    .type = xf_texture_clear_type_color_m, \
+    .color = xg_color_clear_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    // TODO rename to copy_texture_writes?
+    xf_texture_clear_t textures[xf_node_max_copy_texture_writes_m];
+} xf_node_clear_pass_params_t;
+
+#define xf_node_clear_pass_params_m( ... ) ( xf_node_clear_pass_params_t ) { \
+    .textures = { [0 ... xf_node_max_copy_texture_writes_m-1] = xf_texture_clear_m() }, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    union {
+        xf_node_custom_pass_params_t custom;
+        xf_node_compute_pass_params_t compute;
+        xf_node_clear_pass_params_t clear;
+    };
+} xf_node_pass_params_t;
+
+typedef enum {
+    xf_node_type_custom_pass_m,
+    xf_node_type_compute_pass_m,
+    xf_node_type_copy_pass_m,
+    xf_node_type_clear_pass_m,
+} xf_node_type_e;
+
+typedef struct {
+    char debug_name[xf_debug_name_size_m];
+    uint32_t debug_color;
+    xf_node_type_e type;
+    xf_node_pass_params_t pass;
+    xf_node_resource_params_t resources;
+    xf_node_passthrough_params_t passthrough;
+} xf_node_params_t;
+
+#define xf_node_params_m( ... ) ( xf_node_params_t ) { \
     .debug_name = { 0 }, \
     .debug_color = xg_debug_region_color_none_m, \
+    .resources = xf_node_resource_params_m(), \
+    .passthrough = xf_node_passthrough_params_m(), \
+    .type = xf_node_type_custom_pass_m, \
+    .pass.custom = xf_node_custom_pass_params_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -382,7 +466,6 @@ typedef struct {
     .multi_texture_count = 2, \
     ##__VA_ARGS__ \
 }
-#define xf_default_multi_texture_params_m xf_multi_texture_params_m()
 
 typedef struct {
     xf_buffer_params_t buffer;
@@ -433,7 +516,7 @@ typedef struct {
     //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
 
     xf_graph_h ( *create_graph ) ( xg_device_h device, xg_swapchain_h swapchain );
-    xf_node_h ( *create_node ) ( xf_graph_h graph, const xf_node_params_t* params );
+    xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
     //void ( *build_graph ) ( xf_graph_h graph );
     void ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
@@ -454,5 +537,8 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
-    void ( *debug_ui_graph ) ( xi_i* xi, xi_workload_h workload, xf_graph_h graph ); // adding a xf->xi dependency here kind of sucks...
+    // adding a xf->xi dependency here kind of sucks...
+    // TODO instead support inside xf all required debug functionality (passthrough, output override, ...) and have a way for client code to easily iterate through nodes
+    // and leave actual ui code in client space
+    void ( *debug_ui_graph ) ( xi_i* xi, xi_workload_h workload, xf_graph_h graph ); 
 } xf_i;

@@ -177,35 +177,36 @@ static void xi_test ( void ) {
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
 
-    xf_node_h clear_node;
-    {
-        xf_node_params_t node_params = xf_node_params_m (
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "clear",
+        .debug_color = xg_debug_region_color_red_m,
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { xf_texture_clear_m () }
+        ),
+        .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
-            .copy_texture_writes = { xf_copy_texture_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
-            .execute_routine = clear_pass,
-            .debug_name = "clear",
-            .debug_color = xg_debug_region_color_red_m,
-        );
-        clear_node = xf->create_node ( graph, &node_params );
-    }
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+        )
+    ) );
 
     xf_ui_pass_args_t ui_node_args;
-    xf_node_h ui_node;
-    {
-        xf_node_params_t node_params = xf_node_params_m (
-            .render_targets_count = 1,
-            .render_targets = { xf_render_target_dependency_m ( swapchain_multi_texture, xg_default_texture_view_m ) },
-            .presentable_texture = swapchain_multi_texture,
-            .execute_routine = ui_pass,
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "ui",
+        .debug_color = xg_debug_region_color_green_m,
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = ui_pass,
             .user_args = std_buffer_m ( &ui_node_args ),
             .copy_args = false,
-            .debug_name = "ui",
-            .debug_color = xg_debug_region_color_green_m,
             .key_space_size = 128,
-        );
-
-        ui_node = xf->create_node ( graph, &node_params );
-    }
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = swapchain_multi_texture ) },
+            .presentable_texture = swapchain_multi_texture,
+        )
+    ) );
 
     xf->debug_print_graph ( graph );
 

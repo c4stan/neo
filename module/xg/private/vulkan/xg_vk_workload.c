@@ -500,7 +500,6 @@ typedef struct {
 } xg_vk_tranlsation_state_t;
 
 static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* state, xg_vk_workload_submit_context_t* context, xg_device_h device_handle, VkCommandBuffer vk_cmd_buffer ) {
-
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
     // Clear pending dynamic state
@@ -532,7 +531,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
         if ( state->render_textures.depth_stencil.texture != xg_null_handle_m ) {
             //const xg_vk_texture_t* texture = xg_vk_texture_get ( state->render_textures.depth_stencil.texture );
             xg_texture_h texture = state->render_textures.depth_stencil.texture;
-            framebuffer_attachments[state->render_textures.render_targets_count] = xg_vk_texture_get_view ( texture, xg_default_texture_view_m )->vk_handle;
+            framebuffer_attachments[state->render_textures.render_targets_count] = xg_vk_texture_get_view ( texture, xg_texture_view_m() )->vk_handle;
             //clear_values[current_render_textures.render_targets_count].depthStencil.depth = current_render_textures.depth_stencil.clear.depth;
             //clear_values[current_render_textures.render_targets_count].depthStencil.stencil = current_render_textures.depth_stencil.clear.stencil;
             ++attachment_count;
@@ -1150,8 +1149,8 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 const xg_vk_graphics_pipeline_t* pipeline = xg_vk_graphics_pipeline_get ( args->pipeline );
 
                 state.pipeline_type_change = state.pipeline_type != xg_pipeline_graphics_m;
+                state.dirty_pipeline = state.graphics_pipeline != pipeline;
                 state.graphics_pipeline = pipeline;
-                state.dirty_pipeline = true;
                 state.pipeline_type = xg_pipeline_graphics_m;
             }
             break;
@@ -1746,6 +1745,8 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 vk_dependency_info.pImageMemoryBarriers = vk_texture_barriers;
 
                 xg_vk_instance_ext_api()->cmd_sync2_pipeline_barrier ( vk_cmd_buffer, &vk_dependency_info );
+
+                std_noop_m;
 #else
                 // TODO test this path, probably not working atm
                 // --- !! WARNING !! ---
