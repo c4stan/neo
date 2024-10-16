@@ -743,6 +743,12 @@ void xg_cmd_buffer_barrier_set ( xg_cmd_buffer_h cmd_buffer_handle, const xg_bar
     if ( barrier_set->texture_memory_barriers_count > 0 ) {
         std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_texture_memory_barrier_t ) );
         xg_texture_memory_barrier_t* barriers = std_queue_local_emplace_array_m ( &cmd_buffer->cmd_args_allocator, xg_texture_memory_barrier_t, barrier_set->texture_memory_barriers_count );
+        
+        for ( uint32_t i = 0; i < barrier_set->texture_memory_barriers_count; ++i ) {
+            xg_texture_memory_barrier_t* barrier = &barrier_set->texture_memory_barriers[i];
+            std_assert_m ( barrier->texture != xg_null_handle_m );
+        }
+
         std_mem_copy_array_m ( barriers, barrier_set->texture_memory_barriers, barrier_set->texture_memory_barriers_count );
     }
 }

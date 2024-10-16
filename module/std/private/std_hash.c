@@ -936,3 +936,9 @@ bool std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash ) {
     return false;
 }
 
+void std_hash_set_clear ( std_hash_set_t* set ) {
+    set->count = 0;
+    for ( size_t i = 0; i < set->mask + 1; ++i ) {
+        set->hashes[i] = UINT64_MAX;
+    }
+}

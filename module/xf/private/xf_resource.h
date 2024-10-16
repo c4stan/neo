@@ -84,7 +84,7 @@ typedef struct {
 
 typedef struct {
     bool is_dirty;
-    bool is_user_bind;
+    bool is_external; // lifetime not owned by xf. never allocated, just used
     xg_texture_h xg_handle;
     xg_texture_usage_bit_e required_usage;
     xg_texture_usage_bit_e allowed_usage;
@@ -181,6 +181,7 @@ void xf_resource_buffer_add_usage ( xf_buffer_h buffer, xg_buffer_usage_bit_e us
 
 void xf_resource_texture_add_reader ( xf_texture_h texture, xg_texture_view_t view, xf_node_h reader );
 void xf_resource_texture_add_writer ( xf_texture_h texture, xg_texture_view_t view, xf_node_h writer );
+void xf_resource_texture_clear_dependencies ( xf_texture_h texture );
 void xf_resource_buffer_add_reader ( xf_buffer_h buffer, xf_node_h reader );
 void xf_resource_buffer_add_writer ( xf_buffer_h buffer, xf_node_h writer );
 

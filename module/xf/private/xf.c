@@ -7,8 +7,9 @@ static void xf_api_init ( xf_i* xf ) {
     xf->declare_buffer = xf_resource_buffer_declare;
     xf->create_graph = xf_graph_create;
     xf->add_node = xf_graph_add_node;
-    //xf.build_graph = xf_graph_build;
+    xf->build_graph = xf_graph_build2;
     xf->execute_graph = xf_graph_execute;
+    xf->destroy_graph = xf_graph_destroy;
     //xf.declare_swapchain = xf_resource_swapchain_declare;
     //xf.bind_texture = xf_resource_texture_bind;
 

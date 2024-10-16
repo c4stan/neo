@@ -82,7 +82,6 @@ typedef struct {
     xf_node_h nodes[xf_graph_max_nodes_m];
     size_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
     size_t nodes_count;
-    xg_swapchain_h swapchain;
     
     xf_texture_h multi_textures_array[xf_graph_max_multi_textures_per_graph_m];
     uint64_t multi_textures_count;
@@ -102,11 +101,12 @@ void xf_graph_load ( xf_graph_state_t* state );
 void xf_graph_reload ( xf_graph_state_t* state );
 void xf_graph_unload ( void );
 
-xf_graph_h xf_graph_create ( xg_device_h device, xg_swapchain_h swapchain );
+xf_graph_h xf_graph_create ( xg_device_h device );
 xf_node_h xf_graph_add_node ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_clear ( xf_graph_h graph );
-//void xf_graph_build ( xf_graph_h graph );
-void xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload );
+void xf_graph_build2 ( xf_graph_h graph, xg_workload_h xg_workload );
+void xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload );
+void xf_graph_destroy ( xf_graph_h graph );
 
 void xf_graph_get_info ( xf_graph_info_t* info, xf_graph_h graph );
 void xf_graph_get_node_info ( xf_node_info_t* info, xf_node_h node );

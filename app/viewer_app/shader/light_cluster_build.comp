@@ -50,15 +50,20 @@ void main ( void ) {
     uvec3 cluster_3d_idx;
     cluster_3d_idx.z = cluster_idx / ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y );
     cluster_3d_idx.y = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) / uniform_buffer.grid_size.x;
-    cluster_3d_idx.z = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
+    cluster_3d_idx.x = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
 
-    vec2 screen_tile_start = cluster_3d_idx.xy / uniform_buffer.grid_size.xy;
-    vec2 screen_tile_end = ( cluster_3d_idx.xy + vec2 ( 1, 1 ) ) / uniform_buffer.grid_size.xy;
+    vec2 screen_tile_start = vec2 ( cluster_3d_idx.xy ) / uniform_buffer.grid_size.xy;
+    vec2 screen_tile_end = vec2 ( cluster_3d_idx.xy + uvec2 ( 1, 1 ) ) / uniform_buffer.grid_size.xy;
 
     vec3 view_cluster_start = view_from_screen ( vec3 ( screen_tile_start, 1 ) );
     vec3 view_cluster_end = view_from_screen ( vec3 ( screen_tile_end, 1 ) );
-    float view_cluster_near = view_cbuffer.z_near * pow ( view_cbuffer.z_far / view_cbuffer.z_near, cluster_3d_idx.z / uniform_buffer.grid_size.z );
-    float view_cluster_far = view_cbuffer.z_near * pow ( view_cbuffer.z_far / view_cbuffer.z_near, ( cluster_3d_idx.z + 1 ) / uniform_buffer.grid_size.z );
+    float b = view_cbuffer.z_far / view_cbuffer.z_near;
+    float e1 = float ( cluster_3d_idx.z ) / uniform_buffer.grid_size.z;
+    float e2 = float ( cluster_3d_idx.z + 1 ) / uniform_buffer.grid_size.z;
+    float p1 = pow ( b, e1 );
+    float p2 = pow ( b, e2 );
+    float view_cluster_near = view_cbuffer.z_near * p1;
+    float view_cluster_far = view_cbuffer.z_near * p2;
 
     vec3 p0 = vec3 ( 0 );
     vec3 view_cluster_start_near = intersect_line_z_plane ( p0, view_cluster_start, view_cluster_near );
@@ -70,6 +75,6 @@ void main ( void ) {
     vec3 aabb_max = max ( max ( view_cluster_start_near, view_cluster_start_far ), max ( view_cluster_end_near, view_cluster_end_far ) );
 
     cluster_buffer.clusters[cluster_idx].min = vec4 ( aabb_min, 0 );
-    cluster_buffer.clusters[cluster_idx].min = vec4 ( aabb_max, 0 );
+    cluster_buffer.clusters[cluster_idx].max = vec4 ( aabb_max, 0 );
 #endif
 }

@@ -259,9 +259,9 @@ def build_workspace(name, flags):
             print('\n' + Color.FAIL + "-pp and -asm are exclusive, can't have both. Build aborted." + Color.ENDC + '\n')
             return
         build_flags = build_flags | makegen.BUILD_FLAG_OUTPUT_ASM
-    if '-opt' not in flags:
+    if '-o' not in flags:
         build_flags = build_flags | makegen.BUILD_FLAG_OPTIMIZATION_OFF
-    if '-d' in flags:
+    if '-w' in flags:
         build_flags = build_flags | makegen.BUILD_FLAG_PERMISSIVE_WARNINGS
     if '-r' in flags:
         build_flags = build_flags | makegen.BUILD_FLAG_PERMISSIVE_WARNINGS

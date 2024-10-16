@@ -370,6 +370,14 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+typedef struct {
+    float start[3];
+    float end[3];
+    xi_color_t color;
+    xi_id_t id;
+    uint64_t sort_order;
+} xi_line_state_t;
+
 // TODO XOR instead of + ?
 #define xi_line_id_m() ( xi_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )
 
@@ -459,5 +467,6 @@ typedef struct {
     bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
     void ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
 
+    void ( *draw_line )     ( xi_workload_h workload, xi_line_state_t* state );
     void ( *draw_gizmo )    ( xi_workload_h workload, xi_gizmo_state_t* state );
 } xi_i;

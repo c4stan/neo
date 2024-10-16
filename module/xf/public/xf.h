@@ -114,6 +114,8 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+#define xf_compute_buffer_dependency_m( ... ) xf_shader_buffer_dependency_m ( .stage = xg_pipeline_stage_bit_compute_shader_m, ##__VA_ARGS__ )
+
 // Resources
 typedef struct {
     xg_texture_h texture;
@@ -426,6 +428,8 @@ typedef struct {
         xg_depth_stencil_clear_t depth_stencil;
     } clear;
     xg_texture_view_access_e view_access;
+    // To be used only when some usage isn't specified by the graph itself
+    // but it is needed anyway for some external interaction (used by a second later graph? TODO test this use case)
     xg_texture_usage_bit_e usage;
 } xf_texture_params_t;
 
@@ -456,6 +460,7 @@ typedef struct {
     .size = 0, \
     .allow_aliasing = false, \
     .debug_name = {0}, \
+    ##__VA_ARGS__ \
 }
 
 typedef struct {
@@ -477,6 +482,7 @@ typedef struct {
 #define xf_multi_buffer_params_m( ... ) ( xf_multi_buffer_params_t ) { \
     .buffer = xf_buffer_params_m(), \
     .multi_buffer_count = 2, \
+    ##__VA_ARGS__ \
 }
 
 typedef struct {
@@ -500,7 +506,6 @@ typedef struct {
 
 typedef struct {
     xg_device_h device;
-    xg_swapchain_h swapchain;
     uint32_t node_count;
     xf_node_h nodes[xf_graph_max_nodes_m];
 } xf_graph_info_t;
@@ -517,10 +522,11 @@ typedef struct {
     xf_texture_h ( *declare_multi_texture ) ( const xf_multi_texture_params_t* params );
     //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
 
-    xf_graph_h ( *create_graph ) ( xg_device_h device, xg_swapchain_h swapchain );
+    xf_graph_h ( *create_graph ) ( xg_device_h device );
     xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
-    //void ( *build_graph ) ( xf_graph_h graph );
+    void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
     void ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload );
+    void ( *destroy_graph ) ( xf_graph_h graph );
 
     void ( *disable_node ) ( xf_node_h node );
     void ( *enable_node ) ( xf_node_h node );

@@ -12,8 +12,6 @@ void        std_mem_zero ( void* dest, size_t size );
 bool        std_mem_test ( const void* base, size_t size, char value );
 void        std_mem_move ( void* dest, void* source, size_t size );
 
-// note: sizeof(char[32]) == 32, use _T for static arrays (need to take its address)
-// TODO split static_array from array from single item
 #define     std_mem_zero_m( item ) std_mem_zero ( (item), sizeof ( *(item) ) )
 #define     std_mem_zero_array_m( item, count ) std_mem_zero ( (item), sizeof ( *(item) ) * (count) )
 #define     std_mem_zero_static_array_m( array ) std_mem_zero ( array, sizeof ( array ) )

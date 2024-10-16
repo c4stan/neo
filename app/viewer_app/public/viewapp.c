@@ -164,7 +164,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xs_i* xs = m_state->modules.xs;
     xf_i* xf = m_state->modules.xf;
 
-    xf_graph_h graph = xf->create_graph ( device, xg_null_handle_m );
+    xf_graph_h graph = xf->create_graph ( device );
     m_state->render.graph = graph;
 
     // frame setup
@@ -225,7 +225,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xs_i* xs = m_state->modules.xs;
     xf_i* xf = m_state->modules.xf;
 
-    xf_graph_h graph = xf->create_graph ( device, xg_null_handle_m );
+    xf_graph_h graph = xf->create_graph ( device );
     m_state->render.graph = graph;
 
     // frame setup
@@ -341,6 +341,31 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "lighting_texture",
     ) );
+
+#if 1
+    uint32_t light_grid_size[3] = { 16, 8, 24 };
+    uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
+    xf_buffer_h light_cluster_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+        .size = sizeof ( float ) * 4 * 2 * light_cluster_count,
+        .debug_name = "light_clusters"
+    ) );
+
+    xf_node_h light_clusters_build_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "light_cluster_build",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cluster_build" ) ) ),
+            .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
+            .uniform_data = std_buffer_static_array_m ( light_grid_size ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_buffer_writes_count = 1,
+            .storage_buffer_writes = {
+                xf_compute_buffer_dependency_m ( .buffer = light_cluster_buffer )
+            }
+        )
+    ) );
+#endif
 
     // todo remove extra normal texture param
     xf_node_h lighting_node = add_lighting_pass ( graph, lighting_texture, color_texture, normal_texture, normal_texture, depth_stencil_texture, shadow_texture );
@@ -678,6 +703,9 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xf->build_graph ( m_state->render.graph, workload );
+    xg->submit_workload ( workload );
     xf->debug_print_graph ( graph );
 }
 

@@ -288,6 +288,11 @@ void xf_resource_texture_add_writer ( xf_texture_h texture_handle, xg_texture_vi
     //texture->deps.writers[texture->deps.writers_count++] = node;
 }
 
+void xf_resource_texture_clear_dependencies ( xf_texture_h texture_handle ) {
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    std_mem_zero_m ( &texture->deps );
+}
+
 void xf_resource_buffer_add_reader ( xf_buffer_h buffer_handle, xf_node_h node ) {
     xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
     buffer->deps.readers[buffer->deps.readers_count++] = node;
@@ -444,7 +449,7 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
         xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
         //std_mem_zero_m ( texture );
         texture->xg_handle = info.textures[i];
-        texture->is_user_bind = true;
+        texture->is_external = true;
 
         xg_texture_info_t texture_info;
         xg->get_texture_info ( &texture_info, info.textures[i] );
@@ -503,7 +508,7 @@ xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h xg_texture
     std_mem_zero_m ( texture );
     texture->xg_handle = xg_texture;
     //texture->params = params;
-    texture->is_user_bind = true;
+    texture->is_external = true;
     texture->alias = xf_null_handle_m;
 
     xf_texture_h handle = ( xf_texture_h ) ( texture - xf_resource_state->textures_array );
