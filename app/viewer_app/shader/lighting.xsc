@@ -1,10 +1,11 @@
-compute_shader bi_blur.comp
+compute_shader lighting.comp
 
 include common.xsi
 
 begin bindings
     buffer uniform
-    texture sampled[3]
+    buffer storage[3]
+    texture sample[4]
     texture storage
     sampler
 end

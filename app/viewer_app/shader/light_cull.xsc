@@ -1,8 +1,8 @@
 include common.xsi
 
-compute_shader light_cluster_build.comp
+compute_shader light_cull.comp
 
 begin bindings
     buffer uniform
-    buffer storage
+    buffer storage[4]
 end

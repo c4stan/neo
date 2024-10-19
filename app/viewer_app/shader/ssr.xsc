@@ -2,33 +2,9 @@ compute_shader ssr.comp
 
 include common.xsi
 
-begin buffer
-    stage compute
-    register 0
-end
-
-begin texture
-    stage compute
-    register 1
-end
-
-begin texture
-    stage compute
-    register 2
-end
-
-begin texture
-    stage compute
-    register 3
-end
-
-begin texture
-    stage compute
-    register 4
-    access write
-end
-
-begin sampler
-    stage compute
-    register 5
+begin bindings
+    buffer uniform
+    texture sampled[3]
+    texture storage
+    sampler
 end

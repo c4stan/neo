@@ -2,24 +2,9 @@ compute_shader hiz_gen.comp
 
 include common.xsi
 
-begin buffer
-    stage vertex
-    stage compute
-    register 0
-end
-
-begin texture
-    stage compute
-    register 1
-end
-
-begin texture
-    stage compute
-    register 2
-    access write
-end
-
-begin sampler
-    stage compute
-    register 3
+begin bindings
+    buffer uniform
+    texture sampled
+    texture storage
+    sampler
 end

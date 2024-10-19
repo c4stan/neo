@@ -42,7 +42,10 @@ typedef struct {
 
     xs_database_h sdb;
 
-    xf_graph_h graph;
+    xf_graph_h raster_graph;
+    xf_graph_h raytrace_graph;
+
+    xf_graph_h active_graph;
 
     xf_node_h taa_node;
 
@@ -53,6 +56,28 @@ typedef struct {
 
     std_tick_t frame_tick;
 } viewapp_render_state_t;
+
+#define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
+    .resolution_x = 0, \
+    .resolution_y = 0, \
+    .frame_id = 0, \
+    .capture_frame = false, \
+    .time_ms = 0, \
+    .delta_time_ms = 0, \
+    .window = wm_null_handle_m, \
+    .device = xg_null_handle_m, \
+    .swapchain = xg_null_handle_m, \
+    .sdb = xs_null_handle_m, \
+    .raster_graph = xf_null_handle_m, \
+    .raytrace_graph = xf_null_handle_m, \
+    .active_graph = xf_null_handle_m, \
+    .taa_node = xf_null_handle_m, \
+    .raytrace_world = xg_null_handle_m, \
+    .window_info = {}, \
+    .input_state = {}, \
+    .frame_tick = 0, \
+    ##__VA_ARGS__ \
+}
 
 // UI
 typedef struct {
@@ -105,7 +130,7 @@ typedef struct {
     float up[3];
     viewapp_material_data_t material;
 
-    xg_raytrace_geometry_h rt_geo_handle;
+    xg_raytrace_geometry_h rt_geo;
     uint32_t rt_instance_id;
 } viewapp_mesh_component_t;
 
@@ -133,16 +158,18 @@ typedef struct {
     bool shadow_casting;
     rv_view_h view;
     float position[3];
-    float intensity;
+    float radius;
     float color[3];
+    float intensity;
 } viewapp_light_component_t; // spotlight
 
 #define viewapp_light_component_m( ... ) ( viewapp_light_component_t ) { \
     .shadow_casting = false, \
     .view = rv_null_handle_m, \
     .position = { 0, 0, 0 }, \
-    .intensity = 0, \
+    .radius = 100, \
     .color = { 0, 0, 0 }, \
+    .intensity = 0, \
     ##__VA_ARGS__ \
 }
 

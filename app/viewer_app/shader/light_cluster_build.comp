@@ -1,18 +1,14 @@
 #version 460
 
 #include "common.glsl"
+#include "lighting_common.glsl"
 
 layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform_buffer_t {
     uvec3 grid_size;
 } uniform_buffer;
 
-struct cluster_t {
-    vec4 min;
-    vec4 max;
-};
-
 layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer writeonly cluster_buffer_t {
-    cluster_t clusters[];
+    light_cluster_t clusters[];
 } cluster_buffer;
 
 layout ( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;

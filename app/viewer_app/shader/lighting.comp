@@ -1,32 +1,41 @@
 #version 450
 
-#include <xs.glsl>
-
 #include "common.glsl"
 #include "lighting_common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_normal;
-layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_material;
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
-layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_shadows;
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform_buffer_t {
+    uvec3 grid_size;
+    float z_scale;
+    float z_bias;
+} uniform_buffer;
 
-layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_buffer_t {
+    light_t lights[];
+} light_buffer;
+
+layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_list_buffer_t {
+    uint list[];
+} light_list_buffer;
+
+layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_grid_buffer_t {
+    light_grid_t grid[];
+} light_grid_buffer;
+
+layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
+layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_normal;
+layout ( binding = 6, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
+layout ( binding = 7, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_shadows;
+
+layout ( binding = 8, set = xs_resource_binding_set_per_draw_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+
+layout ( binding = 9, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
 
 #define MAX_LIGHT_COUNT 32
 
-layout ( binding = 6, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
-    uint light_count;
-    uint _pad0;
-    uint _pad1;
-    uint _pad2;
-    light_t lights[MAX_LIGHT_COUNT];
-} draw_cbuffer;
-
-layout ( location = 0 ) out vec4 out_color;
+layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 void main ( void ) {
-    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_cbuffer.resolution_f32 );
     screen_uv = dejitter_uv ( screen_uv );
 
     vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
@@ -45,13 +54,35 @@ void main ( void ) {
 
     vec3 irradiance = vec3 ( 0, 0, 0 );
 
-    for ( uint i = 0; i < draw_cbuffer.light_count; ++i ) {
-        vec3 world_light_pos = draw_cbuffer.lights[i].pos;
-        float light_emissive = draw_cbuffer.lights[i].emissive;
-        vec3 light_color = draw_cbuffer.lights[i].color;
+    uvec3 cluster_3d_idx;
+    // TODO precompute
+    //cluster_3d_idx.z = uint ( max ( log2 ( linearize_depth ( depth ) ) * uniform_buffer.z_scale + uniform_buffer.z_bias, 0 ) );
+    cluster_3d_idx.z = uint ( max ( log ( linearize_depth ( depth ) ) 
+        * ( uniform_buffer.grid_size.z / log ( view_cbuffer.z_far / view_cbuffer.z_near ) )
+        + ( - ( uniform_buffer.grid_size.z * log ( view_cbuffer.z_near ) ) / log ( view_cbuffer.z_far / view_cbuffer.z_near ) )
+        , 0 ) );
+    cluster_3d_idx.xy = uvec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_cbuffer.resolution_f32 * uniform_buffer.grid_size.xy );
+
+    uint cluster_idx = cluster_3d_idx.x + uniform_buffer.grid_size.x * cluster_3d_idx.y + ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) * cluster_3d_idx.z;
+
+    // TOOD
+#if 0
+    uint light_count = 1;
+    for ( uint i = 0; i < light_count; ++i ) {
+        light_t light = light_buffer.lights[i];
+#else
+    for ( uint i = 0; i < light_grid_buffer.grid[cluster_idx].count; ++i ) {
+        uint list_idx = light_grid_buffer.grid[cluster_idx].offset + i;
+        uint light_idx = light_list_buffer.list[list_idx];
+        light_t light = light_buffer.lights[light_idx];
+#endif
+
+        vec3 world_light_pos = light.pos;
+        float light_emissive = light.emissive;
+        vec3 light_color = light_buffer.lights[i].color;
 
         // TODO refactor screen_from_view to take in a proj_from_view matrix and use that
-        vec4 shadow_proj = draw_cbuffer.lights[i].proj_from_view * draw_cbuffer.lights[i].view_from_world * world_geo_pos;
+        vec4 shadow_proj = light.proj_from_view * light.view_from_world * world_geo_pos;
         shadow_proj /= shadow_proj.w;
         vec3 shadow_screen = vec3 ( shadow_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, shadow_proj.z );
 
@@ -105,5 +136,5 @@ void main ( void ) {
     vec3 ambient_color = vec3 ( 1, 1, 1 );
     vec3 direct = irradiance + ambient_emissive * ambient_color * base_color;
 
-    out_color = vec4 ( direct, 1 );
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( direct, 1 ) );
 }

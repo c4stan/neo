@@ -2,18 +2,8 @@ include common.xsi
 
 compute_shader tonemap.comp
 
-begin texture
-    stage compute
-    register 0
-end
-
-begin texture
-    stage compute
-    register 1
-    access write
-end
-
-begin sampler
-    stage compute
-    register 2
+begin bindings
+    texture sampled
+    texture storage
+    sampler
 end

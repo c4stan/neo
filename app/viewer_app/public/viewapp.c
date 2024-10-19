@@ -165,7 +165,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xf_i* xf = m_state->modules.xf;
 
     xf_graph_h graph = xf->create_graph ( device );
-    m_state->render.graph = graph;
+    m_state->render.raytrace_graph = graph;
 
     // frame setup
     xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
@@ -212,6 +212,9 @@ static void viewapp_boot_raytrace_graph ( void ) {
         )
     ) );
 
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xf->build_graph ( graph, workload );
+    xg->submit_workload ( workload );
     xf->debug_print_graph ( graph );
 }
 
@@ -226,7 +229,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_i* xf = m_state->modules.xf;
 
     xf_graph_h graph = xf->create_graph ( device );
-    m_state->render.graph = graph;
+    m_state->render.raster_graph = graph;
 
     // frame setup
     xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
@@ -335,6 +338,8 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );
 
     // lighting
+    uint32_t light_grid_size[3] = { 16, 8, 24 };
+    uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
     xf_texture_h lighting_texture = xf->declare_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
@@ -343,12 +348,34 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
 #if 1
-    uint32_t light_grid_size[3] = { 16, 8, 24 };
-    uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
+    // TODO rename these buffers more appropriately both here and in shader code
+    xf_buffer_h light_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+        .size = viewapp_max_lights_m * uniform_light_size(),
+        .debug_name = "lights",
+    ) );
+
+    xf_buffer_h light_upload_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+        .size = viewapp_max_lights_m * uniform_light_size(),
+        .debug_name = "lights_upload",
+        .upload = true,
+    ) );
+
+    xf_buffer_h light_list_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+        .size = sizeof ( uint32_t ) * light_cluster_count * 8,
+        .debug_name = "light_list",
+    ) );
+
+    xf_buffer_h light_grid_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+        .size = sizeof ( uint32_t ) * 2 * light_cluster_count,
+        .debug_name = "light_grid"
+    ) );
+
     xf_buffer_h light_cluster_buffer = xf->declare_buffer ( &xf_buffer_params_m (
         .size = sizeof ( float ) * 4 * 2 * light_cluster_count,
         .debug_name = "light_clusters"
     ) );
+
+    xf_node_h light_update_node = add_light_update_pass ( graph, light_upload_buffer, light_buffer );
 
     xf_node_h light_clusters_build_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "light_cluster_build",
@@ -365,10 +392,76 @@ static void viewapp_boot_raster_graph ( void ) {
             }
         )
     ) );
+
+    xf_node_h light_cull_node = xf->add_node ( graph, &xf_node_params_m ( 
+        .debug_name = "light_cull",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cull" ) ) ),
+            .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
+            .uniform_data = std_buffer_static_array_m ( light_grid_size ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_buffer_reads_count = 2,
+            .storage_buffer_reads = {
+                xf_compute_buffer_dependency_m ( .buffer = light_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = light_cluster_buffer ),
+            },
+            .storage_buffer_writes_count = 2,
+            .storage_buffer_writes =  {
+                xf_compute_buffer_dependency_m ( .buffer = light_list_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = light_grid_buffer ),
+            }
+        )
+    ) );
 #endif
 
-    // todo remove extra normal texture param
-    xf_node_h lighting_node = add_lighting_pass ( graph, lighting_texture, color_texture, normal_texture, normal_texture, depth_stencil_texture, shadow_texture );
+    struct {
+        uint32_t grid_size[3];
+        float z_scale;
+        float z_bias;
+    } lighting_uniforms = {
+        .grid_size[0] = light_grid_size[0],
+        .grid_size[1] = light_grid_size[1],
+        .grid_size[2] = light_grid_size[2],
+        .z_scale = 0, // TODO
+        .z_bias = 0,
+    };
+
+    xf_node_h lighting_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "lighting",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ) ),
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .uniform_data = std_buffer_m ( &lighting_uniforms ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_buffer_reads_count = 3,
+            .storage_buffer_reads = { 
+                xf_compute_buffer_dependency_m ( .buffer = light_buffer ), 
+                xf_compute_buffer_dependency_m ( .buffer = light_list_buffer ), 
+                xf_compute_buffer_dependency_m ( .buffer = light_grid_buffer ) 
+            },
+            .sampled_textures_count = 4,
+            .sampled_textures = {
+                xf_compute_texture_dependency_m ( .texture = color_texture ),
+                xf_compute_texture_dependency_m ( .texture = normal_texture ),
+                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ),
+                xf_compute_texture_dependency_m ( .texture = shadow_texture ),
+            },
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = {
+                xf_compute_texture_dependency_m ( .texture = lighting_texture )
+            }
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color_texture ) },
+        )
+    ) );
 
     // hi-z
     uint32_t hiz_mip_count = 8;
@@ -704,16 +797,14 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    xf->build_graph ( m_state->render.graph, workload );
+    xf->build_graph ( graph, workload );
     xg->submit_workload ( workload );
     xf->debug_print_graph ( graph );
 }
 
-#if 1
-static void viewapp_boot_build_raytrace_world ( void ) {
+static void viewapp_build_raytrace_geo ( void ) {
     xg_device_h device = m_state->render.device;
     xg_i* xg = m_state->modules.xg;
-    xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
 
     se_query_result_t mesh_query_result;
@@ -721,8 +812,6 @@ static void viewapp_boot_build_raytrace_world ( void ) {
     se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     se_component_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
     uint64_t mesh_count = mesh_query_result.entity_count;
-
-    xg_raytrace_geometry_instance_t* rt_instances = std_virtual_heap_alloc_array_m ( xg_raytrace_geometry_instance_t, mesh_count );
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
@@ -748,7 +837,31 @@ static void viewapp_boot_build_raytrace_world ( void ) {
         );
         std_str_copy_static_m ( rt_geo_params.debug_name, entity_properties.name );
         xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &rt_geo_params );
+        mesh_component->rt_geo = rt_geo;
+    }
+}
 
+static void viewapp_build_raytrace_world ( void ) {
+    xg_device_h device = m_state->render.device;
+    xg_i* xg = m_state->modules.xg;
+    xs_i* xs = m_state->modules.xs;
+    se_i* se = m_state->modules.se;
+
+    if ( m_state->render.raytrace_world != xg_null_handle_m ) {
+        xg->destroy_raytrace_world ( m_state->render.raytrace_world );
+    }
+
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_component_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    uint64_t mesh_count = mesh_query_result.entity_count;
+
+    xg_raytrace_geometry_instance_t* rt_instances = std_virtual_heap_alloc_array_m ( xg_raytrace_geometry_instance_t, mesh_count );
+
+    for ( uint64_t i = 0; i < mesh_count; ++i ) {
+        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+        
         sm_vec_3f_t up = {
             .x = mesh_component->up[0],
             .y = mesh_component->up[1],
@@ -779,7 +892,7 @@ static void viewapp_boot_build_raytrace_world ( void ) {
         std_mem_copy ( transform.f, world_matrix.e, sizeof ( float ) * 12 );
 
         rt_instances[i] = xg_raytrace_geometry_instance_m (
-            .geometry = rt_geo,
+            .geometry = mesh_component->rt_geo,
             .id = i,
             .transform = transform,
             .hit_shader_group_binding = 0,
@@ -799,7 +912,6 @@ static void viewapp_boot_build_raytrace_world ( void ) {
 
     m_state->render.raytrace_world = rt_world;
 }
-#endif
 
 static void viewapp_boot_scene_raytrace ( void ) {
     xg_device_h device = m_state->render.device;
@@ -1429,7 +1541,7 @@ static void viewapp_boot ( void ) {
 
         m_state->ui.window_state = xi_window_state_m (
             .title = "debug",
-            .minimized = true,
+            .minimized = false,
             .x = 50,
             .y = 100,
             .width = 350,
@@ -1479,10 +1591,13 @@ static void viewapp_boot ( void ) {
 
     viewapp_boot_scene_cornell_box();
     //viewapp_boot_scene_field();
-    //viewapp_boot_build_raytrace_world();
+    viewapp_build_raytrace_geo();
+    viewapp_build_raytrace_world();
 
     viewapp_boot_raster_graph();
-    //viewapp_boot_raytrace_graph();
+    viewapp_boot_raytrace_graph();
+
+    m_state->render.active_graph = m_state->render.raster_graph;
 }
 
 static void viewapp_update_cameras ( wm_input_state_t* input_state, wm_input_state_t* new_input_state ) {
@@ -1586,12 +1701,23 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     wm_input_buffer_t input_buffer;
     wm->get_window_input_buffer ( window, &input_buffer );
     
-    xi->begin_update ( window_info, input_state, &input_buffer );
+    xi->begin_update ( &xi_update_params_m (
+        .window_info = window_info,
+        .input_state = input_state,
+        .input_buffer = &input_buffer,
+    ) );
     xi->begin_window ( xi_workload, &m_state->ui.window_state );
     
     // frame
     xi->begin_section ( xi_workload, &m_state->ui.frame_section_state );
     {
+        xi_label_state_t frame_id_label = xi_label_state_m ( .text = "frame id:" );
+        xi_label_state_t frame_id_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
+        std_u32_to_str ( m_state->render.frame_id, frame_id_value.text, xi_label_text_size );
+        xi->add_label ( xi_workload, &frame_id_label );
+        xi->add_label ( xi_workload, &frame_id_value );
+        xi->newline();
+
         xi_label_state_t frame_time_label = xi_label_state_m ( .text = "frame time:" );
         xi_label_state_t frame_time_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
         std_f32_to_str ( m_state->render.delta_time_ms, frame_time_value.text, xi_label_text_size );
@@ -1649,34 +1775,93 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     
     // xf graph
     xi->begin_section ( xi_workload, &m_state->ui.xf_graph_section_state );
-    xf->debug_ui_graph ( xi, xi_workload, m_state->render.graph );
-    if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
-        .text = "Disable all",
-        .height = 20, 
-        .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
-    ) ) ) {
-        xf_graph_info_t info;
-        xf->get_graph_info ( &info, m_state->render.graph );
+    {
+        xi_label_state_t graph_select_label = xi_label_state_m (
+            .text = "graph"
+        );
+        xi->add_label ( xi_workload, &graph_select_label );
 
-        for ( uint32_t i = 0; i < info.node_count; ++i ) {
-            xf->disable_node ( info.nodes[i] );
+        const char* graph_select_items[] = { "raster", "raytrace" };
+        xi_select_state_t graph_select = xi_select_state_m (
+            .items = graph_select_items,
+            .item_count = std_static_array_capacity_m ( graph_select_items ),
+            .item_idx = m_state->render.active_graph == m_state->render.raster_graph ? 0 : 1,
+            .width = 100,
+            .sort_order = 1,
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+        );
+
+        xi->add_select ( xi_workload, &graph_select );
+
+        m_state->render.active_graph = graph_select.item_idx == 0 ? m_state->render.raster_graph : m_state->render.raytrace_graph;
+
+        xi->newline();
+
+        xf_graph_info_t graph_info;
+        xf->get_graph_info ( &graph_info, m_state->render.active_graph );
+        uint32_t passthrough_nodes_count = 0;
+
+        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
+            xf_node_info_t node_info;
+            xf->get_node_info ( &node_info, graph_info.nodes[i] );
+
+            if ( node_info.passthrough ) {
+                ++passthrough_nodes_count;
+                bool node_enabled = node_info.enabled;
+
+                xi_label_state_t node_label = xi_label_state_m ();
+                std_str_copy_static_m ( node_label.text, node_info.debug_name );
+                xi->add_label ( xi_workload, &node_label );
+
+                xi_switch_state_t node_switch = xi_switch_state_m (
+                    .width = 14,
+                    .height = 14,
+                    .value = node_enabled,
+                    .style = xi_style_m (
+                        .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+                    ),
+                );
+                xi->add_switch ( xi_workload, &node_switch );
+
+                xi->newline();
+
+                if ( node_switch.value != node_enabled ) {
+                    xf->node_set_enabled ( graph_info.nodes[i], node_switch.value );
+                }
+            }
         }
-    }
-    if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
-        .text = "Enable all", 
-        .height = 20,
-        .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
-    ) ) ) {
-        xf_graph_info_t info;
-        xf->get_graph_info ( &info, m_state->render.graph );
 
-        for ( uint32_t i = 0; i < info.node_count; ++i ) {
-            xf->enable_node ( info.nodes[i] );
+        xi->newline();
+
+        if ( passthrough_nodes_count > 0 ) {
+            if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
+                .text = "Disable all",
+                .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
+            ) ) ) {
+                xf_graph_info_t info;
+                xf->get_graph_info ( &info, m_state->render.active_graph );
+
+                for ( uint32_t i = 0; i < info.node_count; ++i ) {
+                    xf->disable_node ( info.nodes[i] );
+                }
+            }
+            if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
+                .text = "Enable all", 
+                .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
+            ) ) ) {
+                xf_graph_info_t info;
+                xf->get_graph_info ( &info, m_state->render.active_graph );
+
+                for ( uint32_t i = 0; i < info.node_count; ++i ) {
+                    xf->enable_node ( info.nodes[i] );
+                }
+            }
         }
     }
     xi->end_section ( xi_workload );
 
     // se entities
+    bool entity_edit = false;
     xi->begin_section ( xi_workload, &m_state->ui.entities_section_state );
     {
         se_i* se = m_state->modules.se;
@@ -1728,14 +1913,23 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         .id = ( ( ( uint64_t ) i ) << 32 ) + ( ( ( uint64_t ) j ) << 16 ) + ( ( uint64_t ) k ),
                         .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
                     );
-                    xi->add_property_editor ( xi_workload, &property_editor_state );
+                    entity_edit |= xi->add_property_editor ( xi_workload, &property_editor_state );
                     xi->newline();
                 }
             }
         }
     }
     xi->end_section ( xi_workload );
-    
+
+    if ( entity_edit ) {
+        xg->wait_all_workload_complete();
+        // TODO this is currently broken:
+        //      - world handle 0 gets deleted and recreated, the handle is immediately reused and thus remains the same
+        //      - function that creates the raytrace pass takes world handle as param and never updates after
+        //      - since the handle ends up being reused this ends up working out but IT IS BROKEN and needs to be fixed one way or another.
+        viewapp_build_raytrace_world();
+    }
+
     xi->end_window ( xi_workload );
     xi->end_update();
 }
@@ -1812,7 +2006,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
-    xf->execute_graph ( m_state->render.graph, workload );
+    xf->execute_graph ( m_state->render.active_graph, workload );
     xg->submit_workload ( workload );
     xg->present_swapchain ( m_state->render.swapchain, workload );
 
@@ -1846,8 +2040,7 @@ void* viewer_app_load ( void* runtime ) {
     state->modules.rv = std_module_load_m ( rv_module_name_m );
     state->modules.xi = std_module_load_m ( xi_module_name_m );
 
-    std_mem_zero_m ( &state->render );
-    state->render.frame_id = 0;
+    state->render = viewapp_render_state_m();
 
     m_state = state;
     return state;
@@ -1865,8 +2058,6 @@ void viewer_app_unload ( void ) {
     std_module_unload_m ( tk_module_name_m );
 
     viewapp_state_free();
-
-    std_log_info_m ( "viewapp unloaded" );
 }
 
 void viewer_app_reload ( void* runtime, void* api ) {

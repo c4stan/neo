@@ -1,0 +1,102 @@
+#version 460
+
+#include "common.glsl"
+#include "lighting_common.glsl"
+
+#extension GL_EXT_debug_printf : enable
+
+layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform_buffer_t {
+    uvec3 grid_size;
+} uniform_buffer;
+
+layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_buffer_t {
+    light_t lights[];
+} light_buffer;
+
+layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) buffer readonly cluster_buffer_t {
+    light_cluster_t clusters[];
+} cluster_buffer;
+
+layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) buffer writeonly light_list_buffer_t {
+    uint global_offset_accumulator;
+    uint list[];
+} light_list_buffer;
+
+layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) buffer writeonly light_grid_buffer_t {
+    light_grid_t grid[];
+} light_grid_buffer;
+
+layout ( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
+
+shared light_t shared_lights[64];
+
+float sq_distance_point_aabb ( vec3 p, vec3 min, vec3 max ) {
+    float sq_dist = 0;
+
+    for ( uint i = 0; i < 3; ++i ) {
+        float v = p[i];
+        if ( v < min[i] ) sq_dist += ( min[i] - v ) * ( min[i] - v );
+        if ( v > max[i] ) sq_dist += ( v - max[i] ) * ( v - max[i] );
+    }
+
+    return sq_dist;
+}
+
+void main ( void ) {
+    light_list_buffer.global_offset_accumulator = 0;
+    uint cluster_idx = gl_GlobalInvocationID.x;
+    uint cluster_count = uniform_buffer.grid_size.x * uniform_buffer.grid_size.y * uniform_buffer.grid_size.z;
+    if ( cluster_idx >= cluster_count ) {
+        return;
+    }
+
+    uvec3 cluster_3d_idx;
+    cluster_3d_idx.z = cluster_idx / ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y );
+    cluster_3d_idx.y = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) / uniform_buffer.grid_size.x;
+    cluster_3d_idx.x = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
+
+    // TODO
+    uint light_count = 1;
+    uint thread_count = 64;
+    uint light_batch_count = ( light_count + thread_count - 1 ) / thread_count;
+
+    uint visible_light_count = 0;
+    uint visible_light_idx[100];
+
+    // Go over all lights, 64 at a time, one per thread
+    for ( uint i = 0; i < light_batch_count; ++i ) {
+
+        // Move the current lights batch to shared memory
+        uint light_idx = i * thread_count + gl_LocalInvocationIndex;
+        light_idx = min ( light_idx, light_count );
+        shared_lights[gl_LocalInvocationIndex] = light_buffer.lights[light_idx];
+        barrier();
+
+        // Test the lights batch against the thread cluster
+        for ( uint j = 0; j < thread_count; ++j ) {
+            vec3 min = cluster_buffer.clusters[cluster_idx].min.xyz;
+            vec3 max = cluster_buffer.clusters[cluster_idx].max.xyz;
+            vec3 p = shared_lights[j].pos;
+            p = ( view_cbuffer.view_from_world * vec4 ( p, 1 ) ).xyz;
+            float sq_dist = sq_distance_point_aabb ( p, min, max );
+            if ( sq_dist < shared_lights[j].radius * shared_lights[j].radius ) {
+                visible_light_idx[visible_light_count] = i * thread_count + j;
+                visible_light_count += 1;
+            }
+        }
+    }
+
+    barrier();
+
+    uint list_offset = atomicAdd ( light_list_buffer.global_offset_accumulator, visible_light_count );
+
+    for ( uint i = 0; i < visible_light_count; ++i ) {
+        light_list_buffer.list[list_offset + i] = visible_light_idx[i];
+    }
+
+    light_grid_buffer.grid[cluster_idx].offset = list_offset;
+    light_grid_buffer.grid[cluster_idx].count = visible_light_count;
+
+    //if ( visible_light_count == 0 )
+    //    debugPrintfEXT("%d %d %d %d", gl_WorkGroupID, gl_LocalInvocationID.x, gl_LocalInvocationID.y, gl_LocalInvocationID.z );
+}
