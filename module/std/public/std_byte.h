@@ -191,11 +191,7 @@ uint64_t    std_2_u32_to_u64 ( uint32_t high, uint32_t low );
 
 uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_size );
 
-//#define std_ptr_offset_m(from, to)        ( size_t ) ( ( char* ) (to)  - ( char* ) (from) )
-//#define std_ptr_offset_32_m(from, to)     ( uint32_t ) ( ( char* ) (to)  - ( char* ) (from) )
-//#define std_ptr_offset_64_m(from, to)     ( uint64_t ) ( ( char* ) (to)  - ( char* ) (from) )
-
-#define std_ptr_value_m( ptr, type ) ( *( type* ) ( ptr ) )
+#define std_address_value_m( ptr, type ) ( *( type* ) ( ptr ) )
 
 // call std_mem_set to initialize the bitset to the desired initial value
 void std_bitset_set ( uint64_t* bitset, size_t idx );

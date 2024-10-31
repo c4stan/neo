@@ -9,12 +9,14 @@ static void xf_api_init ( xf_i* xf ) {
     xf->add_node = xf_graph_add_node;
     xf->build_graph = xf_graph_build2;
     xf->execute_graph = xf_graph_execute;
+    xf->advance_graph_multi_textures = xf_graph_advance_multi_textures;
     xf->destroy_graph = xf_graph_destroy;
     //xf.declare_swapchain = xf_resource_swapchain_declare;
     //xf.bind_texture = xf_resource_texture_bind;
 
     xf->enable_node = xf_graph_node_enable;
     xf->disable_node = xf_graph_node_disable;
+    xf->node_set_enabled = xf_graph_node_set_enabled;
 
     xf->declare_multi_texture = xf_resource_multi_texture_declare;
     //xf.declare_multi_buffer = xf_multi_resource_declare_multi_buffer;
@@ -25,14 +27,13 @@ static void xf_api_init ( xf_i* xf ) {
     xf->multi_texture_from_swapchain = xf_resource_multi_texture_declare_from_swapchain;
 
     xf->texture_from_external = xf_resource_texture_declare_from_external;
-    xf->get_multi_texture = xf_resource_multi_texture_get;
+    xf->get_multi_texture = xf_resource_multi_texture_get_texture;
 
     xf->get_texture_info = xf_resource_texture_get_info;
     xf->get_graph_info = xf_graph_get_info;
     xf->get_node_info = xf_graph_get_node_info;
 
     xf->debug_print_graph = xf_graph_debug_print;
-    xf->debug_ui_graph = xf_graph_debug_ui;
 }
 
 void* xf_load ( void* std_runtime ) {

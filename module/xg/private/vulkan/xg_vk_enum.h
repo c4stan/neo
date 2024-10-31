@@ -28,6 +28,7 @@ VkSamplerAddressMode        xg_sampler_address_mode_to_vk ( xg_sampler_address_m
 VkImageAspectFlags          xg_texture_aspect_to_vk ( xg_texture_aspect_e aspect );
 VkImageAspectFlags          xg_texture_flags_to_vk_aspect ( xg_texture_flag_bit_e flags );
 VkGeometryInstanceFlagsKHR  xg_raytrace_instance_flags_to_vk ( xg_raytrace_instance_flag_bit_e flags );
+VkImageTiling               xg_texture_tiling_to_vk ( xg_texture_tiling_e tiling );
 
 xg_format_e                 xg_format_from_vk ( VkFormat format );
 xg_color_space_e            xg_color_space_from_vk ( VkColorSpaceKHR colorspace );

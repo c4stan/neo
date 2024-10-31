@@ -109,8 +109,8 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
     std_assert_m ( camera_query_result.entity_count == 1 );
-    se_component_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
-    viewapp_camera_component_t* camera_component = se_component_iterator_next ( &camera_iterator );
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
 
     rv_i* rv = std_module_get_m ( rv_module_name_m );
     rv_view_info_t view_info;
@@ -153,6 +153,57 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 }
 
 // ---
+
+// TODO avoid this, instead raycast into scene. maybe use a bvh or a grid to speed up if needed.
+static void viewapp_boot_mouse_pick_graph ( void ) {
+    xg_device_h device = m_state->render.device;    
+    xg_swapchain_h swapchain = m_state->render.swapchain;    
+    uint32_t resolution_x = m_state->render.resolution_x;
+    uint32_t resolution_y = m_state->render.resolution_y;
+    xs_database_h sdb = m_state->render.sdb;
+    xg_i* xg = m_state->modules.xg;
+    xs_i* xs = m_state->modules.xs;
+    xf_i* xf = m_state->modules.xf;
+
+    xf_graph_h graph = xf->create_graph ( device );
+    m_state->render.mouse_pick_graph = graph;
+
+    // TODO
+    xg_format_e object_id_format = xg_format_r8g8b8a8_uint_m;
+
+    xg_texture_h readback_texture = xg->create_texture ( &xg_texture_params_m (
+        .memory_type = xg_memory_type_readback_m,
+        .device = device,
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = object_id_format,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m,
+        .tiling = xg_texture_tiling_linear_m,
+        .debug_name = "object_id_readback",
+    ) );
+    m_state->render.object_id_readback_texture = readback_texture;
+
+    xf_texture_h copy_dest = xf->texture_from_external ( readback_texture );
+
+    xf_node_h copy_node = xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "mouse_pick_object_id_copy",
+        .type = xf_node_type_copy_pass_m,
+        .resources = xf_node_resource_params_m (
+            .copy_texture_reads_count = 1,
+            .copy_texture_reads = {
+                xf_copy_texture_dependency_m ( .texture = m_state->render.object_id_texture )
+            },
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = {
+                xf_copy_texture_dependency_m ( .texture = copy_dest )
+            }
+        )
+    ) );
+
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xf->build_graph ( graph, workload );
+    xg->submit_workload ( workload );
+}
 
 static void viewapp_boot_raytrace_graph ( void ) {
     xg_device_h device = m_state->render.device;    
@@ -215,7 +266,6 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
     xf->build_graph ( graph, workload );
     xg->submit_workload ( workload );
-    xf->debug_print_graph ( graph );
 }
 
 static void viewapp_boot_raster_graph ( void ) {
@@ -301,8 +351,10 @@ static void viewapp_boot_raster_graph ( void ) {
             .format = xg_format_r8g8b8a8_uint_m,
             .debug_name = "gbuffer_object_id",
         ),
+        .auto_advance = false,
     ) );
     xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
+    m_state->render.object_id_texture = object_id_texture;
 
     xf_texture_h depth_stencil_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
@@ -799,7 +851,6 @@ static void viewapp_boot_raster_graph ( void ) {
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
     xf->build_graph ( graph, workload );
     xg->submit_workload ( workload );
-    xf->debug_print_graph ( graph );
 }
 
 static void viewapp_build_raytrace_geo ( void ) {
@@ -809,14 +860,14 @@ static void viewapp_build_raytrace_geo ( void ) {
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
-    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    se_component_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
-        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         
-        se_entity_h* entity_handle = se_component_iterator_next ( &entity_iterator );
+        se_entity_h* entity_handle = se_stream_iterator_next ( &entity_iterator );
         se_entity_properties_t entity_properties;
         se->get_entity_properties ( &entity_properties, *entity_handle );
 
@@ -853,14 +904,14 @@ static void viewapp_build_raytrace_world ( void ) {
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
-    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    se_component_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     xg_raytrace_geometry_instance_t* rt_instances = std_virtual_heap_alloc_array_m ( xg_raytrace_geometry_instance_t, mesh_count );
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
-        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         
         sm_vec_3f_t up = {
             .x = mesh_component->up[0],
@@ -980,6 +1031,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { -1.1, -1.45, 1 },
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1063,6 +1115,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 plane_up[i][1],
                 plane_up[i][2],
             },
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
                     plane_col[i][0],
@@ -1104,6 +1157,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { 0, 1.45, 0 },
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1187,6 +1241,7 @@ static void viewapp_boot_scene_field ( void ) {
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
                     powf ( 240 / 255.f, 2.2 ),
@@ -1227,6 +1282,7 @@ static void viewapp_boot_scene_field ( void ) {
             .position = { x, 5, 0 },
             .orientation = { 0, 1, 0 },
             .up = { 0, 0, -1 },
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
                     powf ( 240 / 255.f, 2.2 ),
@@ -1265,6 +1321,7 @@ static void viewapp_boot_scene_field ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { 10, 10, -10 },
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1334,6 +1391,7 @@ static void viewapp_boot_scene_field ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { -10, 10, -10 },
+            .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1471,7 +1529,6 @@ static void viewapp_boot ( void ) {
         ) }
     ) );
 
-#if 1
     se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh component", &se_component_properties_params_m (
         .count = 3,
         .properties = {
@@ -1495,7 +1552,6 @@ static void viewapp_boot ( void ) {
         .properties = {
         }
     ) );
-#endif
 
     se->create_entity_family ( &se_entity_family_params_m (
         .component_count = 2,
@@ -1522,6 +1578,7 @@ static void viewapp_boot ( void ) {
 
     xi_i* xi = m_state->modules.xi;
     xi->load_shaders ( device );
+    xi->init_geos ( device );
 
     {
         fs_i* fs = m_state->modules.fs;
@@ -1561,8 +1618,6 @@ static void viewapp_boot ( void ) {
 
     rv_i* rv = m_state->modules.rv;
     {
-        viewapp_camera_component_t camera_component;
-
         // view
         rv_view_params_t view_params = rv_view_params_m (
             .position = { 0, 0, -8 },
@@ -1575,7 +1630,11 @@ static void viewapp_boot ( void ) {
                 .reverse_z = false,
             ),
         );
-        camera_component.view = rv->create_view ( &view_params );
+
+        viewapp_camera_component_t camera_component = {
+            .view = rv->create_view ( &view_params ),
+            .enabled = true,
+        };
 
         // camera
         se->create_entity ( &se_entity_params_m (
@@ -1596,11 +1655,37 @@ static void viewapp_boot ( void ) {
 
     viewapp_boot_raster_graph();
     viewapp_boot_raytrace_graph();
+    viewapp_boot_mouse_pick_graph();
 
     m_state->render.active_graph = m_state->render.raster_graph;
+    
+    xf_i* xf = m_state->modules.xf;
+    xf->debug_print_graph ( m_state->render.active_graph );
 }
 
-static void viewapp_update_cameras ( wm_input_state_t* input_state, wm_input_state_t* new_input_state ) {
+static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
+    se_i* se = m_state->modules.se;
+    rv_i* rv = m_state->modules.rv;
+
+    se_query_result_t camera_query_result;
+    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
+
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
+        viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+
+        if ( !camera_component->enabled ) {
+            continue;
+        }
+
+        rv->get_view_info ( view_info, camera_component->view );
+        return true;
+    }
+
+    return false;
+}
+
+static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_state_t* new_input_state ) {
     se_i* se = m_state->modules.se;
     xi_i* xi = m_state->modules.xi;
     rv_i* rv = m_state->modules.rv;
@@ -1612,9 +1697,13 @@ static void viewapp_update_cameras ( wm_input_state_t* input_state, wm_input_sta
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
 
-    se_component_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
     for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
-        viewapp_camera_component_t* camera_component = se_component_iterator_next ( &camera_iterator );
+        viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+
+        if ( !camera_component->enabled ) {
+            continue;
+        }
 
         rv->update_prev_frame_data ( camera_component->view );
         rv->update_proj_jitter ( camera_component->view, m_state->render.frame_id );
@@ -1635,19 +1724,19 @@ static void viewapp_update_cameras ( wm_input_state_t* input_state, wm_input_sta
             int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
 
             if ( delta_x != 0 ) {
-                sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
+                sm_vec_3f_t up = { 0, 1, 0 };
                 sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
 
-                v = sm_matrix_4x4f_transform_f3 ( mat, v );
+                v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
             }
 
             if ( delta_y != 0 ) {
-                sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
+                sm_vec_3f_t up = { 0, 1, 0 };
                 sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
                 axis = sm_vec_3f_norm ( axis );
 
                 sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( axis, -delta_y * drag_scale );
-                v = sm_matrix_4x4f_transform_f3 ( mat, v );
+                v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
             }
 
             if ( delta_x != 0 || delta_y != 0 ) {
@@ -1685,14 +1774,59 @@ static void viewapp_update_cameras ( wm_input_state_t* input_state, wm_input_sta
         if ( dirty_xform ) {
             rv->update_view_transform ( camera_component->view, &xform );
         }
+
+        if ( camera_component->enabled ) {
+            break;
+        }
     }
 }
 
-static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* input_state ) {
+static void mouse_pick ( uint32_t x, uint32_t y ) {
+    xg_i* xg = m_state->modules.xg;
+    xi_i* xi = m_state->modules.xi;
+
+    if ( xi->get_active_element_id () != 0 ) {
+        return;
+    }
+
+    uint32_t resolution_x = m_state->render.resolution_x;
+    uint32_t resolution_y = m_state->render.resolution_y;
+
+    xg_texture_info_t info;
+    xg->get_texture_info ( &info, m_state->render.object_id_readback_texture );
+    std_auto_m data = ( uint32_t* ) info.allocation.mapped_address;
+
+    // TODO stall the gpu for the latest accurate value before reading?
+    uint32_t pixel = data[y * resolution_x + x];
+    uint32_t id = pixel & 0xff;
+
+    se_i* se = m_state->modules.se;
+    se_query_result_t query_result;
+    se->query_entities ( &query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &query_result.entities );
+    uint32_t mesh_count = query_result.entity_count;
+
+    for ( uint32_t i = 0; i < mesh_count; ++i ) {
+        se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
+
+        if ( mesh_component->object_id == id ) {
+            m_state->ui.mouse_pick_entity = *entity;
+            std_log_info_m ( "Mouse pick entity handle " std_fmt_u64_m, m_state->ui.mouse_pick_entity );
+            return;
+        }
+    }
+ 
+    m_state->ui.mouse_pick_entity = se_null_handle_m;
+}
+
+static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state ) {
     wm_i* wm = m_state->modules.wm;
     xg_i* xg = m_state->modules.xg;
     xf_i* xf = m_state->modules.xf;
     xi_i* xi = m_state->modules.xi;
+    se_i* se = m_state->modules.se;
     wm_window_h window = m_state->render.window;
 
     xi_workload_h xi_workload = xi->create_workload();
@@ -1700,12 +1834,21 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
     wm_input_buffer_t input_buffer;
     wm->get_window_input_buffer ( window, &input_buffer );
-    
+
+    rv_view_info_t view_info;
+    viewapp_get_camera_info ( &view_info );
+
+    // TODO remove
+    xi->set_workload_view_info ( xi_workload, &view_info );
+
     xi->begin_update ( &xi_update_params_m (
         .window_info = window_info,
         .input_state = input_state,
         .input_buffer = &input_buffer,
+        .view_info = &view_info
     ) );
+
+    // ui
     xi->begin_window ( xi_workload, &m_state->ui.window_state );
     
     // frame
@@ -1793,7 +1936,11 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         xi->add_select ( xi_workload, &graph_select );
 
-        m_state->render.active_graph = graph_select.item_idx == 0 ? m_state->render.raster_graph : m_state->render.raytrace_graph;
+        xf_graph_h active_graph = graph_select.item_idx == 0 ? m_state->render.raster_graph : m_state->render.raytrace_graph;
+        if ( m_state->render.active_graph != active_graph ) {
+            xf->debug_print_graph ( active_graph );
+            m_state->render.active_graph = active_graph;
+        }
 
         xi->newline();
 
@@ -1931,6 +2078,26 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
 
     xi->end_window ( xi_workload );
+
+    if ( !old_input_state->mouse[wm_mouse_state_left_m] && input_state->mouse[wm_mouse_state_left_m] ) {
+        mouse_pick ( input_state->cursor_x, input_state->cursor_y );
+    }
+
+    // geos
+    if ( m_state->ui.mouse_pick_entity != se_null_handle_m ) {
+        viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
+        std_assert_m ( mesh );
+
+        xi_transform_state_t xform = xi_transform_state_m (
+            .position = { mesh->position[0], mesh->position[1], mesh->position[2] }
+        );
+        xi->draw_transform ( xi_workload, &xform );
+
+        mesh->position[0] = xform.position[0];
+        mesh->position[1] = xform.position[1];
+        mesh->position[2] = xform.position[2];
+    }
+
     xi->end_update();
 }
 
@@ -1994,19 +2161,22 @@ static std_app_state_e viewapp_update ( void ) {
 
     m_state->render.frame_id += 1;
 
-    viewapp_update_cameras ( input_state, &new_input_state );
+    viewapp_update_camera ( input_state, &new_input_state );
 
     wm_window_info_t new_window_info;
     wm->get_window_info ( window, &new_window_info );
 
-    viewapp_update_ui ( &new_window_info, &new_input_state );
+    viewapp_update_ui ( &new_window_info, input_state, &new_input_state );
 
     m_state->render.window_info = new_window_info;
     m_state->render.input_state = new_input_state;
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
-    xf->execute_graph ( m_state->render.active_graph, workload );
+    uint64_t key = 0;
+    key = xf->execute_graph ( m_state->render.active_graph, workload, key );
+    key = xf->execute_graph ( m_state->render.mouse_pick_graph, workload, key );
+    xf->advance_multi_texture ( m_state->render.object_id_texture );
     xg->submit_workload ( workload );
     xg->present_swapchain ( m_state->render.swapchain, workload );
 
@@ -2030,17 +2200,19 @@ void* viewer_app_load ( void* runtime ) {
 
     state->api.tick = viewapp_tick;
 
-    state->modules.tk = std_module_load_m ( tk_module_name_m );
-    state->modules.fs = std_module_load_m ( fs_module_name_m );
-    state->modules.wm = std_module_load_m ( wm_module_name_m );
-    state->modules.xg = std_module_load_m ( xg_module_name_m );
-    state->modules.xs = std_module_load_m ( xs_module_name_m );
-    state->modules.xf = std_module_load_m ( xf_module_name_m );
-    state->modules.se = std_module_load_m ( se_module_name_m );
-    state->modules.rv = std_module_load_m ( rv_module_name_m );
-    state->modules.xi = std_module_load_m ( xi_module_name_m );
-
+    state->modules = ( viewapp_modules_state_t ) {
+        .tk = std_module_load_m ( tk_module_name_m ),
+        .fs = std_module_load_m ( fs_module_name_m ),
+        .wm = std_module_load_m ( wm_module_name_m ),
+        .xg = std_module_load_m ( xg_module_name_m ),
+        .xs = std_module_load_m ( xs_module_name_m ),
+        .xf = std_module_load_m ( xf_module_name_m ),
+        .se = std_module_load_m ( se_module_name_m ),
+        .rv = std_module_load_m ( rv_module_name_m ),
+        .xi = std_module_load_m ( xi_module_name_m ),
+    };
     state->render = viewapp_render_state_m();
+    state->ui = viewapp_ui_state_m();
 
     m_state = state;
     return state;

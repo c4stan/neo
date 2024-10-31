@@ -56,13 +56,13 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
-    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
-        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
 
         // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->geometry_pipeline );
@@ -102,7 +102,7 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
             .base_color[0] = mesh_component->material.base_color[0],
             .base_color[1] = mesh_component->material.base_color[1],
             .base_color[2] = mesh_component->material.base_color[2],
-            .object_id = ( uint32_t ) i,
+            .object_id = mesh_component->object_id,
             .roughness = mesh_component->material.roughness,
             .metalness = mesh_component->material.metalness,
         };

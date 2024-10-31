@@ -650,7 +650,7 @@ xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h db_handle, xs_st
 
     if ( !lookup ) {
         std_log_error_m ( "Lookup for pipeline state failed" );
-        return xg_null_handle_m;
+        return xs_null_handle_m;
     }
 
     xs_database_pipeline_state_t** state = ( xs_database_pipeline_state_t** ) lookup;
@@ -659,6 +659,10 @@ xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h db_handle, xs_st
 }
 
 xg_graphics_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h handle ) {
+    if ( handle == xs_null_handle_m ) {
+        return xg_null_handle_m;
+    }
+
     xs_database_pipeline_state_t* state = ( xs_database_pipeline_state_t* ) handle;
     return state->pipeline_handle;
 }

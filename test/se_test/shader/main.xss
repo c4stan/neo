@@ -13,6 +13,5 @@ end
 begin buffer
     register 0
     stage vertex
-    access read
     update per_draw
 end

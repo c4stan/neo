@@ -4,6 +4,7 @@
 
 #include <xg.h>
 #include <xs.h>
+#include <rv.h>
 
 #define xi_module_name_m xi
 std_module_export_m void* xi_load ( void* );
@@ -99,6 +100,9 @@ typedef struct {
 #define xi_default_style_m xi_style_m()
 
 // Elements
+
+// TODO XOR instead of + ?
+#define xi_line_id_m() ( xi_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )
 
 typedef struct {
     char title[xi_window_title_size];
@@ -359,15 +363,15 @@ typedef struct {
     xi_id_t id;
     uint64_t sort_order;
     xi_style_t style;
-} xi_gizmo_state_t;
+} xi_transform_state_t;
 
-#define xi_gizmo_state_m(...) ( xi_gizmo_state_t ) { \
+#define xi_transform_state_m(...) ( xi_transform_state_t ) { \
     .position = { 0, 0, 0 }, \
-    .rotation = { 0, 0, 0, 1 } \
+    .rotation = { 0, 0, 0, 1 }, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_null_style_m(), \
-    __VA_ARGS__ \
+    ##__VA_ARGS__ \
 }
 
 typedef struct {
@@ -377,9 +381,6 @@ typedef struct {
     xi_id_t id;
     uint64_t sort_order;
 } xi_line_state_t;
-
-// TODO XOR instead of + ?
-#define xi_line_id_m() ( xi_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )
 
 // Font
 
@@ -403,6 +404,23 @@ typedef struct {
     .first_char_code = xi_font_char_ascii_base_m, \
     .char_count = xi_font_char_ascii_count_m, \
     .outline = false, \
+    ##__VA_ARGS__ \
+}
+
+// Update
+
+typedef struct {
+    const wm_window_info_t* window_info;
+    const wm_input_state_t* input_state;
+    const wm_input_buffer_t* input_buffer;
+    const rv_view_info_t* view_info;
+} xi_update_params_t;
+
+#define xi_update_params_m( ... ) ( xi_update_params_t ) { \
+    .window_info = NULL, \
+    .input_state = NULL, \
+    .input_buffer = NULL, \
+    .view_info = NULL, \
     ##__VA_ARGS__ \
 }
 
@@ -432,13 +450,15 @@ typedef struct {
     //void ( *activate_device ) ( xg_device_h device );
     //void ( *deactivate_device ) ( xg_device_h device );
 
-    void ( *begin_update ) ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer );
+    void ( *begin_update ) ( const xi_update_params_t* params ); // TODO remove, pass update_params to workload
 
     uint64_t ( *get_active_element_id ) ( void );
     uint64_t ( *get_hovered_element_id ) ( void );
 
     xi_font_h ( *create_font ) ( std_buffer_t ttf_data, const xi_font_params_t* params );
     void ( *destroy_font ) ( xi_font_h font );
+
+    void ( *set_workload_view_info ) ( xg_workload_h workload, const rv_view_info_t* view_info ); // TODO remove!
 
     xi_workload_h ( *create_workload ) ( void );
     void ( *flush_workload ) ( xi_workload_h workload, const xi_flush_params_t* params );
@@ -465,8 +485,9 @@ typedef struct {
     void ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
     void ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
     bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
-    void ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
+    bool ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
 
+    void ( *init_geos )     ( xg_device_h device );
     void ( *draw_line )     ( xi_workload_h workload, xi_line_state_t* state );
-    void ( *draw_gizmo )    ( xi_workload_h workload, xi_gizmo_state_t* state );
+    bool ( *draw_transform )( xi_workload_h workload, xi_transform_state_t* state );    
 } xi_i;

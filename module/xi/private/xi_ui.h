@@ -2,6 +2,8 @@
 
 #include <xi.h>
 
+#include <xg_geo_util.h>
+
 #include <std_time.h>
 
 typedef struct {
@@ -49,9 +51,14 @@ typedef struct {
     uint32_t os_window_width;
     uint32_t os_window_height;
 
-    float view[16];
-    float proj[16];
+    rv_view_info_t view_info;
+    bool valid_view_info;
 } xi_ui_update_state_t;
+
+typedef struct {
+    xg_geo_util_geometry_data_t cpu;
+    xg_geo_util_geometry_gpu_data_t gpu;
+} xi_ui_geometry_t;
 
 typedef struct {
     xi_ui_update_state_t update;
@@ -102,13 +109,17 @@ typedef struct {
     bool minimized_section;
     bool culled_section;
     bool minimized_window;
+
+    // geo
+    xg_device_h device;
+    xi_ui_geometry_t transform_geo;
 } xi_ui_state_t;
 
 void xi_ui_load ( xi_ui_state_t* state );
 void xi_ui_reload ( xi_ui_state_t* state );
 void xi_ui_unload ( void );
 
-void xi_ui_update ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer );
+void xi_ui_update_begin ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer, const rv_view_info_t* view_info );
 void xi_ui_update_end ( void );
 
 void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state );
@@ -123,7 +134,7 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state );
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state );
 void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
 bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state );
-void xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state );
+bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state );
 
 void xi_ui_newline ( void );
 
@@ -131,3 +142,7 @@ uint64_t xi_ui_get_active_id ( void );
 uint64_t xi_ui_get_hovered_id ( void );
 
 const xi_ui_update_state_t* xi_ui_get_update_state ( void );
+
+void xi_ui_geo_init ( xg_device_h device_handle );
+void xi_ui_draw_line ( xi_workload_h workload, xi_line_state_t* state );
+bool xi_ui_draw_transform ( xi_workload_h workload, xi_transform_state_t* state );

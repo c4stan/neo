@@ -2,6 +2,11 @@
 
 #include <math.h>
 
+sm_quat_t sm_quat_identity( void ) {
+    sm_quat_t id = { .e = { 0, 0, 0, 1 } };
+    return id;
+}
+
 sm_quat_t sm_quat_mul ( sm_quat_t q1, sm_quat_t q2 ) {
     sm_quat_t q;
     q.e[0] = q1.e[0] * q2.e[3] + q1.e[1] * q2.e[2] - q1.e[2] * q2.e[1] + q1.e[3] * q2.e[0];

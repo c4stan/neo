@@ -131,12 +131,12 @@ static void run_se_test_1 ( void ) {
         .components = { se_test_component_0_m, se_test_component_1_m }
     ) );
 
-    se_component_iterator_t c0_it = se_component_iterator_m ( &query_result.components[0], 0 );
-    se_component_iterator_t c1_it = se_component_iterator_m ( &query_result.components[1], 0 );
+    se_stream_iterator_t c0_it = se_component_iterator_m ( &query_result.components[0], 0 );
+    se_stream_iterator_t c1_it = se_component_iterator_m ( &query_result.components[1], 0 );
 
     for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
-        uint64_t* c0_i = ( uint64_t* ) se_component_iterator_next ( &c0_it );
-        uint64_t* c1_i = ( uint64_t* ) se_component_iterator_next ( &c1_it );
+        uint64_t* c0_i = ( uint64_t* ) se_stream_iterator_next ( &c0_it );
+        uint64_t* c1_i = ( uint64_t* ) se_stream_iterator_next ( &c1_it );
 
         std_assert_m ( *c0_i == c0 );
         std_assert_m ( *c1_i == c1 );
@@ -218,10 +218,10 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
         .components = { se_test_pass_component_m }
     ) );
 
-    se_component_iterator_t it = se_component_iterator_m ( &query_result.components[0], 0 );
+    se_stream_iterator_t it = se_component_iterator_m ( &query_result.components[0], 0 );
 
     for ( uint64_t i = 0; i < query_result.entity_count; ++i ) {
-        se_test_pass_component_t* test_pass_component = ( se_test_pass_component_t* ) se_component_iterator_next ( &it );
+        se_test_pass_component_t* test_pass_component = ( se_test_pass_component_t* ) se_stream_iterator_next ( &it );
 
         // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( test_pass_component->pipeline_state );
@@ -327,7 +327,7 @@ static void run_se_test_2 ( void ) {
     std_assert_m ( pipeline_state != xg_null_handle_m );
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
-    xf_graph_h graph = xf->create_graph ( device, swapchain );
+    xf_graph_h graph = xf->create_graph ( device );
     
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "clear",
@@ -438,7 +438,7 @@ static void run_se_test_2 ( void ) {
 
         //xg->acquire_next_swapchain_texture ( swapchain, workload );
 
-        xf->execute_graph ( graph, workload );
+        xf->execute_graph ( graph, workload, 0 );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
     }

@@ -2,11 +2,13 @@
 
 #include <math.h>
 
-sm_vec_3f_t sm_vec_3f ( float x, float y, float z ) {
-    sm_vec_3f_t vec;
-    vec.x = x;
-    vec.y = y;
-    vec.z = z;
+sm_vec_3f_t sm_vec_3f ( const float f[3] ) {
+    sm_vec_3f_t vec = { f[0], f[1], f[2] };
+    return vec;
+}
+
+sm_vec_4f_t sm_vec_4f ( const float f[4] ) {
+    sm_vec_4f_t vec = { f[0], f[1], f[2], f[3] };
     return vec;
 }
 
@@ -15,6 +17,15 @@ sm_vec_3f_t sm_vec_4f_to_3f ( sm_vec_4f_t vec ) {
     result.x = vec.x;
     result.y = vec.y;
     result.z = vec.z;
+    return result;
+}
+
+sm_vec_4f_t sm_vec_3f_to_4f ( sm_vec_3f_t vec, float w ) {
+    sm_vec_4f_t result;
+    result.x = vec.x;
+    result.y = vec.y;
+    result.z = vec.z;
+    result.w = w;
     return result;
 }
 
@@ -33,6 +44,10 @@ sm_vec_3f_t sm_vec_3f_norm ( sm_vec_3f_t vec ) {
 
 float sm_vec_3f_dot ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+float sm_vec_4f_dot ( sm_vec_4f_t a, sm_vec_4f_t b ) {
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 }
 
 sm_vec_3f_t sm_vec_3f_cross ( sm_vec_3f_t a, sm_vec_3f_t b ) {
@@ -57,4 +72,16 @@ sm_vec_3f_t sm_vec_3f_add ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     result.y = a.y + b.y;
     result.z = a.z + b.z;
     return result;
+}
+
+sm_vec_3f_t sm_vec_3f_sub ( sm_vec_3f_t a, sm_vec_3f_t b ) {
+    sm_vec_3f_t result;
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
+    return result;
+}
+
+sm_vec_3f_t sm_vec_3f_neg ( sm_vec_3f_t a ) {
+    return ( sm_vec_3f_t ) { -a.x, -a.y, -a.z };
 }

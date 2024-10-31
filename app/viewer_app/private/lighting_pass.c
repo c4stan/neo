@@ -33,6 +33,12 @@ typedef struct {
     uniform_light_data_t lights[viewapp_max_lights_m];
 } lighting_uniforms_t;
 
+typedef struct {
+    uint32_t light_count;
+    uint32_t _pad0[3];
+    uniform_light_data_t lights[];
+} light_buffer_t;
+
 //
 
 static void light_update_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -46,23 +52,25 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
 
     xg_buffer_info_t upload_buffer_info;
     xg->get_buffer_info ( &upload_buffer_info, upload_buffer );
-    std_auto_m light_data = ( uniform_light_data_t* ) upload_buffer_info.allocation.mapped_address;
-    std_assert_m ( light_data );
 
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_light_component_id_m } ) );
+    se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     uint64_t light_count = light_query_result.entity_count;
-    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     std_assert_m ( light_count <= viewapp_max_lights_m );
     light_count = std_min ( light_count, viewapp_max_lights_m );
 
+    std_auto_m light_data = ( light_buffer_t* ) upload_buffer_info.allocation.mapped_address;
+    std_assert_m ( light_data );
+    light_data->light_count = light_count;
+
     for ( uint64_t i = 0; i < light_count; ++i ) {
-        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
 
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, light_component->view );
 
-        light_data[i] = ( uniform_light_data_t ) {
+        light_data->lights[i] = ( uniform_light_data_t ) {
             .pos =  {
                 light_component->position[0],
                 light_component->position[1],
@@ -80,7 +88,8 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
         };
     }
 
-    light_data[light_count] = ( uniform_light_data_t ) {};
+    // Null light (radius == 0) at the end needed by the light cull pass
+    light_data->lights[light_count] = ( uniform_light_data_t ) {};
 
     xg->cmd_copy_buffer ( node_args->cmd_buffer, upload_buffer, light_buffer, node_args->base_key );
 }
@@ -132,13 +141,13 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_light_component_id_m } ) );
     uint64_t light_count = light_query_result.entity_count;
-    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+    se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     std_assert_m ( light_count <= viewapp_max_lights_m );
 
     cbuffer.light_count = light_count;
 
     for ( uint64_t i = 0; i < light_count; ++i ) {
-        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
 
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, light_component->view );
@@ -269,7 +278,7 @@ void light_cull_pass ( xf_node_execute_args_t* node_args, void* user_args ) {
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_light_component_id_m } ) );
     uint64_t light_count = light_query_result.entity_count;
-    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+    se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     std_assert_m ( light_count <= MAX_LIGHTS_COUNT );
 
     uniforms.cluster_size[0] = args->cluster_size[0];
@@ -278,7 +287,7 @@ void light_cull_pass ( xf_node_execute_args_t* node_args, void* user_args ) {
     uniforms.light_count = light_count;
 
     for ( uint64_t i = 0; i < light_count; ++i ) {
-        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
 
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, light_component->view );
@@ -361,3 +370,7 @@ xf_node_h add_light_cull_pass ( xf_graph_h graph, xf_buffer_h light_buffer, xf_b
     ) );
 }
 #endif
+
+void get_light_uniform_scale_bias ( float* scale, float* bias ) {
+
+}

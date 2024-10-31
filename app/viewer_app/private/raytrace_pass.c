@@ -54,7 +54,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_light_component_id_m } ) );
     uint64_t light_count = light_query_result.entity_count;
-    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+    se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     std_assert_m ( light_count <= MAX_LIGHTS_COUNT );
 
     lights_uniform_buffer_t cbuffer;
@@ -63,7 +63,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     cbuffer.light_count = light_count;
 
     for ( uint64_t i = 0; i < light_count; ++i ) {
-        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
 
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, light_component->view );
@@ -88,7 +88,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     // Fill raytrace instance buffer
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
-    se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     // TODO avoid creating and destroying this here...
@@ -105,7 +105,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     raytrace_shader_instance_t* instances = shader_instance_buffer_info.allocation.mapped_address;
 
     for ( uint32_t i = 0; i < mesh_count; ++i ) {
-        viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_buffer_info_t pos_buffer_info, nor_buffer_info, idx_buffer_info;
         xg->get_buffer_info ( &pos_buffer_info, mesh_component->pos_buffer );
         xg->get_buffer_info ( &nor_buffer_info, mesh_component->nor_buffer );

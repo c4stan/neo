@@ -73,7 +73,7 @@ ideas
 */
 
 #if 0
-extern inline void* se_component_iterator_next ( se_component_iterator_t* iterator );
+extern inline void* se_stream_iterator_next ( se_stream_iterator_t* iterator );
 extern inline se_entity_params_allocator_t se_entity_params_allocator ( std_virtual_stack_t* stack );
 extern inline void se_entity_params_alloc_entity ( se_entity_params_allocator_t* allocator, se_entity_h entity_handle );
 extern inline void se_entity_params_alloc_component ( se_entity_params_allocator_t* allocator, uint32_t id );

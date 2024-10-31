@@ -37,15 +37,12 @@ end
 begin buffer
     register 0
     stage pixel
-    access read
     update per_draw
-    texel off
 end
 
 /*
 begin texture 0
     stage pixel // vertex
-    access read
     update per_object
     // sampler linear -- is there a reason to support embedding samplers in textures?
 end

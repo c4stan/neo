@@ -10,6 +10,8 @@ layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform
 } uniform_buffer;
 
 layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_buffer_t {
+    uint light_count;
+    uint _pad0[3];
     light_t lights[];
 } light_buffer;
 
@@ -68,7 +70,7 @@ void main ( void ) {
 
         // Move the current lights batch to shared memory
         uint light_idx = i * thread_count + gl_LocalInvocationIndex;
-        light_idx = min ( light_idx, light_count );
+        light_idx = min ( light_idx, light_count ); // Requires a null (rad=0) light at the end
         shared_lights[gl_LocalInvocationIndex] = light_buffer.lights[light_idx];
         barrier();
 

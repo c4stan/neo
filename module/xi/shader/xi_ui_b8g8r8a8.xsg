@@ -1,4 +1,4 @@
-include xi_render_common.xsi
+include xi_ui_common.xsi
 
 begin render_target 0
     format B8G8R8A8_UNORM

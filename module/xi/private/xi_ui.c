@@ -3,6 +3,12 @@
 #include "xi_workload.h"
 #include "xi_font.h"
 
+#include <sm_vector.h>
+#include <sm_matrix.h>
+
+// TODO
+#include <math.h>
+
 #include <std_log.h>
 
 std_warnings_ignore_m ( "-Wunused-function" )
@@ -48,7 +54,7 @@ static bool xi_ui_cursor_click() {
 
 // x,y coords are expected to be relative to the parent layer
 // TODO rename to _push
-static xi_ui_layer_t* xi_ui_layer_add ( int64_t x, int64_t y, uint32_t width, uint32_t height, uint32_t padding_x, uint32_t padding_y, const xi_style_t* style ) {
+static xi_ui_layer_t* xi_ui_layer_add ( int64_t x, int64_t y, uint32_t width, uint32_t height, uint32_t padding_x, uint32_t padding_y, const xi_style_t* style, uint64_t id ) {
     int64_t delta_x = x;
     int64_t delta_y = y;
 
@@ -88,10 +94,10 @@ static xi_ui_layer_t* xi_ui_layer_add ( int64_t x, int64_t y, uint32_t width, ui
     layer->style = *style;
 
     if ( xi_ui_cursor_test ( x, y, width, height ) ) {
-        xi_ui_state->hovered_layer = xi_ui_state->layer_count;
+        xi_ui_state->hovered_layer = id;
 
         if ( xi_ui_cursor_click() ) {
-            xi_ui_state->active_layer = xi_ui_state->layer_count;
+            xi_ui_state->active_layer = id;
         }
     }
 
@@ -415,7 +421,7 @@ static uint32_t xi_ui_string_width ( const char* text, xi_font_h font ) {
     return ( uint32_t ) fx;
 }
 
-void xi_ui_update ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer ) {
+void xi_ui_update_begin ( const wm_window_info_t* window_info, const wm_input_state_t* input_state, const wm_input_buffer_t* input_buffer, const rv_view_info_t* view_info ) {
     //xi_ui_state->base_x = -window_info->x - window_info->border_left;
     //xi_ui_state->base_y = -window_info->y - window_info->border_top;
     //xi_ui_state->base_width = window_info->width;
@@ -443,6 +449,13 @@ void xi_ui_update ( const wm_window_info_t* window_info, const wm_input_state_t*
 
     xi_ui_state->update.input_state = *input_state;
     xi_ui_state->update.input_buffer = *input_buffer;
+
+    if ( view_info ) {
+        xi_ui_state->update.view_info = *view_info;
+        xi_ui_state->update.valid_view_info = true;
+    } else {
+        xi_ui_state->update.valid_view_info = false;
+    }
 
     // Internal
     xi_ui_state->hovered_id = 0;
@@ -524,7 +537,7 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
 
     uint32_t window_height = state->minimized ? header_height : state->height;
 
-    xi_ui_layer_t* layer = xi_ui_layer_add ( state->x, state->y, state->width, window_height, state->padding_x, state->padding_y, &style );
+    xi_ui_layer_t* layer = xi_ui_layer_add ( state->x, state->y, state->width, window_height, state->padding_x, state->padding_y, &style, state->id );
     layer->line_y = header_height;
 
     // acquire active
@@ -1044,16 +1057,18 @@ static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_edit
     return result;
 }
 
-void xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state ) {
+bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state ) {
+    bool edited = false;
     if ( state->type == xi_property_3f32_m ) {
-        xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
-        xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
-        xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
     } else if ( state->type == xi_property_f32_m ) {
-        xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
     } else {
         std_not_implemented_m();
     }
+    return edited;
 }
 
 void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
@@ -1298,11 +1313,11 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
 }
 
 uint64_t xi_ui_get_active_id ( void ) {
-    return xi_ui_state->active_layer;
+    return xi_ui_state->active_id ? xi_ui_state->active_id : xi_ui_state->active_layer;
 }
 
 uint64_t xi_ui_get_hovered_id ( void ) {
-    return xi_ui_state->hovered_layer;
+    return xi_ui_state->hovered_id ? xi_ui_state->hovered_id : xi_ui_state->hovered_layer;
 }
 
 #if 0
@@ -1340,3 +1355,203 @@ void xi_ui_text ( xi_workload_h workload, xi_text_state_t* state, const xi_style
     std_unused_m ( style );
 }
 #endif
+
+void xi_ui_geo_init ( xg_device_h device_handle ) {
+    xi_ui_state->device = device_handle;
+    xi_ui_state->transform_geo.cpu = xg_geo_util_generate_sphere ( 0.1f, 30, 30 );
+    xi_ui_state->transform_geo.gpu = xg_geo_util_upload_geometry_to_gpu ( device_handle, &xi_ui_state->transform_geo.cpu );
+}
+
+static bool xi_ui_ray_triangle_intersect ( sm_vec_3f_t* intersection, float* ray_depth,  sm_vec_3f_t ray_origin, sm_vec_3f_t ray_direction, sm_vec_3f_t tri_a, sm_vec_3f_t tri_b, sm_vec_3f_t tri_c ) {
+    const float epsilon = 1e-4f;
+    bool ret = false;
+    
+    sm_vec_3f_t e1 = sm_vec_3f_sub ( tri_b, tri_a );
+    sm_vec_3f_t e2 = sm_vec_3f_sub ( tri_c, tri_a );
+    sm_vec_3f_t h = sm_vec_3f_cross ( ray_direction, e2 );
+    float a = sm_vec_3f_dot ( e1, h );
+
+    if ( a > -epsilon && a < epsilon ) {
+        goto exit;
+    }
+
+    float f = 1 / a;
+    sm_vec_3f_t s = sm_vec_3f_sub ( ray_origin, tri_a );
+    float u = f * ( sm_vec_3f_dot ( s, h ) );
+
+    if ( u < 0.0 || u > 1.0 ) {
+        goto exit;
+    }
+
+    sm_vec_3f_t q = sm_vec_3f_cross ( s, e1 );
+    float v = f * sm_vec_3f_dot ( ray_direction, q );
+
+    if ( v < 0.0 || u + v > 1.0 ) {
+        goto exit;
+    }
+
+    float t = f * sm_vec_3f_dot ( e2, q );
+
+    if ( t > epsilon ) {
+        sm_vec_3f_t offset = sm_vec_3f_mul ( ray_direction, t );
+        *intersection = sm_vec_3f_add ( offset, ray_origin );
+        *ray_depth = t;
+
+        ret = true;
+        //goto exit;
+    }
+
+exit:
+    return ret;
+}
+
+static bool xi_ui_ray_plane_intersect ( sm_vec_3f_t* intersection, float* ray_depth, sm_vec_3f_t ray_origin, sm_vec_3f_t ray_direction, sm_vec_4f_t plane ) {
+    sm_vec_4f_t p = sm_vec_3f_to_4f ( ray_origin, 1 );
+    sm_vec_4f_t v = sm_vec_3f_to_4f ( ray_direction, 0 );
+
+    sm_vec_3f_t q = sm_vec_3f_sub ( ray_origin, sm_vec_3f_mul ( ray_direction, sm_vec_4f_dot ( plane, p ) / sm_vec_4f_dot ( plane, v ) ) );
+    *intersection = q;
+
+    // TODO properly handle all ray/plane cases
+    return true;
+}
+
+typedef struct {
+    float origin[3];
+    float direction[3];
+} xi_ui_camera_ray_t;
+
+static bool xi_ui_mouse_camera_ray_build ( xi_ui_camera_ray_t* ray ) {
+    if ( !xi_ui_state->update.valid_view_info ) {
+        return false;
+    }
+
+    const rv_view_info_t* view = &xi_ui_state->update.view_info;
+    const wm_input_state_t* input = &xi_ui_state->update.input_state;
+
+    // [0:1], y points down
+    float ndc_x = ( input->cursor_x + 0.5f ) / xi_ui_state->update.os_window_width;
+    float ndc_y = ( input->cursor_y + 0.5f ) / xi_ui_state->update.os_window_height;
+    // [-1:1], y points up
+    float screen_x = 2 * ndc_x - 1;
+    float screen_y = 1 - 2 * ndc_y;
+    // [-tan(fov_y/2):tan(fov_y/2)], x scaled by aspect_ratio
+    float frustum_x = screen_x * tanf ( view->proj_params.fov_y / 2 ) * view->proj_params.aspect_ratio;
+    float frustum_y = screen_y * tanf ( view->proj_params.fov_y / 2 );
+    sm_vec_3f_t dir = { frustum_x, frustum_y, 1 };
+    dir = sm_vec_3f_norm ( dir );
+
+    dir = sm_matrix_4x4f_transform_f3_dir ( sm_matrix_4x4f ( view->inverse_view_matrix.f ), dir );
+
+    *ray = ( xi_ui_camera_ray_t ) {
+        .origin = { view->transform.position[0], view->transform.position[1], view->transform.position[2] },
+        .direction = { dir.x, dir.y, dir.z }
+    };
+
+    return true;
+}
+
+static bool xi_ui_transform_mouse_pick_test ( const xi_ui_camera_ray_t* ray, sm_mat_4x4f_t xform ) {
+    xg_geo_util_geometry_data_t* geo = &xi_ui_state->transform_geo.cpu;
+
+    for ( uint32_t i = 0; i < geo->index_count; i += 3 ) {
+        sm_vec_3f_t pos;
+        float depth;
+
+        sm_vec_3f_t tri_a = { geo->pos[geo->idx[i + 0] + 0], geo->pos[geo->idx[i + 0] + 1], geo->pos[geo->idx[i + 0] + 2] };
+        sm_vec_3f_t tri_b = { geo->pos[geo->idx[i + 1] + 0], geo->pos[geo->idx[i + 1] + 1], geo->pos[geo->idx[i + 1] + 2] };
+        sm_vec_3f_t tri_c = { geo->pos[geo->idx[i + 2] + 0], geo->pos[geo->idx[i + 2] + 1], geo->pos[geo->idx[i + 2] + 2] };
+        
+        tri_a = sm_matrix_4x4f_transform_f3 ( xform, tri_a );
+        tri_b = sm_matrix_4x4f_transform_f3 ( xform, tri_b );
+        tri_c = sm_matrix_4x4f_transform_f3 ( xform, tri_c );
+
+        bool intersects = xi_ui_ray_triangle_intersect ( &pos, &depth, sm_vec_3f ( ray->origin ), sm_vec_3f ( ray->direction ), tri_a, tri_b, tri_c );
+        if ( intersects ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+ 
+bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t* state ) {
+    xg_geo_util_geometry_gpu_data_t* xform = &xi_ui_state->transform_geo.gpu;
+    uint32_t idx_count = xi_ui_state->transform_geo.cpu.index_count;
+
+    xi_ui_camera_ray_t ray;
+    if ( !xi_ui_mouse_camera_ray_build ( &ray ) ) {
+        return false;
+    }
+
+    sm_mat_4x4f_t trans = {
+        .r0[0] = 1,
+        .r1[1] = 1,
+        .r2[2] = 1,
+        .r3[3] = 1,
+        .r0[3] = state->position[0],
+        .r1[3] = state->position[1],
+        .r2[3] = state->position[2],
+    };
+
+    if ( xi_ui_transform_mouse_pick_test ( &ray, trans ) ) {
+        xi_ui_acquire_hovered ( state->id, 0 );
+
+        if ( xi_ui_cursor_click() ) {
+            xi_ui_acquire_active ( state->id, 0 );
+        }
+    } else {
+        xi_ui_release_hovered ( state->id );
+    }
+
+    if ( !xi_ui_state->update.mouse_down && xi_ui_state->active_id == state->id ) {
+        xi_ui_release_active ( state->id );
+    }
+
+    bool down = false;
+
+    if ( xi_ui_state->active_id == state->id ) {
+        const rv_view_info_t* view = &xi_ui_state->update.view_info;
+        sm_vec_3f_t p = { state->position[0], state->position[1], state->position[2] };
+        // TODO negate v
+        sm_vec_3f_t n = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( view->transform.focus_point ), sm_vec_3f ( view->transform.position ) ) );
+        float d = sm_vec_3f_dot ( sm_vec_3f_neg ( n ), p );
+        sm_vec_4f_t plane = { n.x, n.y, n.z, d };
+        sm_vec_3f_t new_p;
+        float depth;
+        xi_ui_ray_plane_intersect ( &new_p, &depth, sm_vec_3f ( ray.origin ), sm_vec_3f ( ray.direction ), plane );
+        state->position[0] = new_p.x;
+        state->position[1] = new_p.y;
+        state->position[2] = new_p.z;
+        down = true;
+    } else {
+        down = false;
+    }
+
+    xi_draw_mesh_t draw = xi_draw_mesh_m (
+        .pos_buffer = xform->pos_buffer,
+        .nor_buffer = xform->nor_buffer,
+        .uv_buffer = xform->uv_buffer,
+        .idx_buffer = xform->idx_buffer,
+        .idx_count = idx_count,
+        .sort_order = state->sort_order,
+        .traslation = { state->position[0], state->position[1], state->position[2] },
+        .rotation = { state->rotation[0], state->rotation[1], state->rotation[2], state->rotation[3] },
+    );
+
+    if ( down ) {
+        draw.color[0] = 1;
+        draw.color[1] = 0;
+        draw.color[2] = 0;
+        draw.color[3] = 1;
+    } else {
+        draw.color[0] = 1;
+        draw.color[1] = 1;
+        draw.color[2] = 0;
+        draw.color[3] = 1;
+    }
+
+    xi_workload_cmd_draw_mesh ( workload_handle, &draw );
+
+    return down;
+}

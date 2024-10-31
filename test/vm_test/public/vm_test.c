@@ -20,8 +20,8 @@ void test_sum ( void ) {
     uint32_t count = 4 * 1448;
     size_t page_size = std_virtual_page_size();
     size_t size = std_align ( sizeof ( float ) * count, page_size );
-    std_alloc_t alloc = std_virtual_alloc ( size );
-    float* f1 = ( float* ) alloc.buffer.base;
+    void* alloc = std_virtual_heap_alloc ( size, 16 );
+    float* f1 = ( float* ) alloc;
 
     for ( uint32_t i = 0; i < count; ++i ) {
         f1[i] = ( float ) i;

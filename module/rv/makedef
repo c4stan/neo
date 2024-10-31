@@ -4,3 +4,4 @@ defs = public.def
 configs = debug, release
 output = dll
 deps = std
+ignores = rv_visible.c

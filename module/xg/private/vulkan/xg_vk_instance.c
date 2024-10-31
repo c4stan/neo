@@ -76,23 +76,36 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
         std_log_info_m ( "Using Vulkan API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m, major, minor, patch );
     #endif
 
-        VkApplicationInfo applicationInfo = {};
-        applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        applicationInfo.pNext = NULL;
-        applicationInfo.pApplicationName = "XG";
-        applicationInfo.applicationVersion = 1;
-        applicationInfo.pEngineName = "XG";
-        applicationInfo.engineVersion = 1;
-        applicationInfo.apiVersion = VK_API_VERSION_1_3;//instance_version;
-        VkInstanceCreateInfo instanceInfo = {};
-        instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        instanceInfo.pNext = NULL;
-        instanceInfo.flags = 0;
-        instanceInfo.pApplicationInfo = &applicationInfo;
-        instanceInfo.enabledLayerCount = enabled_layers_count;
-        instanceInfo.ppEnabledLayerNames = enabled_layers;
-        instanceInfo.enabledExtensionCount = enabled_extensions_count;
-        instanceInfo.ppEnabledExtensionNames = enabled_extensions;
+        // TODO enable in debug only
+#if 0
+        VkValidationFeatureEnableEXT enabled_validation_features[] = { VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT };
+        VkValidationFeaturesEXT validation_features = {
+            .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
+            .enabledValidationFeatureCount = 1,
+            .pEnabledValidationFeatures = enabled_validation_features,
+        };
+#endif
+        
+        VkApplicationInfo applicationInfo = {
+            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pNext = NULL,
+            .pApplicationName = "XG",
+            .applicationVersion = 1,
+            .pEngineName = "XG",
+            .engineVersion = 1,
+            .apiVersion = VK_API_VERSION_1_3,//instance_version;
+        };
+        VkInstanceCreateInfo instanceInfo = {
+            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            .pNext = NULL,//&validation_features,
+            .flags = 0,
+            .pApplicationInfo = &applicationInfo,
+            .enabledLayerCount = enabled_layers_count,
+            .ppEnabledLayerNames = enabled_layers,
+            .enabledExtensionCount = enabled_extensions_count,
+            .ppEnabledExtensionNames = enabled_extensions,
+        };
+        
         VkResult result = vkCreateInstance ( &instanceInfo, NULL, &instance );
         std_verify_m ( result == VK_SUCCESS );
     }

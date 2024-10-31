@@ -76,20 +76,49 @@ typedef struct {
 } xi_workload_vertex_t;
 
 typedef struct {
-    xi_workload_vertex_t* vertices;
-    uint64_t vertices_count;
-    float translation[3];
-    float rotation[4];
+    xg_buffer_h pos_buffer;
+    xg_buffer_h nor_buffer;
+    xg_buffer_h idx_buffer;
+    xg_buffer_h uv_buffer;
+    xg_texture_h texture;
+    bool linear_sampler_filter;
+    uint32_t idx_count;
+    uint64_t sort_order;
+    float traslation[3]; // x y z
+    float rotation[4];    // x y z w
+    float color[4];
 } xi_draw_mesh_t;
+
+#define xi_draw_mesh_m( ... ) ( xi_draw_mesh_t ) { \
+    .pos_buffer = xg_null_handle_m, \
+    .nor_buffer = xg_null_handle_m, \
+    .idx_buffer = xg_null_handle_m, \
+    .uv_buffer = xg_null_handle_m, \
+    .texture = xg_null_handle_m, \
+    .linear_sampler_filter = false, \
+    .idx_count = 0, \
+    .sort_order = 0, \
+    .traslation = { 0, 0, 0 }, \
+    .rotation = { 0, 0, 0, 1 }, \
+    .color = { 1, 1, 1, 1 }, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xi_draw_rect_t rect_array[xi_workload_max_rects_m];
     uint64_t rect_count;
     xi_draw_tri_t tri_array[xi_workload_max_tris_m];
     uint64_t tri_count;
+
     xi_workload_vertex_t vertex_buffer_data[xi_workload_max_rects_m * 6 + xi_workload_max_tris_m * 3];
     xg_buffer_h vertex_buffer;
     // TODO index buffer
+
+    xi_draw_mesh_t mesh_array[xi_workload_max_meshes_m];
+    uint32_t mesh_count;
+
+    float proj_from_world[16];
+
     xg_workload_h xg_workload;
 } xi_workload_t;
 
@@ -110,9 +139,13 @@ typedef struct {
     //std_ring_t submit_ring;
     xi_workload_device_context_t device_contexts[xg_max_active_devices_m];
 
-    xs_database_pipeline_h render_pipeline_rgba8;
-    xs_database_pipeline_h render_pipeline_bgra8;
-    xs_database_pipeline_h render_pipeline_a2bgr10;
+    xs_database_pipeline_h ui_pipeline_rgba8;
+    xs_database_pipeline_h ui_pipeline_bgra8;
+    xs_database_pipeline_h ui_pipeline_a2bgr10;
+
+    xs_database_pipeline_h geo_pipeline_rgba8;
+    xs_database_pipeline_h geo_pipeline_bgra8;
+    xs_database_pipeline_h geo_pipeline_a2bgr10;
 
     xg_texture_h null_texture;
     xg_sampler_h point_sampler;
@@ -135,3 +168,5 @@ xi_scissor_h xi_workload_add_viewport ( xi_workload_h workload, uint32_t x, uint
 
 void xi_workload_activate_device ( xg_i* xg, xg_device_h device );
 void xi_workload_deactivate_device ( xg_i* xg, xg_device_h device );
+
+void xi_workload_set_view_info ( xi_workload_h workload_handle, const rv_view_info_t* view_info );

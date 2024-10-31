@@ -923,6 +923,38 @@ const char* xg_present_mode_str ( xg_present_mode_e mode ) {
     }
 }
 
+const char* xg_texture_layout_str ( xg_texture_layout_e layout ) {
+    switch ( layout ) {
+    case xg_texture_layout_undefined_m:
+        return "undefined";
+    case xg_texture_layout_all_m:
+        return "all";
+    case xg_texture_layout_host_initialize_m:
+        return "host_initialize";
+    case xg_texture_layout_copy_source_m:
+        return "copy_source";
+    case xg_texture_layout_copy_dest_m:
+        return "copy_dest";
+    case xg_texture_layout_present_m:
+        return "present";
+    case xg_texture_layout_shader_read_m:
+        return "shader_read";
+    case xg_texture_layout_shader_write_m:
+        return "shader_write";
+    case xg_texture_layout_render_target_m:
+        return "render_target";
+    case xg_texture_layout_depth_stencil_target_m:
+        return "depth_stencil_target";
+    case xg_texture_layout_depth_stencil_read_m:
+        return "depth_stencil_read";
+    case xg_texture_layout_depth_read_stencil_target_m:
+        return "depth_read_stencil_target";
+    case xg_texture_layout_depth_target_stencil_read_m:
+        return "depth_target_stencil_read";
+    }
+    return "Malformed texture layout enum";
+}
+
 xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
     switch ( stage ) {
         case xg_shading_stage_vertex_m:

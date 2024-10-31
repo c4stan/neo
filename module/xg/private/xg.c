@@ -61,6 +61,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->create_raytrace_world = xg_vk_raytrace_world_create;
     xg->cmd_set_raytrace_pipeline_state = xg_cmd_buffer_raytrace_pipeline_state_bind;
     xg->cmd_trace_rays = xg_cmd_buffer_raytrace_trace_rays;
+    xg->destroy_raytrace_world = xg_vk_raytrace_world_destroy;
     // Command Buffer
     xg->cmd_barrier_set = xg_cmd_buffer_barrier_set;
     xg->cmd_clear_texture = xg_cmd_buffer_texture_clear;

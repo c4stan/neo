@@ -36,10 +36,9 @@ void xf_resource_unload ( void ) {
 
 xf_texture_h xf_resource_texture_declare ( const xf_texture_params_t* params ) {
     xf_texture_t* texture = std_list_pop_m ( &xf_resource_state->textures_freelist );
-    std_mem_zero_m ( texture );
-    texture->xg_handle = xg_null_handle_m;
-    texture->params = *params;
-    texture->alias = xf_null_handle_m;
+    *texture = xf_texture_m (
+        .params = *params
+    );
     xf_texture_h handle = ( xf_texture_h ) ( texture - xf_resource_state->textures_array );
     return handle;
 }
@@ -109,6 +108,17 @@ xf_texture_t* xf_resource_texture_get ( xf_texture_h texture_handle ) {
     }
 
     return texture;
+}
+
+xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture_handle ) {
+    bool is_multi_texture = xf_resource_texture_is_multi ( texture_handle );
+
+    if ( is_multi_texture ) {
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+        return multi_texture;
+    } else {
+        return NULL;
+    }
 }
 
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer_handle ) {
@@ -215,14 +225,16 @@ void xf_resource_texture_set_allowed_usage ( xf_texture_h texture_handle, xg_tex
     texture->allowed_usage = allowed_usage;
 }
 
-void xf_resource_texture_map_to_new ( xf_texture_h texture_handle, xg_texture_h xg_handle ) {
+void xf_resource_texture_map_to_new ( xf_texture_h texture_handle, xg_texture_h xg_handle, xg_texture_usage_bit_e allowed_usage ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     texture->xg_handle = xg_handle;
+    texture->allowed_usage = allowed_usage;
 }
 
-void xf_resource_buffer_map_to_new ( xf_buffer_h buffer_handle, xg_buffer_h xg_handle ) {
+void xf_resource_buffer_map_to_new ( xf_buffer_h buffer_handle, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage ) {
     xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
     buffer->xg_handle = xg_handle;
+    buffer->allowed_usage = allowed_usage;
 }
 
 void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e usage ) {
@@ -233,12 +245,10 @@ void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usa
         for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
             xf_texture_t* texture = &xf_resource_state->textures_array[multi_texture->textures[i]];
             texture->required_usage |= usage;
-            texture->is_dirty = true;
         }
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
         texture->required_usage |= usage;
-        texture->is_dirty = true;
     }
 }
 
@@ -249,12 +259,10 @@ void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_b
         for ( uint32_t i = 0; i < multi_buffer->params.multi_buffer_count; ++i ) {
             xf_buffer_t* buffer = &xf_resource_state->buffers_array[multi_buffer->buffers[i]];
             buffer->required_usage |= usage;
-            buffer->is_dirty = true;
         }
     } else {
         xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
         buffer->required_usage |= usage;
-        buffer->is_dirty = true;
     }
 }
 
@@ -379,15 +387,15 @@ void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer_handle, xg_pipe
     buffer->state.stage |= stage;
 }
 
-void xf_resource_texture_set_dirty ( xf_texture_h texture_handle, bool is_dirty ) {
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    texture->is_dirty = is_dirty;
-}
-
-void xf_resource_buffer_set_dirty ( xf_buffer_h buffer_handle, bool is_dirty ) {
-    xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
-    buffer->is_dirty = is_dirty;
-}
+//void xf_resource_texture_set_dirty ( xf_texture_h texture_handle, bool is_dirty ) {
+//    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+//    texture->is_dirty = is_dirty;
+//}
+//
+//void xf_resource_buffer_set_dirty ( xf_buffer_h buffer_handle, bool is_dirty ) {
+//    xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
+//    buffer->is_dirty = is_dirty;
+//}
 
 xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t* params ) {
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
@@ -422,16 +430,12 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     std_verify_m ( xg->get_swapchain_info ( &info, swapchain ) );
 
     xf_multi_texture_params_t params = xf_multi_texture_params_m (
-        .texture.width = info.width,
-        .texture.height = info.height,
-        .texture.depth = 1,
-        .texture.mip_levels = 1,
-        .texture.array_layers = 1,
-        .texture.dimension = xg_texture_dimension_2d_m,
-        .texture.format = info.format,
-        .texture.samples_per_pixel = xg_sample_count_1_m,
-        .texture.allow_aliasing = false,
-        .texture.view_access = xg_texture_view_access_default_only_m,
+        .texture = xf_texture_params_m (
+            .width = info.width,
+            .height = info.height,
+            .format = info.format,
+            .allow_aliasing = false,
+        ),
         .multi_texture_count = ( uint32_t ) info.texture_count,
     );
     std_str_copy_static_m ( params.texture.debug_name, info.debug_name );
@@ -443,17 +447,20 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     multi_texture->swapchain = swapchain;
 
     for ( uint64_t i = 0; i < info.texture_count; ++i ) {
-        xf_texture_h texture_handle = xf_resource_texture_declare ( &params.texture );
-
-        //xf_resource_texture_bind ( texture_handle, info.textures[i] );
-        xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-        //std_mem_zero_m ( texture );
-        texture->xg_handle = info.textures[i];
-        texture->is_external = true;
-
         xg_texture_info_t texture_info;
         xg->get_texture_info ( &texture_info, info.textures[i] );
+
+        xf_texture_h texture_handle = xf_resource_texture_declare ( &params.texture );
+        xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+
+        texture->xg_handle = info.textures[i];
+        texture->is_external = true;
         xf_resource_texture_update_info ( texture_handle, &texture_info );
+        // TODO check base texture mip mode
+        texture->deps.shared = xf_resource_dependencies_m();
+        texture->state.shared = xf_texture_execution_state_m (
+            .layout = xg_texture_layout_undefined_m, // TODO take as param?
+        );
 
         // TODO tag handle here
         multi_texture->textures[i] = texture_handle;
@@ -490,37 +497,27 @@ xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h xg_texture
     xg_texture_info_t info;
     std_verify_m ( xg->get_texture_info ( &info, xg_texture ) );
 
-#if 0
-    xf_texture_params_t params;
-    params.width = info.width;
-    params.height = info.height;
-    params.depth = info.depth;
-    params.mip_levels = info.mip_levels;
-    params.array_layers = info.array_layers;
-    params.dimension = info.dimension;
-    params.format = info.format;
-    params.samples_per_pixel = info.samples_per_pixel;
-    params.allow_aliasing = false;
-    params.debug_name = info.debug_name;
-#endif
+    xf_texture_params_t params = xf_texture_params_m (
+        .width = info.width,
+        .height = info.height,
+        .format = info.format,
+        .allow_aliasing = false,
+    );
+    std_str_copy_static_m ( params.debug_name, info.debug_name );
 
     xf_texture_t* texture = std_list_pop_m ( &xf_resource_state->textures_freelist );
-    std_mem_zero_m ( texture );
-    texture->xg_handle = xg_texture;
-    //texture->params = params;
-    texture->is_external = true;
-    texture->alias = xf_null_handle_m;
-
     xf_texture_h handle = ( xf_texture_h ) ( texture - xf_resource_state->textures_array );
 
+    *texture = xf_texture_m (
+        .xg_handle = xg_texture,
+        .is_external = true,
+    );
     xf_resource_texture_update_info ( handle, &info );
-    texture->params.allow_aliasing = false;
-    texture->params.clear_on_create = false;
 
     return handle;
 }
 
-xf_texture_h xf_resource_multi_texture_get ( xf_texture_h multi_texture_handle, int32_t offset ) {
+xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture_handle, int32_t offset ) {
     std_assert_m ( std_bit_test_64 ( multi_texture_handle, 63 ) );
     xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
 

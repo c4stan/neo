@@ -566,6 +566,19 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+#if 0
+// -- Input Assembler ---
+
+typedef enum {
+    xg_input_primitive_triangle_m,
+    xg_input_primitive_line_m,
+} xg_input_primitive_e;
+
+typedef struct {
+    xg_input_primitive_e primitive;
+} xg_input_assembler_state_t;
+#endif
+
 // -- Rasterizer State --
 typedef enum {
     xg_polygon_mode_fill_m,
@@ -1320,7 +1333,7 @@ typedef enum {
 } xg_buffer_usage_bit_e;
 
 typedef enum {
-    xg_texture_layout_undefined_m,                    // UNDEFINED
+    xg_texture_layout_undefined_m,                    // UNDEFINED - layout of a texture that was just created
     xg_texture_layout_all_m,                          // GENERAL
     xg_texture_layout_host_initialize_m,              // PREINITIALIZED
     xg_texture_layout_copy_source_m,                  // TRANSFER_SRC
@@ -1343,6 +1356,7 @@ typedef enum {
 
 // TODO
 typedef enum {
+    xg_texture_usage_bit_none_m             =      0,
     xg_texture_usage_bit_copy_source_m      = 1 << 0,
     xg_texture_usage_bit_copy_dest_m        = 1 << 1,
     xg_texture_usage_bit_sampled_m          = 1 << 2,
@@ -1755,6 +1769,11 @@ typedef struct {
 }
 
 typedef enum {
+    xg_texture_tiling_optimal_m,
+    xg_texture_tiling_linear_m,
+} xg_texture_tiling_e;
+
+typedef enum {
     xg_texture_view_access_default_only_m,
     xg_texture_view_access_separate_mips_m,
     xg_texture_view_access_dynamic_m,
@@ -1778,6 +1797,7 @@ typedef struct {
     xg_texture_usage_bit_e allowed_usage;
     xg_texture_layout_e initial_layout; // TODO remove this, only accepted inital layout by vulkan is undefined
     xg_sample_count_e samples_per_pixel;
+    xg_texture_tiling_e tiling;
     xg_texture_view_access_e view_access;
     void* view_access_ext;
     char debug_name[xg_debug_name_size_m];
@@ -1793,10 +1813,12 @@ typedef struct {
     .array_layers = 1, \
     .dimension = xg_texture_dimension_2d_m, \
     .format = xg_format_undefined_m, \
-    .allowed_usage = 0, \
+    .allowed_usage = xg_texture_usage_bit_none_m, \
     .initial_layout = xg_texture_layout_undefined_m, \
     .samples_per_pixel = xg_sample_count_1_m, \
+    .tiling = xg_texture_tiling_optimal_m, \
     .view_access = xg_texture_view_access_default_only_m, \
+    .view_access_ext = NULL, \
     .debug_name = {0}, \
     ##__VA_ARGS__ \
 }
@@ -2245,6 +2267,8 @@ typedef struct {
     // TODO separate creation and build
     xg_raytrace_geometry_h  ( *create_raytrace_geometry )           ( const xg_raytrace_geometry_params_t* params );
     xg_raytrace_world_h     ( *create_raytrace_world )              ( const xg_raytrace_world_params_t* params );
+
+    void                    ( *destroy_raytrace_world )             ( xg_raytrace_world_h world );
 
     // Pipeline state
     // TODO move device into params struct? or always keep out? just pick one and standardize

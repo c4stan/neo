@@ -95,7 +95,7 @@ bool                std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t*
 std_hash_map_t      std_hash_map_create ( uint64_t capacity );
 void                std_hash_map_destroy ( std_hash_map_t* map );
 
-#define std_static_hash_map_m( keys, payloads ) std_hash_map ( std_static_buffer_m ( keys ), std_static_buffer_m ( payloads ) )
+#define std_static_hash_map_m( keys, payloads ) std_hash_map ( keys, payloads, std_static_array_capacity_m ( keys ) )
 
 // NOTE: This allows atomic insertions form multiple threads but it does NOT support a number of other operations happening in parallel with the insertions:
 //      - Removal of any item in the map is NOT supported

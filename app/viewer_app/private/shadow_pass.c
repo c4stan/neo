@@ -48,11 +48,11 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         .component_count = 1,
         .components = { viewapp_mesh_component_id_m }
     ) );
-    se_component_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
+    se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     uint64_t light_count = light_query_result.entity_count;
 
     for ( uint64_t i = 0; i < light_count; ++i ) {
-        viewapp_light_component_t* light_component = se_component_iterator_next ( &light_iterator );
+        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
 
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, light_component->view );
@@ -86,14 +86,14 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         );
         xg->cmd_set_pipeline_viewport ( node_args->cmd_buffer, &viewport, key );
 
-        se_component_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+        se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
         uint64_t mesh_count = mesh_query_result.entity_count;
         for ( uint64_t j = 0; j < mesh_count; ++j ) {
-            viewapp_mesh_component_t* mesh_component = se_component_iterator_next ( &mesh_iterator );
+            viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
             xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->shadow_pipeline );
             xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-            sm_vec_3f_t up = sm_vec_3f ( 0, 1, 0 );
+            sm_vec_3f_t up = { 0, 1, 0 };
             
             sm_vec_3f_t dir = {
                 .x = mesh_component->orientation[0],

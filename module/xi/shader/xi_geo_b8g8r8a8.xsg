@@ -1,0 +1,5 @@
+include xi_geo_common.xsi
+
+begin render_target 0
+    format B8G8R8A8_UNORM
+end

@@ -696,3 +696,15 @@ xg_memory_flag_bit_e xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags ) {
 
     return result;
 }
+
+VkImageTiling xg_texture_tiling_to_vk ( xg_texture_tiling_e tiling ) {
+    switch ( tiling ) {
+    case xg_texture_tiling_optimal_m:
+        return VK_IMAGE_TILING_OPTIMAL;
+    case xg_texture_tiling_linear_m:
+        return VK_IMAGE_TILING_LINEAR;
+    default:
+        std_log_error_m ( "Texture tiling not supported" );
+        return 0;
+    }
+}

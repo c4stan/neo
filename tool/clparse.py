@@ -103,6 +103,7 @@ def print_help():
     print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + Color.ENDC + ' to git pull remote changes')
     print('\t' + Color.OKGREEN + 'gitstatus' + Color.OKBLUE + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
+    print('\t' + Color.OKGREEN + 'recover' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to open the last submitted version of the file')
     print('')
 
 def format_title_string(words):
@@ -490,6 +491,7 @@ def fixup_debug_app(name, flags):
 def create_local_workspace(root, name):
     path = os.path.join(root, name)
     #push_path('../')
+    print(path)
     os.system('mkdir ' + path)
     push_path(path)
     os.system('mkdir public')

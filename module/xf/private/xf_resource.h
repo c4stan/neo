@@ -22,12 +22,19 @@
 
 // Stores what kind of access the graph nodes do on a (sub) resource
 // Filled when adding nodes to a graph and never updated after
+// TODO make there per graph not global (store inside the graph)
 typedef struct {
     xf_node_h writers[xf_resource_max_writers_m];
     xf_node_h readers[xf_resource_max_readers_m];
     size_t readers_count;
     size_t writers_count;
 } xf_resource_dependencies_t;
+
+#define xf_resource_dependencies_m( ... ) ( xf_resource_dependencies_t ) { \
+    .readers_count = 0, \
+    .writers_count = 0, \
+    ##__VA_ARGS__ \
+}
 
 // Keeps track of the state of a (sub) resource
 // Updated during graph execution whenever a new memory barrier is queued up for the resource
@@ -83,7 +90,6 @@ typedef struct {
 #endif
 
 typedef struct {
-    bool is_dirty;
     bool is_external; // lifetime not owned by xf. never allocated, just used
     xg_texture_h xg_handle;
     xg_texture_usage_bit_e required_usage;
@@ -105,8 +111,19 @@ typedef struct {
     xf_texture_h alias;
 } xf_texture_t;
 
+#define xf_texture_m( ... ) ( xf_texture_t ) { \
+    .is_external = false, \
+    .xg_handle = xg_null_handle_m, \
+    .required_usage = xg_texture_usage_bit_none_m, \
+    .allowed_usage = xg_texture_usage_bit_none_m, \
+    .params = xf_texture_params_m(), \
+    .deps.shared = xf_resource_dependencies_m(), \
+    .state.shared = xf_texture_execution_state_m(), \
+    .alias = xg_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
 typedef struct {
-    bool is_dirty;
     xg_buffer_h xg_handle;
     xf_buffer_execution_state_t state;
     xf_resource_dependencies_t deps;
@@ -163,6 +180,7 @@ bool xf_resource_texture_is_multi ( xf_texture_h texture );
 bool xf_resource_buffer_is_multi ( xf_buffer_h buffer );
 
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture );
+xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer );
 
 // t is used as space to store the result when the texture has per-mip dependencies.
@@ -170,8 +188,8 @@ xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer );
 // t is expected to be initialized when passed in. it is acceptable for it to be non-empty.
 const xf_resource_dependencies_t* xf_resource_texture_get_deps ( xf_texture_h texture, xg_texture_view_t view, xf_resource_dependencies_t* t );
 
-void xf_resource_texture_map_to_new ( xf_texture_h texture, xg_texture_h xg_handle );
-void xf_resource_buffer_map_to_new ( xf_buffer_h buffer, xg_buffer_h xg_handle );
+void xf_resource_texture_map_to_new ( xf_texture_h texture, xg_texture_h xg_handle, xg_texture_usage_bit_e allowed_usage );
+void xf_resource_buffer_map_to_new ( xf_buffer_h buffer, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage );
 
 void xf_resource_texture_update_info ( xf_texture_h texture, const xg_texture_info_t* info );
 void xf_resource_texture_set_allowed_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
@@ -193,8 +211,8 @@ void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer, const xf_buffe
 void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer, xg_pipeline_stage_bit_e stage );
 
 // TODO remove these and nove dirty flag clear into map_to_new?
-void xf_resource_texture_set_dirty ( xf_texture_h texture, bool is_dirty );
-void xf_resource_buffer_set_dirty ( xf_buffer_h buffer, bool is_dirty );
+//void xf_resource_texture_set_dirty ( xf_texture_h texture, bool is_dirty );
+//void xf_resource_buffer_set_dirty ( xf_buffer_h buffer, bool is_dirty );
 
 /*
     Multi texture handle : | multi texture flag | unused | multi texture subtexture index | multi texture index |
@@ -221,7 +239,7 @@ xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h texture );
 
 xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
 
-xf_texture_h xf_resource_multi_texture_get ( xf_texture_h multi_texture, int32_t offset );
+xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture, int32_t offset );
 
 xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture );
 

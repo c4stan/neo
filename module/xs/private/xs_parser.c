@@ -40,6 +40,17 @@ typedef struct {
 #endif
 } xs_parser_parsing_context_t;
 
+static xg_shading_stage_bit_e xs_parser_default_shading_stage ( xs_parser_parsing_context_t* context ) {
+    switch ( context->pipeline_type ) {
+    case xg_pipeline_graphics_m:
+        return xg_shading_stage_bit_fragment_m;
+    case xg_pipeline_compute_m:
+        return xg_shading_stage_bit_compute_m;
+    case xg_pipeline_raytrace_m:
+        return xg_shading_stage_bit_ray_gen_m; // TODO is this right?
+    }
+}
+
 static size_t xs_parser_skip_to_text ( xs_parser_parsing_context_t* context ) {
     const char* begin = context->head;
 
@@ -1009,28 +1020,83 @@ static void xs_parser_parse_define ( xs_parser_parsing_context_t* context ) {
     }
 }
 
-static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
-    uint32_t shader_register = 0;
-    {
-        //xs_parser_skip_spaces ( context );
-        //size_t len =
-        //xs_parser_read_u32 ( context, &shader_register );
-        //std_assert_m ( len > 0 );
+typedef enum {
+    xs_parser_buffer_type_uniform_m,
+    xs_parser_buffer_type_storage_m,
+} xs_parser_buffer_type_e;
+
+typedef struct {
+    xg_shading_stage_bit_e stages;
+    xg_resource_binding_set_e update_set;
+    xs_parser_buffer_type_e type;
+    uint32_t shader_register;
+} xs_parser_buffer_t;
+
+static void xs_parser_add_buffer ( xs_parser_parsing_context_t* context, const xs_parser_buffer_t* buffer ) {
+    std_assert_m ( buffer->stages != 0 );
+    std_assert_m ( buffer->update_set != xg_resource_binding_set_invalid_m );
+
+    xg_resource_binding_e type;
+
+    if ( buffer->type == xs_parser_buffer_type_uniform_m ) {
+        type = xg_resource_binding_buffer_uniform_m;
+    } else if ( buffer->type == xs_parser_buffer_type_storage_m ) {
+        type = xg_resource_binding_buffer_storage_m;
+    } else {
+        std_assert_m ( false );
     }
 
+    xg_resource_binding_layout_t* binding_point = NULL;
+
+    switch ( context->pipeline_type ) {
+        case xg_pipeline_graphics_m:
+            for ( size_t i = 0; i < context->graphics_pipeline->resource_bindings.binding_points_count; ++i ) {
+                if ( context->graphics_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
+                    std_assert_m ( context->graphics_pipeline->resource_bindings.binding_points[i].shader_register != buffer->shader_register
+                        || context->graphics_pipeline->resource_bindings.binding_points[i].set != buffer->update_set );
+                }
+            }
+
+            binding_point = &context->graphics_pipeline->resource_bindings.binding_points[context->graphics_pipeline->resource_bindings.binding_points_count++];
+            break;
+
+        case xg_pipeline_compute_m:
+            for ( size_t i = 0; i < context->compute_pipeline->resource_bindings.binding_points_count; ++i ) {
+                if ( context->compute_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
+                    std_assert_m ( context->compute_pipeline->resource_bindings.binding_points[i].shader_register != buffer->shader_register
+                        || context->compute_pipeline->resource_bindings.binding_points[i].set != buffer->update_set );
+                }
+            }
+
+            binding_point = &context->compute_pipeline->resource_bindings.binding_points[context->compute_pipeline->resource_bindings.binding_points_count++];
+            break;
+
+        case xg_pipeline_raytrace_m:
+            for ( size_t i = 0; i < context->raytrace_pipeline->resource_bindings.binding_points_count; ++i ) {
+                if ( context->raytrace_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
+                    std_assert_m ( context->raytrace_pipeline->resource_bindings.binding_points[i].shader_register != buffer->shader_register
+                        || context->raytrace_pipeline->resource_bindings.binding_points[i].set != buffer->update_set );
+                }
+            }
+
+            binding_point = &context->raytrace_pipeline->resource_bindings.binding_points[context->raytrace_pipeline->resource_bindings.binding_points_count++];
+            break;
+    }
+
+    binding_point->shader_register = buffer->shader_register;
+    binding_point->type = type;
+    binding_point->stages = buffer->stages;
+    binding_point->set = buffer->update_set;
+}
+
+static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
-    struct {
-        xg_shading_stage_bit_e stages;
-        xg_resource_binding_set_e update_set;
-        bool is_texel_buffer;
-        bool write_access;
-    } buffer;
-
-    buffer.write_access = false;
-    buffer.is_texel_buffer = false;
-    buffer.stages = 0;
-    buffer.update_set = xg_resource_binding_set_per_draw_m;//xg_resource_binding_set_invalid_m;
+    xs_parser_buffer_t buffer = {
+        .type = xs_parser_buffer_type_uniform_m,
+        .stages = xs_parser_default_shading_stage ( context ),
+        .update_set = xg_resource_binding_set_per_draw_m
+    };
 
     while ( context->head < context->eof ) {
         xs_parser_skip_to_text ( context );
@@ -1044,28 +1110,22 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
             buffer.update_set = xs_parser_resource_binding_set_to_enum ( token );
         } else if ( std_str_cmp ( token, "register" ) == 0 || std_str_cmp ( token, "binding" ) == 0 ) {
             xs_parser_skip_spaces ( context );
-            len = xs_parser_read_u32 ( context, &shader_register );
+            len = xs_parser_read_u32 ( context, &buffer.shader_register );
             std_assert_m ( len > 0 );
         } else if ( std_str_cmp ( token, "access" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len > 0 );
-
-            if ( std_str_cmp ( token, "read_write" ) == 0 || std_str_cmp ( token, "write" ) == 0 ) {
-                buffer.write_access = true;
-            } else {
-                std_assert_m ( std_str_cmp ( token, "read" ) == 0 );
+            if ( std_str_cmp ( token, "read_write" ) == 0 || std_str_cmp ( token, "write" ) == 0 || std_str_cmp ( token, "storage" ) == 0 ) {
+                buffer.type = xs_parser_buffer_type_storage_m;
+            } else if ( std_str_cmp ( token, "uniform" ) == 0 ) {
+                buffer.type = xs_parser_buffer_type_uniform_m;
             }
         } else if ( std_str_cmp ( token, "stage" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len > 0 );
             buffer.stages |= xs_parser_shading_stage_to_bit ( token );
-        } else if ( std_str_cmp ( token, "texel" ) == 0 ) {
-            xs_parser_skip_spaces ( context );
-            len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
-            std_assert_m ( len > 0 );
-            buffer.is_texel_buffer = xs_parser_str_to_bool ( token );
         } else if ( std_str_cmp ( token, xs_parser_line_comment_token_m ) == 0 ) {
             xs_parser_skip_line ( context );
         } else {
@@ -1074,29 +1134,34 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
         }
     }
 
-    std_assert_m ( buffer.stages != 0 );
-    std_assert_m ( buffer.update_set != xg_resource_binding_set_invalid_m );
+    xs_parser_add_buffer ( context, &buffer );
+}
+
+typedef enum {
+    xs_parser_texture_type_sampled_m,
+    xs_parser_texture_type_storage_m,
+} xs_parser_texture_type_e;
+
+typedef struct {
+    xg_shading_stage_bit_e stages;
+    xg_resource_binding_set_e update_set;
+    uint32_t shader_register;
+    xs_parser_texture_type_e type;
+} xs_parser_texture_t;
+
+static void xs_parser_add_texture ( xs_parser_parsing_context_t* context, const xs_parser_texture_t* texture ) {
+    std_assert_m ( texture->stages != 0 );
+    std_assert_m ( texture->update_set != xg_resource_binding_set_invalid_m );
 
     xg_resource_binding_e type;
 
-    if ( buffer.is_texel_buffer ) {
-        if ( buffer.write_access ) {
-            type = xg_resource_binding_buffer_texel_storage_m;
-        } else {
-            type = xg_resource_binding_buffer_texel_uniform_m;
-        }
+    if ( texture->type == xs_parser_texture_type_sampled_m ) {
+        type = xg_resource_binding_texture_to_sample_m;
+    } else if ( texture->type == xs_parser_texture_type_storage_m ) {
+        type = xg_resource_binding_texture_storage_m;
     } else {
-        // TODO redesign this... no way to specify a read only storage buffer but in practice it is useful
-        if ( buffer.write_access ) {
-            type = xg_resource_binding_buffer_storage_m;
-        } else {
-            type = xg_resource_binding_buffer_uniform_m;
-        }
+        std_assert_m ( false );
     }
-
-    /*if ( context->result->resource_bindings.binding_points_count == xs_size_undefined_m ) {
-        context->result->resource_bindings.binding_points_count = 0;
-    }*/
 
     xg_resource_binding_layout_t* binding_point = NULL;
 
@@ -1104,8 +1169,8 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
         case xg_pipeline_graphics_m:
             for ( size_t i = 0; i < context->graphics_pipeline->resource_bindings.binding_points_count; ++i ) {
                 if ( context->graphics_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
-                    std_assert_m ( context->graphics_pipeline->resource_bindings.binding_points[i].shader_register != shader_register
-                        || context->graphics_pipeline->resource_bindings.binding_points[i].set != buffer.update_set );
+                    std_assert_m ( context->graphics_pipeline->resource_bindings.binding_points[i].shader_register != texture->shader_register
+                        || context->graphics_pipeline->resource_bindings.binding_points[i].set != texture->update_set );
                 }
             }
 
@@ -1115,8 +1180,8 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
         case xg_pipeline_compute_m:
             for ( size_t i = 0; i < context->compute_pipeline->resource_bindings.binding_points_count; ++i ) {
                 if ( context->compute_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
-                    std_assert_m ( context->compute_pipeline->resource_bindings.binding_points[i].shader_register != shader_register
-                        || context->compute_pipeline->resource_bindings.binding_points[i].set != buffer.update_set );
+                    std_assert_m ( context->compute_pipeline->resource_bindings.binding_points[i].shader_register != texture->shader_register
+                        || context->compute_pipeline->resource_bindings.binding_points[i].set != texture->update_set );
                 }
             }
 
@@ -1126,8 +1191,8 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
         case xg_pipeline_raytrace_m:
             for ( size_t i = 0; i < context->raytrace_pipeline->resource_bindings.binding_points_count; ++i ) {
                 if ( context->raytrace_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
-                    std_assert_m ( context->raytrace_pipeline->resource_bindings.binding_points[i].shader_register != shader_register
-                        || context->raytrace_pipeline->resource_bindings.binding_points[i].set != buffer.update_set );
+                    std_assert_m ( context->raytrace_pipeline->resource_bindings.binding_points[i].shader_register != texture->shader_register
+                        || context->raytrace_pipeline->resource_bindings.binding_points[i].set != texture->update_set );
                 }
             }
 
@@ -1135,31 +1200,20 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
             break;
     }
 
-    binding_point->shader_register = shader_register;
+    binding_point->shader_register = texture->shader_register;
     binding_point->type = type;
-    binding_point->stages = buffer.stages;
-    binding_point->set = buffer.update_set;
+    binding_point->stages = texture->stages;
+    binding_point->set = texture->update_set;
 }
 
 static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
-    uint32_t shader_register = 0;
-    {
-        //xs_parser_skip_spaces ( context );
-        //size_t len = xs_parser_read_u32 ( context, &shader_register );
-        //std_assert_m ( len > 0 );
-    }
-
     char token[xs_shader_parser_max_token_size_m];
 
-    struct {
-        xg_shading_stage_bit_e stages;
-        xg_resource_binding_set_e update_set;
-        bool write_access;
-    } texture;
-
-    texture.write_access = false;
-    texture.stages = 0;
-    texture.update_set = xg_resource_binding_set_per_draw_m;//xg_resource_binding_set_invalid_m;
+    xs_parser_texture_t texture = {
+        .stages = xs_parser_default_shading_stage ( context ),
+        .update_set = xg_resource_binding_set_per_draw_m,
+        .type = xs_parser_texture_type_sampled_m,
+    };
 
     while ( context->head < context->eof ) {
         xs_parser_skip_to_text ( context );
@@ -1173,17 +1227,17 @@ static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
             texture.update_set = xs_parser_resource_binding_set_to_enum ( token );
         } else if ( std_str_cmp ( token, "register" ) == 0 || std_str_cmp ( token, "binding" ) == 0 ) {
             xs_parser_skip_spaces ( context );
-            len = xs_parser_read_u32 ( context, &shader_register );
+            len = xs_parser_read_u32 ( context, &texture.shader_register );
             std_assert_m ( len > 0 );
         } else if ( std_str_cmp ( token, "access" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len > 0 );
 
-            if ( std_str_cmp ( token, "read_write" ) == 0 || std_str_cmp ( token, "write" ) == 0 ) {
-                texture.write_access = true;
-            } else {
-                std_assert_m ( std_str_cmp ( token, "read" ) == 0 );
+            if ( std_str_cmp ( token, "read_write" ) == 0 || std_str_cmp ( token, "write" ) == 0 || std_str_cmp ( token, "storage" ) == 0 ) {
+                texture.type = xs_parser_texture_type_storage_m;
+            } else if ( std_str_cmp ( token, "sampled" ) == 0 ) {
+                texture.type = xs_parser_texture_type_sampled_m;
             }
         } else if ( std_str_cmp ( token, "stage" ) == 0 ) {
             xs_parser_skip_spaces ( context );
@@ -1198,68 +1252,7 @@ static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
         }
     }
 
-    std_assert_m ( texture.stages != 0 );
-    std_assert_m ( texture.update_set != xg_resource_binding_set_invalid_m );
-
-    xg_resource_binding_e type;
-
-    if ( texture.write_access ) {
-        type = xg_resource_binding_texture_storage_m;
-    } else {
-        type = xg_resource_binding_texture_to_sample_m;
-    }
-
-    /*if ( context->result->resource_bindings.binding_points_count == xs_size_undefined_m ) {
-        context->result->resource_bindings.binding_points_count = 0;
-    }*/
-
-    //for ( size_t i = 0; i < context->result->resource_bindings.binding_points_count; ++i ) {
-    //    if ( context->result->resource_bindings.binding_points[i].type == type ) {
-    //        std_assert_m ( context->result->resource_bindings.binding_points[i].shader_register != shader_register );
-    //    }
-    //}
-
-    xg_resource_binding_layout_t* binding_point = NULL;
-
-    switch ( context->pipeline_type ) {
-        case xg_pipeline_graphics_m:
-            for ( size_t i = 0; i < context->graphics_pipeline->resource_bindings.binding_points_count; ++i ) {
-                if ( context->graphics_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
-                    std_assert_m ( context->graphics_pipeline->resource_bindings.binding_points[i].shader_register != shader_register
-                        || context->graphics_pipeline->resource_bindings.binding_points[i].set != texture.update_set );
-                }
-            }
-
-            binding_point = &context->graphics_pipeline->resource_bindings.binding_points[context->graphics_pipeline->resource_bindings.binding_points_count++];
-            break;
-
-        case xg_pipeline_compute_m:
-            for ( size_t i = 0; i < context->compute_pipeline->resource_bindings.binding_points_count; ++i ) {
-                if ( context->compute_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
-                    std_assert_m ( context->compute_pipeline->resource_bindings.binding_points[i].shader_register != shader_register
-                        || context->compute_pipeline->resource_bindings.binding_points[i].set != texture.update_set );
-                }
-            }
-
-            binding_point = &context->compute_pipeline->resource_bindings.binding_points[context->compute_pipeline->resource_bindings.binding_points_count++];
-            break;
-
-        case xg_pipeline_raytrace_m:
-            for ( size_t i = 0; i < context->raytrace_pipeline->resource_bindings.binding_points_count; ++i ) {
-                if ( context->raytrace_pipeline->resource_bindings.binding_points[i].type == type ) { // TODO is this proper in glsl?
-                    std_assert_m ( context->raytrace_pipeline->resource_bindings.binding_points[i].shader_register != shader_register
-                        || context->raytrace_pipeline->resource_bindings.binding_points[i].set != texture.update_set );
-                }
-            }
-
-            binding_point = &context->raytrace_pipeline->resource_bindings.binding_points[context->raytrace_pipeline->resource_bindings.binding_points_count++];
-            break;
-    }
-
-    binding_point->shader_register = shader_register;
-    binding_point->type = type;
-    binding_point->stages = texture.stages;
-    binding_point->set = texture.update_set;
+    xs_parser_add_texture ( context, &texture );
 }
 
 static void xs_parser_parse_ray_gen_shader ( xs_parser_parsing_context_t* context ) {
@@ -1413,14 +1406,43 @@ static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
     binding_point->set = ray_world.update_set;
 }
 
+typedef struct {
+    xg_shading_stage_bit_e stages;
+    xg_resource_binding_set_e update_set;
+    uint32_t shader_register;
+} xs_parser_sampler_t;
+
+static void xs_parser_add_sampler ( xs_parser_parsing_context_t* context, const xs_parser_sampler_t* sampler ) {
+    std_assert_m ( sampler->stages != 0 );
+    std_assert_m ( sampler->update_set != xg_resource_binding_set_invalid_m );
+    std_assert_m ( sampler->shader_register != UINT32_MAX );
+
+    xg_resource_binding_layout_t* binding_point = NULL;
+
+    switch ( context->pipeline_type ) {
+        case xg_pipeline_graphics_m:
+            binding_point = &context->graphics_pipeline->resource_bindings.binding_points[context->graphics_pipeline->resource_bindings.binding_points_count++];
+            break;
+
+        case xg_pipeline_compute_m:
+            binding_point = &context->compute_pipeline->resource_bindings.binding_points[context->compute_pipeline->resource_bindings.binding_points_count++];
+            break;
+
+        case xg_pipeline_raytrace_m:
+            binding_point = &context->raytrace_pipeline->resource_bindings.binding_points[context->raytrace_pipeline->resource_bindings.binding_points_count++];
+            break;
+    }
+
+    binding_point->shader_register = sampler->shader_register;
+    binding_point->type = xg_resource_binding_sampler_m;
+    binding_point->stages = sampler->stages;
+    binding_point->set = sampler->update_set;
+}
+
 static void xs_parser_parse_sampler ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
-    struct {
-        xg_shading_stage_bit_e stages;
-        xg_resource_binding_set_e update_set;
-        uint32_t shader_register;
-    } sampler;
+    xs_parser_sampler_t sampler;
 
     sampler.stages = 0;
     sampler.update_set = xg_resource_binding_set_per_draw_m;//xg_resource_binding_set_invalid_m;
@@ -1451,30 +1473,134 @@ static void xs_parser_parse_sampler ( xs_parser_parsing_context_t* context ) {
         }
     }
 
-    std_assert_m ( sampler.stages != 0 );
-    std_assert_m ( sampler.update_set != xg_resource_binding_set_invalid_m );
-    std_assert_m ( sampler.shader_register != UINT32_MAX );
+    xs_parser_add_sampler ( context, &sampler );
+}
 
-    xg_resource_binding_layout_t* binding_point = NULL;
-
-    switch ( context->pipeline_type ) {
-        case xg_pipeline_graphics_m:
-            binding_point = &context->graphics_pipeline->resource_bindings.binding_points[context->graphics_pipeline->resource_bindings.binding_points_count++];
-            break;
-
-        case xg_pipeline_compute_m:
-            binding_point = &context->compute_pipeline->resource_bindings.binding_points[context->compute_pipeline->resource_bindings.binding_points_count++];
-            break;
-
-        case xg_pipeline_raytrace_m:
-            binding_point = &context->raytrace_pipeline->resource_bindings.binding_points[context->raytrace_pipeline->resource_bindings.binding_points_count++];
-            break;
+static size_t xs_parser_extract_token_array ( char* token, size_t len ) {
+    if ( token[len - 1] != ']' ) {
+        return 1;
     }
+    
+    size_t i = std_str_find_reverse ( token, len - 1, "[" );
+    std_assert_m ( i != std_str_find_null_m );
 
-    binding_point->shader_register = sampler.shader_register;
-    binding_point->type = xg_resource_binding_sampler_m;
-    binding_point->stages = sampler.stages;
-    binding_point->set = sampler.update_set;
+    token[len - 1] = '\0';
+    uint32_t array_size = std_str_to_u32 ( token + i + 1 );
+    token[i] = '\0';
+    return array_size;
+}
+
+static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
+#if 1
+    char token[xs_shader_parser_max_token_size_m];
+
+    uint32_t default_register = 0;
+
+    while ( context->head < context->eof ) {
+        xs_parser_skip_to_text ( context );
+        size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+        std_assert_m ( len > 0 );
+
+        uint32_t array_size = 1;
+
+        if ( token[len - 1] == ']' ) {
+            array_size = xs_parser_extract_token_array ( token, len );
+            len = std_str_len ( token );
+        }
+
+        if ( std_str_cmp ( token , "buffer" ) == 0 ) {
+            xs_parser_buffer_t buffer = {
+                .stages = xs_parser_default_shading_stage ( context ),
+                .update_set = xg_resource_binding_set_per_draw_m,
+                .type = xs_parser_buffer_type_uniform_m,
+                .shader_register = default_register,
+            };
+
+            xs_parser_skip_spaces ( context );
+            len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+
+            while ( len > 0) {                
+                if ( token[len - 1] == ']' ) {
+                    array_size = xs_parser_extract_token_array ( token, len );
+                    len = std_str_len ( token );
+                }
+
+                if ( len > 0 ) {
+                    if ( std_str_cmp ( token, "uniform" ) == 0 ) { 
+                        buffer.type = xs_parser_buffer_type_uniform_m;
+                    } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
+                        buffer.type = xs_parser_buffer_type_storage_m;
+                    }
+                }
+
+                xs_parser_skip_spaces ( context );
+                len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            for ( uint32_t i = 0; i < array_size; ++i ) {
+                xs_parser_add_buffer ( context, &buffer );
+                buffer.shader_register = ++default_register;
+            }
+        } else if ( std_str_cmp ( token, "texture" ) == 0 ) {
+            xs_parser_texture_t texture = {
+                .stages = xs_parser_default_shading_stage ( context ),
+                .update_set = xg_resource_binding_set_per_draw_m,
+                .type = xs_parser_texture_type_sampled_m,
+                .shader_register = default_register,
+            };
+
+            xs_parser_skip_spaces ( context );
+            len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+
+            while ( len > 0 ) {
+                if ( token[len - 1] == ']' ) {
+                    array_size = xs_parser_extract_token_array ( token, len );
+                    len = std_str_len ( token );
+                }
+
+                if ( len > 0 ) {
+                    if ( std_str_cmp ( token, "sampled" ) == 0 ) { 
+                        texture.type = xs_parser_texture_type_sampled_m;
+                    } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
+                        texture.type = xs_parser_texture_type_storage_m;
+                    }
+                }
+
+                xs_parser_skip_spaces ( context );
+                len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            for ( uint32_t i = 0; i < array_size; ++i ) {
+                xs_parser_add_texture ( context, &texture );
+                texture.shader_register = ++default_register;
+            }
+        } else if (std_str_cmp ( token, "sampler" ) == 0 ) {
+            xs_parser_sampler_t sampler = {
+                .stages = xs_parser_default_shading_stage ( context ),
+                .update_set = xg_resource_binding_set_per_draw_m,
+                .shader_register = default_register,
+            };
+
+            while ( len > 0 ) {
+                if ( token[len - 1] == ']' ) {
+                    array_size = xs_parser_extract_token_array ( token, len );
+                    len = std_str_len ( token );
+                }
+
+                xs_parser_skip_spaces ( context );
+                len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            for ( uint32_t i = 0; i < array_size; ++i ) {
+                xs_parser_add_sampler ( context, &sampler );
+                sampler.shader_register = ++default_register;
+            }
+        } else {
+            std_assert_m ( std_str_cmp ( token, "end" ) == 0 );
+            break;
+        }
+    }
+#endif
 }
 
 #if 0
@@ -1585,6 +1711,10 @@ static void xs_parser_parse_include ( xs_parser_parsing_context_t* context ) {
     }
 }
 
+static void xs_parser_log_bad_token ( xs_parser_parsing_context_t* context, const char* token ) {
+    std_log_error_m ( "Bad token " std_fmt_str_m " while parsing " std_fmt_str_m " line " std_fmt_u32_m, token, context->path, context->line_count );
+}
+
 static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
@@ -1627,7 +1757,7 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
             } else if ( std_str_cmp ( token, "constant" ) == 0 ) {
                 xs_parser_parse_constant ( context );
             } else {
-                std_log_error_m ( "Unknown token" );
+                xs_parser_log_bad_token ( context, token );
             }
         } else if ( std_str_cmp ( token, "vertex_shader" ) == 0 ) {
             xs_parser_parse_shader ( context, xg_shading_stage_vertex_m );
@@ -1662,7 +1792,7 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
         } else if ( std_str_cmp ( token, "end" ) == 0 ) {
             return; // possible end of variation block
         } else {
-            std_log_error_m ( "Unknown token" );
+            xs_parser_log_bad_token ( context, token );
         }
     }
 }
@@ -1728,7 +1858,7 @@ static void xs_parser_parse_raytrace_pipeline_state ( xs_parser_parsing_context_
             } else if ( std_str_cmp ( token, "ray_hit" ) == 0 ) {
                 xs_parser_parse_ray_hit_shader_group ( context );
             } else {
-                std_log_error_m ( "Unknown token" );
+                xs_parser_log_bad_token ( context, token );
             }
         //} else if ( std_str_cmp ( token, "ray_gen_shader" ) == 0 ) {
         //    xs_parser_parse_ray_gen_shader ( context );
@@ -1749,7 +1879,7 @@ static void xs_parser_parse_raytrace_pipeline_state ( xs_parser_parsing_context_
         } else if ( std_str_starts_with ( token, xs_parser_multiline_comment_begin_token_m ) ) {
             xs_parser_skip_comment_block ( context );
         } else {
-            std_log_error_m ( "Unknown token" );
+            xs_parser_log_bad_token ( context, token );
         }
     }
 }
@@ -1780,8 +1910,10 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
                 xs_parser_parse_sampler ( context );
             } else if ( std_str_cmp ( token, "constant" ) == 0 ) {
                 xs_parser_parse_constant ( context );
+            } else if ( std_str_cmp ( token, "bindings" ) == 0 ) {
+                xs_parser_parse_bindings ( context );
             } else {
-                std_log_error_m ( "Unknown token " std_fmt_str_m, token );
+                xs_parser_log_bad_token ( context, token );
             }
         } else if ( std_str_cmp ( token, "compute_shader" ) == 0 ) {
             xs_parser_parse_shader ( context, xg_shading_stage_compute_m );
@@ -1812,7 +1944,7 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
         } else if ( std_str_starts_with ( token, xs_parser_multiline_comment_begin_token_m ) ) {
             xs_parser_skip_comment_block ( context );
         } else {
-            std_log_error_m ( "Unknown token" );
+            xs_parser_log_bad_token ( context, token );
         }
     }
 }

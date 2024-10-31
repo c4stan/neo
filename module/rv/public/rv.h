@@ -8,7 +8,7 @@ std_module_export_m void rv_reload ( void*, void* );
 std_module_export_m void rv_unload ( void );
 
 typedef uint64_t rv_view_h;
-typedef uint64_t rv_visible_h;
+typedef uint64_t rv_entity_h;
 typedef uint64_t rv_query_h;
 
 #define rv_null_handle_m UINT64_MAX
@@ -104,6 +104,7 @@ typedef struct {
     uint64_t renderable_mask;
 } rv_query_params_t;
 
+// TODO store float[16] instead of matrices ?
 typedef struct {
     uint32_t layer_mask;
     uint32_t view_type;
@@ -129,34 +130,30 @@ typedef struct {
     uint32_t layer_flags;
     uint64_t render_flags;
     uint64_t payload;
-} rv_visible_params_t;
+} rv_entity_params_t;
 
 typedef struct {
     uint64_t count;
     uint64_t* payloads;
 } rv_query_results_t;
 
-// TODO: how to handle static vs dynamic visibles?
+// TODO: how to handle static vs dynamic entities?
 
 typedef struct {
     rv_view_h ( *create_view ) ( const rv_view_params_t* params );
     void ( *destroy_view ) ( rv_view_h view );
     void ( *get_view_info ) ( rv_view_info_t* info, rv_view_h view );
+
     // TODO unify these updates?
     void ( *update_view_transform ) ( rv_view_h view, const rv_view_transform_t* transform );
     void ( *update_prev_frame_data ) ( rv_view_h view );
     void ( *update_proj_jitter ) ( rv_view_h view, uint64_t frame_id );
 
-    rv_visible_h ( *create_visible ) ( const rv_visible_params_t* params );
-    void ( *destroy_visible ) ( rv_visible_h visible );
+    rv_entity_h ( *create_entity ) ( const rv_entity_params_t* params );
+    void ( *destroy_entity ) ( rv_entity_h entity );
 #if 0
     bool ( *update_visibles_layer_flags ) ( const rv_visible_h* visibles, uint32_t* flags, size_t count );
     bool ( *update_visibles_render_flags ) ( const rv_visible_h* visibles, uint64_t* flags, size_t count );
     bool ( *update_visibles_bounding_volumes ) ( const rv_visible_h* visibles, rv_bounding_volumes_t* volumes, size_t count );
 #endif
-
-    rv_query_h ( *create_query ) ( const rv_query_params_t* params );
-    void ( *resolve_pending_queries ) ( void );
-    void ( *dispose_query_results ) ( void );
-    const rv_query_results_t* ( *get_query_result ) ( rv_query_h query );
 } rv_i;

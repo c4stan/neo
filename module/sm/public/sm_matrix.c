@@ -1,8 +1,37 @@
 #include <sm_matrix.h>
 
+#include <std_byte.h>
+
 #include <math.h>
 
+sm_mat_4x4f_t sm_matrix_4x4f ( const float f[16] ) {
+    sm_mat_4x4f_t result = {
+        f[0],  f[1],  f[2],  f[3],
+        f[4],  f[5],  f[6],  f[7],
+        f[8],  f[9],  f[10], f[11],
+        f[12], f[13], f[14], f[15],
+    };
+    return result;
+}
+
+sm_vec_4f_t sm_matrix_4x4f_transform_f4 ( sm_mat_4x4f_t mat, sm_vec_4f_t vec ) {
+    sm_vec_4f_t result = {
+        sm_vec_4f_dot ( mat.v0, vec ),
+        sm_vec_4f_dot ( mat.v1, vec ),
+        sm_vec_4f_dot ( mat.v2, vec ),
+        sm_vec_4f_dot ( mat.v3, vec ),
+    };
+    return result;
+}
+
 sm_vec_3f_t sm_matrix_4x4f_transform_f3 ( sm_mat_4x4f_t mat, sm_vec_3f_t vec ) {
+    sm_vec_4f_t vec4 = { vec.x, vec.y, vec.z, 1 };
+    vec4 = sm_matrix_4x4f_transform_f4 ( mat, vec4 );
+    sm_vec_3f_t result = { vec4.x, vec4.y, vec4.z };
+    return result;
+}
+
+sm_vec_3f_t sm_matrix_4x4f_transform_f3_dir ( sm_mat_4x4f_t mat, sm_vec_3f_t vec ) {
     sm_vec_3f_t result;
     result.x = sm_vec_3f_dot ( sm_vec_4f_to_3f ( mat.v0 ), vec );
     result.y = sm_vec_3f_dot ( sm_vec_4f_to_3f ( mat.v1 ), vec );

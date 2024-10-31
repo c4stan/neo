@@ -234,7 +234,7 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     vk_image_info.mipLevels = ( uint32_t ) params->mip_levels;
     vk_image_info.arrayLayers = ( uint32_t ) params->array_layers;
     vk_image_info.samples = xg_sample_count_to_vk ( params->samples_per_pixel );
-    vk_image_info.tiling = VK_IMAGE_TILING_OPTIMAL; // TODO
+    vk_image_info.tiling = xg_texture_tiling_to_vk ( params->tiling );
     vk_image_info.usage = xg_image_usage_to_vk ( params->allowed_usage );
     vk_image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // TODO
     vk_image_info.queueFamilyIndexCount = 0;
@@ -291,15 +291,22 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     texture->vk_handle = vk_image;
     texture->allocation = alloc;
 
-    xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
+    bool needs_view = params->allowed_usage & ( xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_depth_stencil_m );
 
-    if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
-        for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
-            xg_texture_view_t view = xg_texture_view_m ( .mip_base = i, .mip_count = 1 );
-            xg_texture_create_view ( &texture->external_views.mips.array[i], texture_handle, view );
+    if ( needs_view ) {
+        xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
+
+        if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
+            for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
+                xg_texture_view_t view = xg_texture_view_m ( .mip_base = i, .mip_count = 1 );
+                xg_texture_create_view ( &texture->external_views.mips.array[i], texture_handle, view );
+            }
+        } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
+            std_not_implemented_m();
         }
-    } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
-        std_not_implemented_m();
+    } else {
+        texture->default_view.vk_handle = VK_NULL_HANDLE;
+        std_mem_zero_m ( &texture->default_view.params );
     }
 
     texture->state = xg_vk_texture_state_created_m;

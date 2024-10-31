@@ -193,31 +193,31 @@ typedef struct {
 typedef struct {
     void* data;
     uint32_t count;
-} se_component_stream_page_t; // se_data_stream_page_t
+} se_data_stream_page_t;
 
 typedef struct {
     uint32_t page_count;
     uint32_t page_capacity;
     uint32_t data_stride;
-    se_component_stream_page_t pages[se_entity_family_max_pages_per_stream_m];
-} se_component_stream_t; // se_data_stream_t
+    se_data_stream_page_t pages[se_entity_family_max_pages_per_stream_m];
+} se_data_stream_t;
 
 typedef struct {
     uint32_t stream_count;
-    se_component_stream_t streams[se_component_max_streams_m];
-} se_component_t; // se_component_data_t
+    se_data_stream_t streams[se_component_max_streams_m];
+} se_component_data_t;
 
 typedef struct {
     uint32_t entity_count;
-    se_component_stream_t entities;
-    se_component_t components[se_max_components_per_entity_m];
+    se_data_stream_t entities;
+    se_component_data_t components[se_max_components_per_entity_m];
 } se_query_result_t;
 
 // TODO
 #if 0
 typedef struct {
-    se_component_t* read_components[se_max_components_per_entity_m];
-    se_component_t* write_components[se_max_components_per_entity_m];
+    se_component_data_t* read_components[se_max_components_per_entity_m];
+    se_component_data_t* write_components[se_max_components_per_entity_m];
 
     se_entity_h delete_entities[se_max_entities_m];
     uint64_t delete_count;

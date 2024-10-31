@@ -1041,7 +1041,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .pStages = shader_info,
                 .groupCount = group_count,
                 .pGroups = groups,
-                .maxRecursionDepth = 8,//params->state.max_recursion, // TODO
+                .maxRecursionDepth = 4,//params->state.max_recursion, // TODO
                 .layout = pipeline_layout_result.pipeline_layout,
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = 0,

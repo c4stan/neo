@@ -10,10 +10,13 @@ layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform
 } uniform_buffer;
 
 layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_buffer_t {
+    uint light_count;
+    uint _pad0[3];
     light_t lights[];
 } light_buffer;
 
 layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_list_buffer_t {
+    uint global_offset_accumulator;
     uint list[];
 } light_list_buffer;
 
@@ -29,8 +32,6 @@ layout ( binding = 7, set = xs_resource_binding_set_per_draw_m ) uniform texture
 layout ( binding = 8, set = xs_resource_binding_set_per_draw_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
 
 layout ( binding = 9, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
-
-#define MAX_LIGHT_COUNT 32
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 

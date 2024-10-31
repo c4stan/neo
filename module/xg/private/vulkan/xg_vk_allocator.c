@@ -352,6 +352,10 @@ xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t s
     alloc.device = heap->gpu_alloc.device;
     alloc.mapped_address = heap->gpu_alloc.mapped_address + alloc.offset;
     
+    if ( heap->gpu_alloc.mapped_address ) {
+        std_assert_m ( alloc.mapped_address );
+    }
+    
     std_assert_m ( alloc.offset < heap->gpu_alloc.size );
 
     return alloc;

@@ -1,6 +1,6 @@
 #include <xf.h>
 
-#include <xi.h>
+#include <std_hash.h>
 
 /*
     Full rebuild every frame vs rebuild on user request/fraph change only?
@@ -105,7 +105,8 @@ xf_graph_h xf_graph_create ( xg_device_h device );
 xf_node_h xf_graph_add_node ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_clear ( xf_graph_h graph );
 void xf_graph_build2 ( xf_graph_h graph, xg_workload_h xg_workload );
-void xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload );
+uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );
+void xf_graph_advance_multi_textures ( xf_graph_h graph );
 void xf_graph_destroy ( xf_graph_h graph );
 
 void xf_graph_get_info ( xf_graph_info_t* info, xf_graph_h graph );
@@ -113,7 +114,6 @@ void xf_graph_get_node_info ( xf_node_info_t* info, xf_node_h node );
 
 void xf_graph_debug_print ( xf_graph_h graph );
 
+void xf_graph_node_set_enabled ( xf_node_h node, bool enabled );
 void xf_graph_node_enable ( xf_node_h node );
 void xf_graph_node_disable ( xf_node_h node );
-
-void xf_graph_debug_ui ( xi_i* xi, xi_workload_h workload, xf_graph_h graph );

@@ -3,7 +3,6 @@
 // ======================================================================================= //
 //                                       V E C T O R
 // ======================================================================================= //
-
 /* template begin
 
 def <TYPE, PREFIX, SIZE>
@@ -63,44 +62,24 @@ typedef union {
 // template generation end
 
 // ======================================================================================= //
-//                                    C O N S T R U C T
+//                                 C O N S T R U C T O R S
 // ======================================================================================= //
 /* template begin
 
 def <TYPE, PREFIX, SIZE>
-sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX (
-    $TYPE x
-#if $SIZE > 1
-    , $TYPE y
-#endif
-#if $SIZE > 2
-    , $TYPE z
-#endif
-#if $SIZE > 3
-    , $TYPE w
-#endif
-);
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX ( const $TYPE f[$SIZE] );
 
 make <float, f, 3>
+make <float, f, 4>
 
 */
 // template generation begin
-sm_vec_3f_t sm_vec_3f (
-    float x
-#if 3 > 1
-    , float y
-#endif
-#if 3 > 2
-    , float z
-#endif
-#if 3 > 3
-    , float w
-#endif
-);
+sm_vec_3f_t sm_vec_3f ( const float f[3] );
+sm_vec_4f_t sm_vec_4f ( const float f[4] );
 // template generation end
 
 // ======================================================================================= //
-//                                      C O N V E R T
+//                                  C O N V E R S I O N S
 // ======================================================================================= //
 /* template begin
 
@@ -113,6 +92,8 @@ make <float, f, 4, 3>
 // template generation begin
 sm_vec_3f_t sm_vec_4f_to_3f ( sm_vec_4f_t vec );
 // template generation end
+
+sm_vec_4f_t sm_vec_3f_to_4f ( sm_vec_3f_t vec, float w );
 
 // ======================================================================================= //
 //                                          L E N
@@ -153,10 +134,12 @@ def <TYPE, PREFIX, SIZE>
 $TYPE sm_vec_$SIZE$PREFIX_dot ( sm_vec_$SIZE$PREFIX_t a, sm_vec_$SIZE$PREFIX_t b );
 
 make <float, f, 3>
+make <float, f, 4>
 
 */
 // template generation begin
 float sm_vec_3f_dot ( sm_vec_3f_t a, sm_vec_3f_t b );
+float sm_vec_4f_dot ( sm_vec_4f_t a, sm_vec_4f_t b );
 // template generation end
 
 // ======================================================================================= //
@@ -202,4 +185,34 @@ make <float, f, 3>
 */
 // template generation begin
 sm_vec_3f_t sm_vec_3f_add ( sm_vec_3f_t a, sm_vec_3f_t b );
+// template generation end
+
+// ======================================================================================= //
+//                                          S U B
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_sub ( sm_vec_$SIZE$PREFIX_t a, sm_vec_$SIZE$PREFIX_t b );
+
+make <float, f, 3>
+
+*/
+// template generation begin
+sm_vec_3f_t sm_vec_3f_sub ( sm_vec_3f_t a, sm_vec_3f_t b );
+// template generation end
+
+// ======================================================================================= //
+//                                          N E G
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_neg ( sm_vec_$SIZE$PREFIX_t a );
+
+make <float, f, 3>
+
+*/
+// template generation begin
+sm_vec_3f_t sm_vec_3f_neg ( sm_vec_3f_t a );
 // template generation end

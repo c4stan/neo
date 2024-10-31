@@ -271,15 +271,7 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     uint32_t sbt_hit_record_count = 0;
 
     for ( uint32_t i = 0; i < instance_count; ++i ) {
-        VkAccelerationStructureInstanceKHR* vk_instance = &instance_data[i];
         xg_raytrace_geometry_instance_t* instance = &params->instance_array[i];
-        *vk_instance = ( VkAccelerationStructureInstanceKHR ) {
-            .transform = xg_vk_transform_matrix ( &instance->transform ),
-            .instanceCustomIndex = instance->id,
-            .mask = instance->visibility_mask,
-            .instanceShaderBindingTableRecordOffset = i,//sbt_geo_stride * sbt_hit_record_count, //sbt_hit_offset,
-            .flags = xg_raytrace_instance_flags_to_vk ( instance->flags ),
-        };
 
         xg_vk_raytrace_geometry_t* geometry = &xg_vk_raytrace_state->geometries_array[instance->geometry];
         VkAccelerationStructureDeviceAddressInfoKHR blas_info = {
@@ -287,7 +279,16 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
             .accelerationStructure = geometry->vk_handle,
         };
         uint64_t blas_addr = xg_vk_instance_ext_api()->get_acceleration_structure_device_address ( device->vk_handle, &blas_info );
-        vk_instance->accelerationStructureReference = blas_addr;
+
+        VkAccelerationStructureInstanceKHR* vk_instance = &instance_data[i];
+        *vk_instance = ( VkAccelerationStructureInstanceKHR ) {
+            .transform = xg_vk_transform_matrix ( &instance->transform ),
+            .instanceCustomIndex = instance->id,
+            .mask = instance->visibility_mask,
+            .instanceShaderBindingTableRecordOffset = i,//sbt_geo_stride * sbt_hit_record_count, //sbt_hit_offset,
+            .flags = xg_raytrace_instance_flags_to_vk ( instance->flags ),
+            .accelerationStructureReference = blas_addr
+        };
 
         //sbt_hit_offset += sbt_geo_stride * geometry->params.geometry_count;
         sbt_hit_record_count += geometry->params.geometry_count;
@@ -344,6 +345,7 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
         .size = build_size_info.buildScratchSize,
         .allowed_usage = xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_storage_m,
         .debug_name = "TLAS scratch",
+        .align = device->acceleration_structure_properties.minAccelerationStructureScratchOffsetAlignment
     );
     xg_buffer_h scratch_buffer_handle = xg_buffer_create ( &scratch_buffer_params );
     const xg_vk_buffer_t* scratch_buffer = xg_vk_buffer_get ( scratch_buffer_handle );
@@ -467,6 +469,16 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     return world_handle;
 #else
     return xg_null_handle_m;
+#endif
+}
+
+void xg_vk_raytrace_world_destroy ( xg_raytrace_world_h world_handle ) {
+#if xg_enable_raytracing_m
+    xg_vk_raytrace_world_t* world = &xg_vk_raytrace_state->worlds_array[world_handle];
+    xg_device_h device_handle = world->params.device;
+    const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
+    xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, world->vk_handle, NULL );
+    std_list_push ( &xg_vk_raytrace_state->worlds_freelist, world );
 #endif
 }
 

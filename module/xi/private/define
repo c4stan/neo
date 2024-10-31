@@ -2,6 +2,7 @@ xi_ui_max_layers_m 32
 
 xi_workload_max_rects_m 1024
 xi_workload_max_tris_m 1024
+xi_workload_max_meshes_m 32
 xi_workload_max_workloads_m 8
 xi_workload_max_submitted_workloads_m 4
 xi_workload_max_scissors_m 32

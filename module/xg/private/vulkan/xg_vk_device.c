@@ -806,6 +806,10 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 #endif
         "VK_KHR_deferred_host_operations",
 #endif
+        // debugPrintfEXT - TODO enable in debug only
+        "VK_KHR_shader_non_semantic_info",
+        //"VK_EXT_validation_features",
+        //"VK_EXT_debug_utils",
     };
     size_t required_extensions_count = std_static_array_capacity_m ( required_extensions );
 

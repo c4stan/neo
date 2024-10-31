@@ -2,6 +2,8 @@
 
 #include "xi_state.h"
 
+#include "xi_update.h"
+
 static xs_database_h xi_sdb = xs_null_handle_m;
 
 static void xi_load_shaders ( xg_device_h device ) {
@@ -28,9 +30,11 @@ static void xi_api_init ( xi_i* xi ) {
 
     xi->create_workload = xi_workload_create;
     xi->flush_workload = xi_workload_flush;
+    xi->set_workload_view_info = xi_workload_set_view_info;
 
-    xi->begin_update = xi_ui_update;
-    xi->end_update = xi_ui_update_end;
+    xi->begin_update = xi_update_begin;
+    xi->end_update = xi_update_end;
+    
     xi->begin_window = xi_ui_window_begin;
     xi->end_window = xi_ui_window_end;
     xi->begin_section = xi_ui_section_begin;
@@ -45,6 +49,9 @@ static void xi_api_init ( xi_i* xi ) {
 
     xi->newline = xi_ui_newline;
 
+    xi->init_geos = xi_ui_geo_init;
+    xi->draw_transform = xi_ui_draw_transform;
+
     xi->get_active_element_id = xi_ui_get_active_id;
     xi->get_hovered_element_id = xi_ui_get_hovered_id;
 }
@@ -56,6 +63,7 @@ void* xi_load ( void* std_runtime ) {
 
     xi_workload_load ( &state->workload );
     xi_ui_load ( &state->ui );
+    //xi_geo_load ( &state->geo );
     xi_font_load ( &state->font );
 
     xi_api_init ( &state->api );
@@ -70,6 +78,7 @@ void xi_reload ( void* std_runtime, void* api ) {
 
     xi_workload_reload ( &state->workload );
     xi_ui_reload ( &state->ui );
+    //xi_geo_reload ( &state->geo );
     xi_font_reload ( &state->font );
 
     xi_api_init ( &state->api );
@@ -79,6 +88,7 @@ void xi_reload ( void* std_runtime, void* api ) {
 void xi_unload ( void ) {
     xi_workload_unload();
     xi_ui_unload();
+    //xi_geo_unload();
     xi_font_unload();
 
     xi_state_free();

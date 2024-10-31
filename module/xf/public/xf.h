@@ -3,7 +3,6 @@
 #include <std_module.h>
 
 #include <xg.h>
-#include <xi.h>
 
 #define xf_module_name_m xf
 std_module_export_m void* xf_load ( void* );
@@ -453,6 +452,7 @@ typedef struct {
 typedef struct {
     size_t size;
     bool allow_aliasing;
+    bool upload;
     char debug_name[xf_debug_name_size_m];
 } xf_buffer_params_t;
 
@@ -466,11 +466,13 @@ typedef struct {
 typedef struct {
     xf_texture_params_t texture;
     uint32_t multi_texture_count;
+    bool auto_advance;
 } xf_multi_texture_params_t;
 
 #define xf_multi_texture_params_m( ... ) ( xf_multi_texture_params_t ) { \
     .texture = xf_texture_params_m(), \
     .multi_texture_count = 2, \
+    .auto_advance = true, \
     ##__VA_ARGS__ \
 }
 
@@ -525,11 +527,13 @@ typedef struct {
     xf_graph_h ( *create_graph ) ( xg_device_h device );
     xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
     void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
-    void ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload );
+    uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
+    void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph );
 
     void ( *disable_node ) ( xf_node_h node );
     void ( *enable_node ) ( xf_node_h node );
+    void ( *node_set_enabled ) ( xf_node_h node, bool enabled );
 
     void ( *advance_multi_texture ) ( xf_texture_h multi_texture );
     //void ( *advance_multi_buffer ) ( xf_multi_buffer_h multi_buffer );
@@ -537,7 +541,7 @@ typedef struct {
 
     // TODO prefix declare_ to these
     xf_texture_h ( *multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
-    xf_texture_h ( *texture_from_external ) ( xf_texture_h texture );
+    xf_texture_h ( *texture_from_external ) ( xg_texture_h texture );
     void ( *refresh_external_texture ) ( xf_texture_h texture );
 
     void ( *get_texture_info ) ( xf_texture_info_t* info, xf_texture_h texture );
@@ -545,8 +549,4 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
-    // adding a xf->xi dependency here kind of sucks...
-    // TODO instead support inside xf all required debug functionality (passthrough, output override, ...) and have a way for client code to easily iterate through nodes
-    // and leave actual ui code in client space
-    void ( *debug_ui_graph ) ( xi_i* xi, xi_workload_h workload, xf_graph_h graph ); 
 } xf_i;

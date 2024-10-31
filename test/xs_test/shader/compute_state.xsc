@@ -3,7 +3,6 @@ compute_shader comp_kernel.comp
 //begin buffer
 //    register 0
 //    stage compute
-//    access read
 //    update per_frame
 //end
 

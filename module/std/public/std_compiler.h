@@ -82,6 +82,7 @@
     #define std_field_size_m( type, field )                       sizeof( ( ( type * ) 0 )->field )
     #define std_field_offset_m( type, field )                     offsetof( type, field )
     #define std_static_array_stride_m( a )                        sizeof ( a[0] )
+    // TODO rename to std_static_array_count?
     #define std_static_array_capacity_m( a )                      sizeof ( a ) / sizeof ( a[0] )
     #define std_static_array_size_m( a )                          sizeof ( a )
     #define std_array_typecast_m( a )                             ( std_typeof_m ( &( (a)[0] ) ) )

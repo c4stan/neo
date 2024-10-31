@@ -136,7 +136,6 @@
 size_t std_virtual_page_size ( void );
 size_t std_virtual_page_align ( size_t size );
 
-void* std_virtual_alloc ( size_t size );
 void* std_virtual_reserve ( size_t size );
 bool std_virtual_map ( void* begin, void* end ); // begin included, end excluded
 bool std_virtual_unmap ( void* begin, void* end );

@@ -27,7 +27,6 @@ end
 begin texture
     stage fragment
     register 1
-    access read
     update per_draw
 end
 

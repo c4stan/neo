@@ -35,6 +35,8 @@ typedef struct {
     float time_ms;
     float delta_time_ms;
 
+    uint32_t object_id;
+
     wm_window_h window;
 
     xg_device_h device;
@@ -46,6 +48,10 @@ typedef struct {
     xf_graph_h raytrace_graph;
 
     xf_graph_h active_graph;
+
+    xf_graph_h mouse_pick_graph;
+    xf_texture_h object_id_texture;
+    xg_texture_h object_id_readback_texture;
 
     xf_node_h taa_node;
 
@@ -64,6 +70,7 @@ typedef struct {
     .capture_frame = false, \
     .time_ms = 0, \
     .delta_time_ms = 0, \
+    .object_id = 1, \
     .window = wm_null_handle_m, \
     .device = xg_null_handle_m, \
     .swapchain = xg_null_handle_m, \
@@ -90,7 +97,21 @@ typedef struct {
     xi_section_state_t xg_alloc_section_state;
     xi_section_state_t xf_graph_section_state;
     xi_section_state_t entities_section_state;
+
+    se_entity_h mouse_pick_entity;
 } viewapp_ui_state_t;
+
+#define viewapp_ui_state_m( ... ) ( viewapp_ui_state_t ) { \
+    .font = xi_null_handle_m, \
+    .window_state = xi_window_state_m(), \
+    .window_style = xi_style_m(), \
+    .frame_section_state = xi_section_state_m(), \
+    .xg_alloc_section_state = xi_section_state_m(), \
+    .xf_graph_section_state = xi_section_state_m(), \
+    .entities_section_state = xi_section_state_m(), \
+    .mouse_pick_entity = se_null_handle_m, \
+    ##__VA_ARGS__ \
+}
 
 // Components
 #define viewapp_mesh_component_id_m 0
@@ -128,6 +149,7 @@ typedef struct {
     float position[3];
     float orientation[3];
     float up[3];
+    uint32_t object_id;
     viewapp_material_data_t material;
 
     xg_raytrace_geometry_h rt_geo;
@@ -146,12 +168,16 @@ typedef struct {
     .position = { 0, 0, 0 }, \
     .orientation = { 0, 0, 1 }, \
     .up = { 0, 1, 0 }, \
+    .object_id = 0, \
     .material = viewapp_material_data_m(), \
+    .rt_geo = xg_null_handle_m, \
+    .rt_instance_id = 0 ,\
     ##__VA_ARGS__ \
 }
 
 typedef struct {
     rv_view_h view;
+    bool enabled;
 } viewapp_camera_component_t;
 
 typedef struct {

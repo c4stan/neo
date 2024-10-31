@@ -7,6 +7,7 @@
 #include <xi.h>
 #include <fs.h>
 #include <se.h>
+#include <rv.h>
 
 #include <math.h>
 
@@ -98,6 +99,9 @@ static void xi_test ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
     fs_i* fs = std_module_load_m ( fs_module_name_m );
 
+    uint32_t resolution_x = 600;
+    uint32_t resolution_y = 400;
+
     wm_window_params_t window_params = { .name = "xi_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &window_params );
     std_log_info_m ( "Creating window "std_fmt_str_m std_fmt_newline_m, window_params.name );
@@ -173,7 +177,7 @@ static void xi_test ( void ) {
     // pass only calls flush on it.
 
     xf_i* xf = std_module_load_m ( xf_module_name_m );
-    xf_graph_h graph = xf->create_graph ( device, swapchain );
+    xf_graph_h graph = xf->create_graph ( device );
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
 
@@ -397,6 +401,23 @@ static void xi_test ( void ) {
         .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
     );
 
+    rv_i* rv = std_module_load_m ( rv_module_name_m );
+    rv_view_params_t view_params = rv_view_params_m (
+        .position = { 0, 0, -8 },
+        .proj_params = rv_projection_params_m (
+            .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
+            .near_z = 0.1,
+            .far_z = 1000,
+            .fov_y = 50.f * rv_deg_to_rad_m,
+            .jitter = { 1.f / resolution_x, 1.f / resolution_y },
+            .reverse_z = false,
+        ),
+    );
+    rv_view_h view = rv->create_view ( &view_params );
+
+    xi->init_geos ( device );
+    xi_transform_state_t xform_state = xi_transform_state_m();
+
     float target_fps = 30.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = std_tick_now();
@@ -455,7 +476,18 @@ static void xi_test ( void ) {
             wm_input_buffer_t input_buffer;
             wm->get_window_input_buffer ( window, &input_buffer );
 
-            xi->begin_update ( &new_window_info, &input_state, &input_buffer );
+            rv_view_info_t view_info;
+            rv->get_view_info ( &view_info, view );
+
+            // TODO remove
+            xi->set_workload_view_info ( xi_workload, &view_info );
+
+            xi->begin_update ( &xi_update_params_m (  
+                .window_info = &new_window_info, 
+                .input_state = &input_state, 
+                .input_buffer = &input_buffer,
+                .view_info = &view_info
+            ) );
 
             xi->begin_window ( xi_workload, &ui_window );
             xi->begin_section ( xi_workload, &ui_section );
@@ -487,6 +519,8 @@ static void xi_test ( void ) {
             //xi->add_button ( xi_workload, &ui_button, &button_style );
             xi->end_window ( xi_workload );
 
+            xi->draw_transform ( xi_workload, &xform_state );
+
             xi->end_update();
 
             // TODO updating node params like this is only ok when sim and render are serial
@@ -497,7 +531,7 @@ static void xi_test ( void ) {
             ui_node_args.xi_workload = xi_workload;
         }
 
-        xf->execute_graph ( graph, workload );
+        xf->execute_graph ( graph, workload, 0 );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 

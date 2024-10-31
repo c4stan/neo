@@ -3,6 +3,8 @@
 #include <std_atomic.h>
 #include <std_sort.h>
 
+#include <xg_enum.h>
+
 #include "../xg_cmd_buffer.h"
 #include "../xg_resource_cmd_buffer.h"
 #include "../xg_debug_capture.h"
@@ -1964,6 +1966,339 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
     vkEndCommandBuffer ( vk_cmd_buffer );
 }
 
+std_unused_static_m()
+static void xg_vk_submit_context_debug_print ( const xg_vk_workload_submit_context_t* context ) {
+    std_assert_m ( std_align_test_ptr ( context->cmd_headers, xg_cmd_buffer_cmd_alignment_m ) );
+    
+    std_log_info_m ( "begin cmd buffer" );
+
+    for ( size_t cmd_header_it = 0; cmd_header_it < context->cmd_headers_count; ++cmd_header_it ) {
+        const xg_cmd_header_t* header = &context->cmd_headers[cmd_header_it];
+        switch ( header->type ) {
+
+            // -----------------------------------------------------------------------
+            // Simple vertex input streams bind call.
+            // The streams get sorted by id so that contiguous streams get bound within one single Vulkan call as per API design.
+            case xg_cmd_graphics_streams_bind_m: {
+                std_auto_m args = ( xg_cmd_graphics_streams_bind_t* ) header->args;
+                std_unused_m ( args );
+
+                std_log_info_m ( "graphics streams bind" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            // For now pipeline states and render passes are stored together and treated as basically one single thing. This means that for
+            // each new pipeline a new render pass needs to be created, and they are bound together.
+            // Further more for now(?) framebuffers are implicit, meaning that the framebuffer object gets created at the last moment before
+            // binding it. This means we need to store them, have a hash map to reuse them when the same render textures are provided multiple
+            // times, and delete them once the gpu is done with the submission.
+            // Going forward it is probably worth to treat render passes as separate objects that can be created by users through the API,
+            // since it is much more realistic to have a number of pipeline states that all share the same render pass. So first the render pass
+            // would begin and then a number of pipelines would be switched inside of it.
+            // On the other hand framebuffers are fine the way they are now, making them an explicit object is a possibility but not a necessity.
+            // The realistic case for them is a 1:1 match with render passes, meaning that a new framebuffer is bound every time a new
+            // render pass begins. There might be exceptions though and multiple render passes could use the same framebuffer
+            // (solid/translucent/.. color passes?) just like a single render pass could use multiple frame buffers (shadow pass?).
+            // 2021-05-09
+            // Using VK_KHR_imageless_framebuffer means framebuffers can be created together with render passes and do not need to reference
+            // the actual textures, just the format and size.
+            // https://github.com/KhronosGroup/Vulkan-Guide/blob/master/chapters/extensions/VK_KHR_imageless_framebuffer.md
+            case xg_cmd_graphics_pipeline_state_bind_m: {
+                std_auto_m args = ( xg_cmd_graphics_pipeline_state_bind_t* ) header->args;
+
+                const xg_vk_graphics_pipeline_t* pipeline = xg_vk_graphics_pipeline_get ( args->pipeline );
+                std_log_info_m ( "graphics pipeline bind: " std_fmt_str_m, pipeline->common.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_pipeline_state_set_viewport_m: {
+                std_auto_m args = ( xg_cmd_graphics_pipeline_state_set_viewport_t* ) header->args;
+                std_unused_m ( args );
+
+                std_log_info_m ( "viewport bind" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_pipeline_state_set_scissor_m: {
+                std_auto_m args = ( xg_cmd_graphics_pipeline_state_set_scissor_t* ) header->args;
+                std_unused_m ( args );
+
+                std_log_info_m ( "scissor bind" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_renderpass_begin_m: {
+                std_auto_m args = ( xg_cmd_graphics_renderpass_begin_t* ) header->args;
+            
+                const xg_vk_graphics_renderpass_t* renderpass = xg_vk_graphics_renderpass_get ( args->renderpass );
+                std_log_info_m ( "renderpass begin: " std_fmt_str_m, renderpass->params.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_renderpass_end_m: {
+                std_auto_m args = ( xg_cmd_graphics_renderpass_end_t* ) header->args;
+
+                const xg_vk_graphics_renderpass_t* renderpass = xg_vk_graphics_renderpass_get ( args->renderpass );
+                std_log_info_m ( "renderpass end: " std_fmt_str_m, renderpass->params.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_compute_pipeline_state_bind_m: {
+                std_auto_m args = ( xg_cmd_compute_pipeline_state_bind_t* ) header->args;
+
+                const xg_vk_compute_pipeline_t* pipeline = xg_vk_compute_pipeline_get ( args->pipeline );
+                std_log_info_m ( "compute pipeline bind: " std_fmt_str_m, pipeline->common.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_pipeline_constant_write_m: {
+                std_auto_m args = ( xg_cmd_pipeline_constant_data_write_t* ) header->args;
+                std_unused_m ( args );
+                
+                // TODO
+                std_log_info_m ( "pipeline constant bind" );
+            }
+            break;
+
+            case xg_cmd_pipeline_resource_group_bind_m: {
+                std_auto_m args = ( xg_cmd_pipeline_resource_group_bind_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "pipeline resource group bind" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_pipeline_resource_bind_m: {
+                std_auto_m args = ( xg_cmd_pipeline_resource_bind_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "pipeline resource bind" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            // Upon receiving render textures we need to create a framebuffer. To do that we need the Vulkan render pass,
+            // which is stored together with the PSO for now(?), so the render textures are cached and the creation/binding
+            // of the framebuffer is deferred until we get a pipeline bind cmd.
+            case xg_cmd_graphics_render_textures_bind_m: {
+                std_auto_m args =  ( xg_cmd_graphics_render_texture_bind_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "graphics render textures bind" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_streams_submit_m: {
+                std_auto_m args = ( xg_cmd_graphics_streams_submit_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "graphics draw" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_streams_submit_indexed_m: {
+                std_auto_m args = ( xg_cmd_graphics_streams_submit_indexed_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "graphics draw indexed" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_graphics_streams_submit_instanced_m: {
+                std_auto_m args = ( xg_cmd_graphics_streams_submit_instanced_t* ) header->args;
+                std_unused_m  ( args );
+
+                // TODO
+                std_log_info_m ( "graphics draw instanced" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_compute_dispatch_m: {
+                std_auto_m args = ( xg_cmd_compute_dispatch_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "compute dispatch" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_raytrace_pipeline_state_bind_m: {
+                std_auto_m args = ( xg_cmd_raytrace_pipeline_state_bind_t* ) header->args;
+                const xg_vk_raytrace_pipeline_t* pipeline = xg_vk_raytrace_pipeline_get ( args->pipeline );
+
+                // TODO
+                std_log_info_m ( "raytrace pipeline bind: " std_fmt_str_m, pipeline->common.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_raytrace_trace_rays_m: {
+                std_auto_m args = ( xg_cmd_raytrace_trace_rays_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "raytrace trace" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_copy_buffer_m : {
+                std_auto_m args = ( xg_cmd_copy_buffer_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "buffer copy" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_copy_texture_m : {
+                std_auto_m args = ( xg_cmd_copy_texture_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "texture copy" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_copy_texture_to_buffer_m: {
+                std_auto_m args = ( xg_cmd_copy_texture_to_buffer_t* ) header->args;
+                std_unused_m ( args );
+
+                // TODO
+                std_log_info_m ( "texture to buffer copy" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_copy_buffer_to_texture_m: {
+                std_auto_m args = ( xg_cmd_copy_buffer_to_texture_t* ) header->args;
+                std_unused_m (args );
+
+                // TODO
+                std_log_info_m ( "buffer to texture copy" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_barrier_set_m: {
+                std_auto_m args = ( xg_cmd_barrier_set_t* ) header->args;
+
+                char* base = ( char* ) ( args + 1 );
+
+#if xg_vk_enable_sync2_m
+                if ( args->memory_barriers > 0 ) {
+                    std_not_implemented_m();
+                }
+
+                if ( args->buffer_memory_barriers > 0 ) {
+                    base = ( char* ) std_align_ptr ( base, std_alignof_m ( xg_buffer_memory_barrier_t ) );
+
+                    for ( uint32_t i = 0; i < args->buffer_memory_barriers; ++i ) {
+                        xg_buffer_memory_barrier_t* barrier = ( xg_buffer_memory_barrier_t* ) base;
+                        const xg_vk_buffer_t* buffer = xg_vk_buffer_get ( barrier->buffer );
+
+                        // TODO
+                        std_unused_m ( barrier );
+
+                        std_log_info_m ( "buffer barrier: " std_fmt_str_m, buffer->params.debug_name );
+
+                        base += sizeof ( xg_buffer_memory_barrier_t );
+                    }
+                }
+
+                if ( args->texture_memory_barriers > 0 ) {
+                    base = ( char* ) std_align_ptr ( base, std_alignof_m ( xg_texture_memory_barrier_t ) );
+
+                    for ( uint32_t i = 0; i < args->texture_memory_barriers; ++i ) {
+                        xg_texture_memory_barrier_t* barrier = ( xg_texture_memory_barrier_t* ) base;
+                        const xg_vk_texture_t* texture = xg_vk_texture_get ( barrier->texture );
+
+                        std_log_info_m ( "texture barrier: " std_fmt_str_m " " std_fmt_str_m " - > " std_fmt_str_m, 
+                            texture->params.debug_name, xg_texture_layout_str ( barrier->layout.old ), xg_texture_layout_str ( barrier->layout.new ) );
+
+                        base += sizeof ( xg_texture_memory_barrier_t );
+                    }
+                }
+#else
+              // TODO
+#endif
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_texture_clear_m: {
+                std_auto_m args = ( xg_cmd_texture_clear_t* ) header->args;
+                const xg_vk_texture_t* texture = xg_vk_texture_get ( args->texture );
+
+                std_log_info_m ( "texture clear: " std_fmt_str_m, texture->params.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_texture_depth_stencil_clear_m: {
+                std_auto_m args = ( xg_cmd_texture_clear_t* ) header->args;
+                const xg_vk_texture_t* texture = xg_vk_texture_get ( args->texture );
+
+                std_log_info_m ( "depth_stencil clear: " std_fmt_str_m, texture->params.debug_name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_start_debug_capture_m: {
+                std_auto_m args = ( xg_cmd_start_debug_capture_t* ) header->args;
+
+                std_unused_m ( args );
+                std_log_info_m ( "debug capture start" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_stop_debug_capture_m: {
+                std_log_info_m ( "debug capture stop" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_begin_debug_region_m: {
+                std_auto_m args = ( xg_cmd_begin_debug_region_t* ) header->args;
+
+                std_log_info_m ( "debug region begin: " std_fmt_str_m, args->name );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+            case xg_cmd_end_debug_region_m: {
+                std_log_info_m ( "debug region end" );
+            }
+            break;
+
+            // -----------------------------------------------------------------------
+        }
+    }
+
+    std_log_info_m ( "end cmd buffer" );
+}
+
 static void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
     std_assert_m ( workload );
@@ -2369,6 +2704,7 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     // translate
     submit_context->cmd_headers = sort_result.cmd_headers;
     submit_context->cmd_headers_count = sort_result.count;
+    //xg_vk_submit_context_debug_print(submit_context);
     xg_vk_cmd_translate_result_t translate_result;
     xg_vk_submit_context_translate ( &translate_result, submit_context, workload->device );
 

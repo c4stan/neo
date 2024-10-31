@@ -368,12 +368,28 @@ void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t
 
     //entity->mask = mask;
     entity->family = family - se_entity_state->family_array;
-
-    // allocate component pages
     uint32_t family_idx = family->entity_count++;
-
     entity->idx = family_idx;
 
+    // allocate entity
+    {
+        se_entity_family_stream_t* stream = &family->entity_stream;
+
+        uint32_t items_per_page = stream->items_per_page;
+        uint32_t page_idx = family_idx / items_per_page;
+
+        while ( stream->page_count < page_idx + 1 ) {
+            stream->pages[stream->page_count++] = se_entity_state->page_array[--se_entity_state->page_count];
+        }
+
+        // copy entity handle
+        uint32_t page_sub_idx = family_idx % items_per_page;
+        uint32_t stride = stream->stride;
+        std_assert_m ( sizeof ( entity_handle ) == stride );
+        std_mem_copy ( stream->pages[page_idx] + stride * page_sub_idx, &entity_handle, stride );
+    }
+
+    // allocate component pages
     for ( uint32_t i = 0; i < family->component_count; ++i ) {
         se_entity_family_component_t* component = &family->components[i];
 
@@ -552,7 +568,7 @@ void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count ) {
     std_unused_m ( count );
 }
 
-static void se_entity_extract_stream ( se_component_stream_t* result,  const se_entity_family_stream_t* stream, uint32_t entity_count ) {
+static void se_entity_extract_stream ( se_data_stream_t* result,  const se_entity_family_stream_t* stream, uint32_t entity_count ) {
     uint32_t capacity = stream->items_per_page;
     
     result->page_capacity = capacity;
@@ -611,7 +627,7 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
             std_assert_m ( family_slot != 0xff );
             se_entity_family_component_t* component = &family->components[family_slot];
 
-            se_component_t* result_component = &result->components[i];
+            se_component_data_t* result_component = &result->components[i];
             
             result_component->stream_count = component->stream_count;
 
@@ -795,7 +811,7 @@ void se_entity_update ( const se_entity_update_t* updates, uint64_t update_count
         uint32_t family_idx = entity->family_idx;
 
         for ( uint32_t i = 0; i < update->component_count; ++i ) {
-            se_component_t* component = &update->components[i];
+            se_component_data_t* component = &update->components[i];
             
             uint32_t id = component->id;
             std_assert_m ( id < se_max_component_types_m );
@@ -805,7 +821,7 @@ void se_entity_update ( const se_entity_update_t* updates, uint64_t update_count
             se_entity_family_component_t* family_component = family->components[family_slot];
 
             for ( uint32_t j = 0; j < component->stream_count; ++j ) {
-                se_component_stream_t* stream = &component->streams[j];
+                se_data_stream_t* stream = &component->streams[j];
 
                 se_entity_family_stream_t* family_stream = family_component->streams[stream->id];
 

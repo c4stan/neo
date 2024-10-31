@@ -184,8 +184,8 @@ static void xf_test ( void ) {
             ),
         ) );
 
-        xf->execute_graph ( graph, workload );
-        xf->execute_graph ( graph2, workload );
+        uint64_t id = xf->execute_graph ( graph, workload, 0 );
+        xf->execute_graph ( graph2, workload, id );
         xf->destroy_graph ( graph );
         xf->destroy_graph ( graph2 );
         xg->submit_workload ( workload );
