@@ -27,7 +27,10 @@ void std_main ( void ) {
         if ( std_unlikely_m ( state != std_app_state_tick_m ) ) {
             if ( state == std_app_state_reload_m ) {
                 std_module_reload ( app_name );
-            } else if ( state == std_app_state_exit_m ) {
+            } else if ( state == std_app_state_reboot_m ) {
+                app = ( std_app_i* ) std_module_reboot ( app_name );
+            } else { 
+                std_assert_m ( state == std_app_state_exit_m );
                 break;
             }
         }

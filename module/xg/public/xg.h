@@ -437,6 +437,14 @@ typedef struct {
     char debug_name[xg_debug_name_size_m];
 } xg_swapchain_virtual_params_t;
 
+typedef struct {
+    xg_texture_h texture;
+    uint32_t idx;
+    bool resize;
+    //uint32_t width;
+    //uint32_t height;
+} xg_swapchain_acquire_result_t;
+
 // -- Device Memory --
 /*
     We keep memory management explicit to the user. The backend only targets modern apis.
@@ -1031,7 +1039,6 @@ typedef enum {
     // TODO? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
 } xg_resource_binding_e;
 
-// TODO rename this to xg_resource_binding_update_frequency_e or xg_resource_binding_usage_e or xg_resource_binding_slot_e
 typedef enum {
     xg_resource_binding_set_per_frame_m,
     xg_resource_binding_set_per_view_m,
@@ -1319,6 +1326,7 @@ typedef struct {
 */
 
 typedef enum {
+    xg_buffer_usage_bit_none_m                          =      0,
     xg_buffer_usage_bit_copy_source_m                   = 1 << 0,
     xg_buffer_usage_bit_copy_dest_m                     = 1 << 1,
     xg_buffer_usage_bit_texel_uniform_m                 = 1 << 2,
@@ -1911,6 +1919,9 @@ typedef struct {
     char debug_name[xg_debug_name_size_m];
 } xg_sampler_info_t;
 
+// TODO remove resource cmd buffers entirely and just pass a workload handle 
+// and a time when calling current resource cmd buffer api? what's the point
+// of having resource cmd buffers?
 typedef enum {
     xg_resource_cmd_buffer_time_workload_start_m,
     xg_resource_cmd_buffer_time_workload_complete_m,
@@ -2120,19 +2131,31 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    xg_raytrace_world_flag_bit_allow_update_m = 1 << 0,
+} xg_raytrace_world_flag_bit_e;
+
 typedef struct {
     xg_device_h device;
     xg_raytrace_pipeline_state_h pipeline; // TODO is this ok?
     xg_raytrace_geometry_instance_t* instance_array;
     uint32_t instance_count;
+    xg_raytrace_world_flag_bit_e flags;
     char debug_name[xg_debug_name_size_m];
 } xg_raytrace_world_params_t;
+
+typedef struct {
+    xg_raytrace_world_h world;
+    xg_raytrace_geometry_instance_t* instance_array;
+    uint32_t instance_count;    
+} xg_raytrace_world_update_params_t;
 
 #define xg_raytrace_world_params_m( ... ) ( xg_raytrace_world_params_t ) { \
     .device = xg_null_handle_m, \
     .pipeline = xg_null_handle_m, \
     .instance_array = NULL,  \
     .instance_count = 0, \
+    .flags = 0, \
     .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
@@ -2161,7 +2184,7 @@ typedef struct {
     bool                    ( *resize_swapchain )                   ( xg_swapchain_h swapchain, size_t width, size_t height );
     bool                    ( *get_swapchain_info )                 ( xg_swapchain_info_t* info, xg_swapchain_h swapchain );
     // TODO have the option to acquire the swapchain texture through a resource cmd buffer?
-    uint32_t                ( *acquire_next_swapchain_texture )     ( xg_swapchain_h swapchain, xg_workload_h workload, bool* resize );
+    void                    ( *acquire_swapchain )                  ( xg_swapchain_acquire_result_t* result, xg_swapchain_h swapchain, xg_workload_h workload );
     xg_texture_h            ( *get_swapchain_texture )              ( xg_swapchain_h swapchain );
     void                    ( *present_swapchain )                  ( xg_swapchain_h swapchain, xg_workload_h workload );
     void                    ( *destroy_swapchain )                  ( xg_swapchain_h swapchain );
@@ -2202,7 +2225,6 @@ typedef struct {
     void                    ( *cmd_set_graphics_pipeline_state )    ( xg_cmd_buffer_h cmd_buffer, xg_graphics_pipeline_state_h pipeline_state, uint64_t key );
     void                    ( *cmd_set_compute_pipeline_state )     ( xg_cmd_buffer_h cmd_buffer, xg_compute_pipeline_state_h pipeline_state, uint64_t key );
     void                    ( *cmd_set_render_textures )            ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
-    // TODO rename to cmd_bind_pipeline_resource_set (rename set to something else?)
     void                    ( *cmd_set_pipeline_resources )         ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
     void                    ( *cmd_write_pipeline_constant_data )   ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_constant_data_t* data, uint64_t key );
     void                    ( *cmd_dispatch_compute )               ( xg_cmd_buffer_h cmd_buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, uint64_t key );
@@ -2216,9 +2238,9 @@ typedef struct {
 
     //void                    ( *cmd_generate_texture_mips )          ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, uint32_t mip_base, uint32_t mip_count, uint64_t key );
 
-    xg_pipeline_resource_group_h    ( *cmd_create_pipeline_resource_group )     ( xg_resource_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_group_params_t* params );
-    void                            ( *cmd_destroy_pipeline_resource_group )    ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h group, xg_resource_cmd_buffer_time_e destroy_time );
-    void                            ( *cmd_set_pipeline_resource_group )        ( xg_cmd_buffer_h cmd_buffer, xg_resource_binding_set_e set, xg_pipeline_resource_group_h group, uint64_t key );
+    xg_pipeline_resource_group_h    ( *cmd_create_pipeline_resource_group )  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_group_params_t* params );
+    void                            ( *cmd_destroy_pipeline_resource_group ) ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h bindings, xg_resource_cmd_buffer_time_e destroy_time );
+    void                            ( *cmd_set_pipeline_resource_group )     ( xg_cmd_buffer_h cmd_buffer, xg_resource_binding_set_e set, xg_pipeline_resource_group_h bindings, uint64_t key );
 
     void                    ( *cmd_copy_texture )                   ( xg_cmd_buffer_h cmd_buffer, const xg_texture_copy_params_t* params, uint64_t key );
     void                    ( *cmd_copy_buffer )                    ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h src, xg_buffer_h dest, uint64_t key ); // TODO better args
@@ -2241,9 +2263,8 @@ typedef struct {
 
     //xg_query_buffer_h       ( *cmd_create_query_buffer )            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_query_buffer_params_t* params );
 
-    // TODO rename to set_viewport/scissor
-    void                    ( *cmd_set_pipeline_viewport )          ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
-    void                    ( *cmd_set_pipeline_scissor )           ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
+    void                    ( *cmd_set_dynamic_viewport )           ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
+    void                    ( *cmd_set_dynamic_scissor )            ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
 
     xg_buffer_h             ( *create_buffer )                      ( const xg_buffer_params_t* params );
     xg_texture_h            ( *create_texture )                     ( const xg_texture_params_t* params );
@@ -2280,12 +2301,7 @@ typedef struct {
     void                    ( *destroy_compute_pipeline )           ( xg_compute_pipeline_state_h pipeline );
     void                    ( *destroy_raytrace_pipeline )          ( xg_raytrace_pipeline_state_h pipeline );
 
-    //xg_allocator_i          ( *get_default_allocator )              ( xg_device_h device, xg_memory_type_e type );
     void                    ( *get_allocator_info )                 ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
-
-    // TODO add map_buffer/texture for convenience?
-    //char*                 ( *map_alloc )                          ( const xg_alloc_t* alloc );
-    //void                    ( *unmap_alloc )                        ( const xg_alloc_t* alloc );
 
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
     xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size ); // TODO take in a std_buffer_t ?

@@ -106,6 +106,7 @@ void std_module_reload ( const char* build_target );
 #define std_module_reload_m() std_module_reload ( std_pp_eval_string_m ( std_module_name_m ) )
 
 size_t std_module_build ( const char* build_target, void* output, size_t output_size );
+void* std_module_reboot ( const char* solution_name );
 
 // Implemented in std_state.c
 void std_runtime_bind ( void* std_runtime );

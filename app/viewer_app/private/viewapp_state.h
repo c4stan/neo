@@ -219,6 +219,7 @@ typedef struct {
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;
     viewapp_ui_state_t ui;
+    bool reload;
 } viewapp_state_t;
 
 std_module_declare_state_m ( viewapp )

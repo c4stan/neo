@@ -21,9 +21,9 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
 
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
 
-    xg->acquire_next_swapchain_texture ( swapchain, workload, NULL );
-
-    xg_texture_h swapchain_texture = xg->get_swapchain_texture ( swapchain );
+    xg_swapchain_acquire_result_t acquire;
+    xg->acquire_swapchain ( &acquire, swapchain, workload );
+    xg_texture_h swapchain_texture = acquire.texture;
 
     // Allocate temp texture
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
@@ -212,7 +212,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         .width = 600,
         .height = 400,
     );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, 0 );
+    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, 0 );
 
     xg_buffer_range_t cbuffer_range;
     {

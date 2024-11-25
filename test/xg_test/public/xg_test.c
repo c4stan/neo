@@ -13,13 +13,12 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_workload_h workload = xg->create_workload ( device );
-
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
-    xg->acquire_next_swapchain_texture ( swapchain, workload, NULL );
-
-    xg_texture_h texture = xg->get_swapchain_texture ( swapchain );
+    xg_swapchain_acquire_result_t acquire;
+    xg->acquire_swapchain ( &acquire, swapchain, workload );
+    xg_texture_h texture = acquire.texture;
 
     if ( capture ) {
         xg->cmd_start_debug_capture ( cmd_buffer, xg_debug_capture_stop_time_workload_present_m, 0 );
@@ -27,8 +26,9 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
 
     xg->cmd_begin_debug_region ( cmd_buffer, "Test region", xg_debug_region_color_yellow_m, 0 );
 
-    {
-        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+    xg->cmd_barrier_set ( cmd_buffer, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &xg_texture_memory_barrier_m (
             .texture = texture,
             .layout.old = xg_texture_layout_undefined_m,
             .layout.new = xg_texture_layout_copy_dest_m,
@@ -36,34 +36,25 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
             .memory.invalidations = xg_memory_access_bit_transfer_write_m,
             .execution.blocker = xg_pipeline_stage_bit_transfer_m,
             .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-        );
+        ),
+    ), 0 );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m ();
-        barrier_set.texture_memory_barriers_count = 1;
-        barrier_set.texture_memory_barriers = &texture_barrier;
+    xg_color_clear_t color_clear;
+    const uint64_t t = 500;
+    color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
+    color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    xg->cmd_clear_texture ( cmd_buffer, texture, color_clear, 2 );
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
-    }
+    xg->cmd_clear_texture ( cmd_buffer, texture, xg_color_clear_m (
+        .f32[0] = 0,
+        .f32[1] = 0,
+        .f32[2] = 0,
+    ), 1 );
 
-    {
-        xg_color_clear_t color_clear;
-        uint64_t t = 500;
-        color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
-        color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        xg->cmd_clear_texture ( cmd_buffer, texture, color_clear, 2 );
-    }
-
-    {
-        xg_color_clear_t color_clear;
-        color_clear.f32[0] = 0;
-        color_clear.f32[1] = 0;
-        color_clear.f32[2] = 0;
-        xg->cmd_clear_texture ( cmd_buffer, texture, color_clear, 1 );
-    }
-
-    {
-        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+    xg->cmd_barrier_set ( cmd_buffer, &xg_barrier_set_m(
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &xg_texture_memory_barrier_m (
             .texture = texture,
             .layout.old = xg_texture_layout_copy_dest_m,
             .layout.new = xg_texture_layout_present_m,
@@ -71,14 +62,8 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
             .memory.invalidations = xg_memory_access_bit_none_m,
             .execution.blocker = xg_pipeline_stage_bit_transfer_m,
             .execution.blocked = xg_pipeline_stage_bit_bottom_of_pipe_m,
-        );
-
-        xg_barrier_set_t barrier_set = xg_barrier_set_m();
-        barrier_set.texture_memory_barriers_count = 1;
-        barrier_set.texture_memory_barriers = &texture_barrier;
-
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 3 );
-    }
+        ),
+    ), 3 );
 
     xg_texture_h temp_texture = xg->create_texture ( &xg_texture_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
@@ -101,9 +86,10 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
             .execution.blocked = xg_pipeline_stage_bit_transfer_m,
         );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m();
-        barrier_set.texture_memory_barriers_count = 1;
-        barrier_set.texture_memory_barriers = &texture_barrier;
+        xg_barrier_set_t barrier_set = xg_barrier_set_m (
+            .texture_memory_barriers_count = 1,
+            .texture_memory_barriers = &texture_barrier
+        );
 
         xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
     }
@@ -130,7 +116,6 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, temp_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 
-    //xg->close_cmd_buffers ( &cmd_buffer, 1 );
     xg->submit_workload ( workload );
     xg->present_swapchain ( swapchain, workload );
 }
@@ -163,7 +148,7 @@ static void xg_test2_run ( void ) {
         xg->get_device_info ( &device_info, device );
         std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
 
-        xg_swapchain_window_params_t swapchain_params = xg_swapchain_window_params_m (
+        swapchain = xg->create_window_swapchain ( &xg_swapchain_window_params_m (
             .window = window,
             .device = device,
             .texture_count = 3,
@@ -171,12 +156,11 @@ static void xg_test2_run ( void ) {
             .color_space = xg_colorspace_srgb_m,
             .present_mode = xg_present_mode_fifo_m,
             .debug_name = "swapchain",
-        );
-        swapchain = xg->create_window_swapchain ( &swapchain_params );
+        ) );
         std_assert_m ( swapchain != xg_null_handle_m );
     }
 
-    wm_window_info_t info = {0};
+    wm_window_info_t info;
     wm->get_window_info ( window, &info );
 
     std_log_info_m ( "Press F1 to reload modules" );

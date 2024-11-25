@@ -24,6 +24,7 @@ typedef struct wm_window_t {
     size_t handlers_count;
 #endif
 
+    wm_window_params_t params;
     wm_window_info_t info;
 
 #if defined(std_platform_linux_m)
@@ -42,6 +43,7 @@ typedef struct wm_window_state_t {
     wm_window_t* windows_array;
     wm_window_t* windows_freelist;
     wm_window_t* windows_list;
+    uint64_t* windows_bitset;
 
 #if defined(std_platform_win32_m)
     std_hash_map_t map;   // window os handle -> wm_window_h handle

@@ -42,5 +42,6 @@ void xg_vk_raytrace_unload ( void );
 xg_raytrace_geometry_h xg_vk_raytrace_geometry_create ( const xg_raytrace_geometry_params_t* params );
 xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params_t* params );
 void xg_vk_raytrace_world_destroy ( xg_raytrace_world_h world );
+//void xg_vk_raytrace_world_update ( const xg_raytrace_world_update_params_t* params );
 
 const xg_vk_raytrace_world_t* xg_vk_raytrace_world_get ( xg_raytrace_world_h world );

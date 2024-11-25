@@ -13,19 +13,19 @@
 static xg_vk_pipeline_state_t* xg_vk_pipeline_state;
 
 const xg_vk_graphics_pipeline_t* xg_vk_graphics_pipeline_get ( xg_graphics_pipeline_state_h pipeline_handle ) {
-    std_bit_clear_64 ( &pipeline_handle, 63 );
+    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
     xg_vk_graphics_pipeline_t* xg_vk_pipeline = &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_handle];
     return xg_vk_pipeline;
 }
 
 const xg_vk_compute_pipeline_t* xg_vk_compute_pipeline_get ( xg_compute_pipeline_state_h pipeline_handle ) {
-    std_bit_clear_64 ( &pipeline_handle, 63 );
+    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
     xg_vk_compute_pipeline_t* xg_vk_pipeline = &xg_vk_pipeline_state->compute_pipelines_array[pipeline_handle];
     return xg_vk_pipeline;
 }
 
 const xg_vk_raytrace_pipeline_t* xg_vk_raytrace_pipeline_get ( xg_raytrace_pipeline_state_h pipeline_handle ) {
-    std_bit_clear_64 ( &pipeline_handle, 63 );
+    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
     xg_vk_raytrace_pipeline_t* xg_vk_pipeline = &xg_vk_pipeline_state->raytrace_pipelines_array[pipeline_handle];
     return xg_vk_pipeline;
 }
@@ -1203,7 +1203,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         std_mutex_unlock ( &xg_vk_pipeline_state->raytrace_pipelines_map_mutex );
     }
 
-    std_bit_set_64 ( &xg_vk_pipeline_handle, 63 );
+    xg_vk_pipeline_handle = std_bit_set_64_m ( xg_vk_pipeline_handle, 63 );
 
     return xg_vk_pipeline_handle;
 #else
@@ -1215,7 +1215,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
 
 void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_handle ) {
 #if xg_enable_raytracing_m
-    std_bit_clear_64 ( &pipeline_handle, 63 );
+    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
     xg_vk_raytrace_pipeline_t* pipeline = &xg_vk_pipeline_state->raytrace_pipelines_array[pipeline_handle];
 
     if ( --pipeline->common.reference_count > 0 ) {
@@ -1388,7 +1388,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         std_mutex_unlock ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
     }
 
-    std_bit_set_64 ( &xg_vk_pipeline_handle, 63 );
+    xg_vk_pipeline_handle = std_bit_set_64_m ( xg_vk_pipeline_handle, 63 );
 
     return xg_vk_pipeline_handle;
 }
@@ -1934,7 +1934,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 }
 
 void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_handle ) {
-    std_bit_clear_64 ( &pipeline_handle, 63 );
+    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
     xg_vk_graphics_pipeline_t* pipeline = &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_handle];
 
     if ( --pipeline->common.reference_count > 0 ) {
@@ -2013,7 +2013,7 @@ const xg_vk_graphics_renderpass_t* xg_vk_graphics_renderpass_get ( xg_renderpass
 }
 
 void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handle ) {
-    std_bit_clear_64 ( &pipeline_handle, 63 );
+    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
     xg_vk_compute_pipeline_t* pipeline = &xg_vk_pipeline_state->compute_pipelines_array[pipeline_handle];
 
     if ( --pipeline->common.reference_count > 0 ) {
@@ -2154,8 +2154,8 @@ xg_pipeline_resource_group_h xg_vk_pipeline_create_resource_group ( xg_device_h 
 
     xg_vk_pipeline_common_t* pipeline;
 
-    if ( std_bit_test_64 ( pipeline_handle, 63 ) ) {
-        std_bit_clear_64 ( &pipeline_handle, 63 );
+    if ( std_bit_test_64_m ( pipeline_handle, 63 ) ) {
+        pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
         pipeline = &xg_vk_pipeline_state->compute_pipelines_array[pipeline_handle].common;
     } else {
         pipeline = &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_handle].common;

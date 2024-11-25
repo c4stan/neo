@@ -281,7 +281,7 @@ void* fs_file_map ( fs_file_h file, size_t size, fs_map_permits_t permits ) {
     DWORD map_permits = 0;
 
     bool copy_on_write = permits & fs_map_copy_on_write_m;
-    std_bit_clear_32 ( ( uint32_t* ) &permits, fs_map_copy_on_write_m );
+    permits = std_bit_clear_32_m ( permits, fs_map_copy_on_write_m );
 
     if ( permits == fs_map_read_m ) {
         page_permits = PAGE_READONLY;

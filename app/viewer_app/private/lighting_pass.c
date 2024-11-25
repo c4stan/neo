@@ -198,7 +198,7 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
         .width = args->width,
         .height = args->height,
     );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
+    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
 
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
 }
@@ -338,7 +338,7 @@ void light_cull_pass ( xf_node_execute_args_t* node_args, void* user_args ) {
         .width = args->width,
         .height = args->height,
     );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
+    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
 
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
 }

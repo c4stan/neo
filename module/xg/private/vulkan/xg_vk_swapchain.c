@@ -440,15 +440,14 @@ static bool xg_vk_swapchain_resize_check ( xg_swapchain_h swapchain_handle ) {
     }
 }
 
-uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle, bool* resize ) {
+void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_acquire_result_t* result, xg_swapchain_h swapchain_handle, xg_workload_h workload_handle ) {
     std_mutex_lock ( &xg_vk_swapchain_state->swapchains_mutex );
     xg_vk_swapchain_t* swapchain = &xg_vk_swapchain_state->swapchains_array[swapchain_handle];
     std_mutex_unlock ( &xg_vk_swapchain_state->swapchains_mutex );
 
+    bool resize = false;
     if ( xg_vk_swapchain_resize_check ( swapchain_handle ) ) {
-        if ( resize ) {
-            *resize = true;
-        }
+        resize = true;
     }
 
     const xg_vk_device_t* device = xg_vk_device_get ( swapchain->device );
@@ -465,12 +464,12 @@ uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle,
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_create_info.pNext = NULL;
     fence_create_info.flags = 0;
-    VkResult result = vkCreateFence ( device->vk_handle, &fence_create_info, NULL, &fence );
-    std_assert_m ( result == VK_SUCCESS );
-    result = vkAcquireNextImageKHR ( device->vk_handle, swapchain->vk_handle, UINT64_MAX, VK_NULL_HANDLE, fence, &texture_idx );
-    std_assert_m ( result == VK_SUCCESS );
-    result = vkWaitForFences ( device->vk_handle, 1, &fence, VK_TRUE, UINT64_MAX );
-    std_assert_m ( result == VK_SUCCESS );
+    VkResult vk_result = vkCreateFence ( device->vk_handle, &fence_create_info, NULL, &fence );
+    std_assert_m ( vk_result == VK_SUCCESS );
+    vk_result = vkAcquireNextImageKHR ( device->vk_handle, swapchain->vk_handle, UINT64_MAX, VK_NULL_HANDLE, fence, &texture_idx );
+    std_assert_m ( vk_result == VK_SUCCESS );
+    vk_result = vkWaitForFences ( device->vk_handle, 1, &fence, VK_TRUE, UINT64_MAX );
+    std_assert_m ( vk_result == VK_SUCCESS );
     vkDestroyFence ( device->vk_handle, fence, NULL );
     swapchain->acquired_texture_idx = texture_idx;
     xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
@@ -481,8 +480,8 @@ uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle,
     xg_workload_init_swapchain_texture_acquired_gpu_event ( workload_handle );
     xg_gpu_queue_event_log_signal ( workload->swapchain_texture_acquired_event );
     const xg_vk_gpu_queue_event_t* vk_acquire_event = xg_vk_gpu_queue_event_get ( workload->swapchain_texture_acquired_event );
-    VkResult result = vkAcquireNextImageKHR ( device->vk_handle, swapchain->vk_handle, UINT64_MAX, vk_acquire_event->vk_semaphore, VK_NULL_HANDLE, &texture_idx );
-    std_assert_msg_m ( result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, result );
+    VkResult vk_result = vkAcquireNextImageKHR ( device->vk_handle, swapchain->vk_handle, UINT64_MAX, vk_acquire_event->vk_semaphore, VK_NULL_HANDLE, &texture_idx );
+    std_assert_msg_m ( vk_result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, vk_result );
     swapchain->acquired_texture_idx = texture_idx;
     xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
 
@@ -498,7 +497,10 @@ uint32_t xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain_handle,
 #endif
 
     swapchain->acquired = true;
-    return texture_idx;
+
+    result->idx = texture_idx;
+    result->texture = swapchain->textures[texture_idx];
+    result->resize = resize;
 }
 
 void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h workload_handle ) {

@@ -112,7 +112,7 @@ from https://stackoverflow.com/questions/11228855/header-files-for-x86-simd-intr
     typedef __m512 vm_vec_16f_t;
 #endif
 
-#define VM_API std_inline_m static
+#define VM_API std_inline_m static __vectorcall
 
 // ======================================================================================= //
 //                                         S S E 1

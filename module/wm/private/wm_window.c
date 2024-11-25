@@ -62,12 +62,16 @@ static wm_window_state_t* wm_window_state;
         when all events are dequeued, event loop terminates and returns
 */
 
+#define wm_window_bitset_u64_count_m std_div_ceil_m ( wm_max_windows_m, 64 )
+
 void wm_window_load ( wm_window_state_t* state ) {
     wm_window_state = state;
 
     wm_window_state->windows_array = std_virtual_heap_alloc_array_m ( wm_window_t, wm_max_windows_m );
     wm_window_state->windows_freelist = std_freelist_m ( wm_window_state->windows_array, wm_max_windows_m );
     wm_window_state->windows_list = NULL;
+    wm_window_state->windows_bitset = std_virtual_heap_alloc_array_m ( uint64_t, wm_window_bitset_u64_count_m );
+    std_mem_zero ( wm_window_state->windows_bitset, sizeof ( uint64_t ) * wm_window_bitset_u64_count_m );
 
     std_mutex_init ( &wm_window_state->mutex );
 
@@ -97,9 +101,14 @@ void wm_window_reload ( wm_window_state_t* state ) {
 }
 
 void wm_window_unload ( void ) {
-    // TODO check for resource leaks?
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, wm_window_state->windows_bitset, idx, wm_window_bitset_u64_count_m ) ) {
+        wm_window_h handle = idx;
+        wm_window_destroy ( handle );
+    }
 
     std_virtual_heap_free ( wm_window_state->windows_array );
+    std_virtual_heap_free ( wm_window_state->windows_bitset );
 #if defined(std_platform_win32_m)
     std_virtual_heap_free ( wm_window_state->map.hashes );
     std_virtual_heap_free ( wm_window_state->map.payloads );
@@ -1401,8 +1410,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
         wc.cbSize = sizeof ( WNDCLASSEXA );
 
         if ( !RegisterClassExA ( &wc ) ) {
-            DWORD error = GetLastError();
-            std_unused_m(error);
+            std_log_os_error_m();
             return wm_null_handle_m;
         }
 
@@ -1477,6 +1485,8 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     std_mutex_lock ( &wm_window_state->mutex );
     // Pop from freelist and write all data
     wm_window_t* window = std_list_pop_m ( &wm_window_state->windows_freelist );
+    uint64_t window_idx = window - wm_window_state->windows_array;
+    std_bitset_set ( wm_window_state->windows_bitset, window_idx );
 
 #if wm_enable_input_events_m
     window->handlers_count = 0;
@@ -1486,6 +1496,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     std_mem_zero ( &window->input_state, sizeof ( window->input_state ) );
 #endif
 
+    window->params = *params;
     std_str_copy ( window->info.title, wm_window_title_max_len_m, params->name );
     window->info.x = params->x;
     window->info.y = params->y;
@@ -1558,7 +1569,13 @@ bool wm_window_destroy ( wm_window_h handle ) {
 
     // Destroy os window
 #if defined(std_platform_win32_m)
-    DestroyWindow ( ( HWND ) window->info.os_handle.window );
+    if ( !DestroyWindow ( ( HWND ) window->info.os_handle.window ) ) {
+        std_log_os_error_m();
+    }
+    HINSTANCE instance = GetModuleHandle ( NULL );
+    if ( !UnregisterClassA ( window->params.name, instance ) ) {
+        std_log_os_error_m();
+    }
     uint64_t hash = std_hash_64_m ( ( uint64_t ) window->info.os_handle.window );
     bool remove_result = std_hash_map_remove ( &wm_window_state->map, hash );
     std_verify_m ( remove_result );
@@ -1577,6 +1594,8 @@ bool wm_window_destroy ( wm_window_h handle ) {
 
     // Put window back into freelist
     std_list_push ( &wm_window_state->windows_freelist, window );
+    uint64_t window_idx = window - wm_window_state->windows_array;
+    std_bitset_clear ( wm_window_state->windows_bitset, window_idx );
 
     // Unlock and return true
     std_mutex_unlock ( &wm_window_state->mutex );

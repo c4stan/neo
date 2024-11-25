@@ -423,6 +423,36 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
 std_warnings_ignore_m ( "-Wunreachable-code" )
 std_warnings_ignore_m ( "-Wunused-macros" )
 
+void* std_module_reboot ( const char* solution_name ) {
+    std_module_unload ( solution_name );
+
+    char buffer[1024];
+    std_module_build ( solution_name, buffer, std_static_array_size_m ( buffer ) );
+
+    int32_t updated_modules_count = std_str_to_i32 ( buffer );
+
+    if ( updated_modules_count > 0 ) {
+        const char* p = buffer;
+
+        for ( int32_t i = 0; i < updated_modules_count; ++i ) {
+
+            while ( *p != '\0' ) {
+                ++p;
+            }
+
+            ++p;
+            const char* name = p;
+            std_log_info_m ( "Rebuild of module " std_fmt_str_m " complete.", name );
+        }
+    } else if ( updated_modules_count == 0 ) {
+        std_log_info_m ( "Module build skipped, nothing changed." );
+    } else if ( updated_modules_count == -1 ) {
+        std_log_info_m ( "Module build failed." );
+    }
+
+    return std_module_load ( solution_name );
+}
+
 void std_module_reload ( const char* solution_name ) {
     char buffer[1024];
     std_module_build ( solution_name, buffer, std_static_array_size_m ( buffer ) );

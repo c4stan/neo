@@ -86,3 +86,10 @@ void xg_vk_texture_unregister_swapchain_texture ( xg_texture_h texture );
 
 const xg_vk_texture_t* xg_vk_texture_get ( xg_texture_h handle );
 const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture, xg_texture_view_t view );
+
+
+/*
+    TODO
+        check VkMemoryDedicatedRequirements when allocating resources, create a dedicated memory allocation if needed instead of the shared allocator
+        see https://asawicki.info/articles/memory_management_vulkan_direct3d_12.php5 "Dedicated allocations"
+*/

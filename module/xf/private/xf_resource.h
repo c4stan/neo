@@ -22,7 +22,6 @@
 
 // Stores what kind of access the graph nodes do on a (sub) resource
 // Filled when adding nodes to a graph and never updated after
-// TODO make there per graph not global (store inside the graph)
 typedef struct {
     xf_node_h writers[xf_resource_max_writers_m];
     xf_node_h readers[xf_resource_max_readers_m];
@@ -89,6 +88,10 @@ typedef struct {
 } xf_texture_view_table_t;
 #endif
 
+// TODO move out
+#define xf_resource_texture_max_graph_refs_m 4
+#define xf_resource_buffer_max_graph_refs_m 4
+
 typedef struct {
     bool is_external; // lifetime not owned by xf. never allocated, just used
     xg_texture_h xg_handle;
@@ -108,6 +111,9 @@ typedef struct {
         // TODO external hash table to support dynamic view access
     } state;
 
+    xf_graph_h graph_refs[xf_resource_texture_max_graph_refs_m];
+    uint32_t graph_refs_count;
+
     xf_texture_h alias;
 } xf_texture_t;
 
@@ -119,7 +125,8 @@ typedef struct {
     .params = xf_texture_params_m(), \
     .deps.shared = xf_resource_dependencies_m(), \
     .state.shared = xf_texture_execution_state_m(), \
-    .alias = xg_null_handle_m, \
+    .graph_refs_count = 0, \
+    .alias = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
 
@@ -130,8 +137,22 @@ typedef struct {
     xg_buffer_usage_bit_e required_usage;
     xg_buffer_usage_bit_e allowed_usage;
     xf_buffer_params_t params;
+    xf_graph_h graph_refs[xf_resource_buffer_max_graph_refs_m];
+    uint32_t graph_refs_count;
     xf_buffer_h alias;
 } xf_buffer_t;
+
+#define xf_buffer_m( ... ) ( xf_buffer_t ) { \
+    .xg_handle = xg_null_handle_m, \
+    .state = xf_buffer_execution_state_m(), \
+    .deps = xf_resource_dependencies_m(), \
+    .required_usage = xg_buffer_usage_bit_none_m, \
+    .allowed_usage = xg_buffer_usage_bit_none_m, \
+    .params = xf_buffer_params_m(), \
+    .graph_refs_count = 0, \
+    .alias = xf_null_handle_m, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xf_multi_texture_params_t params;
@@ -169,15 +190,11 @@ void xf_resource_unload ( void );
 // TODO group some of those setters into a single function that sets everything and locks only once
 
 xf_texture_h xf_resource_texture_declare ( const xf_texture_params_t* params );
+xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
 xf_buffer_h xf_resource_buffer_declare ( const xf_buffer_params_t* params );
 
 void xf_resource_texture_get_info ( xf_texture_info_t* info, xf_texture_h texture );
 void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
-
-//void xf_resource_texture_bind ( xf_texture_h texture_handle, xg_texture_h xg_handle, const xg_texture_info_t* info );
-
-bool xf_resource_texture_is_multi ( xf_texture_h texture );
-bool xf_resource_buffer_is_multi ( xf_buffer_h buffer );
 
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture );
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
@@ -202,6 +219,7 @@ void xf_resource_texture_add_writer ( xf_texture_h texture, xg_texture_view_t vi
 void xf_resource_texture_clear_dependencies ( xf_texture_h texture );
 void xf_resource_buffer_add_reader ( xf_buffer_h buffer, xf_node_h reader );
 void xf_resource_buffer_add_writer ( xf_buffer_h buffer, xf_node_h writer );
+void xf_resource_buffer_clear_dependencies ( xf_buffer_h buffer );
 
 void xf_resource_texture_set_execution_state ( xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* state );
 void xf_resource_texture_set_execution_layout ( xf_texture_h texture, xg_texture_view_t view, xg_texture_layout_e layout );
@@ -210,21 +228,27 @@ void xf_resource_texture_add_execution_stage ( xf_texture_h texture, xg_texture_
 void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer, const xf_buffer_execution_state_t* state );
 void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer, xg_pipeline_stage_bit_e stage );
 
-// TODO remove these and nove dirty flag clear into map_to_new?
-//void xf_resource_texture_set_dirty ( xf_texture_h texture, bool is_dirty );
-//void xf_resource_buffer_set_dirty ( xf_buffer_h buffer, bool is_dirty );
+void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
+void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
+
+void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
+
+void xf_resource_texture_add_graph_ref ( xf_texture_h texture, xf_graph_h graph );
+void xf_resource_buffer_add_graph_ref ( xf_buffer_h buffer, xf_graph_h graph );
+void xf_resource_texture_remove_graph_ref ( xf_texture_h texture, xf_graph_h graph );
+void xf_resource_buffer_remove_graph_ref ( xf_buffer_h buffer, xf_graph_h graph );
 
 /*
     Multi texture handle : | multi texture flag | unused | multi texture subtexture index | multi texture index |
                            |          1         |   31   |               16               |         16          |
 
-    Multi textures: the idea here is to have a tool to represent textures that
+    Multi textures: the idea here is to have a tool to represent
         - textures that need to hold temporal data over multiple frames, one texture per frame
         - swapchain textures that are backed by multiple textures, again one texture per frame
     The handle returned when creating one is a plain texture handle, this is to allow to use it in place of any other texture
-    After executing the graph the user is supposed to call advance on the handle, so that the next time the handle is used
-    it will reference the "next" texture between the multi textures.
-    In the backend, a multi texture handle has the bit set to 1 to represent that it's a multi texture handle. Storage for multi
+    After executing the graph the multi texture needs to be advanced, so that the next time the handle is used it will reference 
+    the "next" texture between the multi textures.
+    In the backend, a multi texture handle has a bit set to 1 to represent that it's a multi texture handle. Storage for multi
     textures is separate from that of normal textures. A multi texture just has an array of references to actual normal textures,
     and an index indicating the current active texture. Calling advance on a multi texture simply bumps this index, modulo the
     multi texture count.
@@ -236,17 +260,8 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
 void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture, uint32_t index );
 xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h texture );
-
-xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
-
 xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture, int32_t offset );
-
 xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture );
-
-void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
-
-void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
-
-void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
-
+bool xf_resource_texture_is_multi ( xf_texture_h texture );
+bool xf_resource_buffer_is_multi ( xf_buffer_h buffer );
 void xf_resource_swapchain_resize ( xf_texture_h swapchain );

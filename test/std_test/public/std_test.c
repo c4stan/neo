@@ -1269,7 +1269,7 @@ static void test_byte ( void ) {
         uint64_t u64 = 0;
         uint32_t idx;
 
-        std_bit_set_64 ( &u64, 18 );
+        u64 = std_bit_set_64_m ( u64, 18 );
         idx = std_bit_scan_64 ( u64 );
         std_assert_m ( idx == 18 );
         idx = std_bit_scan_rev_64 ( u64 );
@@ -1281,7 +1281,7 @@ static void test_byte ( void ) {
         uint64_t idx;
 
         //
-        std_bit_set_64 ( &bitset[4], 9 );
+        bitset[4] = std_bit_set_64_m ( bitset[4], 9 );
 
         found = std_bitset_scan ( &idx, bitset, 0, 8 );
         std_assert_m ( found );
@@ -1292,8 +1292,8 @@ static void test_byte ( void ) {
         std_assert_m ( idx == 64 * 4 + 9 );
 
         //
-        std_bit_set_64 ( &bitset[6], 9 );
-        std_bit_set_64 ( &bitset[2], 9 );
+        bitset[6] = std_bit_set_64_m ( bitset[6], 9 );
+        bitset[2] = std_bit_set_64_m ( bitset[2], 9 );
 
         found = std_bitset_scan ( &idx, bitset, 0, 8 );
         std_assert_m ( found );
@@ -1452,6 +1452,17 @@ static void test_array ( void ) {
 
     std_log_info_m ( "std_array test complete." );
 }
+#else
+static void test_array ( void ) {
+    std_log_info_m ( "testing std_array..." );
+    int a[3];
+    std_auto_m array = std_static_array_m ( int, a );
+    std_array_push_m ( &array, 5 );
+    std_assert_m ( array.data[0] == 5 );
+    std_assert_m ( array.count == 1 );
+    std_assert_m ( array.capacity == 3 );
+    std_log_info_m ( "std_array test complete." );
+}
 #endif
 
 void std_main ( void ) {
@@ -1523,10 +1534,8 @@ void std_main ( void ) {
     test_time();
     std_log_info_m ( separator );
     test_byte();
-#if defined ( std_compiler_gcc_m )
     std_log_info_m ( separator );
     test_array();
-#endif
     std_log_info_m ( separator );
     test_file();
     std_log_info_m ( separator );

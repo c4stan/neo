@@ -24,10 +24,6 @@ static void xf_triangle_pass ( const xf_node_execute_args_t* node_args, void* us
 
     // Bind swapchain texture as render target
     {
-        xg_color_clear_t color_clear;
-        color_clear.f32[0] = 0;
-        color_clear.f32[1] = 0;
-        color_clear.f32[2] = 0;
         xg_render_textures_binding_t render_textures;
         render_textures.render_targets_count = 1;
         render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
@@ -42,7 +38,7 @@ static void xf_triangle_pass ( const xf_node_execute_args_t* node_args, void* us
         .width = 400,
         .height = 200,
     );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
+    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
 
     // Draw
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
@@ -142,6 +138,18 @@ static void xf_test ( void ) {
         color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
 
+        xf->add_node ( graph, &xf_node_params_m (
+            .debug_name = "present",
+            .type = xf_node_type_copy_pass_m,
+            .resources = xf_node_resource_params_m (
+                .copy_texture_writes_count = 1,
+                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+                .copy_texture_reads_count = 1,
+                .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+                .presentable_texture = swapchain_multi_texture,
+            ),
+        ) );
+
         xf->add_node ( graph, &xf_node_params_m ( 
             .debug_name = "clear",
             .type = xf_node_type_clear_pass_m,
@@ -172,22 +180,10 @@ static void xf_test ( void ) {
 
         xf_graph_h graph2 = xf->create_graph ( device );
 
-        xf->add_node ( graph, &xf_node_params_m (
-            .debug_name = "present",
-            .type = xf_node_type_copy_pass_m,
-            .resources = xf_node_resource_params_m (
-                .copy_texture_writes_count = 1,
-                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
-                .copy_texture_reads_count = 1,
-                .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
-                .presentable_texture = swapchain_multi_texture,
-            ),
-        ) );
-
         uint64_t id = xf->execute_graph ( graph, workload, 0 );
         xf->execute_graph ( graph2, workload, id );
-        xf->destroy_graph ( graph );
-        xf->destroy_graph ( graph2 );
+        xf->destroy_graph ( graph, workload );
+        xf->destroy_graph ( graph2, workload );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 

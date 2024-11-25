@@ -18,7 +18,7 @@ std_module_export_m void xf_unload ( void );
         Sort nodes based on dependencies, and assign a key to each node based on that
         Actual nodes execution can happen in arbitrary order, should follow ordering implied by CPU resources dependencies if any is present
         Aliasing
-            Aliasing can be implemented at resource level, e.g. aliasing 2 textures with same format and size, and at memory level, by just sharing the same memory with multiple separate resources over time
+            Aliasing can be implemented at resource level, e.g. aliasing 2 textures with same format and size, or at memory level, by binding multiple resources to the same or overlapping memory segments and issuing a barrier when moving from using one resource to the other, see https://asawicki.info/articles/memory_management_vulkan_direct3d_12.php5 "Aliasing"
         Compute
             Should compute jobs (e.g. skinning) be run all in one node (e.g. compute skinning node) or have one node per dispatch?
                 Most likely the 1st makes more sense
@@ -54,6 +54,8 @@ std_module_export_m void xf_unload ( void );
     either way, a way to probably optimize the querying is doing "deferred queries" where first all queries for the current frame are entered
     and then they're resolved all at once, and finally the results can be consumed by the clients.
 */
+
+
 
 typedef uint64_t xf_resource_h;
 typedef uint64_t xf_texture_h;
@@ -529,7 +531,7 @@ typedef struct {
     void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
-    void ( *destroy_graph ) ( xf_graph_h graph );
+    void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
     void ( *disable_node ) ( xf_node_h node );
     void ( *enable_node ) ( xf_node_h node );

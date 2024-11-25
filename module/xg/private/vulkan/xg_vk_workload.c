@@ -31,20 +31,26 @@ std_warnings_ignore_m ( "-Wint-to-pointer-cast" )
 // ======================================================================================= //
 //                                     W O R K L O A D
 // ======================================================================================= //
-
+//
+//  Workload handle:
+//     lsb                      msb
+//      --------------------------
+//      |  index  |  generation  |
+//      --------------------------
+//      |    10   |      54      |
+//      --------------------------
+//
 // TODO always check gen, not only when assert is enabled? or avoid writing it entirely when assert is off?
-// TODO properly wrap around when incrementing gen? declared as u64, will break once msb reaches top 10 bits
 #define xg_workload_handle_idx_bits_m 10
 #define xg_workload_handle_gen_bits_m (64 - xg_workload_handle_idx_bits_m)
 
 static xg_vk_workload_t* xg_vk_workload_edit ( xg_workload_h workload_handle ) {
-    #if std_log_assert_enabled_m
-    uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
+#if std_log_assert_enabled_m
+    uint64_t handle_gen = std_bit_read_ms_64_m ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
-    uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
+    uint64_t handle_idx = std_bit_read_ls_64_m ( workload_handle, xg_workload_handle_idx_bits_m );
     xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
-    std_assert_m ( workload->gen == handle_gen );
-    return workload;
+    return workload->gen == handle_gen ? workload : NULL;
 }
 
 const xg_vk_workload_t* xg_vk_workload_get ( xg_workload_h workload_handle ) {
@@ -207,7 +213,8 @@ void xg_vk_workload_reload ( xg_vk_workload_state_t* state ) {
 
 void xg_vk_workload_destroy_ptr ( xg_vk_workload_t* workload ) {
     // gen
-    ++workload->gen;
+    uint64_t gen = workload->gen + 1;
+    gen = std_bit_read_ms_64_m ( gen, xg_workload_handle_gen_bits_m );
 
     // cmd buffer
     xg_cmd_buffer_discard ( workload->cmd_buffers, workload->cmd_buffers_count );
@@ -343,9 +350,9 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, voi
 
 xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload_handle ) {
 #if std_log_assert_enabled_m
-    uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
+    uint64_t handle_gen = std_bit_read_ms_64_m ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
-    uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
+    uint64_t handle_idx = std_bit_read_ls_64_m ( workload_handle, xg_workload_handle_idx_bits_m );
     xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
     std_assert_m ( workload->gen == handle_gen );
 
@@ -358,9 +365,9 @@ xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload_handle ) {
 
 xg_resource_cmd_buffer_h xg_workload_add_resource_cmd_buffer ( xg_workload_h workload_handle ) {
 #if std_log_assert_enabled_m
-    uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
+    uint64_t handle_gen = std_bit_read_ms_64_m ( workload_handle, xg_workload_handle_gen_bits_m );
 #endif
-    uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
+    uint64_t handle_idx = std_bit_read_ls_64_m ( workload_handle, xg_workload_handle_idx_bits_m );
     xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
     std_assert_m ( workload->gen == handle_gen );
 
@@ -372,8 +379,8 @@ xg_resource_cmd_buffer_h xg_workload_add_resource_cmd_buffer ( xg_workload_h wor
 }
 
 bool xg_workload_is_complete ( xg_workload_h workload_handle ) {
-    uint64_t handle_gen = std_bit_read_ms_64 ( workload_handle, xg_workload_handle_gen_bits_m );
-    uint64_t handle_idx = std_bit_read_ls_64 ( workload_handle, xg_workload_handle_idx_bits_m );
+    uint64_t handle_gen = std_bit_read_ms_64_m ( workload_handle, xg_workload_handle_gen_bits_m );
+    uint64_t handle_idx = std_bit_read_ls_64_m ( workload_handle, xg_workload_handle_idx_bits_m );
     xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
     return workload->gen > handle_gen;
 }
@@ -2539,6 +2546,7 @@ typedef struct {
 static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_workload_h workload_handle ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
     const xg_cmd_buffer_t* cmd_buffers[xg_cmd_buffer_max_cmd_buffers_per_workload_m];
+    std_assert_m ( workload->cmd_buffers_count < xg_cmd_buffer_max_cmd_buffers_per_workload_m );
     uint64_t total_header_size = 0;
 
     for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {

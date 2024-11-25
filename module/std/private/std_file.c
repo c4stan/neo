@@ -1146,7 +1146,7 @@ void* std_file_map ( std_file_h file, size_t size, std_file_map_permits_t permit
     DWORD map_permits = 0;
 
     bool copy_on_write = permits & std_file_map_copy_on_write_m;
-    std_bit_clear_32 ( ( uint32_t* ) &permits, std_file_map_copy_on_write_m );
+    permits = std_bit_clear_32_m ( permits, std_file_map_copy_on_write_m );
 
     if ( permits == std_file_map_read_m ) {
         page_permits = PAGE_READONLY;

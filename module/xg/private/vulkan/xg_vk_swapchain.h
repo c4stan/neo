@@ -54,7 +54,7 @@ bool            xg_vk_swapchain_resize ( xg_swapchain_h swapchain, size_t width,
 bool            xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapchain_h swapchain );
 
 //xg_texture_h    xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain, size_t idx );
-uint32_t        xg_vk_swapchain_acquire_next_texture ( xg_swapchain_h swapchain, xg_workload_h workload, bool* acquire );
+void            xg_vk_swapchain_acquire_next_texture ( xg_swapchain_acquire_result_t* result, xg_swapchain_h swapchain_handle, xg_workload_h workload_handle );
 xg_texture_h    xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain );
 void            xg_vk_swapchain_present ( xg_swapchain_h swapchain, xg_workload_h workload );
 

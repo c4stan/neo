@@ -79,6 +79,11 @@ static std_app_state_e std_app_test_tick ( void ) {
             m_state->first_print = true;
         }
 
+        if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
+            return std_app_state_reboot_m;
+            m_state->first_print = true;
+        }
+
         std_thread_this_sleep ( 1 );
     }
 

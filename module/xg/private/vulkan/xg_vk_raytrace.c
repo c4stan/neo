@@ -239,6 +239,17 @@ static VkTransformMatrixKHR xg_vk_transform_matrix ( xg_matrix_3x4_t* matrix ) {
 }
 #endif
 
+#if 0
+void xg_vk_raytrace_world_update ( const xg_raytrace_world_update_params_t* params ) {
+#if xg_enable_raytracing_m
+    xg_vk_raytrace_world_t* world = xg_vk_raytrace_state->worlds_array[params->world];
+    const xg_vk_device_t* device = xg_vk_device_get ( world->params.device );
+
+
+#endif
+}
+#endif
+
 xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params_t* params ) {
 #if xg_enable_raytracing_m
     xg_device_h device_handle = params->device;
@@ -308,10 +319,15 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     VkAccelerationStructureBuildGeometryInfoKHR build_info = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
         .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        .mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,
         .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
         .geometryCount = 1,
         .pGeometries = &geometry
     };
+
+    if ( params->flags & xg_raytrace_world_flag_bit_allow_update_m ) {
+        build_info.flags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+    }
 
     VkAccelerationStructureBuildSizesInfoKHR build_size_info = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR
@@ -337,6 +353,7 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     };
     VkAccelerationStructureKHR as_handle;
     xg_vk_instance_ext_api()->create_acceleration_structure ( device->vk_handle, &create_info, NULL, &as_handle );
+    build_info.dstAccelerationStructure = as_handle;
 
     // Build TLAS
     xg_buffer_params_t scratch_buffer_params = xg_buffer_params_m (
@@ -349,9 +366,6 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     );
     xg_buffer_h scratch_buffer_handle = xg_buffer_create ( &scratch_buffer_params );
     const xg_vk_buffer_t* scratch_buffer = xg_vk_buffer_get ( scratch_buffer_handle );
-
-    build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    build_info.dstAccelerationStructure = as_handle;
     build_info.scratchData.deviceAddress = scratch_buffer->gpu_address;
 
     VkAccelerationStructureBuildRangeInfoKHR build_range = {

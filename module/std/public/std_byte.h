@@ -3,8 +3,6 @@
 #include <std_platform.h>
 #include <std_compiler.h>
 
-// TODO turn this into an .inl
-
 void        std_mem_copy ( void* dest, const void* source, size_t size );
 bool        std_mem_cmp  ( const void* a, const void* b, size_t size );
 void        std_mem_set  ( void* dest, size_t size, char value );
@@ -23,83 +21,40 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 
 // Bit indexing starts from 0.
 // ls/ms suffixed routines operate on count bits starting from ls/ms
-//
 // seq suffixed routines operate on a segment of bits specified by first bit index starting from ls and bit count
-// write_* routines differ from write_repeat_* routines by the fact that they write a sequence of bytes to a sequence of bytes, rather than a repeating a single byte value a number of n times in the target sequence
-#if 0
-    #define     std_bit_set_32_m( u32, bit ) u32 |= 1u << (bit)
-    #define     std_bit_set_64_m( u64, bit ) u64 |= 1ull << (bit)
-    #define     std_bit_set_ls_32_m( u32, bit_count ) u32 |= ~ ( ~0u << (bit_count) )
-    #define     std_bit_set_ls_64_m( u64, bit_count ) u64 |= ~ ( ~0ull << (bit_count) )
-    #define     std_bit_set_ms_32_m( u32, bit_count ) u32 |= ~ ( ~0u >> (bit_count) )
-    #define     std_bit_set_ms_64_m( u64, bit_count ) u64 |= ~ ( ~0ull >> (bit_count) )
-    #define     std_bit_set_seq_64_m( u64, first_bit, bit_count ) u64 |= ( ~ ( ~0ull << (bit_count) ) ) << (first_bit)
-    #define     std_bit_set_all_32_m( u32 ) u32 = 0xffffffff
-    #define     std_bit_set_all_64_m( u64 ) u64 = 0xffffffffffffffff
+#define     std_bit_set_32_m( u32, bit ) ( (u32) | ( 1u << (bit) ) )
+#define     std_bit_set_64_m( u64, bit ) ( (u64) | ( 1ull << (bit) ) )
+#define     std_bit_set_ls_32_m( u32, bit_count ) ( (u32) | ~( ~0u << (bit_count) ) )
+#define     std_bit_set_ls_64_m( u64, bit_count ) ( (u64) | ~( ~0ull << (bit_count) ) )
+#define     std_bit_set_ms_32_m( u32, bit_count ) ( (u32) | ~( ~0u >> (bit_count) ) )
+#define     std_bit_set_ms_64_m( u64, bit_count ) ( (u64) | ~( ~0ull >> (bit_count) ) )
+#define     std_bit_set_seq_64_m( u64, first_bit, bit_count ) ( u64 | ( ( ~ ( ~0ull << (bit_count) ) ) << (first_bit) ) )
 
-    #define     std_bit_clear_32_m( u32, bit ) u32 &= ~ ( 1u << (bit) )
-    #define     std_bit_clear_64_m( u64, bit ) u64 &= ~ ( 1ull << (bit) )
-    #define     std_bit_clear_ls_32_m( u32, bit_count ) u32 &= ( ~0u << (bit_count) )
-    #define     std_bit_clear_ls_64_m( u64, bit_count ) u64 &= ( ~0ull << (bit_count) )
-    #define     std_bit_clear_ms_32_m( u32, bit_count ) u32 &= ( ~0u >> (bit_count) )
-    #define     std_bit_clear_ms_64_m( u64, bit_count ) u64 &= ( ~0ull >> (bit_count) )
-    #define     std_bit_clear_seq_64_m( u64, first_bit, bit_count ) u64 &= ( ( ( ~0ull << (bit_count) ) << (first_bit) ) | ( ~ ( ~0ull << (first_bit) ) ) )
+#define     std_bit_clear_32_m( u32, bit ) ( (u32) & ~ ( 1u << (bit) ) )
+#define     std_bit_clear_64_m( u64, bit ) ( (u64) & ~ ( 1ull << (bit) ) )
+#define     std_bit_clear_ls_32_m( u32, bit_count ) ( (u32) & ( ~0u << (bit_count) ) )
+#define     std_bit_clear_ls_64_m( u64, bit_count ) ( (u64) & ( ~0ull << (bit_count) ) )
+#define     std_bit_clear_ms_32_m( u32, bit_count ) ( (u32) & ( ~0u >> (bit_count) ) )
+#define     std_bit_clear_ms_64_m( u64, bit_count ) ( (u64) & ( ~0ull >> (bit_count) ) )
+#define     std_bit_clear_seq_64_m( u64, first_bit, bit_count ) ( (u64) & ( ( ( ~0ull << (bit_count) ) << (first_bit) ) | ( ~ ( ~0ull << (first_bit) ) ) ) )
 
-    #define     std_bit_toggle_32_m( u32, bit ) u32 ^= 1u << (bit)
-    #define     std_bit_toggle_64_m( u64, bit ) u64 ^= 1ull << (bit)
+#define     std_bit_toggle_32_m( u32, bit ) ( (u32) ^ 1u << (bit) )
+#define     std_bit_toggle_64_m( u64, bit ) ( (u64) ^ 1ull << (bit) )
 
-    #define     std_bit_test_32_m( u32, bit ) (u32) & ( 1u << (bit) )
-    #define     std_bit_test_64_m( u64, bit ) (u64) & ( 1ull << (bit) )
+#define     std_bit_test_32_m( u32, bit ) ( (u32) & ( 1u << (bit) ) )
+#define     std_bit_test_64_m( u64, bit ) ( (u64) & ( 1ull << (bit) ) )
 
-    #define     std_bit_read_32_m( u32, bit ) ( (u32) & ( 1u << (bit) ) ) == 1u << (bit)
-    #define     std_bit_read_64_m( u64, bit ) ( (u64) & ( 1ull << (bit) ) ) == 1ull << (bit)
-    #define     std_bit_read_ls_32_m( u32, bit_count ) (u32) & ( ~ ( ~0u << (bit_count) ) )
-    #define     std_bit_read_ls_64_m( u64, bit_count ) (u64) & ( ~ ( ~0ull << (bit_count) ) )
-    #define     std_bit_read_ms_32_m( u32, bit_count ) (u32) >> ( 32 - (bit_count) )
-    #define     std_bit_read_ms_64_m( u64, bit_count ) (u64) >> ( 64 - (bit_count) )
-    #define     std_bit_read_seq_32_m( u32, first_bit, bit_count ) std_bit_read_ls_32_m ( (u32) >> (first_bit), bit_count )
-    #define     std_bit_read_seq_64_m( u64, first_bit, bit_count ) std_bit_read_ls_64_m ( (u64) >> (first_bit), bit_count )
-#endif
+#define     std_bit_read_32_m( u32, bit ) ( (u32) & ( 1u << (bit) ) ) == 1u << (bit)
+#define     std_bit_read_64_m( u64, bit ) ( (u64) & ( 1ull << (bit) ) ) == 1ull << (bit)
+#define     std_bit_read_ls_32_m( u32, bit_count ) ( (u32) & ( ~ ( ~0u << (bit_count) ) ) )
+#define     std_bit_read_ls_64_m( u64, bit_count ) ( (u64) & ( ~ ( ~0ull << (bit_count) ) ) )
+#define     std_bit_read_ms_32_m( u32, bit_count ) ( (u32) >> ( 32 - (bit_count) ) )
+#define     std_bit_read_ms_64_m( u64, bit_count ) ( (u64) >> ( 64 - (bit_count) ) )
+#define     std_bit_read_seq_32_m( u32, first_bit, bit_count ) ( std_bit_read_ls_32_m ( (u32) >> (first_bit), bit_count ) )
+#define     std_bit_read_seq_64_m( u64, first_bit, bit_count ) ( std_bit_read_ls_64_m ( (u64) >> (first_bit), bit_count ) )
 
-void        std_bit_set_32       ( uint32_t* u32, size_t bit );
-void        std_bit_set_64       ( uint64_t* u64, size_t bit );
-void        std_bit_set_ls_32    ( uint32_t* u32, size_t n );
-void        std_bit_set_ls_64    ( uint64_t* u64, size_t n );
-void        std_bit_set_ms_32    ( uint32_t* u32, size_t n );
-void        std_bit_set_ms_64    ( uint64_t* u64, size_t n );
-void        std_bit_set_seq_64   ( uint64_t* u64, size_t starting_bit_idx, size_t n );
-void        std_bit_set_all_32   ( uint32_t* u32 );
-void        std_bit_set_all_64   ( uint64_t* u64 );
-
-void        std_bit_clear_32     ( uint32_t* u32, size_t bit );
-void        std_bit_clear_64     ( uint64_t* u64, size_t bit );
-void        std_bit_clear_ls_32  ( uint32_t* u32, size_t count );
-void        std_bit_clear_ls_64  ( uint64_t* u64, size_t count );
-void        std_bit_clear_ms_32  ( uint32_t* u32, size_t count );
-void        std_bit_clear_ms_64  ( uint64_t* u64, size_t count );
-void        std_bit_clear_seq_64 ( uint64_t* u64, size_t starting_bit_idx, size_t count );
-
-void        std_bit_toggle_32    ( uint32_t* u32, size_t bit );
-void        std_bit_toggle_64    ( uint64_t* u64, size_t bit );
-
-bool        std_bit_test_64      ( uint64_t u64, uint32_t bit );
-
-// TODO rename these? remove?
-uint32_t    std_bit_read_32      ( uint32_t u32, size_t bit );
-uint64_t    std_bit_read_64      ( uint64_t u64, size_t bit );
-uint32_t    std_bit_read_ls_32   ( uint32_t u32, size_t n );
-uint64_t    std_bit_read_ls_64   ( uint64_t u64, size_t n );
-uint32_t    std_bit_read_ms_32   ( uint32_t u32, size_t n );
-uint64_t    std_bit_read_ms_64   ( uint64_t u64, size_t n );
-uint32_t    std_bit_read_seq_32  ( uint32_t u32, size_t starting_bit_idx, size_t n );
-uint64_t    std_bit_read_seq_64  ( uint64_t u64, size_t starting_bit_idx, size_t n );
-
-void        std_bit_write_32            ( uint32_t* u32, size_t bit, uint32_t bit_value );
-void        std_bit_write_64            ( uint64_t* u64, size_t bit, uint64_t bit_value );
-void        std_bit_write_ls_64         ( uint64_t* u64, uint64_t bit_sequence, size_t length );
-void        std_bit_write_ms_64         ( uint64_t* u64, uint64_t bit_sequence, size_t length );
-void        std_bit_write_repeat_ls_64  ( uint64_t* u64, uint64_t value, size_t length );
-void        std_bit_write_repeat_ms_64  ( uint64_t* u64, uint64_t value, size_t length );
+#define     std_bit_write_32_m( u32, bit, value ) ( ( (u32) & ~( 1u << (bit) ) ) | ( -(value) & ( 1u << (bit) ) ) )
+#define     std_bit_write_64_m( u64, bit, value ) ( ( (u64) & ~( 1ull << (bit) ) ) | ( -(value) & ( 1ull << (bit) ) ) )
 
 // Stores the position of the first bit found to be 1
 // The lookup is performed in the required direction (default is lsb->msb)
@@ -191,8 +146,6 @@ uint64_t    std_2_u32_to_u64 ( uint32_t high, uint32_t low );
 
 uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_size );
 
-#define std_address_value_m( ptr, type ) ( *( type* ) ( ptr ) )
-
 // call std_mem_set to initialize the bitset to the desired initial value
 void std_bitset_set ( uint64_t* bitset, size_t idx );
 bool std_bitset_test ( const uint64_t* bitset, size_t idx );
@@ -205,5 +158,3 @@ bool std_bitset_scan_rev ( uint64_t* out_idx, const uint64_t* bitset, size_t sta
 
 bool std_bitset_set_atomic ( uint64_t* bitset, size_t idx );
 bool std_bitset_clear_atomic ( uint64_t* bitset, size_t idx );
-
-//#include <std_byte.inl>

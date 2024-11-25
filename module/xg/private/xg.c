@@ -26,13 +26,11 @@ static void xg_api_init ( xg_i* xg ) {
     xg->get_device_info = xg_vk_device_get_info;
     xg->activate_device = xg_vk_device_activate;
     xg->deactivate_device = xg_vk_device_deactivate;
-    //xg->map_alloc = xg_vk_device_map_alloc;
-    //xg->unmap_alloc = xg_vk_device_unmap_alloc;
     // Swapchain
     xg->create_window_swapchain = xg_vk_swapchain_create_window;
     xg->create_display_swapchain = NULL;
     xg->create_virtual_swapchain = NULL;
-    xg->acquire_next_swapchain_texture = xg_vk_swapchain_acquire_next_texture;
+    xg->acquire_swapchain = xg_vk_swapchain_acquire_next_texture;
     xg->get_swapchain_texture = xg_vk_swapchain_get_texture;
     xg->present_swapchain = xg_vk_swapchain_present;
     xg->resize_swapchain = xg_vk_swapchain_resize;
@@ -49,9 +47,6 @@ static void xg_api_init ( xg_i* xg ) {
     // Workload
     xg->create_workload = xg_workload_create;
     xg->create_cmd_buffer = xg_workload_add_cmd_buffer;
-    //xg->create_cmd_buffers = xg_cmd_buffer_open_n;
-    //xg.close_cmd_buffers = xg_cmd_buffer_close;
-    //xg.discard_cmd_buffers = xg_cmd_buffer_discard;
     xg->submit_workload = xg_workload_submit;
     xg->is_workload_complete = xg_workload_is_complete;
     xg->write_workload_uniform = xg_workload_write_uniform;
@@ -78,7 +73,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_copy_buffer = xg_cmd_buffer_copy_buffer;
     xg->cmd_copy_buffer_to_texture = xg_cmd_buffer_copy_buffer_to_texture;
     xg->cmd_set_pipeline_resources = xg_cmd_buffer_pipeline_resources_bind;
-    xg->cmd_set_pipeline_viewport = xg_cmd_buffer_graphics_pipeline_state_set_viewport;
+    xg->cmd_set_dynamic_viewport = xg_cmd_buffer_graphics_pipeline_state_set_viewport;
     //#if defined(std_platform_win32_m)
     xg->cmd_start_debug_capture = xg_cmd_buffer_start_debug_capture;
     xg->cmd_stop_debug_capture = xg_cmd_buffer_stop_debug_capture;
@@ -89,8 +84,6 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_end_renderpass = xg_cmd_buffer_graphics_renderpass_end;
     // Resource command buffer
     xg->create_resource_cmd_buffer = xg_workload_add_resource_cmd_buffer;
-    //xg->create_resource_cmd_buffers = xg_resource_cmd_buffer_open_n;
-    //xg.close_resource_cmd_buffers = xg_resource_cmd_buffer_close;
     xg->cmd_create_buffer = xg_resource_cmd_buffer_buffer_create;
     xg->cmd_create_texture = xg_resource_cmd_buffer_texture_create;
     xg->cmd_destroy_buffer = xg_resource_cmd_buffer_buffer_destroy;
@@ -104,7 +97,6 @@ static void xg_api_init ( xg_i* xg ) {
     xg->create_sampler = xg_sampler_create;
     xg->get_default_sampler = xg_sampler_get_default;
     // Allocator
-    //xg->get_default_allocator = xg_allocator_default;
     xg->get_allocator_info = xg_vk_allocator_get_info;
 
 #if xg_debug_enable_simple_frame_test_m

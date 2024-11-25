@@ -81,6 +81,11 @@
     - static private code
 */
 
+/*
+    TODO
+        handle properly separating linear and tiled resources, see https://asawicki.info/articles/memory_management_vulkan_direct3d_12.php5 "Proximity requirements"
+*/
+
 #include "xg_vk.h"
 
 #include <std_mutex.h>

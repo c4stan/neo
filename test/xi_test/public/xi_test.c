@@ -460,7 +460,7 @@ static void xi_test ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        //xg->acquire_next_swapchain_texture ( swapchain, workload );
+        //xg->acquire_swapchain ( swapchain, workload );
         //xg_texture_h xg_swapchain_texture = xg->get_swapchain_texture ( swapchain );
         //xf->bind_texture ( swapchain_texture, xg_swapchain_texture );
 

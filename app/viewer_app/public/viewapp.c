@@ -171,6 +171,8 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
     // TODO
     xg_format_e object_id_format = xg_format_r8g8b8a8_uint_m;
 
+    // TODO redo an object id pass here to remove dependency on the raster graph
+
     xg_texture_h readback_texture = xg->create_texture ( &xg_texture_params_m (
         .memory_type = xg_memory_type_readback_m,
         .device = device,
@@ -200,9 +202,9 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
         )
     ) );
 
-    xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    xf->build_graph ( graph, workload );
-    xg->submit_workload ( workload );
+    //xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    //xf->build_graph ( graph, workload );
+    //xg->submit_workload ( workload );
 }
 
 static void viewapp_boot_raytrace_graph ( void ) {
@@ -263,9 +265,9 @@ static void viewapp_boot_raytrace_graph ( void ) {
         )
     ) );
 
-    xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    xf->build_graph ( graph, workload );
-    xg->submit_workload ( workload );
+    //xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    //xf->build_graph ( graph, workload );
+    //xg->submit_workload ( workload );
 }
 
 static void viewapp_boot_raster_graph ( void ) {
@@ -848,9 +850,9 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    xf->build_graph ( graph, workload );
-    xg->submit_workload ( workload );
+    //xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    //xf->build_graph ( graph, workload );
+    //xg->submit_workload ( workload );
 }
 
 static void viewapp_build_raytrace_geo ( void ) {
@@ -1606,7 +1608,7 @@ static void viewapp_boot ( void ) {
             .padding_x = 10,
             .padding_y = 2,
             .style = xi_style_m (
-                .font = m_state->ui.font
+                .font = m_state->ui.font,
             )
         );
 
@@ -1781,6 +1783,42 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
     }
 }
 
+static void duplicate_selection ( void ) {
+    se_i* se = m_state->modules.se;
+
+    if ( m_state->ui.mouse_pick_entity == se_null_handle_m ) {
+        return;
+    }
+
+    viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
+
+    viewapp_mesh_component_t new_mesh = *mesh;
+    new_mesh.object_id = m_state->render.object_id++;
+    new_mesh.position[0] = 0;
+    new_mesh.position[1] = 0;
+    new_mesh.position[2] = 0;
+    new_mesh.orientation[0] = 0;
+    new_mesh.orientation[1] = 0;
+    new_mesh.orientation[2] = 1;
+    new_mesh.up[0] = 0;
+    new_mesh.up[1] = 1;
+    new_mesh.up[2] = 0;
+
+    se->create_entity( &se_entity_params_m (
+        .debug_name = "duplicate mesh", // TODO
+        .update = se_entity_update_m (
+            .component_count = 1,
+            .components = se_component_update_m (
+                .id = viewapp_mesh_component_id_m,
+                .stream_count = 1,
+                .streams = {
+                    se_stream_update_m ( .id = 0, .data = &new_mesh )
+                }
+            )
+        )
+    ) );
+}
+    
 static void mouse_pick ( uint32_t x, uint32_t y ) {
     xg_i* xg = m_state->modules.xg;
     xi_i* xi = m_state->modules.xi;
@@ -1983,6 +2021,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         if ( passthrough_nodes_count > 0 ) {
             if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
                 .text = "Disable all",
+                .width = 100,
                 .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
             ) ) ) {
                 xf_graph_info_t info;
@@ -1994,6 +2033,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             }
             if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
                 .text = "Enable all", 
+                .width = 100,
                 .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
             ) ) ) {
                 xf_graph_info_t info;
@@ -2149,14 +2189,23 @@ static std_app_state_e viewapp_update ( void ) {
 
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
         xs->rebuild_databases();
+        m_state->reload = true;
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
         return std_app_state_reload_m;
     }
 
+    if ( !input_state->keyboard[wm_keyboard_state_f5_m] && new_input_state.keyboard[wm_keyboard_state_f5_m] ) {
+        return std_app_state_reboot_m;
+    }
+
     if ( !input_state->keyboard[wm_keyboard_state_f3_m] && new_input_state.keyboard[wm_keyboard_state_f3_m] ) {
         m_state->render.capture_frame = true;
+    }
+
+    if ( !input_state->keyboard[wm_keyboard_state_f4_m] && new_input_state.keyboard[wm_keyboard_state_f4_m] ) {
+            duplicate_selection();
     }
 
     m_state->render.frame_id += 1;
@@ -2172,6 +2221,22 @@ static std_app_state_e viewapp_update ( void ) {
     m_state->render.input_state = new_input_state;
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
+
+    if ( m_state->reload ) {
+        std_log_info_m ( "asd" );
+
+        xf->destroy_graph ( m_state->render.raster_graph, workload );
+        xf->destroy_graph ( m_state->render.raytrace_graph, workload );
+        xf->destroy_graph ( m_state->render.mouse_pick_graph, workload );
+
+        viewapp_boot_raster_graph();
+        viewapp_boot_raytrace_graph();
+        viewapp_boot_mouse_pick_graph();
+
+        m_state->render.active_graph = m_state->render.raster_graph;
+
+        m_state->reload = false;
+    }
 
     uint64_t key = 0;
     key = xf->execute_graph ( m_state->render.active_graph, workload, key );
@@ -2199,6 +2264,7 @@ void* viewer_app_load ( void* runtime ) {
     viewapp_state_t* state = viewapp_state_alloc();
 
     state->api.tick = viewapp_tick;
+    state->reload = false;
 
     state->modules = ( viewapp_modules_state_t ) {
         .tk = std_module_load_m ( tk_module_name_m ),
@@ -2237,6 +2303,7 @@ void viewer_app_reload ( void* runtime, void* api ) {
 
     std_auto_m state = ( viewapp_state_t* ) api;
     state->api.tick = viewapp_tick;
+    state->reload = true;
     m_state = state;
 
     viewapp_state_bind ( state );

@@ -194,7 +194,7 @@ tk_fiber_context_t* tk_fiber_pop_context ( void );
 
 
 // ------------------------------------------------------------------------------------------------
-// Surface user API.
+// Surface API.
 
 void                tk_fiber_init ( void );
 

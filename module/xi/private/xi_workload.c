@@ -230,7 +230,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
         }
         xg->cmd_set_graphics_pipeline_state ( flush_params->cmd_buffer, pipeline_state, key );
 
-        xg->cmd_set_pipeline_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
+        xg->cmd_set_dynamic_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
 
         for ( uint32_t i = 0; i < workload->mesh_count; ++i ) {
             const xi_draw_mesh_t* mesh = &workload->mesh_array[i];
@@ -450,7 +450,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
         xg->cmd_set_vertex_streams ( flush_params->cmd_buffer, &ui_bindings, 1, key );
 
         // set viewport
-        xg->cmd_set_pipeline_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
+        xg->cmd_set_dynamic_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
 
         // TODO single draw call?
         // draw rects
@@ -488,7 +488,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                 scissor.height = xi_workload_state->scissor_array[rect->scissor].height;
             }
 
-            //xg->cmd_set_pipeline_scissor ( flush_params->cmd_buffer, &scissor, flush_params->key + rect->sort_order );
+            //xg->cmd_set_dynamic_scissor ( flush_params->cmd_buffer, &scissor, flush_params->key + rect->sort_order );
 
             xg->cmd_draw ( flush_params->cmd_buffer, 6, i * 6, key + rect->sort_order );
         }

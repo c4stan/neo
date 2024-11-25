@@ -1,3 +1,5 @@
+#pragma once
+
 #include <xf.h>
 
 #include <std_hash.h>
@@ -78,15 +80,20 @@ typedef struct xf_node_t {
 
 typedef struct {
     xg_device_h device;
-    //xf_node_t* nodes[xf_graph_max_nodes_m];
     xf_node_h nodes[xf_graph_max_nodes_m];
     size_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
     size_t nodes_count;
-    
+    bool dirty;
+
     xf_texture_h multi_textures_array[xf_graph_max_multi_textures_per_graph_m];
-    uint64_t multi_textures_count;
-    uint64_t multi_textures_hashes[xf_graph_max_multi_textures_per_graph_m];
-    std_hash_set_t multi_textures_hash_set;
+    uint32_t multi_textures_count;
+    //uint64_t multi_textures_hashes[xf_graph_max_multi_textures_per_graph_m];
+    //std_hash_set_t multi_textures_hash_set;
+
+    xf_texture_h textures_array[xf_graph_max_textures_per_graph_m];
+    xf_buffer_h buffers_array[xf_graph_max_buffers_per_graph_m];
+    uint32_t textures_count;
+    uint32_t buffers_count;
 } xf_graph_t;
 
 typedef struct {
@@ -107,7 +114,7 @@ void xf_graph_clear ( xf_graph_h graph );
 void xf_graph_build2 ( xf_graph_h graph, xg_workload_h xg_workload );
 uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );
 void xf_graph_advance_multi_textures ( xf_graph_h graph );
-void xf_graph_destroy ( xf_graph_h graph );
+void xf_graph_destroy ( xf_graph_h graph, xg_workload_h workload );
 
 void xf_graph_get_info ( xf_graph_info_t* info, xf_graph_h graph );
 void xf_graph_get_node_info ( xf_node_info_t* info, xf_node_h node );

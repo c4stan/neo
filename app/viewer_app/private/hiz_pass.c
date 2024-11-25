@@ -89,7 +89,7 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
         .width = pass_args->width,
         .height = pass_args->height,
     );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
+    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
 
     xg->cmd_draw ( cmd_buffer, 3, 0, key );
 }

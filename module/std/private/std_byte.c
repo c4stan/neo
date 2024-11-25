@@ -47,80 +47,8 @@ void std_mem_move ( void* dest, void* source, size_t size ) {
 }
 
 // ------------------------------------------------------------------------------------------------------
-// Bit set
+// Bit count
 // ------------------------------------------------------------------------------------------------------
-void std_bit_set_32 ( uint32_t* value, size_t bit ) {
-    *value |= 1u << bit;
-}
-
-void std_bit_set_64 ( uint64_t* value, uint64_t bit ) {
-    *value |= 1ull << bit;
-}
-
-void std_bit_toggle_32 ( uint32_t* value, size_t bit ) {
-    *value ^= 1u << bit;
-}
-
-void std_bit_toggle_64 ( uint64_t* value, size_t bit ) {
-    *value ^= 1ull << bit;
-}
-
-void std_bit_set_ls_32  ( uint32_t* value, size_t n ) {
-    *value |= ( uint32_t ) ~ ( ~0u << n );
-}
-
-void std_bit_set_ls_64 ( uint64_t* value, size_t n ) {
-    *value |= ( uint64_t ) ~ ( ~0ull << n );
-}
-
-void std_bit_set_ms_32 ( uint32_t* value, size_t n ) {
-    *value |= ( uint32_t ) ~ ( ~0u >> n );
-}
-
-void std_bit_set_ms_64 ( uint64_t* value, size_t n ) {
-    *value |= ( uint64_t ) ~ ( ~0ull >> n );
-}
-
-void std_bit_set_seq_64 ( uint64_t* value, size_t ls_offset, size_t n ) {
-    *value |= ( ~ ( ~0ull << n ) ) << ls_offset;
-}
-
-void std_bit_set_all_32 ( uint32_t* value ) {
-    *value = UINT32_MAX;
-}
-
-void std_bit_set_all_64 ( uint64_t* value ) {
-    *value = UINT64_MAX;
-}
-
-void std_bit_clear_32 ( uint32_t* value, size_t bit ) {
-    *value &= ~ ( 1u << bit );
-}
-
-void std_bit_clear_64 ( uint64_t* value, size_t bit ) {
-    *value &= ~ ( 1ull << bit );
-}
-
-void std_bit_clear_ls_64 ( uint64_t* value, size_t n ) {
-    *value &= ( ~0ull << n );
-}
-
-void std_bit_clear_ms_64 ( uint64_t* value, size_t n ) {
-    *value &= ( ~0ull >> n );
-}
-
-void std_bit_clear_ls_32 ( uint32_t* value, size_t n ) {
-    *value &= ( ~0u << n );
-}
-
-void std_bit_clear_ms_32 ( uint32_t* value, size_t n ) {
-    *value &= ( ~0u >> n );
-}
-
-void std_bit_clear_seq_64 ( uint64_t* value, size_t ls_offset, size_t n ) {
-    *value &= ( ( ( ~0ull << n ) << ls_offset ) | ( ~ ( ~0ull << ls_offset ) ) );
-}
-
 size_t std_bit_count_32 ( uint32_t value ) {
 #if defined(std_platform_win32_m)
     return __popcnt ( value );
@@ -137,82 +65,28 @@ size_t std_bit_count_64 ( uint64_t value ) {
 #endif
 }
 
-uint64_t std_bit_read_64 ( uint64_t value, size_t bit ) {
-    return ( value & ( 1ull << bit ) ) == 1ull << bit;
-}
-
-uint64_t std_bit_read_ls_64 ( uint64_t value, size_t n ) {
-    uint64_t mask = 0;
-    std_bit_set_ls_64 ( &mask, n );
-    return value & mask;
-}
-
-uint64_t std_bit_read_ms_64 ( uint64_t value, size_t n ) {
-    uint64_t mask = 0;
-    std_bit_set_ms_64 ( &mask, n );
-    return ( value & mask ) >> ( 64 - n );
-}
-
-uint64_t std_bit_read_seq_64 ( uint64_t value, size_t ls_offset, size_t n ) {
-    value = value >> ls_offset;
-    return std_bit_read_ls_64 ( value, n );
-}
-
-uint32_t std_bit_read_32 ( uint32_t value, size_t bit ) {
-    return ( value & ( 1 << bit ) ) == 1 << bit;
-}
-
-uint32_t std_bit_read_ls_32 ( uint32_t value, size_t n ) {
-    uint32_t mask = 0;
-    std_bit_set_ls_32 ( &mask, n );
-    return value & mask;
-}
-
-uint32_t std_bit_read_ms_32 ( uint32_t value, size_t n ) {
-    return value >> ( 32 - n );
-}
-
-uint32_t std_bit_read_seq_32 ( uint32_t value, size_t ls_offset, size_t n ) {
-    value = value >> ls_offset;
-    return std_bit_read_ls_32 ( value, n );
-}
-
-bool std_bit_test_64 ( uint64_t value, uint32_t bit ) {
-    return value & ( 1ull << bit );
-}
-
-void std_bit_write_32 ( uint32_t* value, size_t bit, uint32_t x ) {
-    std_bit_clear_32 ( value, bit );
-    *value |= ( x << bit );
-}
-
-void std_bit_write_64 ( uint64_t* value, size_t bit, uint64_t x ) {
-    std_bit_clear_64 ( value, bit );
-    *value |= ( x << bit );
-}
-
-void std_bit_write_ls_64 ( uint64_t* value, uint64_t write, size_t n ) {
-    std_bit_clear_ls_64 ( value, n );
-    uint64_t mask = 0;
-    std_bit_set_ls_64 ( &mask, n );
-    *value |= write & mask;
-}
-
-void std_bit_write_ms_64 ( uint64_t* value, uint64_t write, size_t n ) {
-    write = write << n;
-    std_bit_clear_ms_64 ( value, n );
-    *value |= write;
-}
-
-void std_bit_write_repeat_ls_64 ( uint64_t* value, uint64_t write, size_t n ) {
-    uint64_t bitset = write - 1;    // all 1s if value==0, all 0s if value==1
-    std_bit_write_ls_64 ( value, bitset, n );
-}
-
-void std_bit_write_repeat_ms_64 ( uint64_t* value, uint64_t write, size_t n ) {
-    uint64_t bitset = write - 1;    // all 1s if value==0, all 0s if value==1
-    std_bit_write_ms_64 ( value, bitset, n );
-}
+//void std_bit_write_ls_64 ( uint64_t* value, uint64_t write, size_t n ) {
+//    std_bit_clear_ls_64 ( value, n );
+//    uint64_t mask = 0;
+//    std_bit_set_ls_64 ( &mask, n );
+//    *value |= write & mask;
+//}
+//
+//void std_bit_write_ms_64 ( uint64_t* value, uint64_t write, size_t n ) {
+//    write = write << n;
+//    std_bit_clear_ms_64 ( value, n );
+//    *value |= write;
+//}
+//
+//void std_bit_write_repeat_ls_64 ( uint64_t* value, uint64_t write, size_t n ) {
+//    uint64_t bitset = write - 1;    // all 1s if value==0, all 0s if value==1
+//    std_bit_write_ls_64 ( value, bitset, n );
+//}
+//
+//void std_bit_write_repeat_ms_64 ( uint64_t* value, uint64_t write, size_t n ) {
+//    uint64_t bitset = write - 1;    // all 1s if value==0, all 0s if value==1
+//    std_bit_write_ms_64 ( value, bitset, n );
+//}
 
 // ------------------------------------------------------------------------------------------------------
 // Bit scan
@@ -503,8 +377,9 @@ uint64_t std_ring_distance_u64 ( uint64_t a, uint64_t b, uint64_t ring_size ) {
 
 #endif
 
+// ------------------------------------------------------------------------------------------------------
 // Bitset
-// TODO use 32 bit blocks?
+// ------------------------------------------------------------------------------------------------------
 bool std_bitset_test ( const uint64_t* blocks, size_t idx ) {
     uint64_t block_idx = idx >> 6;
     uint64_t bit_idx = idx & 0x3f; // 63, 2^6 - 1
@@ -554,7 +429,7 @@ bool std_bitset_scan ( uint64_t* result_bit_idx, const uint64_t* blocks, size_t 
     uint64_t bit_idx = starting_bit_idx & 0x3f;
 
     uint64_t block = blocks[block_idx];
-    std_bit_clear_ls_64 ( &block, bit_idx );
+    block = std_bit_clear_ls_64_m ( block, bit_idx );
 
     for ( ;; ) {
 
@@ -581,7 +456,7 @@ bool std_bitset_scan_rev ( uint64_t* result_bit_idx, const uint64_t* blocks, siz
     uint64_t bit_idx = starting_bit_idx & 0x3f;
 
     uint64_t block = blocks[block_idx];
-    std_bit_clear_ms_64 ( &block, 63 - bit_idx );
+    block = std_bit_clear_ms_64_m ( block, 63 - bit_idx );
 
     for ( ;; ) {
 

@@ -436,7 +436,7 @@ static void run_se_test_2 ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        //xg->acquire_next_swapchain_texture ( swapchain, workload );
+        //xg->acquire_swapchain ( swapchain, workload );
 
         xf->execute_graph ( graph, workload, 0 );
         xg->submit_workload ( workload );

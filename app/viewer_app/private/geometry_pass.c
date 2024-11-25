@@ -50,7 +50,7 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
         .width = pass_args->width,
         .height = pass_args->height,
     );
-    xg->cmd_set_pipeline_viewport ( cmd_buffer, &viewport, key );
+    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
 
     se_i* se = std_module_get_m ( se_module_name_m );
 

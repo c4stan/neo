@@ -84,7 +84,7 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
             .width = 1024,
             .height = 1024,
         );
-        xg->cmd_set_pipeline_viewport ( node_args->cmd_buffer, &viewport, key );
+        xg->cmd_set_dynamic_viewport ( node_args->cmd_buffer, &viewport, key );
 
         se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
         uint64_t mesh_count = mesh_query_result.entity_count;
