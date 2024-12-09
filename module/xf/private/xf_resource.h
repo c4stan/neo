@@ -16,25 +16,6 @@
         permanent resources are kept alive, next frame it won't be necessary to recreate, just grab the already existing one
 */
 
-/*
-    TODO support for multi textures (to support history on prev frame textures, and be able to track state for all swapchain textures)
-*/
-
-// Stores what kind of access the graph nodes do on a (sub) resource
-// Filled when adding nodes to a graph and never updated after
-typedef struct {
-    xf_node_h writers[xf_resource_max_writers_m];
-    xf_node_h readers[xf_resource_max_readers_m];
-    size_t readers_count;
-    size_t writers_count;
-} xf_resource_dependencies_t;
-
-#define xf_resource_dependencies_m( ... ) ( xf_resource_dependencies_t ) { \
-    .readers_count = 0, \
-    .writers_count = 0, \
-    ##__VA_ARGS__ \
-}
-
 // Keeps track of the state of a (sub) resource
 // Updated during graph execution whenever a new memory barrier is queued up for the resource
 typedef struct {
@@ -100,12 +81,6 @@ typedef struct {
     xf_texture_params_t params;
 
     union {
-        xf_resource_dependencies_t shared;
-        xf_resource_dependencies_t mips[16]; // TODO make storage external?
-        // TODO external hash table to support dynamic view access
-    } deps;
-
-    union {
         xf_texture_execution_state_t shared;
         xf_texture_execution_state_t mips[16]; // TODO make storage external?
         // TODO external hash table to support dynamic view access
@@ -123,7 +98,6 @@ typedef struct {
     .required_usage = xg_texture_usage_bit_none_m, \
     .allowed_usage = xg_texture_usage_bit_none_m, \
     .params = xf_texture_params_m(), \
-    .deps.shared = xf_resource_dependencies_m(), \
     .state.shared = xf_texture_execution_state_m(), \
     .graph_refs_count = 0, \
     .alias = xf_null_handle_m, \
@@ -133,7 +107,6 @@ typedef struct {
 typedef struct {
     xg_buffer_h xg_handle;
     xf_buffer_execution_state_t state;
-    xf_resource_dependencies_t deps;
     xg_buffer_usage_bit_e required_usage;
     xg_buffer_usage_bit_e allowed_usage;
     xf_buffer_params_t params;
@@ -145,7 +118,6 @@ typedef struct {
 #define xf_buffer_m( ... ) ( xf_buffer_t ) { \
     .xg_handle = xg_null_handle_m, \
     .state = xf_buffer_execution_state_m(), \
-    .deps = xf_resource_dependencies_m(), \
     .required_usage = xg_buffer_usage_bit_none_m, \
     .allowed_usage = xg_buffer_usage_bit_none_m, \
     .params = xf_buffer_params_m(), \
@@ -199,11 +171,6 @@ void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture );
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer );
-
-// t is used as space to store the result when the texture has per-mip dependencies.
-// in that case the dependencies get accumulated on t and a pointer to t is returned.
-// t is expected to be initialized when passed in. it is acceptable for it to be non-empty.
-const xf_resource_dependencies_t* xf_resource_texture_get_deps ( xf_texture_h texture, xg_texture_view_t view, xf_resource_dependencies_t* t );
 
 void xf_resource_texture_map_to_new ( xf_texture_h texture, xg_texture_h xg_handle, xg_texture_usage_bit_e allowed_usage );
 void xf_resource_buffer_map_to_new ( xf_buffer_h buffer, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage );

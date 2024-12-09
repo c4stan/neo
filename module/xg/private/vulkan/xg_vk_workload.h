@@ -57,26 +57,23 @@ typedef struct {
 
 typedef struct {
     VkCommandPool vk_cmd_pool;
-    VkCommandBuffer vk_cmd_buffers[xg_vk_cmd_buffer_cmd_buffers_per_allocator_m];
+    VkCommandBuffer vk_cmd_buffers[xg_vk_workload_cmd_buffers_per_allocator_m];
     size_t cmd_buffers_count;
 } xg_vk_cmd_allocator_t;
-
-#define xg_vk_max_total_descriptors_per_pool_m ( \
-      xg_vk_max_samplers_per_descriptor_pool_m \
-    + xg_vk_max_sampled_texture_per_descriptor_pool_m \
-    + xg_vk_max_storage_texture_per_descriptor_pool_m \
-    + xg_vk_max_uniform_buffer_per_descriptor_pool_m \
-    + xg_vk_max_storage_buffer_per_descriptor_pool_m \
-    + xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m \
-    + xg_vk_max_storage_texel_buffer_per_descriptor_pool_m \
-    + xg_vk_max_raytrace_world_per_descriptor_pool_m \
-)
 
 typedef struct {
     VkDescriptorPool vk_desc_pool;
     uint32_t set_count;
     int32_t descriptor_counts[xg_resource_binding_count_m];
 } xg_vk_desc_allocator_t;
+
+typedef struct {
+    uint32_t cmd_idx_begin;
+    uint32_t cmd_idx_end;
+    xg_cmd_queue_e queue;
+    VkCommandBuffer cmd_buffers[xg_vk_workload_cmd_buffers_per_allocator_m]; // TODO support multiple allocators per workload? if so this should be max_cmd_buffers_per_workload_m
+    uint32_t cmd_buffers_count;
+} xg_vk_workload_cmd_chunk_t;
 
 typedef struct {
     xg_workload_h workload;

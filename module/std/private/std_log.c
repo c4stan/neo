@@ -279,7 +279,7 @@ void std_log_os_error ( std_log_scope_t scope ) {
 
     std_stack_string_append ( &stack, "OS-" );
     char code_string[32];
-    std_u32_to_str ( error_code, code_string, 32 );
+    std_u32_to_str ( code_string, 32, error_code, 0 );
     std_stack_string_append ( &stack, code_string );
     std_stack_string_append ( &stack, ": " );
 
@@ -296,7 +296,7 @@ void std_log_os_error ( std_log_scope_t scope ) {
 
     std_stack_string_append ( &stack, "OS-" );
     char code_string[32];
-    std_u32_to_str ( error_code, code_string, 32 );
+    std_u32_to_str ( code_string, 32, error_code, 0 );
     std_stack_string_append ( &stack, code_string );
     std_stack_string_append ( &stack, ": " );
 

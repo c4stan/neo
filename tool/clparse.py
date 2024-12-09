@@ -104,6 +104,7 @@ def print_help():
     print('\t' + Color.OKGREEN + 'gitstatus' + Color.OKBLUE + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
     print('\t' + Color.OKGREEN + 'recover' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to open the last submitted version of the file')
+    print('\t' + Color.OKGREEN + 'killeditor' + Color.ENDC + ' to kill the text editor process')
     print('')
 
 def format_title_string(words):
@@ -229,6 +230,13 @@ def open_workspace(name):
     if platform.system() == 'Windows':
         # Bring the new window to focus
         win32gui.EnumWindows(enum_window_callback, None)
+
+def kill_editor():
+    if platform.system() == 'Windows':
+        os.system('taskkill /f /im ' + get_binding('text_editor_process'))
+    elif platform.system() == 'Linux':
+        # TODO
+        skip
 
 def makegen_workspace(name, flags):
     build_flags = makegen.BUILD_FLAG_NONE
@@ -746,6 +754,8 @@ def parse(string):
         fixup_debug_app(tokens[1], tokens[2:])
     elif cmd == 'recover':
         show_committed_version(tokens[1], tokens[2])
+    elif cmd == 'killeditor':
+        kill_editor()
     elif cmd == '':
         pass
     else:

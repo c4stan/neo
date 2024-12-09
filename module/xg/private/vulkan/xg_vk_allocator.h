@@ -91,7 +91,7 @@
 #include <std_mutex.h>
 #include <std_queue.h>
 
-typedef struct xg_vk_allocator_tlsf_segment_t {
+typedef struct {
     uint64_t offset;
     uint64_t size;
     bool free;

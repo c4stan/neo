@@ -633,6 +633,34 @@ bool std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload 
     return false;
 }
 
+bool std_hash_map_try_insert ( uint64_t* out_payload, std_hash_map_t* map, uint64_t hash, uint64_t payload ) {
+    // Load
+    size_t      mask = map->mask;
+    uint64_t*   hashes = map->hashes;
+    uint64_t*   payloads = map->payloads;
+
+    // Compute idx
+    size_t      idx = hash & mask;
+
+    // Try insert until success (linear probing)
+    for ( size_t i = 0; i < mask + 1; ++i ) {
+        if ( hashes[idx] == UINT64_MAX ) {
+            hashes[idx] = hash;
+            payloads[idx] = payload;
+            ++map->count;
+            return true;
+        } else if ( hashes[idx] == hash ) {
+            *out_payload = payloads[idx];
+            return false;
+        }
+
+        idx = ( idx + 1 ) & mask;
+    }
+
+    std_log_error_m ( "hash map is full!" );
+    return false;
+}
+
 bool std_hash_map_insert_shared ( std_hash_map_t* map, uint64_t hash, uint64_t payload ) {
     // Load
     size_t      mask = map->mask;

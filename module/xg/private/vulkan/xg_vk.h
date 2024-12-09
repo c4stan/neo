@@ -218,6 +218,7 @@ Vulkan
         When creating a framebuffer or a graphics pipeline a render pass is provided. That framebuffer and that pipeline can only be bound when inside that render pass, or
         when inside one compatible with it. Two render passes are compatible when all their attachments have matching format and sample count. Image layouts and load/store ops
         can differ.
+        When binding a compute or raytrace(?) pipeline on the other hand, no render pass must be active. 
         https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/vkspec.html#renderpass-compatibility
 
     Queries

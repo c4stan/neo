@@ -89,6 +89,7 @@ typedef struct {
 // Clears keys, doesn't touch values
 std_hash_map_t      std_hash_map ( uint64_t* keys, uint64_t* values, size_t capacity );
 bool                std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload );
+bool                std_hash_map_try_insert ( uint64_t* out_payload, std_hash_map_t* map, uint64_t hash, uint64_t payload ); // Returns false and writes out payload if already present
 bool                std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ); // TODO rename std_hash_map_remove_hash
 uint64_t*           std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ); // TODO split into _edit (returns u64 ptr) and _get(?) (returns u64 value)
 bool                std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t* payload );

@@ -60,7 +60,7 @@ std_module_export_m void xf_unload ( void );
 typedef uint64_t xf_resource_h;
 typedef uint64_t xf_texture_h;
 typedef uint64_t xf_buffer_h;
-typedef uint64_t xf_node_h;
+typedef uint64_t xf_node_h; // TODO u32?
 typedef uint64_t xf_graph_h;
 
 #define xf_null_handle_m UINT64_MAX
@@ -397,9 +397,12 @@ typedef struct {
     char debug_name[xf_debug_name_size_m];
     uint32_t debug_color;
     xf_node_type_e type;
+    xg_cmd_queue_e queue;
     xf_node_pass_params_t pass;
     xf_node_resource_params_t resources;
     xf_node_passthrough_params_t passthrough;
+    xf_node_h node_dependencies[xf_graph_max_nodes_m];
+    uint32_t node_dependencies_count;
 } xf_node_params_t;
 
 #define xf_node_params_m( ... ) ( xf_node_params_t ) { \
@@ -408,7 +411,9 @@ typedef struct {
     .resources = xf_node_resource_params_m(), \
     .passthrough = xf_node_passthrough_params_m(), \
     .type = xf_node_type_custom_pass_m, \
+    .queue = xg_cmd_queue_graphics_m, \
     .pass.custom = xf_node_custom_pass_params_m(), \
+    .node_dependencies_count = 0, \
     ##__VA_ARGS__ \
 }
 
@@ -498,13 +503,14 @@ typedef struct {
     xg_texture_dimension_e dimension;
     xg_format_e format;
     xg_sample_count_e sample_count;
-    bool allows_aliasing;
+    xg_texture_view_access_e view_access;
+    bool allow_aliasing;
     const char* debug_name;
 } xf_texture_info_t;
 
 typedef struct {
     uint64_t size;
-    bool allows_aliasing;
+    bool allow_aliasing;
     const char* debug_name;
 } xf_buffer_info_t;
 
@@ -521,21 +527,34 @@ typedef struct {
 } xf_node_info_t;
 
 typedef struct {
+    xg_device_h device;
+    bool sort;
+    char debug_name[xf_debug_name_size_m];
+} xf_graph_params_t;
+
+#define xf_graph_params_m( ... ) ( xf_graph_params_t ) { \
+    .device = xg_null_handle_m, \
+    .sort = true, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xf_texture_h ( *declare_texture ) ( const xf_texture_params_t* params );
     xf_buffer_h ( *declare_buffer ) ( const xf_buffer_params_t* params );
     xf_texture_h ( *declare_multi_texture ) ( const xf_multi_texture_params_t* params );
     //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
 
-    xf_graph_h ( *create_graph ) ( xg_device_h device );
+    xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
     xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
     void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
-    void ( *disable_node ) ( xf_node_h node );
-    void ( *enable_node ) ( xf_node_h node );
-    void ( *node_set_enabled ) ( xf_node_h node, bool enabled );
+    void ( *disable_node ) ( xf_graph_h graph, xf_node_h node );
+    void ( *enable_node ) ( xf_graph_h graph, xf_node_h node );
+    void ( *node_set_enabled ) ( xf_graph_h graph, xf_node_h node, bool enabled );
 
     void ( *advance_multi_texture ) ( xf_texture_h multi_texture );
     //void ( *advance_multi_buffer ) ( xf_multi_buffer_h multi_buffer );
@@ -548,7 +567,7 @@ typedef struct {
 
     void ( *get_texture_info ) ( xf_texture_info_t* info, xf_texture_h texture );
     void ( *get_graph_info ) ( xf_graph_info_t* info, xf_graph_h graph );
-    void ( *get_node_info ) ( xf_node_info_t* info, xf_node_h node );
+    void ( *get_node_info ) ( xf_node_info_t* info, xf_graph_h graph, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
 } xf_i;

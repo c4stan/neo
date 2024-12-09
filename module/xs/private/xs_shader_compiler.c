@@ -106,7 +106,7 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
                 std_stack_string_copy ( &stack, "-D" );
                 std_stack_string_append ( &stack, params->global_definitions[i].name );
                 std_stack_string_append ( &stack, "=" );
-                size_t len = std_u32_to_str ( params->global_definitions[i].value, u32_buffer, 32 );
+                size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );
                 std_assert_m ( len > 0 && len < 32 );
                 std_stack_string_append ( &stack, u32_buffer );
             }
@@ -116,7 +116,7 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
                 std_stack_string_copy ( &stack, "-D" );
                 std_stack_string_append ( &stack, params->global_definitions[i].name );
                 std_stack_string_append ( &stack, "=" );
-                size_t len = std_u32_to_str ( params->global_definitions[i].value, u32_buffer, 32 );
+                size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );
                 std_assert_m ( len > 0 && len < 32 );
                 std_stack_string_append ( &stack, u32_buffer );
             }

@@ -438,7 +438,7 @@ void xg_vk_workload_add_timestamp_query_pool ( xg_workload_h workload_handle, xg
         merge sort
             simple merge sort on the cmd headers, drag along the args? or not? could be parallelized easily
         chunk
-            scan the merged buffer for 1ry and 2rt segments. 1ry: pso changes, 2ry: rendertarget changes. hard to parallelize, might require
+            scan the merged buffer for 1ry and 2rt segments. maybe 1ry: renderpass changes, 2ry: pso changes. hard to parallelize, might require
             the merge sort step to look for cmds that marg the beginning of a 1ry/2ry buffer and pass that info along
         translate
             translate each chunk individually into native cmd buffers. easy to parallelize. 1ry buffers dispatch tasks for the translation
@@ -447,6 +447,70 @@ void xg_vk_workload_add_timestamp_query_pool ( xg_workload_h workload_handle, xg
             simple step where all native buffers are submitted to the cmd queue. can't be parallelized, need to enforce order in the queue
 
 */
+
+typedef struct {
+    xg_cmd_header_t* cmd_headers;
+    size_t count;
+} xg_vk_workload_cmd_sort_result_t;
+
+static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_workload_h workload_handle ) {
+    const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
+    const xg_cmd_buffer_t* cmd_buffers[xg_cmd_buffer_max_cmd_buffers_per_workload_m];
+    std_assert_m ( workload->cmd_buffers_count < xg_cmd_buffer_max_cmd_buffers_per_workload_m );
+    uint64_t total_header_size = 0;
+
+    for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {
+        const xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->cmd_buffers[i] );
+        cmd_buffers[i] = cmd_buffer;
+        total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+    }
+
+    size_t total_header_count = total_header_size / sizeof ( xg_cmd_header_t );
+
+    // TODO avoid this alloc?
+    xg_cmd_header_t* cmd_headers = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
+    xg_cmd_header_t* cmd_headers_temp = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
+
+    xg_cmd_buffer_sort_n ( cmd_headers, cmd_headers_temp, total_header_count, cmd_buffers, workload->cmd_buffers_count );
+
+    std_virtual_heap_free ( cmd_headers_temp );
+
+    xg_vk_workload_cmd_sort_result_t result;
+    result.cmd_headers = cmd_headers;
+    result.count = total_header_count;
+    return result;
+}
+
+static void xg_vk_workload_sort_result_destroy ( xg_vk_workload_cmd_sort_result_t result ) {
+    std_virtual_heap_free ( result.cmd_headers );
+}
+
+typedef struct {
+    xg_vk_workload_cmd_chunk_t* chunks;
+    uint32_t count;
+} xg_vk_workload_cmd_chunk_result_t;
+
+std_unused_static_m()
+static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_workload_h workload_handle, const xg_cmd_header_t* cmd_headers, uint32_t cmd_count ) {
+    const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
+
+    std_unused_m ( workload );
+
+    xg_vk_workload_cmd_chunk_result_t result = {};
+    return result;
+#if 0
+    for ( uint32_t i = 0; i < cmd_count; ++i ) {
+        xg_cmd_header_t* header = &cmd_headers[i];
+
+        switch ( header->type ) {
+        case xg_cmd_graphics_streams_bind_m:
+        case xg_cmd_graphics_pipeline_state_bind_m:
+        case xg_cmd_graphics_render_textures_bind_m:
+        }        
+    }
+#endif
+    // TODO
+}
 
 typedef struct {
     bool debug_capture_stop_on_workload_submit;
@@ -652,6 +716,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
                     break;
 
                 case xg_pipeline_raytrace_m:
+                    // TODO terminate current render pass?
                     vk_pipeline_type = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
                     break;
             }
@@ -1026,7 +1091,6 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
 
     state->pipeline_type_change = false;
 }
-
 
 static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* result, xg_vk_workload_submit_context_t* context, xg_device_h device_handle ) {
     VkCommandBuffer vk_cmd_buffer = context->cmd_allocator.vk_cmd_buffers[0]; // TODO
@@ -1650,8 +1714,8 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 char* base = ( char* ) ( args + 1 );
 
 #if xg_vk_enable_sync2_m
-                VkImageMemoryBarrier2KHR vk_texture_barriers[xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m];
-                VkBufferMemoryBarrier2KHR vk_buffer_barriers[xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m];
+                VkImageMemoryBarrier2KHR vk_texture_barriers[xg_vk_workload_max_texture_barriers_per_cmd_m];
+                VkBufferMemoryBarrier2KHR vk_buffer_barriers[xg_vk_workload_max_texture_barriers_per_cmd_m];
 
                 if ( args->memory_barriers > 0 ) {
                     std_not_implemented_m();
@@ -1761,7 +1825,7 @@ static void xg_vk_submit_context_translate ( xg_vk_cmd_translate_result_t* resul
                 // --- !! WARNING !! ---
                 // Support for non-sync2 (sync1?) devices is very poor
                 // The code below assumes that all barriers in a set share the same srcStage and dstStage
-                VkImageMemoryBarrier vk_texture_barriers[xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m];
+                VkImageMemoryBarrier vk_texture_barriers[xg_vk_workload_max_texture_barriers_per_cmd_m];
 
                 VkImageSubresourceRange range;
                 range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -2537,43 +2601,6 @@ static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_c
 #endif
 }
 
-typedef struct {
-    xg_cmd_header_t* cmd_headers;
-    size_t count;
-} xg_vk_workload_cmd_sort_result_t;
-
-// TODO
-static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_workload_h workload_handle ) {
-    const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
-    const xg_cmd_buffer_t* cmd_buffers[xg_cmd_buffer_max_cmd_buffers_per_workload_m];
-    std_assert_m ( workload->cmd_buffers_count < xg_cmd_buffer_max_cmd_buffers_per_workload_m );
-    uint64_t total_header_size = 0;
-
-    for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {
-        const xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->cmd_buffers[i] );
-        cmd_buffers[i] = cmd_buffer;
-        total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
-    }
-
-    size_t total_header_count = total_header_size / sizeof ( xg_cmd_header_t );
-
-    xg_cmd_header_t* cmd_headers = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
-    xg_cmd_header_t* cmd_headers_temp = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
-
-    xg_cmd_buffer_sort_n ( cmd_headers, cmd_headers_temp, total_header_count, cmd_buffers, workload->cmd_buffers_count );
-
-    std_virtual_heap_free ( cmd_headers_temp );
-
-    xg_vk_workload_cmd_sort_result_t result;
-    result.cmd_headers = cmd_headers;
-    result.count = total_header_count;
-    return result;
-}
-
-static void xg_vk_workload_sort_result_destroy ( xg_vk_workload_cmd_sort_result_t result ) {
-    std_virtual_heap_free ( result.cmd_headers );
-}
-
 xg_vk_workload_submit_context_t* xg_vk_workload_submit_context_create ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
 
@@ -2691,20 +2718,13 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
 
     submit_context->workload = workload_handle;
 
-    // TODO merge
-
-    // sort
+    // merge & sort
+    // TODO split merge from sort
     xg_vk_workload_cmd_sort_result_t sort_result = xg_vk_workload_sort_cmd_buffers ( workload_handle );
 
     // TODO chunk?
+    //xg_vk_workload_cmd_chunk_result_t chunk_result = xg_vk_workload_chunk_cmd_headers ( sort_result.cmd_headers, sort_result.count );
 
-    // TODO
-    // merge/sort/chunk/translate ideally will happen in async from the caller on multiple threads
-    // but the caller might want the guarantee that resources have been allocated on return to be able to memmap
-    // unsure of what's the best solution
-    // - provide one CREATE_TIME for immediate and one for post merge/sort/chunk (not translate)
-    // - always run resource creation as immediate
-    // - don't allow direct memmap to the user, instead pass along the init data and fill the buffer after alloc, and do something similar(?) for update/readback memmap cases
     xg_vk_workload_create_resources ( workload_handle );
     xg_vk_workload_update_resource_groups ( workload_handle );
     xg_vk_workload_destroy_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_start_m );

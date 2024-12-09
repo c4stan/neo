@@ -182,11 +182,11 @@ bool        std_stack_align_zero ( std_stack_t* buffer, size_t align );
 void*       std_stack_alloc_align ( std_stack_t* buffer, size_t size, size_t align );
 void*       std_stack_write_align ( std_stack_t* buffer, const void* data, size_t size, size_t align );
 void        std_stack_clear ( std_stack_t* buffer );
-char*       std_stack_string_copy ( std_stack_t* buffer, const char* std );
-char*       std_stack_string_append ( std_stack_t* buffer, const char* std );
+char*       std_stack_string_copy ( std_stack_t* buffer, const char* str );
+char*       std_stack_string_append ( std_stack_t* buffer, const char* str );
 char*       std_stack_string_append_char ( std_stack_t* stack, char c );
 void        std_stack_string_pop ( std_stack_t* stack );
-void        std_stack_free ( std_stack_t* buffer, size_t size );
+void        std_stack_free ( std_stack_t* stack, size_t size );
 void        std_stack_clone ( std_stack_t* from, std_stack_t* to );
 
 #define std_static_stack_m( array ) std_stack ( array, sizeof ( array ) )

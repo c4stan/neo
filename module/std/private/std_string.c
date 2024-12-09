@@ -168,12 +168,22 @@ size_t std_str_format_valist ( char* dest, size_t cap, const char* src, va_list 
     return ( size_t ) result;
 }
 
-size_t std_u32_to_str ( uint32_t u32, char* str, size_t size ) {
-    int len = snprintf ( str, size, "%u", u32 );
-    return len < 0 ? SIZE_MAX : ( size_t ) len;
+size_t std_u32_to_str ( char* str, size_t size, uint32_t u32, uint32_t pad ) {
+    int len = snprintf ( NULL, 0, "%u", u32 );
+    if ( len >= size ) {
+        return SIZE_MAX;
+    }
+    if ( pad < len ) {
+        pad = len;
+    }
+
+    std_mem_set ( str, len, ' ' );
+    str[len] = '\0';    
+    snprintf ( str + pad - len, size, "%u", u32 );
+    return ( size_t ) len;
 }
 
-size_t std_u64_to_str ( uint64_t u64, char* str, size_t size ) {
+size_t std_u64_to_str ( char* str, size_t size, uint64_t u64 ) {
     int len = snprintf ( str, size, "%llu", ( unsigned long long ) u64 );
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }

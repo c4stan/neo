@@ -1544,6 +1544,13 @@ typedef struct {
 typedef uint64_t xg_workload_h;
 #define xg_workload_null_m UINT64_MAX;
 
+typedef enum {
+    xg_cmd_queue_graphics_m,
+    xg_cmd_queue_compute_m,
+    xg_cmd_queue_copy_m,
+    xg_cmd_queue_count_m,
+} xg_cmd_queue_e;
+
 typedef struct {
     xg_buffer_h buffer;
     uint32_t stream_id;

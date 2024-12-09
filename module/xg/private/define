@@ -61,15 +61,9 @@ xg_vk_max_linear_allocators_m                   32
 xg_vk_raytrace_max_geometries_m                 32
 xg_vk_raytrace_max_worlds_m                     4
 
-# cmd buffer management
-xg_vk_cmd_buffer_cmd_buffers_per_allocator_m        4
-xg_vk_cmd_buffer_max_execution_barriers_per_cmd_m   8
-xg_vk_cmd_buffer_max_memory_barriers_per_cmd_m      8
-xg_vk_cmd_buffer_max_buffer_barriers_per_cmd_m      16
-xg_vk_cmd_buffer_max_texture_barriers_per_cmd_m     16
-
+# workload management
 xg_vk_workload_max_cmd_allocators_m                 16
-xg_vk_workload_cmd_buffers_per_allocator_m          4
+xg_vk_workload_cmd_buffers_per_allocator_m          16
 xg_vk_workload_max_desc_allocators_m                16
 xg_vk_workload_max_framebuffers_per_workload_m      4
 xg_vk_workload_max_fences_m                         16

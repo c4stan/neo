@@ -130,7 +130,7 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 
     // if TAA is off disable jittering
     xf_node_info_t taa_node_info;
-    xf->get_node_info ( &taa_node_info, m_state->render.taa_node );
+    xf->get_node_info ( &taa_node_info, m_state->render.raster_graph,  m_state->render.taa_node );
     if ( !taa_node_info.enabled ) {
         view_data.jittered_proj_from_view = view_info.proj_matrix;
     }
@@ -165,7 +165,10 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
     xs_i* xs = m_state->modules.xs;
     xf_i* xf = m_state->modules.xf;
 
-    xf_graph_h graph = xf->create_graph ( device );
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
+        .device = device,
+        .debug_name = "mouse_pick_graph"
+    ) );
     m_state->render.mouse_pick_graph = graph;
 
     // TODO
@@ -217,7 +220,10 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xs_i* xs = m_state->modules.xs;
     xf_i* xf = m_state->modules.xf;
 
-    xf_graph_h graph = xf->create_graph ( device );
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
+        .device = device,
+        .debug_name = "raytrace_graph"
+    ) );
     m_state->render.raytrace_graph = graph;
 
     // frame setup
@@ -280,7 +286,11 @@ static void viewapp_boot_raster_graph ( void ) {
     xs_i* xs = m_state->modules.xs;
     xf_i* xf = m_state->modules.xf;
 
-    xf_graph_h graph = xf->create_graph ( device );
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
+        .device = device,
+        .debug_name = "raster_graph",
+        .sort = true
+    ) );
     m_state->render.raster_graph = graph;
 
     // frame setup
@@ -324,7 +334,9 @@ static void viewapp_boot_raster_graph ( void ) {
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = view_setup_pass,
-        )
+        ),
+        .node_dependencies_count = 1,
+        .node_dependencies = { frame_setup_node }
     ) );
 
     // gbuffer laydown
@@ -386,7 +398,9 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_copy_texture_dependency_m ( .texture = object_id_texture ),
                 xf_copy_texture_dependency_m ( .texture = depth_stencil_texture ),
             }
-        )
+        ),
+        .node_dependencies_count = 1,
+        .node_dependencies = { view_setup_node }
     ) );
 
     xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );
@@ -444,7 +458,9 @@ static void viewapp_boot_raster_graph ( void ) {
             .storage_buffer_writes = {
                 xf_compute_buffer_dependency_m ( .buffer = light_cluster_buffer )
             }
-        )
+        ),
+        .node_dependencies_count = 2,
+        .node_dependencies = { view_setup_node, light_update_node }
     ) );
 
     xf_node_h light_cull_node = xf->add_node ( graph, &xf_node_params_m ( 
@@ -514,7 +530,9 @@ static void viewapp_boot_raster_graph ( void ) {
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
             .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color_texture ) },
-        )
+        ),
+        .node_dependencies_count = 1,
+        .node_dependencies = { view_setup_node },
     ) );
 
     // hi-z
@@ -1662,7 +1680,7 @@ static void viewapp_boot ( void ) {
     m_state->render.active_graph = m_state->render.raster_graph;
     
     xf_i* xf = m_state->modules.xf;
-    xf->debug_print_graph ( m_state->render.active_graph );
+    //xf->debug_print_graph ( m_state->render.active_graph );
 }
 
 static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
@@ -1894,7 +1912,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     {
         xi_label_state_t frame_id_label = xi_label_state_m ( .text = "frame id:" );
         xi_label_state_t frame_id_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
-        std_u32_to_str ( m_state->render.frame_id, frame_id_value.text, xi_label_text_size );
+        std_u32_to_str ( frame_id_value.text, xi_label_text_size, m_state->render.frame_id, 0 );
         xi->add_label ( xi_workload, &frame_id_label );
         xi->add_label ( xi_workload, &frame_id_value );
         xi->newline();
@@ -1988,7 +2006,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
             xf_node_info_t node_info;
-            xf->get_node_info ( &node_info, graph_info.nodes[i] );
+            xf->get_node_info ( &node_info, m_state->render.active_graph, graph_info.nodes[i] );
 
             if ( node_info.passthrough ) {
                 ++passthrough_nodes_count;
@@ -2011,7 +2029,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 xi->newline();
 
                 if ( node_switch.value != node_enabled ) {
-                    xf->node_set_enabled ( graph_info.nodes[i], node_switch.value );
+                    xf->node_set_enabled ( m_state->render.active_graph, graph_info.nodes[i], node_switch.value );
                 }
             }
         }
@@ -2028,7 +2046,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 xf->get_graph_info ( &info, m_state->render.active_graph );
 
                 for ( uint32_t i = 0; i < info.node_count; ++i ) {
-                    xf->disable_node ( info.nodes[i] );
+                    xf->disable_node ( m_state->render.active_graph, info.nodes[i] );
                 }
             }
             if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
@@ -2040,7 +2058,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 xf->get_graph_info ( &info, m_state->render.active_graph );
 
                 for ( uint32_t i = 0; i < info.node_count; ++i ) {
-                    xf->enable_node ( info.nodes[i] );
+                    xf->enable_node ( m_state->render.active_graph, info.nodes[i] );
                 }
             }
         }

@@ -168,7 +168,8 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
             .render_targets = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) }
-        )
+        ),
+        .queue = xg_cmd_queue_compute_m,
     ) );
 
     return node;

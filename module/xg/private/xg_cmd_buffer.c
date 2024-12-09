@@ -373,19 +373,6 @@ void xg_cmd_buffer_sort_n ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_h
     // sorted result is in buffer2
 }
 
-#if 0
-void xg_cmd_buffer_close ( xg_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
-    // On close we store the cmd buffers in the shared queue
-    // The user is expected to not use these anymore. Maybe it's a good idea to somehow mark the buffer as closed and test that on each user access?
-    for ( size_t i = 0; i < count; ++i ) {
-        xg_cmd_buffer_h handle = cmd_buffer_handles[i];
-        xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state.cmd_buffers_array[handle];
-
-        xg_workload_add_cmd_buffer ( cmd_buffer->workload, handle );
-    }
-}
-#endif
-
 void xg_cmd_buffer_discard ( xg_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
     std_mutex_lock ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 

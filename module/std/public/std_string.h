@@ -45,9 +45,9 @@ bool std_str_starts_with ( const char* str, const char* token );
 #define std_str_copy_static_m( _dst, _src ) std_str_copy ( _dst, sizeof ( _dst ), _src )
 #define std_str_format_m( _dst, _src, ... ) std_str_format ( _dst, sizeof ( _dst ), _src, __VA_ARGS__ )
 
-// TODO fix param order
-size_t std_u32_to_str ( uint32_t u32, char* str, size_t cap );
-size_t std_u64_to_str ( uint64_t u64, char* str, size_t cap );
+// TODO support left pad as param
+size_t std_u32_to_str ( char* str, size_t cap, uint32_t u32, uint32_t pad );
+size_t std_u64_to_str ( char* str, size_t cap, uint64_t u64 );
 size_t std_f32_to_str ( float f32, char* str, size_t cap );
 
 uint32_t std_str_to_u32 ( const char* str );

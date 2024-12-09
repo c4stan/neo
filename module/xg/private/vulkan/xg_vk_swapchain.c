@@ -224,7 +224,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
 
     for ( size_t i = 0; i < texture_count; ++i ) {
         char id[8];
-        std_u32_to_str ( i, id, 8 );
+        std_u32_to_str ( id, 8, i, 0 );
         xg_texture_params_t texture_params = swapchain_texture_params;
         std_stack_t stack = std_static_stack_m ( texture_params.debug_name );
         stack.top += std_str_len ( texture_params.debug_name );

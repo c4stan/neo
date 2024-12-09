@@ -632,7 +632,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
     std_log_info_m ( "Shader database build " std_fmt_str_m std_fmt_newline_m 
         "Pipeline states: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached" std_fmt_newline_m 
-        "Shader references: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", 
+        "Shaders: " std_fmt_tab_m std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", 
         std_debug_string_get ( &db->debug_name ),
         result.failed_pipeline_states, result.successful_pipeline_states, result.skipped_pipeline_states,
         result.failed_shaders, result.successful_shaders, result.skipped_shaders );

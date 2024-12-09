@@ -470,7 +470,6 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     } else {
         if ( graphics_queue_found && graphics_queue_flags & VK_QUEUE_COMPUTE_BIT ) {
             device->compute_queue = device->graphics_queue;
-            device->compute_queue.vk_family_idx = device->graphics_queue.vk_family_idx;
             std_log_info_m ( "Dedicated compute queue not found - fallback to graphics queue" );
         } else {
             std_log_warn_m ( "Compute queue not found" );
