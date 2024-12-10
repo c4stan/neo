@@ -241,7 +241,9 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = view_setup_pass,
-        )
+        ),
+        .node_dependencies_count = 1,
+        .node_dependencies = { frame_setup_node }
     ) );
 
     xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m ( 
@@ -252,7 +254,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ));
 
     // raytrace
-    xf_node_h raytrace_node = add_raytrace_pass ( graph, color_texture );
+    xf_node_h raytrace_node = add_raytrace_pass ( graph, color_texture, view_setup_node );
 
     // ui
     xf_node_h ui_node = add_ui_pass ( graph, color_texture );
@@ -1176,7 +1178,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { 0, 1.45, 0 },
+            .position = { 0, 2, 0 },
             .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1192,7 +1194,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
-            .position = { 0, 1.45, 0 },
+            .position = { 0, 2, 0 },
             .intensity = 5,
             .color = { 1, 1, 1 },
             .shadow_casting = true
@@ -1211,7 +1213,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             },
             .proj_params = rv_projection_params_m (
                 .aspect_ratio = 1,
-                .near_z = 0.1,
+                .near_z = 0.01,
                 .far_z = 100,
                 .reverse_z = false, // TODO ?
             ),

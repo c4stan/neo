@@ -740,8 +740,8 @@ static int xf_graph_lifespan_overlap_test ( xf_graph_h graph_handle, const xf_gr
 
 static void xf_graph_gather_unique_buffers ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    uint64_t buffer_hashes[xf_graph_max_buffers_per_graph_m * 2];
-    uint64_t buffer_values[xf_graph_max_buffers_per_graph_m * 2];
+    uint64_t buffer_hashes[xf_graph_max_buffers_m * 2];
+    uint64_t buffer_values[xf_graph_max_buffers_m * 2];
     std_hash_map_t buffers_map = std_static_hash_map_m ( buffer_hashes, buffer_values );
     std_auto_m buffers_array = std_static_array_m ( xf_graph_buffer_t, graph->buffers_array );
 
@@ -805,8 +805,8 @@ static void xf_graph_gather_unique_buffers ( xf_graph_h graph_handle ) {
 
 static void xf_graph_gather_unique_textures ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    uint64_t texture_hashes[xf_graph_max_textures_per_graph_m * 2];
-    uint64_t texture_values[xf_graph_max_textures_per_graph_m];
+    uint64_t texture_hashes[xf_graph_max_textures_m * 2];
+    uint64_t texture_values[xf_graph_max_textures_m];
     std_hash_map_t textures_map = std_static_hash_map_m ( texture_hashes, texture_values );
     std_auto_m textures_array = std_static_array_m ( xf_graph_texture_t, graph->textures_array );
 
@@ -889,7 +889,7 @@ static void xf_graph_gather_unique_textures ( xf_graph_h graph_handle ) {
 
 static void xf_graph_gather_unique_multi_textures ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    uint64_t texture_hashes[xf_graph_max_multi_textures_per_graph_m * 2];
+    uint64_t texture_hashes[xf_graph_max_multi_textures_m * 2];
     std_hash_set_t textures_set = std_static_hash_set_m ( texture_hashes );
     std_auto_m multi_textures_array = std_static_array_m ( uint32_t, graph->multi_textures_array );
 
@@ -916,7 +916,7 @@ static void xf_graph_build_resources ( xf_graph_h graph_handle, xg_i* xg, xg_cmd
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
 #if 0
-    uint8_t flags[xf_graph_max_textures_per_graph_m] = {};
+    uint8_t flags[xf_graph_max_textures_m] = {};
 
     for ( uint32_t i = 0; i < graph->textures_count; ++i ) {
         xf_texture_info_t info;
@@ -925,7 +925,7 @@ static void xf_graph_build_resources ( xf_graph_h graph_handle, xg_i* xg, xg_cmd
         bool can_alias = info.allow_aliasing;
 
         if ( can_alias ) {
-            xf_graph_texture_h alias_candidates[xf_graph_max_textures_per_graph_m];
+            xf_graph_texture_h alias_candidates[xf_graph_max_textures_m];
 
             flags[i] = 1;
         }

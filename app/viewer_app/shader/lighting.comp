@@ -122,6 +122,10 @@ void main ( void ) {
         }
     #endif
 
+        if ( any ( greaterThan ( shadow_screen, vec3(1.0) ) ) || any ( lessThan ( shadow_screen, vec3(0.0) ) ) ) {
+            shadow = 0;
+        }
+
         float light_visibility = 1.f - shadow;
         //float shadow_occlusion = shadow_depth + 0.001 > shadow_proj.z ? 1.f : 0.f;
 

@@ -158,7 +158,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     xg->cmd_destroy_buffer ( resource_cmd_buffer, shader_instance_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 }
 
-xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target ) {
+xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target, xf_node_h dep ) {
     viewapp_state_t* state = viewapp_state_get();
     xs_i* xs = state->modules.xs;
     xf_i* xf = state->modules.xf;
@@ -185,6 +185,8 @@ xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target ) {
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = target, .stage = xg_pipeline_stage_bit_raytrace_shader_m ) },
         ),
+        .node_dependencies_count = 1,
+        .node_dependencies = { dep }
     );
     xf_node_h raytrace_node = xf->add_node ( graph, &node_params );
     return raytrace_node;

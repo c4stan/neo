@@ -1,0 +1,9 @@
+{
+	"extension_api": 1,
+	"name": "Compute Pixel Debug",
+	"version": "1.0",
+	"minimum_renderdoc": "1.13",
+	"description": "",
+	"author": "",
+	"url": ""
+}

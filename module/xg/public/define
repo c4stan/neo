@@ -23,10 +23,10 @@ xg_swapchain_max_textures_m                     8
 
 xg_enable_raytracing_m                          1
 
-xg_raytrace_shader_state_max_shaders_m              16
-xg_raytrace_shader_state_max_gen_shaders_m          1
-xg_raytrace_shader_state_max_hit_groups_m           4
-xg_raytrace_shader_state_max_miss_shaders_m         4
+xg_raytrace_shader_state_max_shaders_m          16
+xg_raytrace_shader_state_max_gen_shaders_m      1
+xg_raytrace_shader_state_max_hit_groups_m       4
+xg_raytrace_shader_state_max_miss_shaders_m     4
 
 ########## debug ##########
 
