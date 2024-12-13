@@ -454,7 +454,7 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
 
 // --------------------------
 
-xg_alloc_t xg_alloc ( xg_vk_alloc_params_t* params ) {
+xg_alloc_t xg_alloc ( const xg_alloc_params_t* params ) {
     uint64_t device_idx = xg_vk_device_get_idx ( params->device );
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
     xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[params->type];

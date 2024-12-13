@@ -97,11 +97,9 @@ def print_help():
     print('\t' + Color.OKGREEN + 'explorer' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run explorer on a workspace')
     print('\t' + Color.OKGREEN + 'cmd' + Color.OKBLUE + ' <name> <cmd>' + Color.ENDC + ' to run a system cmd on a workspace')
     print('\t' + Color.OKGREEN + 'create' + Color.OKBLUE + ' <root> <name>' + Color.ENDC + ' to create a new workspace under the root')
-    #print('\t' + Color.OKGREEN + 'gitinit' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to initialize the local git repo for a workspace')
-    #print('\t' + Color.OKGREEN + 'githublink' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to link the local git repo of a workspace to github')
     print('\t' + Color.OKGREEN + 'gitpush' + Color.OKBLUE + ' <comment>' + Color.ENDC + ' to git push local changes')
     print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + Color.ENDC + ' to git pull remote changes')
-    print('\t' + Color.OKGREEN + 'gitstatus' + Color.OKBLUE + Color.ENDC + ' to get the git status')
+    print('\t' + Color.OKGREEN + 'gitstatus' + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
     print('\t' + Color.OKGREEN + 'recover' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to open the last submitted version of the file')
     print('\t' + Color.OKGREEN + 'killeditor' + Color.ENDC + ' to kill the text editor process')
@@ -547,109 +545,7 @@ def create_local_workspace(root, name):
     pop_path()
     #pop_path()
 
-def git_init_workspace(name):
-    path = get_workspace_path(name)
-    push_path(path)
-
-    os.system('git init')
-    '''
-    gitignore_file = open('.gitignore', 'w')
-    gitignore_file.write(
-        '*\n'\
-        '!.gitignore\n'\
-        '!makedef\n'\
-        '!*.def\n'\
-        '!private/\n'\
-        '!private/**\n'\
-        '!public/\n'\
-        '!public/**\n'\
-    )
-    gitignore_file.close()
-    '''
-
-    os.system('git add .')
-    os.system('git commit -m "init"')
-    os.system('')
-
-    pop_path()
-
-def git_init_github(name):
-    path = get_workspace_path(name)
-    push_path(path)
-
-    os.system('git remote add origin https://github.com/' + get_binding('github_user') + '/' + name + '.git')
-    os.system('git branch -M main')
-    os.system('git push -u origin main')
-    os.system('')
-
-    pop_path()
-
-def git_push_workspace(name, tokens):
-    comment = ''
-    for token in tokens:
-        if comment:
-            comment += ' '
-        comment += token
-
-    if not comment:
-        print(Color.FAIL + 'Provide a comment.' + Color.ENDC)
-        return
-
-    if workspace_is_all(name):
-        for module in ['neo'] + MODULES + TESTS + APPS:
-            path = get_workspace_path(module)
-            push_path(path)
-            print('')
-            title = format_title_string([module])
-            print(title)
-            os.system('git add .')
-            os.system('git commit -m "' + comment + '"')
-            os.system('git push')
-            os.system('')
-            pop_path()
-    else:
-        path = get_workspace_path(name)
-        push_path(path)
-        os.system('git add .')
-        os.system('git commit -m "' + comment + '"')
-        os.system('git push')
-        os.system('')
-        pop_path()
-
-def git_pull_workspace(name):
-    # TODO try cloning if workspace doesn't already exist locally
-    #      where to fetch the git username from?
-    if workspace_is_all(name):
-        modules = ['neo'] + MODULES + TESTS + APPS
-    else:
-        modules = [name]
-
-    for module in modules:
-        path = get_workspace_path(module)
-        push_path(path)
-        print('')
-        title = format_title_string([module])
-        print(title)
-        os.system('git pull')
-        pop_path()
-    print('')
-
-def git_status_workspace(name):
-    if workspace_is_all(name):
-        modules = ['neo'] + MODULES + TESTS + APPS
-    else:
-        modules = [name]
-    for module in modules:
-        path = get_workspace_path(module)
-        push_path(path)
-        print('')
-        title = format_title_string([module])
-        print(title)
-        os.system('git status')
-        pop_path()
-    print('')
-
-def git_push(tokens):
+ef git_push(tokens):
     comment = ''
     for token in tokens:
         if comment:
@@ -733,18 +629,11 @@ def parse(string):
         debug_app(tokens[1], tokens[2:])
     elif cmd == 'create':
         create_local_workspace(tokens[1], tokens[2])
-    #elif cmd == 'gitinit':
-    #    git_init_workspace(tokens[1])
-    #elif cmd == 'githublink':
-    #    git_init_github(tokens[1])
     elif cmd == 'gitpush':
-        #git_push_workspace(tokens[1], tokens[2:])
         git_push(tokens[1:])
     elif cmd == 'gitpull':
-        #git_pull_workspace(tokens[1])
         git_pull()
     elif cmd == 'gitstatus':
-        #git_status_workspace(tokens[1])
         git_status()
     elif cmd == 'title':
         make_title(tokens[1:])

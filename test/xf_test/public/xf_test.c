@@ -130,7 +130,10 @@ static void xf_test ( void ) {
         window_info = new_window_info;
 
         xg_workload_h workload = xg->create_workload ( device );
-        xf_graph_h graph = xf->create_graph ( device );
+        xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( 
+            .device = device,
+            .debug_name = "test_graph_1" 
+        ) );
 
         uint64_t t = 500;
         float color[3];
@@ -178,7 +181,7 @@ static void xf_test ( void ) {
             ),
         ) );
 
-        xf_graph_h graph2 = xf->create_graph ( device );
+        xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
 
         uint64_t id = xf->execute_graph ( graph, workload, 0 );
         xf->execute_graph ( graph2, workload, id );

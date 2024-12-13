@@ -206,6 +206,72 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     return texture_handle;
 }
 
+xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_t* params ) {
+    const xg_vk_device_t* device = xg_vk_device_get ( params->device );
+    
+    // Create Vulkan image
+    VkImage vk_image;
+    std_assert_m ( params->width < UINT32_MAX );
+    std_assert_m ( params->height < UINT32_MAX );
+    std_assert_m ( params->depth < UINT32_MAX );
+    std_assert_m ( params->mip_levels < UINT32_MAX );
+    std_assert_m ( params->array_layers < UINT32_MAX );
+    VkImageCreateInfo vk_image_info;
+    vk_image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    vk_image_info.pNext = NULL;
+    vk_image_info.flags = 0;
+    vk_image_info.imageType = xg_image_type_to_vk ( params->dimension );
+    vk_image_info.format = xg_format_to_vk ( params->format );
+    vk_image_info.extent.width = ( uint32_t ) params->width;
+    vk_image_info.extent.height = ( uint32_t ) params->height;
+    vk_image_info.extent.depth = ( uint32_t ) params->depth;
+    vk_image_info.mipLevels = ( uint32_t ) params->mip_levels;
+    vk_image_info.arrayLayers = ( uint32_t ) params->array_layers;
+    vk_image_info.samples = xg_sample_count_to_vk ( params->samples_per_pixel );
+    vk_image_info.tiling = xg_texture_tiling_to_vk ( params->tiling );
+    vk_image_info.usage = xg_image_usage_to_vk ( params->allowed_usage );
+    vk_image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // TODO
+    vk_image_info.queueFamilyIndexCount = 0;
+    vk_image_info.pQueueFamilyIndices = NULL;
+    vk_image_info.initialLayout = xg_image_layout_to_vk ( params->initial_layout );
+
+    // Query for memory requiremens
+    vkCreateImage ( device->vk_handle, &vk_image_info, NULL, &vk_image );
+
+    VkMemoryDedicatedRequirements dedicated_requirements = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS,
+        .pNext = NULL,
+    };
+    VkMemoryRequirements2 memory_requirements_2 = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+        .pNext = &dedicated_requirements,
+    };
+    const VkImageMemoryRequirementsInfo2 image_requirements_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+        .pNext = NULL,
+        .image = vk_image
+    };
+    vkGetImageMemoryRequirements2 ( device->vk_handle, &image_requirements_info, &memory_requirements_2 );
+    const VkMemoryRequirements* vk_memory_requirements = &memory_requirements_2.memoryRequirements;
+
+    // Destroy Vulkan image
+    // TODO is there no way to do this without creating and destroying a temp VkImage?
+    vkDestroyImage ( device->vk_handle, vk_image, NULL );
+
+    // Return
+    xg_memory_requirement_t req = {
+        .size = vk_memory_requirements->size,
+        .align = vk_memory_requirements->alignment,
+        .flags = xg_memory_requirement_bit_none_m
+    };
+
+    if ( dedicated_requirements.requiresDedicatedAllocation ) {
+        req.flags |= xg_memory_requirement_bit_dedicated_m;
+    }
+
+    return req;
+}
+
 bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 
@@ -254,42 +320,50 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
         xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
     }
 
-    //VkMemoryRequirements vk_memory_requirements;
-    //vkGetImageMemoryRequirements ( device->vk_handle, vk_image, &vk_memory_requirements );
-    VkMemoryDedicatedRequirements dedicated_requirements =
-    {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS,
-        .pNext = NULL,
-    };
-    VkMemoryRequirements2 memory_requirements_2 =
-    {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
-        .pNext = &dedicated_requirements,
-    };
-    const VkImageMemoryRequirementsInfo2 image_requirements_info =
-    {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
-        .pNext = NULL,
-        .image = vk_image
-    };
-    vkGetImageMemoryRequirements2 ( device->vk_handle, &image_requirements_info, &memory_requirements_2 );
-    // TODO
-    std_assert_m ( !dedicated_requirements.requiresDedicatedAllocation );
-    VkMemoryRequirements vk_memory_requirements = memory_requirements_2.memoryRequirements;
-    xg_vk_alloc_params_t alloc_params = xg_vk_alloc_params_m ( 
-        .device = params->device,
-        .size = vk_memory_requirements.size,
-        .align = vk_memory_requirements.alignment,
-        .type = params->memory_type
-    );
-    std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
-    //xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_memory_requirements.size, vk_memory_requirements.alignment );
-    xg_alloc_t alloc = xg_alloc ( &alloc_params );
-    VkResult result = vkBindImageMemory ( device->vk_handle, vk_image, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
+    VkDeviceMemory alloc_base;
+    VkDeviceSize alloc_offset;
+
+    if ( params->creation_address.base ) {
+        alloc_base = ( VkDeviceMemory ) params->creation_address.base;
+        alloc_offset = params->creation_address.offset;
+
+        texture->allocation = xg_null_alloc_m;
+    } else {
+        VkMemoryDedicatedRequirements dedicated_requirements = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS,
+            .pNext = NULL,
+        };
+        VkMemoryRequirements2 memory_requirements_2 = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+            .pNext = &dedicated_requirements,
+        };
+        const VkImageMemoryRequirementsInfo2 image_requirements_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
+            .pNext = NULL,
+            .image = vk_image
+        };
+        vkGetImageMemoryRequirements2 ( device->vk_handle, &image_requirements_info, &memory_requirements_2 );
+        // TODO
+        std_assert_m ( !dedicated_requirements.requiresDedicatedAllocation );
+        VkMemoryRequirements vk_memory_requirements = memory_requirements_2.memoryRequirements;
+        xg_alloc_params_t alloc_params = xg_alloc_params_m ( 
+            .device = params->device,
+            .size = vk_memory_requirements.size,
+            .align = vk_memory_requirements.alignment,
+            .type = params->memory_type
+        );
+        std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
+        xg_alloc_t alloc = xg_alloc ( &alloc_params );
+        alloc_base = ( VkDeviceMemory ) alloc.base;
+        alloc_offset = alloc.offset;
+
+        texture->allocation = alloc;
+    }
+
+    VkResult result = vkBindImageMemory ( device->vk_handle, vk_image, alloc_base, alloc_offset );
     std_verify_m ( result == VK_SUCCESS );
 
     texture->vk_handle = vk_image;
-    texture->allocation = alloc;
 
     bool needs_view = params->allowed_usage & ( xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_depth_stencil_m );
 

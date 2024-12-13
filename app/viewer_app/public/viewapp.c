@@ -1178,7 +1178,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { 0, 2, 0 },
+            .position = { 0, 1.5, 0 },
             .object_id = m_state->render.object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1194,7 +1194,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
-            .position = { 0, 2, 0 },
+            .position = { 0, 1.5, 0 },
             .intensity = 5,
             .color = { 1, 1, 1 },
             .shadow_casting = true
@@ -2243,8 +2243,6 @@ static std_app_state_e viewapp_update ( void ) {
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
     if ( m_state->reload ) {
-        std_log_info_m ( "asd" );
-
         xf->destroy_graph ( m_state->render.raster_graph, workload );
         xf->destroy_graph ( m_state->render.raytrace_graph, workload );
         xf->destroy_graph ( m_state->render.mouse_pick_graph, workload );
@@ -2257,6 +2255,13 @@ static std_app_state_e viewapp_update ( void ) {
 
         m_state->reload = false;
     }
+
+
+    //if ( m_state->render.frame_id == 1 ) 
+    //{
+    //    xf->build_graph ( m_state->render.active_graph, workload );
+    //    xf->build_graph ( m_state->render.mouse_pick_graph, workload );
+    //}
 
     uint64_t key = 0;
     key = xf->execute_graph ( m_state->render.active_graph, workload, key );

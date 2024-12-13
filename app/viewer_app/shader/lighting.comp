@@ -100,7 +100,7 @@ void main ( void ) {
                 //    shadow_depth = 1.f;
                 //}
 
-                float shadow_bias = 0.003;
+                float shadow_bias = 0.001;
                 float shadow_contribution = shadow_proj.z - shadow_bias > shadow_depth ? 1.f : 0.f;
 
                 if ( shadow_screen.z > 1.f ) {

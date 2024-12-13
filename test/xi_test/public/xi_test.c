@@ -177,7 +177,7 @@ static void xi_test ( void ) {
     // pass only calls flush on it.
 
     xf_i* xf = std_module_load_m ( xf_module_name_m );
-    xf_graph_h graph = xf->create_graph ( device );
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "xi_graph" ) );
 
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
 

@@ -165,7 +165,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     // TODO
     std_assert_m ( !dedicated_requirements.requiresDedicatedAllocation );
     VkMemoryRequirements vk_buffer_memory = memory_requirements_2.memoryRequirements;
-    xg_vk_alloc_params_t alloc_params = xg_vk_alloc_params_m ( 
+    xg_alloc_params_t alloc_params = xg_alloc_params_m ( 
         .device = params->device,
         .size = vk_buffer_memory.size,
         .align = std_max ( vk_buffer_memory.alignment, params->align ),

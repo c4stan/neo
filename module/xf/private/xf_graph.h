@@ -136,18 +136,19 @@ typedef struct {
 }
 
 typedef struct {
-    uint32_t first; // indexes graph nodes_execution_order
-    uint32_t last[xg_cmd_queue_count_m];
+    int32_t first; // indexes graph nodes_execution_order
+    int32_t last[xg_cmd_queue_count_m];
 } xf_graph_resource_lifespan_t;
 
 #define xf_graph_resource_lifespan_m( ... ) ( xf_graph_resource_lifespan_t ) { \
-    .first = 0, \
-    .last = { 0 }, \
+    .first = INT32_MAX, \
+    .last = { -1, -1, -1 }, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
     xf_texture_h handle;
+    bool allow_aliasing;
     xf_graph_resource_lifespan_t lifespan;
     union {
         xf_resource_dependencies_t shared;
@@ -158,6 +159,7 @@ typedef struct {
 
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
     .handle = xf_null_handle_m, \
+    .allow_aliasing = true, \
     .lifespan = xf_graph_resource_lifespan_m(), \
     .deps.mips = { [0 ... 15] = xf_resource_dependencies_m() }, \
     ##__VA_ARGS__ \
@@ -195,7 +197,14 @@ typedef struct {
     //std_hash_set_t multi_textures_hash_set;
     
     // queue[n][q] stores the idx of node n predecessor for queue type q. All indices are to nodes_execution_order
-    uint32_t cross_queue_node_deps[xf_graph_max_nodes_m][xg_cmd_queue_count_m];
+    int32_t cross_queue_node_deps[xf_graph_max_nodes_m][xg_cmd_queue_count_m];
+
+    uint64_t texture_hashes[xf_graph_max_textures_m * 2];
+    uint64_t texture_values[xf_graph_max_textures_m];
+    std_hash_map_t textures_map;
+    uint64_t buffer_hashes[xf_graph_max_buffers_m * 2];
+    uint64_t buffer_values[xf_graph_max_buffers_m];
+    std_hash_map_t buffers_map;
 } xf_graph_t;
 
 typedef struct {

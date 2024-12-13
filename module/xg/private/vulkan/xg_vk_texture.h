@@ -31,9 +31,7 @@ typedef struct {
     xg_alloc_t              allocation;
     xg_texture_params_t     params;
     xg_texture_flag_bit_e      flags;
-    //VkImageView             vk_view; // default view
 
-    //xg_texture_view_h       default_view;
     xg_vk_texture_view_t    default_view;
 
     union {
@@ -87,6 +85,7 @@ void xg_vk_texture_unregister_swapchain_texture ( xg_texture_h texture );
 const xg_vk_texture_t* xg_vk_texture_get ( xg_texture_h handle );
 const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture, xg_texture_view_t view );
 
+xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_t* params );
 
 /*
     TODO

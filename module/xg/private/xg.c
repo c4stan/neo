@@ -98,6 +98,9 @@ static void xg_api_init ( xg_i* xg ) {
     xg->get_default_sampler = xg_sampler_get_default;
     // Allocator
     xg->get_allocator_info = xg_vk_allocator_get_info;
+    xg->alloc_memory = xg_alloc;
+    xg->free_memory = xg_free;
+    xg->get_texture_memory_requirement = xg_texture_memory_requirement;
 
 #if xg_debug_enable_simple_frame_test_m
     xg->debug_simple_frame = xg_debug_simple_frame;

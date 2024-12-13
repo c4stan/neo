@@ -152,22 +152,5 @@ void xg_vk_allocator_deactivate_device ( xg_device_h device );
 
 void xg_vk_allocator_get_info ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
 
-typedef struct {
-    xg_device_h device;
-    size_t size;
-    size_t align;
-    xg_memory_type_e type;
-    char debug_name[xg_debug_name_size_m];
-} xg_vk_alloc_params_t;
-
-#define xg_vk_alloc_params_m( ... ) ( xg_vk_alloc_params_t ) { \
-    .device = xg_null_handle_m, \
-    .size = 0, \
-    .align = 0, \
-    .type = xg_memory_type_null_m, \
-    .debug_name = "", \
-    ##__VA_ARGS__ \
-}
-
-xg_alloc_t xg_alloc ( xg_vk_alloc_params_t* params );
+xg_alloc_t xg_alloc ( const xg_alloc_params_t* params );
 void xg_free ( xg_memory_h handle );

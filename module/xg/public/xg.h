@@ -542,6 +542,23 @@ typedef struct {
     uint64_t system_size;
 } xg_allocator_info_t;
 
+typedef struct {
+    xg_device_h device;
+    size_t size;
+    size_t align;
+    xg_memory_type_e type;
+    char debug_name[xg_debug_name_size_m];
+} xg_alloc_params_t;
+
+#define xg_alloc_params_m( ... ) ( xg_alloc_params_t ) { \
+    .device = xg_null_handle_m, \
+    .size = 0, \
+    .align = 0, \
+    .type = xg_memory_type_null_m, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
+
 // -- Input Layout --
 typedef enum {
     xg_vertex_attribute_pos_m,
@@ -1791,12 +1808,19 @@ typedef enum {
 typedef enum {
     xg_texture_view_access_default_only_m,
     xg_texture_view_access_separate_mips_m,
-    xg_texture_view_access_dynamic_m,
+    xg_texture_view_access_dynamic_m, // TODO
 } xg_texture_view_access_e;
 
 typedef struct {
-    uint32_t max_view_count;
-} xg_texture_view_access_ext_dynamic_params_t;
+    uint64_t base;
+    uint64_t offset;
+} xg_memory_address_t;
+
+#define xg_memory_address_m( ... ) ( xg_memory_address_t ) { \
+    .base = 0, \
+    .offset = 0, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_memory_type_e memory_type;
@@ -1814,7 +1838,7 @@ typedef struct {
     xg_sample_count_e samples_per_pixel;
     xg_texture_tiling_e tiling;
     xg_texture_view_access_e view_access;
-    void* view_access_ext;
+    xg_memory_address_t creation_address; // TODO make a separate param struct for create-at-address?
     char debug_name[xg_debug_name_size_m];
 } xg_texture_params_t;
 
@@ -1833,8 +1857,26 @@ typedef struct {
     .samples_per_pixel = xg_sample_count_1_m, \
     .tiling = xg_texture_tiling_optimal_m, \
     .view_access = xg_texture_view_access_default_only_m, \
-    .view_access_ext = NULL, \
+    .creation_address = xg_memory_address_m(), \
     .debug_name = {0}, \
+    ##__VA_ARGS__ \
+}
+
+typedef enum {
+    xg_memory_requirement_bit_none_m = 0,
+    xg_memory_requirement_bit_dedicated_m = 1 << 0,
+} xg_memory_requirement_bit_e;
+
+typedef struct {
+    size_t size;
+    size_t align;
+    xg_memory_requirement_bit_e flags;
+} xg_memory_requirement_t;
+
+#define xg_memory_requirement_m( ... ) ( xg_memory_requirement_t ) { \
+    .size = 0, \
+    .align = 0, \
+    .flags = xg_memory_requirement_bit_none_m, \
     ##__VA_ARGS__ \
 }
 
@@ -2275,6 +2317,11 @@ typedef struct {
 
     xg_buffer_h             ( *create_buffer )                      ( const xg_buffer_params_t* params );
     xg_texture_h            ( *create_texture )                     ( const xg_texture_params_t* params );
+
+    xg_memory_requirement_t ( *get_texture_memory_requirement )     ( const xg_texture_params_t* params );
+
+    xg_alloc_t              ( *alloc_memory )                       ( const xg_alloc_params_t* params );
+    void                    ( *free_memory )                        ( xg_memory_h handle );
 
 #if 0
     xg_query_pool_h         ( *create_query_pool )                  ( const xg_query_pool_params_t* params );
