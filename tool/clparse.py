@@ -545,7 +545,7 @@ def create_local_workspace(root, name):
     pop_path()
     #pop_path()
 
-ef git_push(tokens):
+def git_push(tokens):
     comment = ''
     for token in tokens:
         if comment:

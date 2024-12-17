@@ -1972,7 +1972,8 @@ typedef struct {
 // and a time when calling current resource cmd buffer api? what's the point
 // of having resource cmd buffers?
 typedef enum {
-    xg_resource_cmd_buffer_time_workload_start_m,
+    // TODO add prev_workload_complete ?
+    xg_resource_cmd_buffer_time_workload_start_m, // TODO rename to workload_submit?
     xg_resource_cmd_buffer_time_workload_complete_m,
 } xg_resource_cmd_buffer_time_e;
 

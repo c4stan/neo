@@ -439,7 +439,7 @@ void xg_vk_workload_add_timestamp_query_pool ( xg_workload_h workload_handle, xg
             simple merge sort on the cmd headers, drag along the args? or not? could be parallelized easily
         chunk
             scan the merged buffer for 1ry and 2rt segments. maybe 1ry: renderpass changes, 2ry: pso changes. hard to parallelize, might require
-            the merge sort step to look for cmds that marg the beginning of a 1ry/2ry buffer and pass that info along
+            the merge sort step to look for cmds that mark the beginning of a 1ry/2ry buffer and pass that info along
         translate
             translate each chunk individually into native cmd buffers. easy to parallelize. 1ry buffers dispatch tasks for the translation
             of their 2ry buffers and at their termination add them as their cmd.

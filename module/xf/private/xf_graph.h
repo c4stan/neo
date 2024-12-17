@@ -148,7 +148,7 @@ typedef struct {
 
 typedef struct {
     xf_texture_h handle;
-    bool allow_aliasing;
+    bool disable_aliasing;
     xf_graph_resource_lifespan_t lifespan;
     union {
         xf_resource_dependencies_t shared;
@@ -159,7 +159,7 @@ typedef struct {
 
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
     .handle = xf_null_handle_m, \
-    .allow_aliasing = true, \
+    .disable_aliasing = false, \
     .lifespan = xf_graph_resource_lifespan_m(), \
     .deps.mips = { [0 ... 15] = xf_resource_dependencies_m() }, \
     ##__VA_ARGS__ \

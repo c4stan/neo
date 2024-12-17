@@ -559,13 +559,19 @@ static void viewapp_boot_raster_graph ( void ) {
     // ssgi
     // TODO use prev frame final color texture?
     //xf_texture_h prev_color_texture = color_texture;//xf->get_multi_texture ( color_texture, -1 );
-    xf_texture_h ssgi_raymarch_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
-        .texture = xf_texture_params_m (
-            .width = resolution_x,
-            .height = resolution_y,
-            .format = xg_format_b10g11r11_ufloat_pack32_m,
-            .debug_name = "ssgi_raymarch_texture",
-        ),
+    //xf_texture_h ssgi_raymarch_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    //    .texture = xf_texture_params_m (
+    //        .width = resolution_x,
+    //        .height = resolution_y,
+    //        .format = xg_format_b10g11r11_ufloat_pack32_m,
+    //        .debug_name = "ssgi_raymarch_texture",
+    //    ),
+    //) );
+    xf_texture_h ssgi_raymarch_texture = xf->declare_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "ssgi_raymarch_texture",
     ) );
     xf_node_h ssgi_raymarch_node = add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, lighting_texture, hiz_texture );
 
@@ -624,13 +630,11 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // ssgi2
-    xf_texture_h ssgi_2_raymarch_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
-        .texture = xf_texture_params_m (
-            .width = resolution_x,
-            .height = resolution_y,
-            .format = xg_format_b10g11r11_ufloat_pack32_m,
-            .debug_name = "ssgi_2_raymarch_texture",
-        ),
+    xf_texture_h ssgi_2_raymarch_texture = xf->declare_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "ssgi_2_raymarch_texture",
     ) );
     xf_node_h ssgi_2_raymarch_node = add_ssgi_raymarch_pass ( graph, "ssgi_2", ssgi_2_raymarch_texture, normal_texture, color_texture, ssgi_raymarch_texture, hiz_texture );
 
@@ -2216,16 +2220,16 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_reload_m;
     }
 
-    if ( !input_state->keyboard[wm_keyboard_state_f5_m] && new_input_state.keyboard[wm_keyboard_state_f5_m] ) {
+    if ( !input_state->keyboard[wm_keyboard_state_f3_m] && new_input_state.keyboard[wm_keyboard_state_f3_m] ) {
         return std_app_state_reboot_m;
     }
 
-    if ( !input_state->keyboard[wm_keyboard_state_f3_m] && new_input_state.keyboard[wm_keyboard_state_f3_m] ) {
+    if ( !input_state->keyboard[wm_keyboard_state_f4_m] && new_input_state.keyboard[wm_keyboard_state_f4_m] ) {
         m_state->render.capture_frame = true;
     }
 
-    if ( !input_state->keyboard[wm_keyboard_state_f4_m] && new_input_state.keyboard[wm_keyboard_state_f4_m] ) {
-            duplicate_selection();
+    if ( !input_state->keyboard[wm_keyboard_state_f5_m] && new_input_state.keyboard[wm_keyboard_state_f5_m] ) {
+        duplicate_selection();
     }
 
     m_state->render.frame_id += 1;
@@ -2255,13 +2259,6 @@ static std_app_state_e viewapp_update ( void ) {
 
         m_state->reload = false;
     }
-
-
-    //if ( m_state->render.frame_id == 1 ) 
-    //{
-    //    xf->build_graph ( m_state->render.active_graph, workload );
-    //    xf->build_graph ( m_state->render.mouse_pick_graph, workload );
-    //}
 
     uint64_t key = 0;
     key = xf->execute_graph ( m_state->render.active_graph, workload, key );

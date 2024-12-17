@@ -171,9 +171,12 @@ void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture );
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer );
+xf_texture_t* xf_resource_texture_get_no_alias ( xf_texture_h texture );
 
 void xf_resource_texture_map_to_new ( xf_texture_h texture, xg_texture_h xg_handle, xg_texture_usage_bit_e allowed_usage );
 void xf_resource_buffer_map_to_new ( xf_buffer_h buffer, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage );
+void xf_resource_texture_unmap ( xf_texture_h texture );
+void xf_resource_buffer_unmap ( xf_buffer_h buffer );
 
 void xf_resource_texture_update_info ( xf_texture_h texture, const xg_texture_info_t* info );
 void xf_resource_texture_set_allowed_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );

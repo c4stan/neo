@@ -85,6 +85,22 @@ bool xf_resource_buffer_is_multi ( xf_buffer_h buffer_handle ) {
     return std_bit_test_64_m ( buffer_handle, 63 );
 }
 
+xf_texture_t* xf_resource_texture_get_no_alias ( xf_texture_h texture_handle ) {
+    xf_texture_t* texture;
+    bool is_multi_texture = xf_resource_texture_is_multi ( texture_handle );
+
+    if ( is_multi_texture ) {
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+        uint64_t subtexture_index = ( texture_handle >> 16 ) & 0xffff;
+        subtexture_index = ( subtexture_index + multi_texture->index ) % multi_texture->params.multi_texture_count;
+        texture_handle = multi_texture->textures[subtexture_index];
+    }
+
+    texture = &xf_resource_state->textures_array[texture_handle];
+
+    return texture;
+}
+
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture_handle ) {
     xf_texture_t* texture;
     bool is_multi_texture = xf_resource_texture_is_multi ( texture_handle );
@@ -169,12 +185,24 @@ void xf_resource_texture_map_to_new ( xf_texture_h texture_handle, xg_texture_h 
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     texture->xg_handle = xg_handle;
     texture->allowed_usage = allowed_usage;
+    texture->state.shared = xf_texture_execution_state_m(); // TODO take as param, don't assume shared
 }
 
 void xf_resource_buffer_map_to_new ( xf_buffer_h buffer_handle, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage ) {
     xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
     buffer->xg_handle = xg_handle;
     buffer->allowed_usage = allowed_usage;
+    buffer->state = xf_buffer_execution_state_m(); // TODO
+}
+
+void xf_resource_texture_unmap ( xf_texture_h texture_handle ) {
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    texture->xg_handle = xg_null_handle_m;
+}
+
+void xf_resource_buffer_unmap ( xf_buffer_h buffer_handle ) {
+    xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
+    buffer->xg_handle = xg_null_handle_m;
 }
 
 void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e usage ) {
