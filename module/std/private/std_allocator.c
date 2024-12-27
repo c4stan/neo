@@ -1228,7 +1228,7 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
     //void* new_segment = std_arena_alloc ( &heap->arena, size );
 
     if ( !empty ) {
-        // not the first grow
+        // not the first gro
         //char* base = heap->arena.base;
 
         char* top_segment_end = top;
@@ -1272,6 +1272,8 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
         std_noop_m;
     }
+
+    heap->total_size += size;
 }
 
 void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t size ) {
@@ -1281,14 +1283,8 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
     std_mutex_init ( &heap->mutex );
 
-#if 0
-    uint64_t s = std_allocator_tlsf_min_segment_size_m;
-    while ( s < std_allocator_tlsf_max_segment_size_m ) {
-        std_allocator_tlsf_freelist_idx_t idx = std_allocator_tlsf_freelist_idx ( s );
-        std_log_info_m ( std_fmt_u64_m " " std_fmt_u64_m " " std_fmt_u64_m, s, idx.x, idx.y );
-        s = std_allocator_tlsf_heap_size_roundup ( s + 1 );
-    }
-#endif
+    heap->allocated_size = 0;
+    heap->total_size = 0;
 
     heap->stack = std_virtual_stack_create ( std_allocator_tlsf_max_segment_size_m );
     std_allocator_tlsf_heap_grow ( heap, size );
@@ -1477,6 +1473,11 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
 
 void std_allocator_tlsf_heap_deinit ( std_allocator_tlsf_heap_t* heap ) {
     std_virtual_stack_destroy ( &heap->stack );
+}
+
+void std_virtual_heap_allocator_info ( std_allocator_info_t* info ) {
+    info->allocated_size = std_allocator_state->tlsf_heap.allocated_size;
+    info->reserved_size = std_allocator_state->tlsf_heap.total_size;
 }
 
 //==============================================================================

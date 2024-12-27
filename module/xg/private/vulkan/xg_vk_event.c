@@ -2,6 +2,7 @@
 
 #include "xg_vk.h"
 #include "xg_vk_device.h"
+#include "xg_vk_instance.h"
 
 #include <std_list.h>
 
@@ -45,7 +46,7 @@ xg_gpu_event_h xg_gpu_event_create ( xg_device_h device_handle ) {
     event_create_info.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO;
     event_create_info.pNext = NULL;
     event_create_info.flags = 0;
-    vkCreateEvent ( device->vk_handle, &event_create_info, NULL, &event->vk_event );
+    vkCreateEvent ( device->vk_handle, &event_create_info, xg_vk_cpu_allocator(), &event->vk_event );
 
     event->device = device_handle;
 
@@ -60,7 +61,7 @@ void xg_gpu_event_destroy ( xg_gpu_event_h event_handle ) {
     xg_vk_gpu_event_t* event = &xg_vk_event_state->gpu_events_array[event_handle];
     const xg_vk_device_t* device = xg_vk_device_get ( event->device );
 
-    vkDestroyEvent ( device->vk_handle, event->vk_event, NULL );
+    vkDestroyEvent ( device->vk_handle, event->vk_event, xg_vk_cpu_allocator() );
 
     std_list_push ( &xg_vk_event_state->gpu_events_freelist, event );
 
@@ -85,7 +86,7 @@ xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
     semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semaphore_create_info.pNext = NULL;
     semaphore_create_info.flags = 0;
-    VkResult result = vkCreateSemaphore ( device->vk_handle, &semaphore_create_info, NULL, &event->vk_semaphore );
+    VkResult result = vkCreateSemaphore ( device->vk_handle, &semaphore_create_info, xg_vk_cpu_allocator(), &event->vk_semaphore );
     std_verify_m ( result == VK_SUCCESS );
 
 #if xg_debug_enable_events_log_m
@@ -109,7 +110,7 @@ void xg_gpu_queue_event_destroy ( xg_gpu_queue_event_h event_handle ) {
     std_log_info_m ( "[XG-VK-EVENT] Destroy " std_fmt_u64_m, event->vk_semaphore );
 #endif
 
-    vkDestroySemaphore ( device->vk_handle, event->vk_semaphore, NULL );
+    vkDestroySemaphore ( device->vk_handle, event->vk_semaphore, xg_vk_cpu_allocator() );
 
     std_list_push ( &xg_vk_event_state->gpu_queue_events_freelist, event );
 
@@ -152,7 +153,7 @@ xg_cpu_queue_event_h xg_cpu_queue_event_create ( xg_device_h device_handle ) {
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_create_info.pNext = NULL;
     fence_create_info.flags = 0;
-    vkCreateFence ( device->vk_handle, &fence_create_info, NULL, &event->vk_fence );
+    vkCreateFence ( device->vk_handle, &fence_create_info, xg_vk_cpu_allocator(), &event->vk_fence );
 
     event->device = device_handle;
 
@@ -168,7 +169,7 @@ void xg_cpu_queue_event_destroy ( xg_cpu_queue_event_h event_handle ) {
     xg_vk_cpu_queue_event_t* event = &xg_vk_event_state->cpu_queue_events_array[event_handle];
     const xg_vk_device_t* device = xg_vk_device_get ( event->device );
 
-    vkDestroyFence ( device->vk_handle, event->vk_fence, NULL );
+    vkDestroyFence ( device->vk_handle, event->vk_fence, xg_vk_cpu_allocator() );
 
     std_list_push ( &xg_vk_event_state->cpu_queue_events_freelist, event );
 

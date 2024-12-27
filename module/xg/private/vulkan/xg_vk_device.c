@@ -902,7 +902,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     device_create_info.enabledExtensionCount = enabled_extensions_count;
     device_create_info.ppEnabledExtensionNames = enabled_extensions;
     device_create_info.pEnabledFeatures = &enabled_features;
-    vkCreateDevice ( device->vk_physical_handle, &device_create_info, NULL, &device->vk_handle );
+    vkCreateDevice ( device->vk_physical_handle, &device_create_info, xg_vk_cpu_allocator(), &device->vk_handle );
 
     // Create Device queues
     // We only support one queue per type for now
@@ -943,7 +943,7 @@ bool xg_vk_device_deactivate ( xg_device_h device_handle ) {
     //vkDestroyCommandPool ( device->logical_id, device->graphics_cmd_pool, NULL );
     //vkDestroyCommandPool ( device->logical_id, device->compute_cmd_pool, NULL );
     //vkDestroyCommandPool ( device->logical_id, device->copy_cmd_pool, NULL );
-    vkDestroyDevice ( device->vk_handle, NULL );
+    vkDestroyDevice ( device->vk_handle, xg_vk_cpu_allocator() );
 
     std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
 

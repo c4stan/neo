@@ -1637,7 +1637,7 @@ static void viewapp_boot ( void ) {
         );
 
         m_state->ui.frame_section_state = xi_section_state_m ( .title = "frame" );
-        m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "xg allocator" );
+        m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
         m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
         m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
     }
@@ -1942,6 +1942,27 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
     // xg allocator
     xi->begin_section ( xi_workload, &m_state->ui.xg_alloc_section_state );
+    {
+        std_allocator_info_t cpu_info;
+        std_virtual_heap_allocator_info ( &cpu_info );
+        std_platform_memory_info_t memory_info = std_platform_memory_info();
+        xi->add_label ( xi_workload, &xi_label_state_m ( .text = "cpu" ) );
+        xi_label_state_t size_label = xi_label_state_m ( 
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+        );
+        std_stack_t stack = std_static_stack_m ( size_label.text );
+        char buffer[32];
+        std_size_to_str_approx ( buffer, 32, cpu_info.allocated_size );
+        std_stack_string_append ( &stack, buffer );
+        std_stack_string_append ( &stack, "/" );
+        std_size_to_str_approx ( buffer, 32, cpu_info.reserved_size );
+        std_stack_string_append ( &stack, buffer );
+        std_stack_string_append ( &stack, "/" );
+        std_size_to_str_approx ( buffer, 32, memory_info.total_ram_size );
+        std_stack_string_append ( &stack, buffer );
+        xi->add_label ( xi_workload, &size_label );
+    }
+    xi->newline();
     for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
         xg_allocator_info_t info;
         xg->get_allocator_info ( &info, m_state->render.device, i );

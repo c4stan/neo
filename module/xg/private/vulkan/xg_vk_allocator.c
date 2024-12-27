@@ -63,7 +63,7 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
         .memoryTypeIndex = memory_type_index,
     };
     VkDeviceMemory memory;
-    VkResult vk_result = vkAllocateMemory ( device->vk_handle, &info, NULL, &memory );
+    VkResult vk_result = vkAllocateMemory ( device->vk_handle, &info, xg_vk_cpu_allocator(), &memory );
     std_assert_m ( vk_result == VK_SUCCESS );
 
     VkDebugUtilsObjectNameInfoEXT debug_name = {
@@ -116,7 +116,7 @@ static void xg_vk_allocator_simple_free ( xg_memory_h memory_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
     std_assert_m ( device );
 
-    vkFreeMemory ( device->vk_handle, alloc->vk_handle, NULL );
+    vkFreeMemory ( device->vk_handle, alloc->vk_handle, xg_vk_cpu_allocator() );
     std_list_push ( &xg_vk_allocator_state->allocations_freelist, alloc );
     std_mutex_unlock ( &xg_vk_allocator_state->allocations_mutex );
 }

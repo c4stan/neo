@@ -131,7 +131,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     vk_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vk_buffer_info.queueFamilyIndexCount = 0;
     vk_buffer_info.pQueueFamilyIndices = NULL;
-    VkResult result = vkCreateBuffer ( device->vk_handle, &vk_buffer_info, NULL, &vk_buffer );
+    VkResult result = vkCreateBuffer ( device->vk_handle, &vk_buffer_info, xg_vk_cpu_allocator(), &vk_buffer );
     std_assert_m ( result == VK_SUCCESS );
 
     if ( params->debug_name[0] != '\0' ) {
@@ -223,7 +223,7 @@ bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
     xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[idx];
 
     const xg_vk_device_t* device = xg_vk_device_get ( buffer->params.device );
-    vkDestroyBuffer ( device->vk_handle, buffer->vk_handle, NULL );
+    vkDestroyBuffer ( device->vk_handle, buffer->vk_handle, xg_vk_cpu_allocator() );
     //buffer->params.allocator.free ( buffer->params.allocator.impl, buffer->allocation.handle );
     xg_free ( buffer->allocation.handle );
 

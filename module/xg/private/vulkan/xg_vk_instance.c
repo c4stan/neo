@@ -1,5 +1,31 @@
 #include "xg_vk_instance.h"
 
+#include "xg_vk_allocator.h"
+
+// --------------------------
+
+void* xg_vk_instance_cpu_alloc ( void* user, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
+    std_unused_m ( user );
+    std_unused_m ( scope );
+    return std_virtual_heap_alloc ( size, alignment );
+}
+
+void* xg_vk_instance_cpu_realloc ( void* user, void* original, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
+    std_unused_m ( user );
+    std_unused_m ( scope );
+    void* new = std_virtual_heap_alloc ( size, alignment );
+    std_mem_copy ( new, original, size );
+    std_virtual_heap_free ( original );
+    return new;
+}
+
+void xg_vk_instance_cpu_free ( void* user, void* memory ) {
+    std_unused_m ( user );
+    std_virtual_heap_free ( memory );
+}
+
+// --------------------------
+
 static xg_vk_instance_state_t* xg_vk_instance_state;
 
 static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_count, const char** extensions, size_t extensions_count ) {
@@ -106,7 +132,7 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
             .ppEnabledExtensionNames = enabled_extensions,
         };
         
-        VkResult result = vkCreateInstance ( &instanceInfo, NULL, &instance );
+        VkResult result = vkCreateInstance ( &instanceInfo, xg_vk_cpu_allocator(), &instance );
         std_verify_m ( result == VK_SUCCESS );
     }
     return instance;
@@ -180,6 +206,16 @@ static void xg_vk_instance_create_debug_callback ( void ) {
 
 void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e layers_flags ) {
     xg_vk_instance_state = state;
+
+    // Cpu allocator
+    state->cpu_allocator = ( VkAllocationCallbacks ) {
+        .pUserData = NULL,
+        .pfnAllocation = xg_vk_instance_cpu_alloc,
+        .pfnReallocation = xg_vk_instance_cpu_realloc,
+        .pfnFree = xg_vk_instance_cpu_free,
+        .pfnInternalAllocation = NULL,
+        .pfnInternalFree = NULL,
+    };
 
     /*
     LAYERS
@@ -332,7 +368,7 @@ void xg_vk_instance_reload ( xg_vk_instance_state_t* state ) {
 
 void xg_vk_instance_unload ( void ) {
     xg_vk_instance_destroy_debug_callback();
-    vkDestroyInstance ( xg_vk_instance_state->vk_handle, NULL );
+    vkDestroyInstance ( xg_vk_instance_state->vk_handle, xg_vk_cpu_allocator() );
 }
 
 VkInstance xg_vk_instance ( void ) {
@@ -341,4 +377,8 @@ VkInstance xg_vk_instance ( void ) {
 
 xg_vk_instance_ext_api_i* xg_vk_instance_ext_api ( void ) {
     return &xg_vk_instance_state->ext_api;
+}
+
+VkAllocationCallbacks* xg_vk_cpu_allocator ( void ) {
+    return &xg_vk_instance_state->cpu_allocator;
 }

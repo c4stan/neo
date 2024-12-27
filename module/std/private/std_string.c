@@ -467,7 +467,9 @@ static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint
         if ( u64 % multiplier == 0 ) {
             retval = snprintf ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
         } else {
-            retval = snprintf ( dest, cap, "~" std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
+            // The ~ character breaks a number of fonts when used for text rendering... better if avoided
+            //retval = snprintf ( dest, cap, "~" std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
+            retval = snprintf ( dest, cap, std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
         }
 
         std_assert_m ( retval >= 0 );

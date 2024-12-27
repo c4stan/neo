@@ -150,6 +150,13 @@ bool    std_virtual_heap_free ( void* ptr );
 #define std_virtual_heap_alloc_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
 #define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
 
+typedef struct {
+    uint64_t allocated_size;
+    uint64_t reserved_size;
+} std_allocator_info_t;
+
+void std_virtual_heap_allocator_info ( std_allocator_info_t* info );
+
 /*
     Buffer utilities
 */

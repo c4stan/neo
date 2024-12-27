@@ -7,6 +7,7 @@
 #include "xg_vk_buffer.h"
 #include "xg_vk_texture.h"
 #include "xg_vk_sampler.h"
+#include "xg_vk_allocator.h"
 
 #include <std_sort.h>
 
@@ -364,7 +365,7 @@ static uint64_t xg_vk_renderpass_params_hash ( const xg_render_textures_layout_t
 static void xg_vk_framebuffer_destroy ( xg_vk_framebuffer_h framebuffer_handle ) {
     xg_vk_framebuffer_t* framebuffer = &xg_vk_pipeline_state->framebuffers_array[framebuffer_handle];
     const xg_vk_device_t* device = xg_vk_device_get ( framebuffer->device );
-    vkDestroyFramebuffer ( device->vk_handle, framebuffer->vk_handle, NULL );
+    vkDestroyFramebuffer ( device->vk_handle, framebuffer->vk_handle, xg_vk_cpu_allocator() );
     std_hash_map_remove ( &xg_vk_pipeline_state->framebuffers_map, framebuffer->hash );
     std_list_push ( &xg_vk_pipeline_state->framebuffers_freelist, framebuffer );
 }
@@ -439,7 +440,7 @@ static xg_vk_framebuffer_h xg_vk_framebuffer_create ( xg_device_h device_handle,
         framebuffer_create_info.height = height;
         framebuffer_create_info.layers = 1;
 
-        std_verify_m ( vkCreateFramebuffer ( device->vk_handle, &framebuffer_create_info, NULL, &framebuffer ) == VK_SUCCESS );
+        std_verify_m ( vkCreateFramebuffer ( device->vk_handle, &framebuffer_create_info, xg_vk_cpu_allocator(), &framebuffer ) == VK_SUCCESS );
     }
 
     if ( debug_name != NULL ) {
@@ -565,7 +566,7 @@ static xg_vk_renderpass_h xg_vk_renderpass_create ( xg_device_h device_handle, c
         info.pSubpasses = &subpass;
         info.dependencyCount = 0;
         info.pDependencies = NULL;
-        vkCreateRenderPass ( device->vk_handle, &info, NULL, &renderpass );
+        vkCreateRenderPass ( device->vk_handle, &info, xg_vk_cpu_allocator(), &renderpass );
     }
 
     // TODO remove?
@@ -593,7 +594,7 @@ static xg_vk_renderpass_h xg_vk_renderpass_create ( xg_device_h device_handle, c
 static void xg_vk_renderpass_destroy ( xg_vk_renderpass_h renderpass_handle ) {
     xg_vk_renderpass_t* renderpass = xg_vk_renderpass_edit ( renderpass_handle );
     const xg_vk_device_t* device = xg_vk_device_get ( renderpass->device );
-    vkDestroyRenderPass ( device->vk_handle, renderpass->vk_renderpass, NULL );
+    vkDestroyRenderPass ( device->vk_handle, renderpass->vk_renderpass, xg_vk_cpu_allocator() );
     std_hash_map_remove ( &xg_vk_pipeline_state->renderpasses_map, renderpass->hash );
     std_list_push ( &xg_vk_pipeline_state->renderpasses_freelist, renderpass );
 }
@@ -739,7 +740,7 @@ void xg_vk_pipeline_create_pipeline_layout ( xg_vk_pipeline_layout_creation_resu
             descriptor_set_info.flags = 0;
             descriptor_set_info.bindingCount = ( uint32_t ) set->descriptor_count;
             descriptor_set_info.pBindings = vk_bindings;
-            vkCreateDescriptorSetLayout ( device->vk_handle, &descriptor_set_info, NULL, &vk_sets[i] );
+            vkCreateDescriptorSetLayout ( device->vk_handle, &descriptor_set_info, xg_vk_cpu_allocator(), &vk_sets[i] );
 
             set->vk_handle = vk_sets[i];
 
@@ -798,7 +799,7 @@ void xg_vk_pipeline_create_pipeline_layout ( xg_vk_pipeline_layout_creation_resu
         layout_info.pSetLayouts = vk_sets;
         layout_info.pushConstantRangeCount = bindings->constant_binding_points_count;
         layout_info.pPushConstantRanges = vk_constant_ranges;
-        VkResult vk_result = vkCreatePipelineLayout ( device->vk_handle, &layout_info, NULL, &pipeline_layout );
+        VkResult vk_result = vkCreatePipelineLayout ( device->vk_handle, &layout_info, xg_vk_cpu_allocator(), &pipeline_layout );
         std_verify_m ( vk_result == VK_SUCCESS );
 
         if ( debug_name != NULL ) {
@@ -873,7 +874,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .pCode = ( const uint32_t* ) shader->buffer.base,
                 .codeSize = shader->buffer.size,
             };
-            vkCreateShaderModule ( device->vk_handle, &module_info, NULL, &vk_shader_handles[i] );
+            vkCreateShaderModule ( device->vk_handle, &module_info, xg_vk_cpu_allocator(), &vk_shader_handles[i] );
 
             shader_info[i] = ( VkPipelineShaderStageCreateInfo ) {
                 .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1083,7 +1084,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = 0,
             };
-            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
+            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
 #else
             // TODO
             VkRayTracingPipelineCreateInfoKHR info = {
@@ -1102,7 +1103,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = 0,
             };
-            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
+            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
 #endif
             std_verify_m ( result == VK_SUCCESS );
 
@@ -1262,11 +1263,11 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
 
     for ( uint32_t i = 0; i < xg_shading_stage_count_m; ++i ) {
         if ( pipeline->common.vk_shader_handles[i] != VK_NULL_HANDLE ) {
-            vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[i], NULL );
+            vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[i], xg_vk_cpu_allocator() );
         }
     }
-    vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
-    vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, NULL );
+    vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, xg_vk_cpu_allocator() );
+    vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, xg_vk_cpu_allocator() );
 
     for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_h layout_handle = pipeline->common.descriptor_set_layouts[i];
@@ -1274,7 +1275,7 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
         set->ref_count -= 1;
         if ( set->ref_count == 0 ) {
             const xg_vk_device_t* device = xg_vk_device_get ( set->device );
-            vkDestroyDescriptorSetLayout ( device->vk_handle, set->vk_handle, NULL );
+            vkDestroyDescriptorSetLayout ( device->vk_handle, set->vk_handle, xg_vk_cpu_allocator() );
             std_hash_map_remove ( &xg_vk_pipeline_state->set_layouts_map, set->hash );
             std_list_push ( &xg_vk_pipeline_state->set_layouts_freelist, set );
         }
@@ -1349,7 +1350,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
             module_info.flags = 0;
             module_info.pCode = ( const uint32_t* ) params->state.compute_shader.buffer.base;
             module_info.codeSize = params->state.compute_shader.buffer.size;
-            vkCreateShaderModule ( device->vk_handle, &module_info, NULL, &shader );
+            vkCreateShaderModule ( device->vk_handle, &module_info, xg_vk_cpu_allocator(), &shader );
 
             shader_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
             shader_info.pNext = NULL;
@@ -1375,7 +1376,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
             info.layout = pipeline_layout_result.pipeline_layout;
             info.basePipelineHandle = VK_NULL_HANDLE;
             info.basePipelineIndex = 0;
-            VkResult result = vkCreateComputePipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
+            VkResult result = vkCreateComputePipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
             std_verify_m ( result == VK_SUCCESS );
 
             if ( params->debug_name[0] ) {
@@ -1819,7 +1820,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                 module_info[shader_count].flags = 0;
                 module_info[shader_count].pCode = ( const uint32_t* ) params->state.vertex_shader.buffer.base;
                 module_info[shader_count].codeSize = params->state.vertex_shader.buffer.size;
-                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
+                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], xg_vk_cpu_allocator(), &vk_shader_handles[shader_count] );
 
                 shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
                 shader_info[shader_count].pNext = NULL;
@@ -1853,7 +1854,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                 module_info[shader_count].flags = 0;
                 module_info[shader_count].pCode = ( const uint32_t* ) params->state.fragment_shader.buffer.base;
                 module_info[shader_count].codeSize = params->state.fragment_shader.buffer.size;
-                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], NULL, &vk_shader_handles[shader_count] );
+                vkCreateShaderModule ( device->vk_handle, &module_info[shader_count], xg_vk_cpu_allocator(), &vk_shader_handles[shader_count] );
 
                 shader_info[shader_count].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
                 shader_info[shader_count].pNext = NULL;
@@ -1909,7 +1910,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             info.subpass = 0;
             info.basePipelineHandle = VK_NULL_HANDLE;
             info.basePipelineIndex = 0;
-            VkResult result = vkCreateGraphicsPipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
+            VkResult result = vkCreateGraphicsPipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
             std_verify_m ( result == VK_SUCCESS );
 
             if ( params->debug_name[0] ) {
@@ -1983,12 +1984,12 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
 
     for ( uint32_t i = 0; i < xg_shading_stage_count_m; ++i ) {
         if ( pipeline->common.vk_shader_handles[i] != VK_NULL_HANDLE ) {
-            vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[i], NULL );
+            vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[i], xg_vk_cpu_allocator() );
         }
     }
 
-    vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
-    vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, NULL );
+    vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, xg_vk_cpu_allocator() );
+    vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, xg_vk_cpu_allocator() );
 
     for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_h layout_handle = pipeline->common.descriptor_set_layouts[i];
@@ -1996,7 +1997,7 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
         set->ref_count -= 1;
         if ( set->ref_count == 0 ) {
             const xg_vk_device_t* device = xg_vk_device_get ( set->device );
-            vkDestroyDescriptorSetLayout ( device->vk_handle, set->vk_handle, NULL );
+            vkDestroyDescriptorSetLayout ( device->vk_handle, set->vk_handle, xg_vk_cpu_allocator() );
             std_hash_map_remove ( &xg_vk_pipeline_state->set_layouts_map, set->hash );
             std_list_push ( &xg_vk_pipeline_state->set_layouts_freelist, set );
         }
@@ -2059,9 +2060,9 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
 
     const xg_vk_device_t* device = xg_vk_device_get ( pipeline->common.device_handle );
 
-    vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[xg_shading_stage_compute_m], NULL );
-    vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
-    vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, NULL );
+    vkDestroyShaderModule ( device->vk_handle, pipeline->common.vk_shader_handles[xg_shading_stage_compute_m], xg_vk_cpu_allocator() );
+    vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, xg_vk_cpu_allocator() );
+    vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, xg_vk_cpu_allocator() );
 
     for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_h layout_handle = pipeline->common.descriptor_set_layouts[i];
@@ -2069,7 +2070,7 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
         set->ref_count -= 1;
         if ( set->ref_count == 0 ) {
             const xg_vk_device_t* device = xg_vk_device_get ( set->device );
-            vkDestroyDescriptorSetLayout ( device->vk_handle, set->vk_handle, NULL );
+            vkDestroyDescriptorSetLayout ( device->vk_handle, set->vk_handle, xg_vk_cpu_allocator() );
             std_hash_map_remove ( &xg_vk_pipeline_state->set_layouts_map, set->hash );
             std_list_push ( &xg_vk_pipeline_state->set_layouts_freelist, set );
         }
@@ -2167,7 +2168,7 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         sizes[xg_resource_binding_raytrace_world_m].descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m;
 #endif
         info.pPoolSizes = sizes;
-        VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &context->vk_desc_pool );
+        VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, xg_vk_cpu_allocator(), &context->vk_desc_pool );
         std_verify_m ( result == VK_SUCCESS );
     }
 
@@ -2179,7 +2180,7 @@ void xg_vk_pipeline_deactivate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
-    vkDestroyDescriptorPool ( device->vk_handle, xg_vk_pipeline_state->device_contexts[device_idx].vk_desc_pool, NULL );
+    vkDestroyDescriptorPool ( device->vk_handle, xg_vk_pipeline_state->device_contexts[device_idx].vk_desc_pool, xg_vk_cpu_allocator() );
 }
 
 xg_pipeline_resource_group_h xg_vk_pipeline_create_resource_group ( xg_device_h device_handle, xg_pipeline_state_h pipeline_handle, xg_shader_binding_set_e set ) {
