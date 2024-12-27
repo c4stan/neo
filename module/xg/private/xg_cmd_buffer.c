@@ -518,7 +518,7 @@ void xg_cmd_buffer_pipeline_constant_write ( xg_cmd_buffer_h cmd_buffer_handle, 
     std_mem_copy ( data, constant_data->base, constant_data->size );
 }
 
-void xg_cmd_buffer_pipeline_resource_group_bind ( xg_cmd_buffer_h cmd_buffer_handle, xg_resource_binding_set_e set, xg_pipeline_resource_group_h group, uint64_t key ) {
+void xg_cmd_buffer_pipeline_resource_group_bind ( xg_cmd_buffer_h cmd_buffer_handle, xg_shader_binding_set_e set, xg_pipeline_resource_group_h group, uint64_t key ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_pipeline_resource_group_bind_m, key, xg_cmd_pipeline_resource_group_bind_t );
 
@@ -530,7 +530,7 @@ void xg_cmd_buffer_pipeline_resources_bind ( xg_cmd_buffer_h cmd_buffer_handle, 
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_pipeline_resource_bind_m, key, xg_cmd_pipeline_resource_bind_t );
 
-    xg_resource_binding_set_e set = bindings->set;
+    xg_shader_binding_set_e set = bindings->set;
     uint32_t buffer_count = bindings->buffer_count;
     uint32_t texture_count = bindings->texture_count;
     uint32_t sampler_count = bindings->sampler_count;

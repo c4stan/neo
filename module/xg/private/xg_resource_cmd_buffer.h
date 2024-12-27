@@ -65,7 +65,7 @@ typedef struct {
 
 typedef struct {
     xg_pipeline_resource_group_h group;
-    xg_resource_binding_set_e set;
+    //xg_shader_binding_set_e set;
     uint32_t buffer_count;
     uint32_t texture_count;
     uint32_t sampler_count;
@@ -125,6 +125,8 @@ xg_buffer_h     xg_resource_cmd_buffer_buffer_create            ( xg_resource_cm
 void            xg_resource_cmd_buffer_buffer_destroy           ( xg_resource_cmd_buffer_h cmd_buffer, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e destroy_time );
 
 xg_pipeline_resource_group_h xg_resource_cmd_buffer_resource_group_create ( xg_resource_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_group_params_t* params );
+xg_pipeline_resource_group_h xg_resource_cmd_buffer_workload_resource_group_create ( xg_resource_cmd_buffer_h cmd_buffer, xg_workload_h workload_handle, const xg_pipeline_resource_group_params_t* params );
+void            xg_resource_cmd_buffer_resource_group_update    ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h group, const xg_pipeline_resource_group_params_t* params );
 void            xg_resource_cmd_buffer_resource_group_destroy   ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h group, xg_resource_cmd_buffer_time_e destroy_time );
 
 void            xg_resource_cmd_buffer_graphics_renderpass_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time );

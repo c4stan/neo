@@ -109,7 +109,7 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
         // Bind draw resources
         xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_resource_binding_set_per_draw_m,
+            .set = xg_shader_binding_set_per_draw_m,
             .buffer_count = 2,
             .buffers = {
                 xg_buffer_resource_binding_m (

@@ -23,7 +23,7 @@ layout ( buffer_reference, scalar ) buffer uint3_buffer_t { uint[3] data[]; };
 
 layout ( location = 0 ) rayPayloadInNV ray_payload_t ray_payload;
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform accelerationStructureNV scene;
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform accelerationStructureNV scene;
 
 struct light_t {
     vec3 pos;
@@ -36,7 +36,7 @@ struct light_t {
 
 #define MAX_LIGHT_COUNT 32
 
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 3, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
     uint light_count;
     uint _pad0;
     uint _pad1;
@@ -44,11 +44,11 @@ layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform draw_cb
     light_t lights[MAX_LIGHT_COUNT];
 } draw_cbuffer;
 
-layout ( binding = 2, set = xs_resource_binding_set_per_draw_m, scalar ) buffer instance_array_t {
+layout ( binding = 2, set = xs_shader_binding_set_per_draw_m, scalar ) buffer instance_array_t {
     instance_t data[];
 } instance_array;
 
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m, rgba32f ) uniform image2D img_color;
+layout ( binding = 1, set = xs_shader_binding_set_per_draw_m, rgba32f ) uniform image2D img_color;
 
 vec3 load_vec3 ( float[3] f32 ) {
     return vec3 ( f32[0], f32[1], f32[2] );

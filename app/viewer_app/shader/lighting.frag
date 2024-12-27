@@ -5,17 +5,17 @@
 #include "common.glsl"
 #include "lighting_common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_color;
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_normal;
-layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_material;
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_depth;
-layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) uniform texture2D tex_shadows;
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_color;
+layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_normal;
+layout ( binding = 2, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_material;
+layout ( binding = 3, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_depth;
+layout ( binding = 4, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_shadows;
 
-layout ( binding = 5, set = xs_resource_binding_set_per_draw_m ) uniform sampler sampler_point;
+layout ( binding = 5, set = xs_shader_binding_set_per_draw_m ) uniform sampler sampler_point;
 
 #define MAX_LIGHT_COUNT 32
 
-layout ( binding = 6, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 6, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
     uint light_count;
     uint _pad0;
     uint _pad1;

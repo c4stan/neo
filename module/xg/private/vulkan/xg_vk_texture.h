@@ -54,13 +54,7 @@ typedef struct {
     xg_vk_texture_t* textures_freelist;
     uint64_t* textures_bitset;
     std_mutex_t textures_mutex;
-
-#if 0
-    std_memory_h texture_views_memory_handle;
-    xg_vk_texture_view_t* texture_views_array;
-    xg_vk_texture_view_t* texture_views_freelist;
-    std_mutex_t texture_views_mutex;
-#endif
+    xg_texture_h default_textures[xg_vk_max_devices_m][xg_default_texture_count_m];
 } xg_vk_texture_state_t;
 
 void xg_vk_texture_load ( xg_vk_texture_state_t* state );

@@ -4,8 +4,8 @@
 
 #include "common.glsl"
 
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_input;
-layout ( set = xs_resource_binding_set_per_draw_m, binding = 1 ) uniform sampler sampler_input;
+layout ( set = xs_shader_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_input;
+layout ( set = xs_shader_binding_set_per_draw_m, binding = 1 ) uniform sampler sampler_input;
 
 layout ( location = 0 ) out vec4 out_color;
 

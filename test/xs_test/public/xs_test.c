@@ -16,25 +16,34 @@ typedef struct {
     float pad;
 } frame_cbuffer_t;
 
-static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swapchain_h swapchain, xg_graphics_pipeline_state_h graphics_pipeline_state, xg_compute_pipeline_state_h compute_pipeline_state ) {
+typedef struct {
+    xg_device_h device;
+    xg_workload_h workload;
+    xg_swapchain_h swapchain;
+    xg_compute_pipeline_state_h compute_pipeline;
+    xg_graphics_pipeline_state_h graphics_pipeline;
+    xg_renderpass_h renderpass;
+} xs_test_frame_params_t;
+
+static void xs_test_frame ( xs_test_frame_params_t frame ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
+    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( frame.workload );
 
     xg_swapchain_acquire_result_t acquire;
-    xg->acquire_swapchain ( &acquire, swapchain, workload );
+    xg->acquire_swapchain ( &acquire, frame.swapchain, frame.workload );
     xg_texture_h swapchain_texture = acquire.texture;
 
-    // Allocate temp texture
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( frame.workload );
 
     xg_texture_info_t swapchain_texture_info;
     xg->get_texture_info ( &swapchain_texture_info, swapchain_texture );
 
 #if 1
+    // Allocate temp texture
     xg_texture_params_t params = xg_texture_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
-        .device = device,
+        .device = frame.device,
         .width = swapchain_texture_info.width,
         .height = swapchain_texture_info.height,
         .format = swapchain_texture_info.format,
@@ -98,10 +107,11 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
 #if !COMPUTE_CLEAR
         xg->cmd_clear_texture ( cmd_buffer, temp_texture, color_clear, 0 );
 #else
-        xg->cmd_set_compute_pipeline_state ( cmd_buffer, compute_pipeline_state, 0 );
+        xg->cmd_set_compute_pipeline_state ( cmd_buffer, frame.compute_pipeline, 0 );
 
+#if 0
         xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_resource_binding_set_per_frame_m,
+            .set = xg_shader_binding_set_per_frame_m,
             .texture_count = 1,
             .textures = {
                 xg_texture_resource_binding_m (
@@ -113,6 +123,25 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
             }
         );
         xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, 0 );
+#else
+        xg_pipeline_resource_group_h group = xg->cmd_create_workload_resource_group ( resource_cmd_buffer, frame.workload, &xg_pipeline_resource_group_params_m (
+            .device = frame.device,
+            .pipeline = frame.compute_pipeline,
+            .bindings = xg_pipeline_resource_bindings_m (
+                .set = xg_shader_binding_set_per_frame_m,
+                .texture_count = 1,
+                .textures = {
+                    xg_texture_resource_binding_m (
+                        .shader_register = 0,
+                        .texture = temp_texture,
+                        .view = xg_texture_view_m(),
+                        .layout = xg_texture_layout_shader_write_m,
+                    )
+                }
+            )
+        ) );
+        xg->cmd_set_resource_group ( cmd_buffer, xg_shader_binding_set_per_frame_m, group, 0 );
+#endif
 
         xg->cmd_dispatch_compute ( cmd_buffer, swapchain_texture_info.width, swapchain_texture_info.height, 1, 0 );
 #endif
@@ -206,7 +235,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
     }
 
     // Set pipeline
-    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, graphics_pipeline_state, 0 );
+    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, frame.graphics_pipeline, 0 );
 
     xg_viewport_state_t viewport = xg_viewport_state_m (
         .width = 600,
@@ -223,7 +252,7 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
         //cbuffer_range = xg->write_workload_uniform ( workload, &cbuffer_data, sizeof ( cbuffer_data ) );
         xg_buffer_h buffer_handle = xg->create_buffer ( & xg_buffer_params_m (
             .memory_type = xg_memory_type_gpu_mapped_m,
-            .device = device,
+            .device = frame.device,
             .size = 128,
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
             .debug_name = "uniform buffer"
@@ -240,8 +269,9 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
     }
 
     // Bind resources
+#if 0
     xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_draw_m,
+        .set = xg_shader_binding_set_per_draw_m,
         .buffer_count = 1,
         .buffers = {
             xg_buffer_resource_binding_m (
@@ -253,9 +283,32 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
     );
 
     xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, 0 );
+#else
+    xg_pipeline_resource_group_h group = xg->cmd_create_workload_resource_group ( resource_cmd_buffer, frame.workload, &xg_pipeline_resource_group_params_m (
+        .device = frame.device,
+        .pipeline = frame.graphics_pipeline,
+        .bindings = xg_pipeline_resource_bindings_m (
+            .set = xg_shader_binding_set_per_draw_m,
+            .buffer_count = 1,
+            .buffers = {
+                xg_buffer_resource_binding_m (
+                    .shader_register = 0,
+                    .type = xg_buffer_binding_type_uniform_m,
+                    .range = cbuffer_range,
+                )
+            }
+        )
+    ) );
+
+    xg->cmd_set_resource_group ( cmd_buffer, xg_shader_binding_set_per_draw_m, group, 0 );
+#endif
+
+    xg->cmd_begin_renderpass ( cmd_buffer, frame.renderpass, 0 );
 
     // Draw
     xg->cmd_draw ( cmd_buffer, 3, 0, 0 );
+
+    xg->cmd_end_renderpass ( cmd_buffer, frame.renderpass, 0 );
 
     // Transition swapchain texture to present mode
     {
@@ -280,15 +333,17 @@ static void xs_test2_frame ( xg_device_h device, xg_workload_h workload, xg_swap
     //xg->close_resource_cmd_buffers ( &resource_cmd_buffer, 1 );
 
     //xg->close_cmd_buffers ( &cmd_buffer, 1 );
-    xg->submit_workload ( workload );
-    xg->present_swapchain ( swapchain, workload );
+    xg->submit_workload ( frame.workload );
+    xg->present_swapchain ( frame.swapchain, frame.workload );
 }
 
-static void xs_test2 ( void ) {
+static void xs_test ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
     std_assert_m ( wm );
 
-    wm_window_params_t window_params = { .name = "xs_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
+    uint32_t resolution_x = 600;
+    uint32_t resolution_y = 400;
+    wm_window_params_t window_params = { .name = "xs_test", .x = 0, .y = 0, .width = resolution_x, .height = resolution_y, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &window_params );
     std_log_info_m ( "Creating window "std_fmt_str_m std_fmt_newline_m, window_params.name );
 
@@ -340,6 +395,17 @@ static void xs_test2 ( void ) {
     xs_database_pipeline_h graphics_database_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "test_state" ) );
     xs_database_pipeline_h compute_database_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "compute_state" ) );
 
+    xg_renderpass_h renderpass = xg->create_renderpass ( &xg_graphics_renderpass_params_m ( 
+        .device = device,
+        .render_textures = xg_render_textures_layout_m (
+            .render_targets_count = 1,
+            .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
+        ),
+        .resolution_x = resolution_x,
+        .resolution_y = resolution_y,
+        .debug_name = "xs_test_renderpass"
+    ) );
+
     wm_window_info_t window_info;
     wm->get_window_info ( window, &window_info );
     wm_input_state_t input_state;
@@ -388,7 +454,14 @@ static void xs_test2 ( void ) {
 
         xg_graphics_pipeline_state_h graphics_pipeline = xs->get_pipeline_state ( graphics_database_pipeline );
         xg_compute_pipeline_state_h compute_pipeline = xs->get_pipeline_state ( compute_database_pipeline );
-        xs_test2_frame ( device, workload, swapchain, graphics_pipeline, compute_pipeline );
+        xs_test_frame ( ( xs_test_frame_params_t ) {
+            .device = device,
+            .workload = workload,
+            .swapchain = swapchain,
+            .compute_pipeline = compute_pipeline,
+            .graphics_pipeline = graphics_pipeline,
+            .renderpass = renderpass
+        } );
 
         xs->update_pipeline_states ( workload );
     }
@@ -397,45 +470,7 @@ static void xs_test2 ( void ) {
     std_module_unload_m ( xg_module_name_m );
 }
 
-#if 0
-static void xs_test1 ( void ) {
-    xg_device_h device;
-    xg_i* xg = std_module_load_m ( xg_module_name_m );
-    {
-        size_t device_count = xg->get_devices_count();
-        std_assert_m ( device_count > 0 );
-        xg_device_h devices[16];
-        xg->get_devices ( devices, 16 );
-        device = devices[0];
-        bool activate_result = xg->activate_device ( device );
-        std_assert_m ( activate_result );
-        xg_device_info_t device_info;
-        xg->get_device_info ( &device_info, device );
-        std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
-    }
-
-    xs_i* xs = std_module_load_m ( xs_module_name_m );
-    {
-        xs->add_database_folder ( "shader/" );
-        xs->set_output_folder ( "output/shader/" );
-
-        xs_database_build_params_t build_params;
-        build_params.viewport_width = 600;
-        build_params.viewport_height = 400;
-        xs_database_build_result_t result = xs->build_database_shaders ( device, &build_params );
-        std_log_info_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders", result.successful_pipeline_states, result.successful_shaders );
-
-        if ( result.failed_shaders || result.failed_pipeline_states ) {
-            std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
-        }
-    }
-
-    std_module_unload_m ( xs_module_name_m );
-    std_module_unload_m ( xg_module_name_m );
-}
-#endif
-
 void std_main ( void ) {
-    xs_test2();
+    xs_test();
     std_log_info_m ( "xs_test_m COMPLETE!" );
 }

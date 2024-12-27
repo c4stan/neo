@@ -5,26 +5,26 @@
 
 #extension GL_EXT_debug_printf : enable
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform_buffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform uniform_buffer_t {
     uvec3 grid_size;
 } uniform_buffer;
 
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer readonly light_buffer_t {
+layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) buffer readonly light_buffer_t {
     uint light_count;
     uint _pad0[3];
     light_t lights[];
 } light_buffer;
 
-layout ( binding = 2, set = xs_resource_binding_set_per_draw_m ) buffer readonly cluster_buffer_t {
+layout ( binding = 2, set = xs_shader_binding_set_per_draw_m ) buffer readonly cluster_buffer_t {
     light_cluster_t clusters[];
 } cluster_buffer;
 
-layout ( binding = 3, set = xs_resource_binding_set_per_draw_m ) buffer writeonly light_list_buffer_t {
+layout ( binding = 3, set = xs_shader_binding_set_per_draw_m ) buffer writeonly light_list_buffer_t {
     uint global_offset_accumulator;
     uint list[];
 } light_list_buffer;
 
-layout ( binding = 4, set = xs_resource_binding_set_per_draw_m ) buffer writeonly light_grid_buffer_t {
+layout ( binding = 4, set = xs_shader_binding_set_per_draw_m ) buffer writeonly light_grid_buffer_t {
     light_grid_t grid[];
 } light_grid_buffer;
 

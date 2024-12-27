@@ -371,19 +371,19 @@ static xg_compare_op_e xs_parser_compare_op_to_enum ( const char* op ) {
     return xg_compare_op_never_m;
 }
 
-static xg_resource_binding_set_e xs_parser_resource_binding_set_to_enum ( const char* set ) {
+static xg_shader_binding_set_e xs_parser_shader_binding_set_to_enum ( const char* set ) {
     if ( std_str_cmp ( set, "per_frame" ) == 0 || std_str_cmp ( set, "frame" ) == 0 ) {
-        return xg_resource_binding_set_per_frame_m;
+        return xg_shader_binding_set_per_frame_m;
     } else if ( std_str_cmp ( set, "per_view" ) == 0 || std_str_cmp ( set, "view" ) == 0 ) {
-        return xg_resource_binding_set_per_view_m;
+        return xg_shader_binding_set_per_view_m;
     } else if ( std_str_cmp ( set, "per_pass" ) == 0 || std_str_cmp ( set, "pass" ) == 0 ) {
-        return xg_resource_binding_set_per_pass_m;
+        return xg_shader_binding_set_per_pass_m;
     } else if ( std_str_cmp ( set, "per_draw" ) == 0 || std_str_cmp ( set, "draw" ) == 0 ) {
-        return xg_resource_binding_set_per_draw_m;
+        return xg_shader_binding_set_per_draw_m;
     }
 
     std_assert_m ( false );
-    return xg_resource_binding_set_per_draw_m;
+    return xg_shader_binding_set_per_draw_m;
 }
 
 static xg_shading_stage_bit_e xs_parser_shading_stage_to_bit ( const char* stage ) {
@@ -1027,14 +1027,14 @@ typedef enum {
 
 typedef struct {
     xg_shading_stage_bit_e stages;
-    xg_resource_binding_set_e update_set;
+    xg_shader_binding_set_e update_set;
     xs_parser_buffer_type_e type;
     uint32_t shader_register;
 } xs_parser_buffer_t;
 
 static void xs_parser_add_buffer ( xs_parser_parsing_context_t* context, const xs_parser_buffer_t* buffer ) {
     std_assert_m ( buffer->stages != 0 );
-    std_assert_m ( buffer->update_set != xg_resource_binding_set_invalid_m );
+    std_assert_m ( buffer->update_set != xg_shader_binding_set_invalid_m );
 
     xg_resource_binding_e type;
 
@@ -1095,7 +1095,7 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
     xs_parser_buffer_t buffer = {
         .type = xs_parser_buffer_type_uniform_m,
         .stages = xs_parser_default_shading_stage ( context ),
-        .update_set = xg_resource_binding_set_per_draw_m
+        .update_set = xg_shader_binding_set_per_draw_m
     };
 
     while ( context->head < context->eof ) {
@@ -1107,7 +1107,7 @@ static void xs_parser_parse_buffer ( xs_parser_parsing_context_t* context ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len >  0 );
-            buffer.update_set = xs_parser_resource_binding_set_to_enum ( token );
+            buffer.update_set = xs_parser_shader_binding_set_to_enum ( token );
         } else if ( std_str_cmp ( token, "register" ) == 0 || std_str_cmp ( token, "binding" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_u32 ( context, &buffer.shader_register );
@@ -1144,14 +1144,14 @@ typedef enum {
 
 typedef struct {
     xg_shading_stage_bit_e stages;
-    xg_resource_binding_set_e update_set;
+    xg_shader_binding_set_e update_set;
     uint32_t shader_register;
     xs_parser_texture_type_e type;
 } xs_parser_texture_t;
 
 static void xs_parser_add_texture ( xs_parser_parsing_context_t* context, const xs_parser_texture_t* texture ) {
     std_assert_m ( texture->stages != 0 );
-    std_assert_m ( texture->update_set != xg_resource_binding_set_invalid_m );
+    std_assert_m ( texture->update_set != xg_shader_binding_set_invalid_m );
 
     xg_resource_binding_e type;
 
@@ -1211,7 +1211,7 @@ static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
 
     xs_parser_texture_t texture = {
         .stages = xs_parser_default_shading_stage ( context ),
-        .update_set = xg_resource_binding_set_per_draw_m,
+        .update_set = xg_shader_binding_set_per_draw_m,
         .type = xs_parser_texture_type_sampled_m,
     };
 
@@ -1224,7 +1224,7 @@ static void xs_parser_parse_texture ( xs_parser_parsing_context_t* context ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len >  0 );
-            texture.update_set = xs_parser_resource_binding_set_to_enum ( token );
+            texture.update_set = xs_parser_shader_binding_set_to_enum ( token );
         } else if ( std_str_cmp ( token, "register" ) == 0 || std_str_cmp ( token, "binding" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_u32 ( context, &texture.shader_register );
@@ -1364,7 +1364,7 @@ static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
 
     struct {
         xg_shading_stage_bit_e stages;
-        xg_resource_binding_set_e update_set;
+        xg_shader_binding_set_e update_set;
         uint32_t shader_register;
     } ray_world;
 
@@ -1377,7 +1377,7 @@ static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len > 0 );
-            ray_world.update_set = xs_parser_resource_binding_set_to_enum ( token );
+            ray_world.update_set = xs_parser_shader_binding_set_to_enum ( token );
         } else if ( std_str_cmp ( token, "register" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_u32 ( context, &ray_world.shader_register );
@@ -1394,7 +1394,7 @@ static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
     }
 
     std_assert_m ( ray_world.stages != 0 );
-    std_assert_m ( ray_world.update_set != xg_resource_binding_set_invalid_m );
+    std_assert_m ( ray_world.update_set != xg_shader_binding_set_invalid_m );
     std_assert_m ( ray_world.shader_register != UINT32_MAX );
 
     std_assert_m ( context->pipeline_type == xg_pipeline_raytrace_m );
@@ -1408,13 +1408,13 @@ static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
 
 typedef struct {
     xg_shading_stage_bit_e stages;
-    xg_resource_binding_set_e update_set;
+    xg_shader_binding_set_e update_set;
     uint32_t shader_register;
 } xs_parser_sampler_t;
 
 static void xs_parser_add_sampler ( xs_parser_parsing_context_t* context, const xs_parser_sampler_t* sampler ) {
     std_assert_m ( sampler->stages != 0 );
-    std_assert_m ( sampler->update_set != xg_resource_binding_set_invalid_m );
+    std_assert_m ( sampler->update_set != xg_shader_binding_set_invalid_m );
     std_assert_m ( sampler->shader_register != UINT32_MAX );
 
     xg_resource_binding_layout_t* binding_point = NULL;
@@ -1445,7 +1445,7 @@ static void xs_parser_parse_sampler ( xs_parser_parsing_context_t* context ) {
     xs_parser_sampler_t sampler;
 
     sampler.stages = 0;
-    sampler.update_set = xg_resource_binding_set_per_draw_m;//xg_resource_binding_set_invalid_m;
+    sampler.update_set = xg_shader_binding_set_per_draw_m;//xg_shader_binding_set_invalid_m;
     sampler.shader_register = UINT32_MAX;
 
     while ( context->head < context->eof ) {
@@ -1457,7 +1457,7 @@ static void xs_parser_parse_sampler ( xs_parser_parsing_context_t* context ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
             std_assert_m ( len > 0 );
-            sampler.update_set = xs_parser_resource_binding_set_to_enum ( token );
+            sampler.update_set = xs_parser_shader_binding_set_to_enum ( token );
         } else if ( std_str_cmp ( token, "register" ) == 0 ) {
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_u32 ( context, &sampler.shader_register );
@@ -1511,7 +1511,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
         if ( std_str_cmp ( token , "buffer" ) == 0 ) {
             xs_parser_buffer_t buffer = {
                 .stages = xs_parser_default_shading_stage ( context ),
-                .update_set = xg_resource_binding_set_per_draw_m,
+                .update_set = xg_shader_binding_set_per_draw_m,
                 .type = xs_parser_buffer_type_uniform_m,
                 .shader_register = default_register,
             };
@@ -1544,7 +1544,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
         } else if ( std_str_cmp ( token, "texture" ) == 0 ) {
             xs_parser_texture_t texture = {
                 .stages = xs_parser_default_shading_stage ( context ),
-                .update_set = xg_resource_binding_set_per_draw_m,
+                .update_set = xg_shader_binding_set_per_draw_m,
                 .type = xs_parser_texture_type_sampled_m,
                 .shader_register = default_register,
             };
@@ -1577,7 +1577,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
         } else if (std_str_cmp ( token, "sampler" ) == 0 ) {
             xs_parser_sampler_t sampler = {
                 .stages = xs_parser_default_shading_stage ( context ),
-                .update_set = xg_resource_binding_set_per_draw_m,
+                .update_set = xg_shader_binding_set_per_draw_m,
                 .shader_register = default_register,
             };
 

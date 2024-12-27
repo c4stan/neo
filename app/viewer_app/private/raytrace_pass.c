@@ -124,7 +124,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     // Bind
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_draw_m,
+        .set = xg_shader_binding_set_per_draw_m,
         .raytrace_world_count = 1,
         .raytrace_worlds = { xg_raytrace_world_resource_binding_m (
             .shader_register = 0,

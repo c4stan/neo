@@ -243,7 +243,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     xg->cmd_set_pipeline_resources (
         cmd_buffer,
         &xg_pipeline_resource_bindings_m (
-            .set = xg_resource_binding_set_per_draw_m,
+            .set = xg_shader_binding_set_per_draw_m,
             .buffer_count = 1,
             .buffers = {
                 xg_buffer_resource_binding_m (
@@ -292,7 +292,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         sampler_resource.sampler = xg->get_default_sampler ( params->xg_device, xg_default_sampler_point_clamp_m );
 
         xg_pipeline_resource_bindings_t bindings;
-        bindings.set = xg_resource_binding_set_per_draw_m;
+        bindings.set = xg_shader_binding_set_per_draw_m;
         bindings.buffer_count = 1;
         bindings.texture_count = 1;
         bindings.sampler_count = 1;

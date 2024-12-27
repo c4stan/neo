@@ -39,11 +39,3 @@ begin buffer
     stage pixel
     update per_draw
 end
-
-/*
-begin texture 0
-    stage pixel // vertex
-    update per_object
-    // sampler linear -- is there a reason to support embedding samplers in textures?
-end
-*/

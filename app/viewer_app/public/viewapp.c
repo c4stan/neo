@@ -74,7 +74,7 @@ static void frame_setup_pass ( const xf_node_execute_args_t* node_args, void* us
     };
 
     xg_pipeline_resource_bindings_t frame_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_frame_m,
+        .set = xg_shader_binding_set_per_frame_m,
         .buffer_count = 1,
         .buffers = {
             xg_buffer_resource_binding_m (
@@ -137,7 +137,7 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 
     // Bind view resources
     xg_pipeline_resource_bindings_t view_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_view_m,
+        .set = xg_shader_binding_set_per_view_m,
         .buffer_count = 1,
         .buffers = {
             xg_buffer_resource_binding_m ( 

@@ -238,7 +238,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
             buffer.range.size = 12; // TODO ...
 
             xg_pipeline_resource_bindings_t bindings = xg_default_pipeline_resource_bindings_m;
-            bindings.set = xg_resource_binding_set_per_draw_m;
+            bindings.set = xg_shader_binding_set_per_draw_m;
             bindings.buffer_count = 1;
             bindings.buffers = &buffer;
 
@@ -248,7 +248,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
             bindings.stages = xg_shading_stage_bit_vertex_m;
             bindings.type = xg_resource_binding_buffer_uniform_m;
             bindings.resource = test_pass_component->vertex_cbuffer;
-            xg->cmd_set_pipeline_resources ( cmd_buffer, xg_resource_binding_set_per_draw_m, &bindings, 1, key );
+            xg->cmd_set_pipeline_resources ( cmd_buffer, xg_shader_binding_set_per_draw_m, &bindings, 1, key );
 #else
             xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
 #endif
@@ -259,7 +259,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
         xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .type = xg_buffer_binding_type_uniform_m, .range = vert_uniform_range );
 
         xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_resource_binding_set_per_draw_m,
+            .set = xg_shader_binding_set_per_draw_m,
             .buffer_count = 1,
             .buffers = { buffer },
         );

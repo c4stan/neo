@@ -8,8 +8,8 @@
 layout ( location = 0 ) rayPayloadNV ray_payload_t          ray_payload;
 layout ( location = 1 ) rayPayloadNV shadow_ray_payload_t   shadow_ray_payload;
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform accelerationStructureNV scene;
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m, rgba32f ) uniform image2D img_color;
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform accelerationStructureNV scene;
+layout ( binding = 1, set = xs_shader_binding_set_per_draw_m, rgba32f ) uniform image2D img_color;
 
 void trace_ray ( vec3 pos, vec3 dir ) {
     const uint trace_flags = gl_RayFlagsOpaqueEXT;

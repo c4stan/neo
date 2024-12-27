@@ -745,7 +745,13 @@ static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_device_h devic
             new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params );
         }
 #else
-        xg_buffer_h new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params );
+        xg_buffer_h new_buffer;
+        if ( buffer->params.upload ) {
+            // If tagged as upload the buffer needs to be available immediately
+            new_buffer = xg->create_buffer ( &params );
+        } else {
+            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params );
+        }
 #endif
 
         xf_resource_buffer_map_to_new ( buffer_handle, new_buffer, params.allowed_usage );
@@ -1017,51 +1023,6 @@ static void xf_graph_compute_texture_lifespans ( xf_graph_h graph_handle ) {
 static void xf_graph_compute_resource_lifespans ( xf_graph_h graph_handle ) {
     xf_graph_compute_texture_lifespans ( graph_handle );
     xf_graph_compute_buffer_lifespans ( graph_handle );
-}
-
-typedef struct {
-    size_t width;
-    size_t height;
-    size_t depth;
-    size_t mip_levels;
-    size_t array_layers;
-    xg_texture_dimension_e dimension;
-    xg_format_e format;
-    xg_sample_count_e samples_per_pixel;
-    xg_texture_view_access_e view_access;
-    xg_texture_usage_bit_e usage;
-} xf_graph_transient_texture_desc_t;
-
-static xf_graph_transient_texture_desc_t xf_graph_transient_texture_desc_from_texture ( xf_texture_h texture_handle ) {
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    xf_graph_transient_texture_desc_t desc = {
-        .width = texture->params.width,
-        .height = texture->params.height,
-        .depth = texture->params.depth,
-        .mip_levels = texture->params.mip_levels,
-        .array_layers = texture->params.array_layers,
-        .dimension = texture->params.dimension,
-        .format = texture->params.format,
-        .samples_per_pixel = texture->params.samples_per_pixel,
-        .view_access = texture->params.view_access,
-        .usage = texture->params.usage,
-    };
-    return desc;
-}
-
-static bool xf_graph_transient_texture_test ( xf_graph_transient_texture_desc_t* t1, xf_graph_transient_texture_desc_t* t2 ) {
-    bool reusable = 
-        t1->width == t2->width &&
-        t1->height == t2->height &&
-        t1->depth == t2->depth &&
-        t1->mip_levels == t2->mip_levels &&
-        t1->array_layers == t2->array_layers &&
-        t1->dimension == t2->dimension &&
-        t1->format == t2->format &&
-        t1->samples_per_pixel == t2->samples_per_pixel &&
-        t1->view_access == t2->view_access;
-        t1->usage == t2->usage;
-    return reusable;
 }
 
 static bool xf_graph_texture_params_test ( xg_texture_params_t* t1, xg_texture_params_t* t2 ) {
@@ -1834,7 +1795,7 @@ void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, vo
     xg->cmd_set_compute_pipeline_state ( cmd_buffer, pass_args->pipeline, key );
 
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_draw_m,
+        .set = xg_shader_binding_set_per_draw_m,
         .texture_count = resources->sampled_textures_count + resources->storage_texture_reads_count + resources->storage_texture_writes_count,
         .buffer_count = resources->uniform_buffers_count + resources->storage_buffer_reads_count + resources->storage_buffer_writes_count + ( pass_args->uniform_data.base ? 1 : 0 ),
         .sampler_count = pass_args->params->pass.compute.samplers_count,

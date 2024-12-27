@@ -49,12 +49,16 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 #define     std_bit_read_ls_32_m( u32, bit_count ) ( (u32) & ( ~ ( ~0u << (bit_count) ) ) )
 #define     std_bit_read_ls_64_m( u64, bit_count ) ( (u64) & ( ~ ( ~0ull << (bit_count) ) ) )
 #define     std_bit_read_ms_32_m( u32, bit_count ) ( (u32) >> ( 32 - (bit_count) ) )
-#define     std_bit_read_ms_64_m( u64, bit_count ) ( (u64) >> ( 64 - (bit_count) ) )
+#define     std_bit_read_ms_64_m( u64, bit_count ) ( ( uint64_t ) (u64) >> ( 64 - (bit_count) ) )
 #define     std_bit_read_seq_32_m( u32, first_bit, bit_count ) ( std_bit_read_ls_32_m ( (u32) >> (first_bit), bit_count ) )
-#define     std_bit_read_seq_64_m( u64, first_bit, bit_count ) ( std_bit_read_ls_64_m ( (u64) >> (first_bit), bit_count ) )
+#define     std_bit_read_seq_64_m( u64, first_bit, bit_count ) ( std_bit_read_ls_64_m ( ( uint64_t ) (u64) >> (first_bit), bit_count ) )
+
+#define     std_bit_mask_ls_64_m( bit_count ) ( ( 1ull << bit_count ) - 1 )
+#define     std_bit_mask_ms_64_m( bit_count ) ( ~ std_bit_mask_ls_64_m ( bit_count ) )
 
 #define     std_bit_write_32_m( u32, bit, value ) ( ( (u32) & ~( 1u << (bit) ) ) | ( -(value) & ( 1u << (bit) ) ) )
-#define     std_bit_write_64_m( u64, bit, value ) ( ( (u64) & ~( 1ull << (bit) ) ) | ( -(value) & ( 1ull << (bit) ) ) )
+#define     std_bit_write_64_m( u64, bit, value ) ( ( ( ( uint64_t ) (u64) ) & ~( 1ull << (bit) ) ) | ( -(value) & ( 1ull << (bit) ) ) )
+#define     std_bit_write_ms_64_m( u64, bit_count, value ) ( ( ( uint64_t ) (value) << ( 64 - (bit_count) ) ) | ( (u64) & std_bit_mask_ls_64_m ( 64 - (bit_count) ) ) )
 
 // Stores the position of the first bit found to be 1
 // The lookup is performed in the required direction (default is lsb->msb)

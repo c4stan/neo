@@ -102,7 +102,9 @@ xg_buffer_h xg_buffer_reserve ( const xg_buffer_params_t* params ) {
     xg_buffer_h buffer_handle = ( xg_buffer_h ) idx;
 
     buffer->vk_handle = VK_NULL_HANDLE;
-    buffer->allocation.handle = xg_null_memory_handle_m;
+    buffer->allocation = xg_null_alloc_m;
+    buffer->offset = 0;
+    buffer->gpu_address = 0;
     buffer->params = *params;
     buffer->state = xg_vk_buffer_state_reserved_m;
 

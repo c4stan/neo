@@ -72,7 +72,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         .height = 400,
         .format = xg_format_b8g8r8a8_unorm_m,
         .debug_name = "temp_texture",
-        .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m,
     ) );
 
     {

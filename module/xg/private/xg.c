@@ -74,6 +74,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_copy_buffer_to_texture = xg_cmd_buffer_copy_buffer_to_texture;
     xg->cmd_set_pipeline_resources = xg_cmd_buffer_pipeline_resources_bind;
     xg->cmd_set_dynamic_viewport = xg_cmd_buffer_graphics_pipeline_state_set_viewport;
+    xg->cmd_set_resource_group = xg_cmd_buffer_pipeline_resource_group_bind;
     //#if defined(std_platform_win32_m)
     xg->cmd_start_debug_capture = xg_cmd_buffer_start_debug_capture;
     xg->cmd_stop_debug_capture = xg_cmd_buffer_stop_debug_capture;
@@ -89,6 +90,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_destroy_buffer = xg_resource_cmd_buffer_buffer_destroy;
     xg->cmd_destroy_texture = xg_resource_cmd_buffer_texture_destroy;
     xg->cmd_destroy_renderpass = xg_resource_cmd_buffer_graphics_renderpass_destroy;
+    xg->cmd_create_workload_resource_group = xg_resource_cmd_buffer_workload_resource_group_create;
 
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;

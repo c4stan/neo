@@ -106,7 +106,7 @@ typedef struct {
 } xg_cmd_graphics_pipeline_state_bind_t;
 
 typedef struct {
-    xg_resource_binding_set_e set;
+    xg_shader_binding_set_e set;
     uint32_t buffer_count;
     uint32_t texture_count;
     uint32_t sampler_count;
@@ -118,7 +118,7 @@ typedef struct {
 } xg_cmd_pipeline_resource_bind_t;
 
 typedef struct {
-    xg_resource_binding_set_e set;
+    xg_shader_binding_set_e set;
     xg_pipeline_resource_group_h group;
 } xg_cmd_pipeline_resource_group_bind_t;
 
@@ -369,7 +369,7 @@ void xg_cmd_buffer_copy_texture_to_buffer ( xg_cmd_buffer_h buffer, const xg_tex
 //                                         M I S C
 // ======================================================================================= //
 void    xg_cmd_buffer_pipeline_resources_bind           ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
-void    xg_cmd_buffer_pipeline_resource_group_bind      ( xg_cmd_buffer_h cmd_buffer, xg_resource_binding_set_e set, xg_pipeline_resource_group_h group, uint64_t key );
+void    xg_cmd_buffer_pipeline_resource_group_bind      ( xg_cmd_buffer_h cmd_buffer, xg_shader_binding_set_e set, xg_pipeline_resource_group_h group, uint64_t key );
 
 void    xg_cmd_buffer_barrier_set                       ( xg_cmd_buffer_h cmd_buffer, const xg_barrier_set_t* barrier_set, uint64_t key );
 

@@ -422,9 +422,18 @@ bool xg_texture_destroy ( xg_texture_h texture_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( texture->params.device );
     
     if ( texture->state == xg_vk_texture_state_created_m ) {
-        if ( ! ( texture->flags & xg_texture_flag_bit_swapchain_texture_m ) ) {
+        bool destroy_image = true;
+        destroy_image &= ! ( texture->flags & xg_texture_flag_bit_swapchain_texture_m );
+
+        bool free_memory = true;
+        free_memory &= destroy_image;
+        free_memory &= texture->params.creation_address.base == 0;
+
+        if ( destroy_image ) {
             vkDestroyImage ( device->vk_handle, texture->vk_handle, NULL );
-            //texture->params.allocator.free ( texture->params.allocator.impl, texture->allocation.handle );
+        }
+
+        if ( free_memory ) {
             xg_free ( texture->allocation.handle );
         }
 
@@ -528,4 +537,50 @@ const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture_handle
             return NULL;
         }
     }
+}
+
+static xg_texture_h xg_texture_create_default ( xg_device_h device, xg_default_texture_e texture_enum ) {
+    xg_texture_params_t params;
+
+    // TODO fill content to white/black
+    switch ( texture_enum ) {
+        case xg_default_texture_r8g8b8a8_unorm_white_m:
+            params = xg_texture_params_m (
+                .device = device,
+                .memory_type = xg_memory_type_gpu_only_m,
+                .format = xg_format_r8g8b8a8_unorm_m,
+                .allowed_usage = xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m,
+            );
+            std_str_copy_static_m ( params.debug_name, "default r8g8b8a8_unorm" );
+            break;
+
+        case xg_default_texture_r8g8b8a8_unorm_black_m:
+            params = xg_texture_params_m (
+                .device = device,
+                .memory_type = xg_memory_type_gpu_only_m,
+                .format = xg_format_r8g8b8a8_unorm_m,
+                .allowed_usage = xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m,
+            );
+            std_str_copy_static_m ( params.debug_name, "default linear clamp" );
+            break;
+
+        default:
+            std_log_error_m ( "Unkown default sampler" );
+            break;
+    }
+
+    return xg_texture_create ( &params );
+}
+
+// TODO pre-create on device init?
+xg_texture_h xg_texture_get_default ( xg_device_h device, xg_default_texture_e texture_enum ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( device );
+    xg_texture_h texture = xg_vk_texture_state->default_textures[device_idx][texture_enum];
+
+    if ( texture == xg_null_handle_m ) {
+        texture = xg_texture_create_default ( device, texture_enum );
+        xg_vk_texture_state->default_textures[device_idx][texture_enum] = texture;
+    }
+
+    return texture;
 }

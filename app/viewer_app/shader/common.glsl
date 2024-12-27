@@ -7,14 +7,14 @@
 //                              U N I F O R M   B U F F E R S
 // ======================================================================================= //
 
-layout ( binding = 0, set = xs_resource_binding_set_per_frame_m ) uniform frame_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_per_frame_m ) uniform frame_cbuffer_t {
     vec2 resolution_f32;
     uvec2 resolution_u32;
     uint frame_id; // TODO enable GL_ARB_gpu_shader_int64 and use uint64_t
     float time_ms;
 } frame_cbuffer;
 
-layout ( binding = 0, set = xs_resource_binding_set_per_view_m ) uniform view_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_per_view_m ) uniform view_cbuffer_t {
     mat4 view_from_world;
     mat4 proj_from_view;
     mat4 jittered_proj_from_view;

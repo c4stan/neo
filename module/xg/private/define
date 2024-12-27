@@ -1,11 +1,11 @@
-
 ########## xg ##########
 
 xg_pipeline_resource_max_bindings_per_set_m   (xg_pipeline_resource_max_buffers_per_set_m + xg_pipeline_resource_max_textures_per_set_m + xg_pipeline_resource_max_samplers_per_set_m)
 
 xg_workload_max_queued_workloads_m                      4
 xg_workload_max_allocated_workloads_m                   8
-xg_vk_workload_uniform_buffer_size_m                    2 * 1024 * 1024
+xg_workload_uniform_buffer_size_m                       2 * 1024 * 1024
+# TODO use these
 xg_workload_max_timestamp_query_pools_per_workload_m    8
 xg_workload_timing_name_size_m                          32
 
@@ -63,9 +63,11 @@ xg_vk_raytrace_max_worlds_m                     4
 
 # workload management
 xg_vk_workload_max_cmd_allocators_m                 16
+xg_vk_workload_max_desc_allocators_m                32
 xg_vk_workload_cmd_buffers_per_allocator_m          16
-xg_vk_workload_max_desc_allocators_m                16
 xg_vk_workload_max_framebuffers_per_workload_m      4
+xg_vk_workload_max_desc_allocators_per_workload_m   8
+xg_vk_workload_max_resource_groups_m                1024
 xg_vk_workload_max_fences_m                         16
 xg_vk_workload_max_translates_per_submit_m          2
 xg_vk_workload_max_execution_barriers_per_cmd_m     8

@@ -3,11 +3,11 @@
 #include "common.glsl"
 #include "lighting_common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform uniform_buffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform uniform_buffer_t {
     uvec3 grid_size;
 } uniform_buffer;
 
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer writeonly cluster_buffer_t {
+layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) buffer writeonly cluster_buffer_t {
     light_cluster_t clusters[];
 } cluster_buffer;
 

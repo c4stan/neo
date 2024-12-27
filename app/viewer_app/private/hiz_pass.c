@@ -76,7 +76,7 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
     xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_resource_binding_set_per_draw_m,
+        .set = xg_shader_binding_set_per_draw_m,
         .texture_count = 1,
         .textures = { xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ) },
         .sampler_count = 1,

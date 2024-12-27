@@ -924,6 +924,13 @@ typedef struct {
     xg_sample_count_e samples_per_pixel;
 } xg_render_target_layout_t;
 
+#define xg_render_target_layout_m( ... ) ( xg_render_target_layout_t ) { \
+    .slot = 0, \
+    .format = xg_format_undefined_m, \
+    .samples_per_pixel = xg_sample_count_1_m, \
+    ##__VA_ARGS__ \
+}
+
 typedef struct {
     xg_format_e format;
     xg_sample_count_e samples_per_pixel;
@@ -941,7 +948,7 @@ typedef struct {
     .render_targets_count = 0, \
     .render_targets = { 0 }, \
     .depth_stencil_enabled = false, \
-    .depth_stencil = { 0 } \
+    .depth_stencil = { 0 }, \
     ##__VA_ARGS__ \
 }
 
@@ -1057,19 +1064,19 @@ typedef enum {
 } xg_resource_binding_e;
 
 typedef enum {
-    xg_resource_binding_set_per_frame_m,
-    xg_resource_binding_set_per_view_m,
-    xg_resource_binding_set_per_pass_m,
-    xg_resource_binding_set_per_draw_m,
-    xg_resource_binding_set_count_m,
-    xg_resource_binding_set_invalid_m
-} xg_resource_binding_set_e;
+    xg_shader_binding_set_per_frame_m,
+    xg_shader_binding_set_per_view_m,
+    xg_shader_binding_set_per_pass_m,
+    xg_shader_binding_set_per_draw_m,
+    xg_shader_binding_set_count_m,
+    xg_shader_binding_set_invalid_m
+} xg_shader_binding_set_e;
 
 typedef struct {
     uint32_t shader_register;
     xg_shading_stage_bit_e stages;
     xg_resource_binding_e type;
-    xg_resource_binding_set_e set;
+    xg_shader_binding_set_e set;
 } xg_resource_binding_layout_t;
 
 typedef struct {
@@ -1693,7 +1700,7 @@ typedef struct {
 // TODO store whole arrays instead of pointers here? makes filling this struct easier
 #if 0
 typedef struct {
-    xg_resource_binding_set_e set;
+    xg_shader_binding_set_e set;
     uint32_t buffer_count;
     uint32_t texture_count;
     uint32_t sampler_count;
@@ -1703,7 +1710,7 @@ typedef struct {
 } xg_pipeline_resource_bindings_t;
 #else
 typedef struct {
-    xg_resource_binding_set_e set;
+    xg_shader_binding_set_e set;
     uint32_t buffer_count;
     uint32_t texture_count;
     uint32_t sampler_count;
@@ -1715,15 +1722,9 @@ typedef struct {
 } xg_pipeline_resource_bindings_t;
 #endif
 
-typedef struct {
-    xg_device_h device;
-    xg_pipeline_state_h pipeline;
-    xg_pipeline_resource_bindings_t bindings;
-} xg_pipeline_resource_group_params_t;
-
 #if 0
 #define xg_pipeline_resource_bindings_m( ... ) ( xg_pipeline_resource_bindings_t ) { \
-    .set = xg_resource_binding_set_invalid_m, \
+    .set = xg_shader_binding_set_invalid_m, \
     .buffer_count = 0, \
     .texture_count = 0, \
     .sampler_count = 0, \
@@ -1734,7 +1735,7 @@ typedef struct {
 }
 #else
 #define xg_pipeline_resource_bindings_m( ... ) ( xg_pipeline_resource_bindings_t ) { \
-    .set = xg_resource_binding_set_invalid_m, \
+    .set = xg_shader_binding_set_invalid_m, \
     .buffer_count = 0, \
     .texture_count = 0, \
     .sampler_count = 0, \
@@ -1745,6 +1746,19 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 #endif
+
+typedef struct {
+    xg_device_h device;
+    xg_pipeline_state_h pipeline;
+    xg_pipeline_resource_bindings_t bindings;
+} xg_pipeline_resource_group_params_t;
+
+#define xg_pipeline_resource_group_params_m( ... ) ( xg_pipeline_resource_group_params_t ) { \
+    .device = xg_null_handle_m, \
+    .pipeline = xg_null_handle_m, \
+    .bindings = xg_pipeline_resource_bindings_m(), \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_shading_stage_bit_e stages;
@@ -1785,7 +1799,6 @@ typedef struct {
     xg_device_h device;
     size_t size;
     size_t align;
-    // TODO rename to allowed_gpu_usage?
     xg_buffer_usage_bit_e allowed_usage;
     char debug_name[xg_debug_name_size_m];
 } xg_buffer_params_t;
@@ -1896,7 +1909,7 @@ typedef struct {
     xg_sampler_filter_e mag_filter;
     xg_sampler_filter_e mipmap_filter;
     bool enable_anisotropy;
-    uint32_t min_mip; // TODO why are min and max mip floats in the Vulkan api?
+    uint32_t min_mip;
     uint32_t max_mip;
     uint32_t mip_bias;
     xg_sampler_address_mode_e address_mode; // TODO separate value for u/v/w axes?
@@ -2077,6 +2090,7 @@ typedef struct {
 typedef enum {
     xg_default_texture_r8g8b8a8_unorm_white_m,
     xg_default_texture_r8g8b8a8_unorm_black_m,
+    xg_default_texture_count_m,
 } xg_default_texture_e;
 
 typedef enum {
@@ -2288,9 +2302,10 @@ typedef struct {
 
     //void                    ( *cmd_generate_texture_mips )          ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, uint32_t mip_base, uint32_t mip_count, uint64_t key );
 
-    xg_pipeline_resource_group_h    ( *cmd_create_pipeline_resource_group )  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_group_params_t* params );
-    void                            ( *cmd_destroy_pipeline_resource_group ) ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h bindings, xg_resource_cmd_buffer_time_e destroy_time );
-    void                            ( *cmd_set_pipeline_resource_group )     ( xg_cmd_buffer_h cmd_buffer, xg_resource_binding_set_e set, xg_pipeline_resource_group_h bindings, uint64_t key );
+    xg_pipeline_resource_group_h  ( *cmd_create_resource_group )    ( xg_resource_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_group_params_t* params );
+    void                        ( *cmd_destroy_resource_group )     ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h set, xg_resource_cmd_buffer_time_e destroy_time );
+    void                        ( *cmd_set_resource_group )         ( xg_cmd_buffer_h cmd_buffer, xg_shader_binding_set_e shader_set, xg_pipeline_resource_group_h resource_set, uint64_t key );
+    xg_pipeline_resource_group_h  ( *cmd_create_workload_resource_group ) ( xg_resource_cmd_buffer_h cmd_buffer, xg_workload_h workload, const xg_pipeline_resource_group_params_t* params );
 
     void                    ( *cmd_copy_texture )                   ( xg_cmd_buffer_h cmd_buffer, const xg_texture_copy_params_t* params, uint64_t key );
     void                    ( *cmd_copy_buffer )                    ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h src, xg_buffer_h dest, uint64_t key ); // TODO better args

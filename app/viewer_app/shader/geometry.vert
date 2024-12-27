@@ -4,7 +4,7 @@
 
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
     mat4 world_from_model;
 } draw_cbuffer;
 

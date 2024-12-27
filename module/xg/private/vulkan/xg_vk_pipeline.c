@@ -12,22 +12,59 @@
 
 static xg_vk_pipeline_state_t* xg_vk_pipeline_state;
 
-const xg_vk_graphics_pipeline_t* xg_vk_graphics_pipeline_get ( xg_graphics_pipeline_state_h pipeline_handle ) {
-    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
+#define xg_vk_pipeline_handle_is_graphics_m( h ) ( std_bit_read_ms_64_m ( h, 2 ) == 0 )
+#define xg_vk_pipeline_handle_is_compute_m( h ) ( std_bit_read_ms_64_m ( h, 2 ) == 1 )
+#define xg_vk_pipeline_handle_is_raytrace_m( h ) ( std_bit_read_ms_64_m ( h, 2 ) == 2 )
+#define xg_vk_pipeline_handle_tag_as_graphics_m( h ) std_bit_write_ms_64_m ( h, 2, 0 )
+#define xg_vk_pipeline_handle_tag_as_compute_m( h ) std_bit_write_ms_64_m ( h, 2, 1 )
+#define xg_vk_pipeline_handle_tag_as_raytrace_m( h ) std_bit_write_ms_64_m ( h, 2, 2 )
+#define xg_vk_pipeline_handle_remove_tag_m( h ) ( std_bit_clear_ms_64_m ( h, 2 ) )
+
+xg_vk_graphics_pipeline_t* xg_vk_graphics_pipeline_edit ( xg_graphics_pipeline_state_h pipeline_handle ) {
+    std_assert_m ( xg_vk_pipeline_handle_is_graphics_m ( pipeline_handle ) );
+    pipeline_handle = xg_vk_pipeline_handle_remove_tag_m ( pipeline_handle );
     xg_vk_graphics_pipeline_t* xg_vk_pipeline = &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_handle];
     return xg_vk_pipeline;
 }
 
-const xg_vk_compute_pipeline_t* xg_vk_compute_pipeline_get ( xg_compute_pipeline_state_h pipeline_handle ) {
-    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
+xg_vk_compute_pipeline_t* xg_vk_compute_pipeline_edit ( xg_compute_pipeline_state_h pipeline_handle ) {
+    std_assert_m ( xg_vk_pipeline_handle_is_compute_m ( pipeline_handle ) );
+    pipeline_handle = xg_vk_pipeline_handle_remove_tag_m ( pipeline_handle );
     xg_vk_compute_pipeline_t* xg_vk_pipeline = &xg_vk_pipeline_state->compute_pipelines_array[pipeline_handle];
     return xg_vk_pipeline;
 }
 
-const xg_vk_raytrace_pipeline_t* xg_vk_raytrace_pipeline_get ( xg_raytrace_pipeline_state_h pipeline_handle ) {
-    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
+xg_vk_raytrace_pipeline_t* xg_vk_raytrace_pipeline_edit ( xg_raytrace_pipeline_state_h pipeline_handle ) {
+    std_assert_m ( xg_vk_pipeline_handle_is_raytrace_m ( pipeline_handle ) );
+    pipeline_handle = xg_vk_pipeline_handle_remove_tag_m ( pipeline_handle );
     xg_vk_raytrace_pipeline_t* xg_vk_pipeline = &xg_vk_pipeline_state->raytrace_pipelines_array[pipeline_handle];
     return xg_vk_pipeline;
+}
+
+const xg_vk_graphics_pipeline_t* xg_vk_graphics_pipeline_get ( xg_graphics_pipeline_state_h pipeline_handle ) {
+    return xg_vk_graphics_pipeline_edit ( pipeline_handle );
+}
+
+const xg_vk_compute_pipeline_t* xg_vk_compute_pipeline_get ( xg_compute_pipeline_state_h pipeline_handle ) {
+    return xg_vk_compute_pipeline_edit ( pipeline_handle );
+}
+
+const xg_vk_raytrace_pipeline_t* xg_vk_raytrace_pipeline_get ( xg_raytrace_pipeline_state_h pipeline_handle ) {
+    return xg_vk_raytrace_pipeline_edit ( pipeline_handle );
+}
+
+xg_vk_pipeline_common_t* xg_vk_common_pipeline_get ( xg_pipeline_state_h pipeline_handle ) {
+    xg_pipeline_state_h pipeline_idx = xg_vk_pipeline_handle_remove_tag_m ( pipeline_handle );
+    if ( xg_vk_pipeline_handle_is_graphics_m ( pipeline_handle ) ) {
+        return &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_idx].common;
+    } else if ( xg_vk_pipeline_handle_is_compute_m ( pipeline_handle ) ) {
+        return &xg_vk_pipeline_state->compute_pipelines_array[pipeline_idx].common;
+    } else if ( xg_vk_pipeline_handle_is_raytrace_m ( pipeline_handle ) ) {
+        return &xg_vk_pipeline_state->raytrace_pipelines_array[pipeline_idx].common;
+    } else {
+        std_assert_m ( false );
+        return NULL;
+    }
 }
 
 xg_vk_renderpass_t* xg_vk_renderpass_edit ( xg_vk_renderpass_h renderpass_handle ) {
@@ -595,13 +632,13 @@ typedef struct {
     uint64_t resource_bindings_hash;
     uint64_t constant_bindings_hash;
     uint64_t constant_binding_points_count;
-    xg_vk_descriptor_set_layout_t resource_binding_sets[xg_resource_binding_set_count_m];
+    xg_vk_descriptor_set_layout_t resource_binding_sets[xg_shader_binding_set_count_m];
     xg_constant_binding_layout_t constant_binding_points[xg_pipeline_constant_max_bindings_m];
 } xg_vk_pipeline_bindings_layout_t;
 
 typedef struct {
     VkPipelineLayout pipeline_layout;
-    xg_vk_descriptor_set_layout_h descriptor_set_layouts[xg_resource_binding_set_count_m];
+    xg_vk_descriptor_set_layout_h descriptor_set_layouts[xg_shader_binding_set_count_m];
 } xg_vk_pipeline_layout_creation_result_t;
 
 void xg_vk_pipeline_bindings_layout_prepare ( xg_vk_pipeline_bindings_layout_t* layout, const xg_resource_bindings_layout_t* resource_bindings, const xg_constant_bindings_layout_t* constant_bindings, const char* debug_name ) {
@@ -624,7 +661,7 @@ void xg_vk_pipeline_bindings_layout_prepare ( xg_vk_pipeline_bindings_layout_t* 
             here we sort binding points by shader_register and so, *as long as there are no holes*, the shader_register is equal to the descriptor index. But it's an assumption!
             Is this the right way to do things? A better way might be to store the mapping from shader register to descriptor index, and use that when updating descriptors to find the right index.
     */
-    for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+    for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_t* set = &layout->resource_binding_sets[i];
         xg_vk_descriptor_slot_t tmp;
         std_sort_insertion ( set->descriptors, sizeof ( xg_vk_descriptor_slot_t ), set->descriptor_count, xg_vk_descriptor_slot_cmp, &tmp );
@@ -651,7 +688,7 @@ void xg_vk_pipeline_bindings_layout_prepare ( xg_vk_pipeline_bindings_layout_t* 
         // TODO hash the whole data instead of the individual sets hashes?
         std_hash_metro_state_t hash_state;
         std_hash_metro_begin ( &hash_state );
-        for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+        for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
             std_hash_metro_add_m ( &hash_state, &layout->resource_binding_sets[i].hash );
         }
         layout->resource_bindings_hash = std_hash_metro_end ( &hash_state );
@@ -665,15 +702,15 @@ void xg_vk_pipeline_create_pipeline_layout ( xg_vk_pipeline_layout_creation_resu
     // Pipeline layout (resource bindings)
     //      pipeline state: sorted resource_binding_sets
     //      TODO cache the pipeline layout too in addition to the desc set layouts?
-    //xg_vk_descriptor_set_layout_h descriptor_set_layouts[xg_resource_binding_set_count_m];
+    //xg_vk_descriptor_set_layout_h descriptor_set_layouts[xg_shader_binding_set_count_m];
 
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
-    VkDescriptorSetLayout vk_sets[xg_resource_binding_set_count_m];
+    VkDescriptorSetLayout vk_sets[xg_shader_binding_set_count_m];
     VkPipelineLayoutCreateInfo layout_info;
 
     // Create the Vulkan sets
-    for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+    for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_t* set = &bindings->resource_binding_sets[i];
 
         std_mutex_lock ( &xg_vk_pipeline_state->set_layouts_mutex );
@@ -757,7 +794,7 @@ void xg_vk_pipeline_create_pipeline_layout ( xg_vk_pipeline_layout_creation_resu
         layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         layout_info.pNext = NULL;
         layout_info.flags = 0;
-        layout_info.setLayoutCount = ( uint32_t ) xg_resource_binding_set_count_m;
+        layout_info.setLayoutCount = ( uint32_t ) xg_shader_binding_set_count_m;
         layout_info.pSetLayouts = vk_sets;
         layout_info.pushConstantRangeCount = bindings->constant_binding_points_count;
         layout_info.pPushConstantRanges = vk_constant_ranges;
@@ -1178,7 +1215,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         std_mem_copy_static_array_m ( xg_vk_pipeline->hit_offsets, hit_offsets );
 
         // Store common state
-        for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+        for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
             xg_vk_pipeline->common.descriptor_set_layouts[i] = pipeline_layout_result.descriptor_set_layouts[i];
         }
 
@@ -1203,7 +1240,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         std_mutex_unlock ( &xg_vk_pipeline_state->raytrace_pipelines_map_mutex );
     }
 
-    xg_vk_pipeline_handle = std_bit_set_64_m ( xg_vk_pipeline_handle, 63 );
+    xg_vk_pipeline_handle = xg_vk_pipeline_handle_tag_as_raytrace_m ( xg_vk_pipeline_handle );
 
     return xg_vk_pipeline_handle;
 #else
@@ -1215,8 +1252,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
 
 void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_handle ) {
 #if xg_enable_raytracing_m
-    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
-    xg_vk_raytrace_pipeline_t* pipeline = &xg_vk_pipeline_state->raytrace_pipelines_array[pipeline_handle];
+    xg_vk_raytrace_pipeline_t* pipeline = xg_vk_raytrace_pipeline_edit ( pipeline_handle );
 
     if ( --pipeline->common.reference_count > 0 ) {
         return;
@@ -1232,7 +1268,7 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
     vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, NULL );
 
-    for ( uint32_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_h layout_handle = pipeline->common.descriptor_set_layouts[i];
         xg_vk_descriptor_set_layout_t* set = xg_vk_descriptor_set_layout_edit ( layout_handle );
         set->ref_count -= 1;
@@ -1362,7 +1398,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         xg_vk_pipeline->state = params->state;
 
         // store common state
-        for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+        for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
             xg_vk_pipeline->common.descriptor_set_layouts[i] = pipeline_layout_result.descriptor_set_layouts[i];
         }
 
@@ -1388,7 +1424,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         std_mutex_unlock ( &xg_vk_pipeline_state->compute_pipelines_map_mutex );
     }
 
-    xg_vk_pipeline_handle = std_bit_set_64_m ( xg_vk_pipeline_handle, 63 );
+    xg_vk_pipeline_handle = xg_vk_pipeline_handle_tag_as_compute_m ( xg_vk_pipeline_handle );
 
     return xg_vk_pipeline_handle;
 }
@@ -1898,7 +1934,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         xg_vk_pipeline->renderpass = renderpass_handle;
 
         // store common pipeline state
-        for ( size_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+        for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
             xg_vk_pipeline->common.descriptor_set_layouts[i] = pipeline_layout_result.descriptor_set_layouts[i];
         }
 
@@ -1930,12 +1966,12 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         xg_vk_pipeline->common.reference_count += 1;
     }
 
+    xg_vk_pipeline_handle = xg_vk_pipeline_handle_tag_as_graphics_m ( xg_vk_pipeline_handle );
     return xg_vk_pipeline_handle;
 }
 
 void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_handle ) {
-    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
-    xg_vk_graphics_pipeline_t* pipeline = &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_handle];
+    xg_vk_graphics_pipeline_t* pipeline = xg_vk_graphics_pipeline_edit ( pipeline_handle );
 
     if ( --pipeline->common.reference_count > 0 ) {
         return;
@@ -1954,7 +1990,7 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
     vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, NULL );
 
-    for ( uint32_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_h layout_handle = pipeline->common.descriptor_set_layouts[i];
         xg_vk_descriptor_set_layout_t* set = xg_vk_descriptor_set_layout_edit ( layout_handle );
         set->ref_count -= 1;
@@ -2013,8 +2049,7 @@ const xg_vk_graphics_renderpass_t* xg_vk_graphics_renderpass_get ( xg_renderpass
 }
 
 void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handle ) {
-    pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
-    xg_vk_compute_pipeline_t* pipeline = &xg_vk_pipeline_state->compute_pipelines_array[pipeline_handle];
+    xg_vk_compute_pipeline_t* pipeline = xg_vk_compute_pipeline_edit ( pipeline_handle );
 
     if ( --pipeline->common.reference_count > 0 ) {
         return;
@@ -2028,7 +2063,7 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, NULL );
     vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, NULL );
 
-    for ( uint32_t i = 0; i < xg_resource_binding_set_count_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_descriptor_set_layout_h layout_handle = pipeline->common.descriptor_set_layouts[i];
         xg_vk_descriptor_set_layout_t* set = xg_vk_descriptor_set_layout_edit ( layout_handle );
         set->ref_count -= 1;
@@ -2147,20 +2182,12 @@ void xg_vk_pipeline_deactivate_device ( xg_device_h device_handle ) {
     vkDestroyDescriptorPool ( device->vk_handle, xg_vk_pipeline_state->device_contexts[device_idx].vk_desc_pool, NULL );
 }
 
-xg_pipeline_resource_group_h xg_vk_pipeline_create_resource_group ( xg_device_h device_handle, xg_pipeline_state_h pipeline_handle, xg_resource_binding_set_e set ) {
+xg_pipeline_resource_group_h xg_vk_pipeline_create_resource_group ( xg_device_h device_handle, xg_pipeline_state_h pipeline_handle, xg_shader_binding_set_e set ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
     xg_vk_pipeline_device_context_t* context = &xg_vk_pipeline_state->device_contexts[device_idx];
 
-    xg_vk_pipeline_common_t* pipeline;
-
-    if ( std_bit_test_64_m ( pipeline_handle, 63 ) ) {
-        pipeline_handle = std_bit_clear_64_m ( pipeline_handle, 63 );
-        pipeline = &xg_vk_pipeline_state->compute_pipelines_array[pipeline_handle].common;
-    } else {
-        pipeline = &xg_vk_pipeline_state->graphics_pipelines_array[pipeline_handle].common;
-    }
-
+    xg_vk_pipeline_common_t* pipeline = xg_vk_common_pipeline_get ( pipeline_handle );
     xg_vk_descriptor_set_layout_h layout_handle = pipeline->descriptor_set_layouts[set];
     const xg_vk_descriptor_set_layout_t* layout = xg_vk_descriptor_set_layout_get ( layout_handle );
 

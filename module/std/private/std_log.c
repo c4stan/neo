@@ -90,10 +90,9 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
     const char* color_prefix = "";
     const char* color_postfix = "";
 #if std_enable_log_colored_console_output_m
-
     if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         color_prefix = std_terminal_color_red_m;
-    } else if ( msg->level == std_log_level_bit_warn_m ) {
+    } else if ( ( 1 << msg->level ) & std_log_level_bit_warn_m ) {
         color_prefix = std_terminal_color_yellow_m;
     }
 

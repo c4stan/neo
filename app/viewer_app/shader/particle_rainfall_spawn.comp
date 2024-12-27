@@ -3,12 +3,12 @@
 #include "xs.glsl"
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_resource_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
     uint particle_count;
     uint spawn_count;
 } draw_cbuffer;
 
-layout ( binding = 1, set = xs_resource_binding_set_per_draw_m ) buffer particle_buffer_t {
+layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) buffer particle_buffer_t {
     vec4 data[];
 } particle_buffer;
 

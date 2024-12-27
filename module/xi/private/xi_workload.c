@@ -280,7 +280,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             xg->cmd_set_pipeline_resources (
                 flush_params->cmd_buffer,
                 &xg_pipeline_resource_bindings_m (
-                    .set = xg_resource_binding_set_per_draw_m,
+                    .set = xg_shader_binding_set_per_draw_m,
                     .buffer_count = 1,
                     .buffers = {
                         xg_buffer_resource_binding_m (
@@ -460,7 +460,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             xg->cmd_set_pipeline_resources (
                 flush_params->cmd_buffer,
                 &xg_pipeline_resource_bindings_m (
-                    .set = xg_resource_binding_set_per_draw_m,
+                    .set = xg_shader_binding_set_per_draw_m,
                     .texture_count = 1,
                     .textures = {
                         xg_texture_resource_binding_m (
@@ -500,7 +500,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             xg->cmd_set_pipeline_resources (
                 flush_params->cmd_buffer,
                 &xg_pipeline_resource_bindings_m (
-                    .set = xg_resource_binding_set_per_draw_m,
+                    .set = xg_shader_binding_set_per_draw_m,
                     .texture_count = 1,
                     .textures = { 
                         xg_texture_resource_binding_m (
