@@ -2291,7 +2291,7 @@ typedef struct {
     void                    ( *cmd_set_render_textures )            ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
     void                    ( *cmd_set_pipeline_resources )         ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
     void                    ( *cmd_write_pipeline_constant_data )   ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_constant_data_t* data, uint64_t key );
-    void                    ( *cmd_dispatch_compute )               ( xg_cmd_buffer_h cmd_buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, uint64_t key );
+    void                    ( *cmd_dispatch_compute )               ( xg_cmd_buffer_h cmd_buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, xg_cmd_queue_e queue, uint64_t key );
     void                    ( *cmd_begin_renderpass )               ( xg_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, uint64_t key );
     void                    ( *cmd_end_renderpass )                 ( xg_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, uint64_t key );
 

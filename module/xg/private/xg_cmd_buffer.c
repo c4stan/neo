@@ -621,13 +621,14 @@ void xg_cmd_buffer_graphics_render_textures_bind ( xg_cmd_buffer_h cmd_buffer_ha
     }
 }
 
-void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h cmd_buffer_handle, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, uint64_t key ) {
+void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h cmd_buffer_handle, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, xg_cmd_queue_e queue, uint64_t key ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_compute_dispatch_m, key, xg_cmd_compute_dispatch_t );
 
     cmd_args->workgroup_count_x = workgroup_count_x;
     cmd_args->workgroup_count_y = workgroup_count_y;
     cmd_args->workgroup_count_z = workgroup_count_z;
+    cmd_args->queue = queue;
 }
 
 #include <vulkan/xg_vk_pipeline.h>

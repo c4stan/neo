@@ -94,13 +94,6 @@ static void xf_test ( void ) {
 
     xf_i* xf = std_module_load_m ( xf_module_name_m );
 
-    xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m (
-        .width = 400,
-        .height = 200,
-        .format = xg_format_r8g8b8a8_unorm_m,
-        .debug_name = "color_texture",
-    ) );
-    
     xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain(swapchain);
 
     wm_window_info_t window_info;
@@ -135,23 +128,18 @@ static void xf_test ( void ) {
             .debug_name = "test_graph_1" 
         ) );
 
+        xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m (
+            .width = 400,
+            .height = 200,
+            .format = xg_format_r8g8b8a8_unorm_m,
+            .debug_name = "color_texture",
+        ) );
+        
         uint64_t t = 500;
         float color[3];
         color[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
         color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-
-        xf->add_node ( graph, &xf_node_params_m (
-            .debug_name = "present",
-            .type = xf_node_type_copy_pass_m,
-            .resources = xf_node_resource_params_m (
-                .copy_texture_writes_count = 1,
-                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
-                .copy_texture_reads_count = 1,
-                .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
-                .presentable_texture = swapchain_multi_texture,
-            ),
-        ) );
 
         xf->add_node ( graph, &xf_node_params_m ( 
             .debug_name = "clear",
@@ -183,6 +171,18 @@ static void xf_test ( void ) {
 
         xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
 
+        xf->add_node ( graph2, &xf_node_params_m (
+            .debug_name = "present",
+            .type = xf_node_type_copy_pass_m,
+            .resources = xf_node_resource_params_m (
+                .copy_texture_writes_count = 1,
+                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+                .copy_texture_reads_count = 1,
+                .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+                .presentable_texture = swapchain_multi_texture,
+            ),
+        ) );
+
         uint64_t id = xf->execute_graph ( graph, workload, 0 );
         xf->execute_graph ( graph2, workload, id );
         xf->destroy_graph ( graph, workload );
@@ -191,6 +191,8 @@ static void xf_test ( void ) {
         xg->present_swapchain ( swapchain, workload );
 
         xs->update_pipeline_states ( workload );
+
+        xf->destroy_texture ( color_texture );
     }
 
     std_module_unload_m ( xf_module_name_m );

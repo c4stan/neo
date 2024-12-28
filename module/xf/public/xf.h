@@ -545,6 +545,8 @@ typedef struct {
     xf_texture_h ( *declare_multi_texture ) ( const xf_multi_texture_params_t* params );
     //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
 
+    void ( *destroy_texture ) ( xf_texture_h texture );
+
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
     xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
     void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );

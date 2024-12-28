@@ -177,6 +177,7 @@ typedef struct {
     uint32_t workgroup_count_x;
     uint32_t workgroup_count_y;
     uint32_t workgroup_count_z;
+    xg_cmd_queue_e queue;
 } xg_cmd_compute_dispatch_t;
 
 typedef struct {
@@ -346,7 +347,7 @@ void xg_cmd_buffer_graphics_pipeline_state_set_scissor ( xg_cmd_buffer_h cmd_buf
 // ======================================================================================= //
 //                                      C O M P U T E
 // ======================================================================================= //
-void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, uint64_t key );
+void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, xg_cmd_queue_e queue, uint64_t key );
 void xg_cmd_buffer_compute_pipeline_state_bind ( xg_cmd_buffer_h buffer, xg_compute_pipeline_state_h pipeline, uint64_t key );
 //void    xg_cmd_buffer_compute_pipeline_resource_bind    ( xg_cmd_buffer_h buffer, xg_pipeline_resource_bindings_t* bindings, uint64_t key );
 

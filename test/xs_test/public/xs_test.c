@@ -143,7 +143,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         xg->cmd_set_resource_group ( cmd_buffer, xg_shader_binding_set_per_frame_m, group, 0 );
 #endif
 
-        xg->cmd_dispatch_compute ( cmd_buffer, swapchain_texture_info.width, swapchain_texture_info.height, 1, 0 );
+        xg->cmd_dispatch_compute ( cmd_buffer, swapchain_texture_info.width, swapchain_texture_info.height, 1, xg_cmd_queue_compute_m, 0 );
 #endif
     }
 

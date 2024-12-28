@@ -5,6 +5,10 @@
 #include <std_list.h>
 #include <std_log.h>
 
+#define xf_resource_handle_is_multi_m( h ) std_bit_test_64_m ( h, 63 )
+#define xf_resource_handle_multi_idx_m( h ) ( h & 0xffff )
+#define xf_resource_handle_sub_idx_m( h ) ( ( h >> 16 ) & 0xffff )
+
 static xf_resource_state_t* xf_resource_state;
 
 void xf_resource_load ( xf_resource_state_t* state ) {
@@ -43,6 +47,38 @@ xf_texture_h xf_resource_texture_declare ( const xf_texture_params_t* params ) {
     return handle;
 }
 
+void xf_resource_texture_destroy ( xf_texture_h texture_handle ) {
+    if ( xf_resource_handle_is_multi_m ( texture_handle ) ) {
+        uint32_t multi_idx = xf_resource_handle_multi_idx_m ( texture_handle );
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_idx];
+    
+        for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
+            xf_resource_texture_destroy ( multi_texture->textures[i] );
+        }
+
+        std_list_push ( &xf_resource_state->multi_buffers_freelist, multi_texture );
+    } else {
+        xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
+        std_list_push ( &xf_resource_state->textures_freelist, texture);
+    }
+}
+
+void xf_resource_buffer_destroy ( xf_buffer_h buffer_handle ) {
+    if ( xf_resource_handle_is_multi_m ( buffer_handle ) ) {
+        uint32_t multi_idx = xf_resource_handle_multi_idx_m ( buffer_handle );
+        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[multi_idx];
+    
+        for ( uint32_t i = 0; i < multi_buffer->params.multi_buffer_count; ++i ) {
+            xf_resource_buffer_destroy ( multi_buffer->buffers[i] );
+        }
+
+        std_list_push ( &xf_resource_state->multi_buffers_freelist, multi_buffer );
+    } else {
+        xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
+        std_list_push ( &xf_resource_state->buffers_freelist, buffer );
+    }
+}
+
 xf_buffer_h xf_resource_buffer_declare ( const xf_buffer_params_t* params ) {
     xf_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->buffers_freelist );
     std_mem_zero_m ( buffer );
@@ -78,20 +114,20 @@ void xf_resource_buffet_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer_ha
 }
 
 bool xf_resource_texture_is_multi ( xf_texture_h texture_handle ) {
-    return std_bit_test_64_m ( texture_handle, 63 );
+    return xf_resource_handle_is_multi_m ( texture_handle );
 }
 
 bool xf_resource_buffer_is_multi ( xf_buffer_h buffer_handle ) {
-    return std_bit_test_64_m ( buffer_handle, 63 );
+    return xf_resource_handle_is_multi_m ( buffer_handle );
 }
 
 xf_texture_t* xf_resource_texture_get_no_alias ( xf_texture_h texture_handle ) {
     xf_texture_t* texture;
-    bool is_multi_texture = xf_resource_texture_is_multi ( texture_handle );
+    bool is_multi_texture = xf_resource_handle_is_multi_m ( texture_handle );
 
     if ( is_multi_texture ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
-        uint64_t subtexture_index = ( texture_handle >> 16 ) & 0xffff;
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
+        uint64_t subtexture_index = xf_resource_handle_sub_idx_m ( texture_handle );
         subtexture_index = ( subtexture_index + multi_texture->index ) % multi_texture->params.multi_texture_count;
         texture_handle = multi_texture->textures[subtexture_index];
     }
@@ -103,11 +139,11 @@ xf_texture_t* xf_resource_texture_get_no_alias ( xf_texture_h texture_handle ) {
 
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture_handle ) {
     xf_texture_t* texture;
-    bool is_multi_texture = xf_resource_texture_is_multi ( texture_handle );
+    bool is_multi_texture = xf_resource_handle_is_multi_m ( texture_handle );
 
     if ( is_multi_texture ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
-        uint64_t subtexture_index = ( texture_handle >> 16 ) & 0xffff;
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
+        uint64_t subtexture_index = xf_resource_handle_sub_idx_m ( texture_handle );
         subtexture_index = ( subtexture_index + multi_texture->index ) % multi_texture->params.multi_texture_count;
         texture_handle = multi_texture->textures[subtexture_index];
 
@@ -128,10 +164,10 @@ xf_texture_t* xf_resource_texture_get ( xf_texture_h texture_handle ) {
 }
 
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture_handle ) {
-    bool is_multi_texture = xf_resource_texture_is_multi ( texture_handle );
+    bool is_multi_texture = xf_resource_handle_is_multi_m ( texture_handle );
 
     if ( is_multi_texture ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
         return multi_texture;
     } else {
         return NULL;
@@ -140,11 +176,11 @@ xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture_handle 
 
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer_handle ) {
     xf_buffer_t* buffer;
-    bool is_multi_buffer = xf_resource_buffer_is_multi ( buffer_handle );
+    bool is_multi_buffer = xf_resource_handle_is_multi_m ( buffer_handle );
 
     if ( is_multi_buffer ) {
-        xf_multi_buffer_t* multi_buffer = & xf_resource_state->multi_buffers_array[buffer_handle & 0xffff];
-        uint64_t subbuffer_index = ( buffer_handle >> 16 ) & 0xffff;
+        xf_multi_buffer_t* multi_buffer = & xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( buffer_handle )];
+        uint64_t subbuffer_index = xf_resource_handle_sub_idx_m ( buffer_handle );
         subbuffer_index = ( subbuffer_index + multi_buffer->index ) % multi_buffer->params.multi_buffer_count;
         buffer_handle = multi_buffer->buffers[subbuffer_index];
 
@@ -176,11 +212,6 @@ void xf_resource_texture_update_info ( xf_texture_h texture_handle, const xg_tex
     texture->allowed_usage = info->allowed_usage;
 }
 
-void xf_resource_texture_set_allowed_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e allowed_usage ) {
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    texture->allowed_usage = allowed_usage;
-}
-
 void xf_resource_texture_map_to_new ( xf_texture_h texture_handle, xg_texture_h xg_handle, xg_texture_usage_bit_e allowed_usage ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     texture->xg_handle = xg_handle;
@@ -207,8 +238,8 @@ void xf_resource_buffer_unmap ( xf_buffer_h buffer_handle ) {
 
 void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e usage ) {
     // TODO should this take aliasing into account?
-    if ( std_bit_test_64_m ( texture_handle, 63 ) ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+    if ( xf_resource_handle_is_multi_m ( texture_handle ) ) {
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
 
         for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
             xf_texture_t* texture = &xf_resource_state->textures_array[multi_texture->textures[i]];
@@ -221,8 +252,8 @@ void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usa
 }
 
 void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_bit_e usage ) {
-    if ( xf_resource_buffer_is_multi ( buffer_handle ) ) {
-        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[buffer_handle & 0xffff];
+    if ( xf_resource_handle_is_multi_m ( buffer_handle ) ) {
+        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( buffer_handle )];
 
         for ( uint32_t i = 0; i < multi_buffer->params.multi_buffer_count; ++i ) {
             xf_buffer_t* buffer = &xf_resource_state->buffers_array[multi_buffer->buffers[i]];
@@ -234,7 +265,7 @@ void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_b
     }
 }
 
-void xf_resource_texture_set_execution_state ( xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* state ) {
+static void xf_resource_texture_set_execution_state ( xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* state ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
     if ( texture->params.view_access == xg_texture_view_access_default_only_m ) {
@@ -256,7 +287,7 @@ void xf_resource_texture_set_execution_state ( xf_texture_h texture_handle, xg_t
     }
 }
 
-void xf_resource_texture_set_execution_layout ( xf_texture_h texture_handle, xg_texture_view_t view, xg_texture_layout_e layout ) {
+static void xf_resource_texture_set_execution_layout ( xf_texture_h texture_handle, xg_texture_view_t view, xg_texture_layout_e layout ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
     if ( texture->params.view_access == xg_texture_view_access_default_only_m ) {
@@ -278,7 +309,7 @@ void xf_resource_texture_set_execution_layout ( xf_texture_h texture_handle, xg_
     }
 }
 
-void xf_resource_texture_add_execution_stage ( xf_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
+static void xf_resource_texture_add_execution_stage ( xf_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
     if ( texture->params.view_access == xg_texture_view_access_default_only_m ) {
@@ -300,25 +331,15 @@ void xf_resource_texture_add_execution_stage ( xf_texture_h texture_handle, xg_t
     }
 }
 
-void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer_handle, const xf_buffer_execution_state_t* state ) {
+static void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer_handle, const xf_buffer_execution_state_t* state ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
     buffer->state = *state;
 }
 
-void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer_handle, xg_pipeline_stage_bit_e stage ) {
+static void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer_handle, xg_pipeline_stage_bit_e stage ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
     buffer->state.stage |= stage;
 }
-
-//void xf_resource_texture_set_dirty ( xf_texture_h texture_handle, bool is_dirty ) {
-//    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-//    texture->is_dirty = is_dirty;
-//}
-//
-//void xf_resource_buffer_set_dirty ( xf_buffer_h buffer_handle, bool is_dirty ) {
-//    xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
-//    buffer->is_dirty = is_dirty;
-//}
 
 xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t* params ) {
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
@@ -396,20 +417,20 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
 
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture_handle ) {
     // TODO should this take aliasing into account?
-    std_assert_m ( std_bit_test_64_m ( multi_texture_handle, 63 ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
     multi_texture->index = ( multi_texture->index + 1 ) % multi_texture->params.multi_texture_count;
 }
 
 void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture_handle, uint32_t index ) {
-    std_assert_m ( std_bit_test_64_m ( multi_texture_handle, 63 ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
     multi_texture->index = index % multi_texture->params.multi_texture_count;
 }
 
 xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h multi_texture_handle ) {
-    std_assert_m ( std_bit_test_64_m ( multi_texture_handle, 63 ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
     return multi_texture->swapchain;
 }
 
@@ -440,8 +461,8 @@ xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h xg_texture
 }
 
 xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture_handle, int32_t offset ) {
-    std_assert_m ( std_bit_test_64_m ( multi_texture_handle, 63 ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
 
     int32_t rem = ( ( int32_t ) multi_texture->index + offset ) % ( int32_t ) multi_texture->params.multi_texture_count;
     uint32_t index = rem < 0 ? ( uint32_t ) ( rem + ( int32_t ) multi_texture->params.multi_texture_count ) : ( uint32_t ) rem;
@@ -454,8 +475,8 @@ xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture_
 }
 
 xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture_handle ) {
-    std_assert_m ( std_bit_test_64_m ( multi_texture_handle, 63 ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_texture_handle & 0xffff];
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
     handle = std_bit_set_ms_64_m ( handle, 1 );
     return handle;
@@ -563,8 +584,8 @@ void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer_h
 }
 
 void xf_resource_texture_alias ( xf_texture_h texture_handle, xf_texture_h alias ) {
-    if ( xf_resource_texture_is_multi ( texture_handle ) ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+    if ( xf_resource_handle_is_multi_m ( texture_handle ) ) {
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
         multi_texture->alias = alias;
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
@@ -572,71 +593,9 @@ void xf_resource_texture_alias ( xf_texture_h texture_handle, xf_texture_h alias
     }
 }
 
-void xf_resource_texture_add_graph_ref ( xf_texture_h texture_handle, xf_graph_h graph ) {
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-
-    uint32_t count = texture->graph_refs_count;
-    for ( uint32_t i = 0; i < count; ++i ) {
-        if ( graph == texture->graph_refs[i] ) {
-            return;
-        }
-    }
-
-    std_assert_m ( count < xf_resource_texture_max_graph_refs_m );
-
-    texture->graph_refs[count++] = graph;
-    texture->graph_refs_count = count;
-}
-
-void xf_resource_buffer_add_graph_ref ( xf_buffer_h buffer_handle, xf_graph_h graph ) {
-    xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
-
-    uint32_t count = buffer->graph_refs_count;
-    for ( uint32_t i = 0; i < count; ++i ) {
-        if ( graph == buffer->graph_refs[i] ) {
-            return;
-        }
-    }
-
-    std_assert_m ( count < xf_resource_buffer_max_graph_refs_m );
-
-    buffer->graph_refs[count++] = graph;
-    buffer->graph_refs_count = count;
-}
-
-void xf_resource_texture_remove_graph_ref ( xf_texture_h texture_handle, xf_graph_h graph ) {
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-
-    uint32_t count = texture->graph_refs_count;
-    for ( uint32_t i = 0; i < count; ++i ) {
-        if ( graph == texture->graph_refs[i] ) {
-            texture->graph_refs[i] = texture->graph_refs[--count];
-            texture->graph_refs_count = count;
-            return;
-        }
-    }
-
-    std_log_error_m ( "Graph reference not found during removal request" );
-}
-
-void xf_resource_buffer_remove_graph_ref ( xf_buffer_h buffer_handle, xf_graph_h graph ) {
-    xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
-
-    uint32_t count = buffer->graph_refs_count;
-    for ( uint32_t i = 0; i < count; ++i ) {
-        if ( graph == buffer->graph_refs[i] ) {
-            buffer->graph_refs[i] = buffer->graph_refs[--count];
-            buffer->graph_refs_count = count;
-            return;
-        }
-    }
-
-    std_log_error_m ( "Graph reference not found during removal request" );
-}
-
 static xf_multi_texture_t* xf_resource_multi_texture_get_multi ( xf_texture_h texture_handle ) {
-    std_assert_m ( xf_resource_texture_is_multi ( texture_handle ) );
-    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[texture_handle & 0xffff];
+    std_assert_m ( xf_resource_handle_is_multi_m ( texture_handle ) );
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
     return multi_texture;
 }
 

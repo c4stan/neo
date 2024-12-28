@@ -26,6 +26,8 @@ static void xf_api_init ( xf_i* xf ) {
     //xf.get_multi_buffer = xf_multi_resource_get_multi_buffer;
     xf->multi_texture_from_swapchain = xf_resource_multi_texture_declare_from_swapchain;
 
+    xf->destroy_texture = xf_resource_texture_destroy;
+
     xf->texture_from_external = xf_resource_texture_declare_from_external;
     xf->get_multi_texture = xf_resource_multi_texture_get_texture;
 

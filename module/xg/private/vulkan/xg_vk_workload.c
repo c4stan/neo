@@ -871,9 +871,10 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
             }
         }
 
-        const xg_vk_renderpass_t* renderpass;
-        const xg_vk_framebuffer_t* framebuffer;
+        const xg_vk_renderpass_t* renderpass = NULL;
+        const xg_vk_framebuffer_t* framebuffer = NULL;
         if ( state->graphics_renderpass == NULL ) {
+            //std_assert_m ( false );
             xg_vk_renderpass_h renderpass_handle = state->graphics_pipeline->renderpass;
             renderpass = xg_vk_renderpass_get ( renderpass_handle );
             xg_vk_framebuffer_h framebuffer_handle = xg_vk_framebuffer_acquire ( device_handle, renderpass_handle, width, height );
@@ -1049,7 +1050,7 @@ static void xg_vk_translation_state_cache_flush ( xg_vk_tranlsation_state_t* sta
         vkCmdBindDescriptorSets ( vk_cmd_buffer, pipeline_type, common_pipeline->vk_layout_handle, set_it, 1, &vk_set, 0, NULL );
 #else
         xg_pipeline_resource_group_h group_handle = set->group;
-        if ( false && group_handle != xg_null_handle_m ) {
+        if ( group_handle != xg_null_handle_m ) {
             VkDescriptorSet vk_set;
             if ( xg_vk_resource_group_handle_is_workload_m ( group_handle ) ) {
                 const xg_vk_workload_t* workload = xg_vk_workload_get ( context->workload );

@@ -69,10 +69,6 @@ typedef struct {
 } xf_texture_view_table_t;
 #endif
 
-// TODO move out
-#define xf_resource_texture_max_graph_refs_m 4
-#define xf_resource_buffer_max_graph_refs_m 4
-
 typedef struct {
     bool is_external; // lifetime not owned by xf. never allocated, just used
     xg_texture_h xg_handle;
@@ -86,9 +82,6 @@ typedef struct {
         // TODO external hash table to support dynamic view access
     } state;
 
-    xf_graph_h graph_refs[xf_resource_texture_max_graph_refs_m];
-    uint32_t graph_refs_count;
-
     xf_texture_h alias;
 } xf_texture_t;
 
@@ -99,7 +92,6 @@ typedef struct {
     .allowed_usage = xg_texture_usage_bit_none_m, \
     .params = xf_texture_params_m(), \
     .state.shared = xf_texture_execution_state_m(), \
-    .graph_refs_count = 0, \
     .alias = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
@@ -110,8 +102,6 @@ typedef struct {
     xg_buffer_usage_bit_e required_usage;
     xg_buffer_usage_bit_e allowed_usage;
     xf_buffer_params_t params;
-    xf_graph_h graph_refs[xf_resource_buffer_max_graph_refs_m];
-    uint32_t graph_refs_count;
     xf_buffer_h alias;
 } xf_buffer_t;
 
@@ -121,7 +111,6 @@ typedef struct {
     .required_usage = xg_buffer_usage_bit_none_m, \
     .allowed_usage = xg_buffer_usage_bit_none_m, \
     .params = xf_buffer_params_m(), \
-    .graph_refs_count = 0, \
     .alias = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
@@ -159,11 +148,13 @@ void xf_resource_load ( xf_resource_state_t* state );
 void xf_resource_reload ( xf_resource_state_t* state );
 void xf_resource_unload ( void );
 
-// TODO group some of those setters into a single function that sets everything and locks only once
-
+// TODO rename _declare to _create?
 xf_texture_h xf_resource_texture_declare ( const xf_texture_params_t* params );
 xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
 xf_buffer_h xf_resource_buffer_declare ( const xf_buffer_params_t* params );
+
+void xf_resource_texture_destroy ( xf_texture_h texture );
+void xf_resource_buffer_destroy ( xf_buffer_h buffer );
 
 void xf_resource_texture_get_info ( xf_texture_info_t* info, xf_texture_h texture );
 void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
@@ -179,34 +170,14 @@ void xf_resource_texture_unmap ( xf_texture_h texture );
 void xf_resource_buffer_unmap ( xf_buffer_h buffer );
 
 void xf_resource_texture_update_info ( xf_texture_h texture, const xg_texture_info_t* info );
-void xf_resource_texture_set_allowed_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
 
 void xf_resource_texture_add_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
 void xf_resource_buffer_add_usage ( xf_buffer_h buffer, xg_buffer_usage_bit_e usage );
-
-void xf_resource_texture_add_reader ( xf_texture_h texture, xg_texture_view_t view, xf_node_h reader );
-void xf_resource_texture_add_writer ( xf_texture_h texture, xg_texture_view_t view, xf_node_h writer );
-void xf_resource_texture_clear_dependencies ( xf_texture_h texture );
-void xf_resource_buffer_add_reader ( xf_buffer_h buffer, xf_node_h reader );
-void xf_resource_buffer_add_writer ( xf_buffer_h buffer, xf_node_h writer );
-void xf_resource_buffer_clear_dependencies ( xf_buffer_h buffer );
-
-void xf_resource_texture_set_execution_state ( xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* state );
-void xf_resource_texture_set_execution_layout ( xf_texture_h texture, xg_texture_view_t view, xg_texture_layout_e layout );
-void xf_resource_texture_add_execution_stage ( xf_texture_h texture, xg_texture_view_t view, xg_pipeline_stage_bit_e stage );
-
-void xf_resource_buffer_set_execution_state ( xf_buffer_h buffer, const xf_buffer_execution_state_t* state );
-void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer, xg_pipeline_stage_bit_e stage );
 
 void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
 void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
 
 void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
-
-void xf_resource_texture_add_graph_ref ( xf_texture_h texture, xf_graph_h graph );
-void xf_resource_buffer_add_graph_ref ( xf_buffer_h buffer, xf_graph_h graph );
-void xf_resource_texture_remove_graph_ref ( xf_texture_h texture, xf_graph_h graph );
-void xf_resource_buffer_remove_graph_ref ( xf_buffer_h buffer, xf_graph_h graph );
 
 /*
     Multi texture handle : | multi texture flag | unused | multi texture subtexture index | multi texture index |
@@ -227,11 +198,15 @@ void xf_resource_buffer_remove_graph_ref ( xf_buffer_h buffer, xf_graph_h graph 
 */
 xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t* params );
 xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h swapchain );
+
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
 void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture, uint32_t index );
+
 xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h texture );
 xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture, int32_t offset );
 xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture );
+
 bool xf_resource_texture_is_multi ( xf_texture_h texture );
 bool xf_resource_buffer_is_multi ( xf_buffer_h buffer );
+
 void xf_resource_swapchain_resize ( xf_texture_h swapchain );

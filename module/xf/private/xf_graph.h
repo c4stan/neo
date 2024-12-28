@@ -179,6 +179,12 @@ typedef struct {
 }
 
 typedef struct {
+    xg_memory_h memory_handle;
+    xf_texture_h textures_array[xf_graph_max_textures_m];
+    uint32_t textures_count;
+} xf_graph_memory_heap_t;
+
+typedef struct {
     xf_graph_params_t params;
 
     xf_node_t nodes_array[xf_graph_max_nodes_m];
@@ -205,6 +211,8 @@ typedef struct {
     uint64_t buffer_hashes[xf_graph_max_buffers_m * 2];
     uint64_t buffer_values[xf_graph_max_buffers_m];
     std_hash_map_t buffers_map;
+
+    xf_graph_memory_heap_t heap; // TODO one per mem type?
 } xf_graph_t;
 
 typedef struct {
