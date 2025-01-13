@@ -14,7 +14,7 @@ std_warnings_ignore_m ( "-Wunused-function" )
 typedef struct {
     float color[3];
     float pad;
-} frame_cbuffer_t;
+} draw_uniforms_t;
 
 typedef struct {
     xg_device_h device;
@@ -39,7 +39,6 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
     xg_texture_info_t swapchain_texture_info;
     xg->get_texture_info ( &swapchain_texture_info, swapchain_texture );
 
-#if 1
     // Allocate temp texture
     xg_texture_params_t params = xg_texture_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
@@ -55,29 +54,29 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, temp_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 
-#define COMPUTE_CLEAR 1
+    const bool compute_clear = true;
 
     // Clear temp texture
-    {
-#if !COMPUTE_CLEAR
+    if ( !compute_clear ) {
         // transition to copy_dest
-        xg_texture_memory_barrier_t texture_barrier = xg_default_texture_memory_barrier_m;
-        texture_barrier.texture = temp_texture;
-        texture_barrier.layout.old = xg_texture_layout_undefined_m;
-        texture_barrier.layout.new = xg_texture_layout_copy_dest_m;
-        texture_barrier.memory.flushes = xg_memory_access_bit_none_m;
-        texture_barrier.memory.invalidations = xg_memory_access_bit_none_m;
-        texture_barrier.execution.blocker = xg_pipeline_stage_bit_transfer_m;
-        texture_barrier.execution.blocked = xg_pipeline_stage_bit_transfer_m;
+        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+            .texture = temp_texture,
+            .layout.old = xg_texture_layout_undefined_m,
+            .layout.new = xg_texture_layout_copy_dest_m,
+            .memory.flushes = xg_memory_access_bit_none_m,
+            .memory.invalidations = xg_memory_access_bit_none_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+        );
 
-        xg_barrier_set_t barrier_set;
-        barrier_set.memory_barriers_count = 0;
-        barrier_set.texture_memory_barriers_count = 1;
-        barrier_set.texture_memory_barriers = &texture_barrier;
+        xg_barrier_set_t barrier_set = xg_barrier_set_m (
+            .memory_barriers_count = 0,
+            .texture_memory_barriers_count = 1,
+            .texture_memory_barriers = &texture_barrier,
+        );
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
-
-#else
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
+    } else {
         // transition to storage image
         xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
             .texture = temp_texture,
@@ -94,8 +93,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .texture_memory_barriers = &texture_barrier,
         );
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
-#endif
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
     }
 
     {
@@ -104,47 +102,44 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
         color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-#if !COMPUTE_CLEAR
-        xg->cmd_clear_texture ( cmd_buffer, temp_texture, color_clear, 0 );
-#else
-        xg->cmd_set_compute_pipeline_state ( cmd_buffer, frame.compute_pipeline, 0 );
 
-#if 0
-        xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_shader_binding_set_per_frame_m,
-            .texture_count = 1,
-            .textures = {
-                xg_texture_resource_binding_m (
-                    .shader_register = 0,
-                    .texture = temp_texture,
-                    .view = xg_texture_view_m(),
-                    .layout = xg_texture_layout_shader_write_m,
+        if ( !compute_clear ) {
+            xg->cmd_clear_texture ( cmd_buffer, 0, temp_texture, color_clear );
+        } else {
+            // TODO upload color_clear to compute cbuffer...
+
+            xg_resource_bindings_layout_h compute_layouts[xg_shader_binding_set_count_m];
+            xg->get_pipeline_resource_layouts ( compute_layouts, frame.compute_pipeline );
+
+            xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+                .layout = compute_layouts[xg_shader_binding_set_dispatch_m],
+                .bindings = xg_pipeline_resource_bindings_m (
+                    .texture_count = 1,
+                    .textures = {
+                        xg_texture_resource_binding_m (
+                            .texture = temp_texture,
+                            .layout = xg_texture_layout_shader_write_m,
+                            .shader_register = 0,
+                        )
+                    }
                 )
-            }
-        );
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, 0 );
-#else
-        xg_pipeline_resource_group_h group = xg->cmd_create_workload_resource_group ( resource_cmd_buffer, frame.workload, &xg_pipeline_resource_group_params_m (
-            .device = frame.device,
-            .pipeline = frame.compute_pipeline,
-            .bindings = xg_pipeline_resource_bindings_m (
-                .set = xg_shader_binding_set_per_frame_m,
-                .texture_count = 1,
-                .textures = {
-                    xg_texture_resource_binding_m (
-                        .shader_register = 0,
-                        .texture = temp_texture,
-                        .view = xg_texture_view_m(),
-                        .layout = xg_texture_layout_shader_write_m,
-                    )
-                }
-            )
-        ) );
-        xg->cmd_set_resource_group ( cmd_buffer, xg_shader_binding_set_per_frame_m, group, 0 );
-#endif
+            ) );
 
-        xg->cmd_dispatch_compute ( cmd_buffer, swapchain_texture_info.width, swapchain_texture_info.height, 1, xg_cmd_queue_compute_m, 0 );
-#endif
+            xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+                .queue = xg_cmd_queue_compute_m,
+            ) );
+
+            xg->cmd_compute ( cmd_buffer, 0, &xg_cmd_compute_params_m (
+                .workgroup_count_x = swapchain_texture_info.width,
+                .workgroup_count_y = swapchain_texture_info.height,
+                .pipeline = frame.compute_pipeline,
+                .bindings[xg_shader_binding_set_dispatch_m] = group,
+            ) );
+
+             xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+                .queue = xg_cmd_queue_graphics_m,
+            ) );
+        }
     }
 
     // Copy temp texture on swapchain texture
@@ -152,27 +147,28 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         // flush and make visible the clear
         // transition to copy_source
         xg_texture_memory_barrier_t texture_barrier[2];
-#if !COMPUTE_CLEAR
-        texture_barrier[0] = xg_texture_memory_barrier_m (
-            .texture = temp_texture,
-            .layout.old = xg_texture_layout_copy_dest_m,
-            .layout.new = xg_texture_layout_copy_source_m,
-            .memory.flushes = xg_memory_access_bit_transfer_write_m,
-            .memory.invalidations = xg_memory_access_bit_transfer_write_m,
-            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-        );
-#else
-        texture_barrier[0] = xg_texture_memory_barrier_m (
-            .texture = temp_texture,
-            .layout.old = xg_texture_layout_shader_write_m,
-            .layout.new = xg_texture_layout_copy_source_m,
-            .memory.flushes = xg_memory_access_bit_shader_write_m,
-            .memory.invalidations = xg_memory_access_bit_transfer_write_m, // xg_memory_access_bit_transfer_read_m?
-            .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
-            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-        );
-#endif
+
+        if ( !compute_clear ) {
+            texture_barrier[0] = xg_texture_memory_barrier_m (
+                .texture = temp_texture,
+                .layout.old = xg_texture_layout_copy_dest_m,
+                .layout.new = xg_texture_layout_copy_source_m,
+                .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+            );
+        } else {
+            texture_barrier[0] = xg_texture_memory_barrier_m (
+                .texture = temp_texture,
+                .layout.old = xg_texture_layout_shader_write_m,
+                .layout.new = xg_texture_layout_copy_source_m,
+                .memory.flushes = xg_memory_access_bit_shader_write_m,
+                .memory.invalidations = xg_memory_access_bit_transfer_write_m, // xg_memory_access_bit_transfer_read_m?
+                .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
+                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+            );
+        }
         // transition to to copy_dest
         texture_barrier[1] = xg_texture_memory_barrier_m (
             .texture = swapchain_texture,
@@ -188,30 +184,14 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .texture_memory_barriers_count = 2,
             .texture_memory_barriers = texture_barrier,
         );
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
     }
 
     xg_texture_copy_params_t copy_params = xg_texture_copy_params_m (
         .source.texture = temp_texture,
         .destination.texture = swapchain_texture,
     );
-    xg->cmd_copy_texture ( cmd_buffer, &copy_params, 0 );
-#endif
-
-    // Bind swapchain texture as render target
-    {
-        xg_color_clear_t color_clear;
-        color_clear.f32[0] = 0;
-        color_clear.f32[1] = 0;
-        color_clear.f32[2] = 0;
-        xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
-            .render_targets_count = 1,
-            .render_targets[0].texture = swapchain_texture,
-            .render_targets[0].view = xg_texture_view_m(),
-            .depth_stencil.texture = xg_null_handle_m,
-        );
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, 0 );
-    }
+    xg->cmd_copy_texture ( cmd_buffer, 0, &copy_params );
 
     // Transition swpachain texture to render target
     {
@@ -231,25 +211,34 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .texture_memory_barriers = &texture_barrier,
         );
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
     }
 
-    // Set pipeline
-    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, frame.graphics_pipeline, 0 );
+    // Bind swapchain texture as render target
+    xg->cmd_begin_renderpass ( cmd_buffer, 0, &xg_cmd_renderpass_params_m (
+        .renderpass = frame.renderpass,
+        .render_targets_count = 1,
+        .render_targets = { xg_render_target_binding_m (
+            .texture = swapchain_texture,
+            .view = xg_texture_view_m(),
+        ) },
+    ) );
 
-    xg_viewport_state_t viewport = xg_viewport_state_m (
-        .width = 600,
-        .height = 400,
-    );
-    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, 0 );
+    // Set pipeline
+    //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, frame.graphics_pipeline, 0 );
+
+    //xg_viewport_state_t viewport = xg_viewport_state_m (
+    //    .width = 600,
+    //    .height = 400,
+    //);
+    //xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, 0 );
 
     xg_buffer_range_t cbuffer_range;
     {
-        frame_cbuffer_t cbuffer_data;
-        cbuffer_data.color[0] = 0.0;
-        cbuffer_data.color[1] = 0.0;
-        cbuffer_data.color[2] = 1.0;
-        //cbuffer_range = xg->write_workload_uniform ( workload, &cbuffer_data, sizeof ( cbuffer_data ) );
+        draw_uniforms_t uniforms;
+        uniforms.color[0] = 0.0;
+        uniforms.color[1] = 0.0;
+        uniforms.color[2] = 1.0;
         xg_buffer_h buffer_handle = xg->create_buffer ( & xg_buffer_params_m (
             .memory_type = xg_memory_type_gpu_mapped_m,
             .device = frame.device,
@@ -260,55 +249,38 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
         xg_buffer_info_t buffer_info;
         xg->get_buffer_info ( &buffer_info, buffer_handle );
-        std_mem_copy ( buffer_info.allocation.mapped_address, &cbuffer_data, sizeof ( cbuffer_data ) );
+        std_mem_copy ( buffer_info.allocation.mapped_address, &uniforms, sizeof ( uniforms ) );
         cbuffer_range.handle = buffer_handle;
         cbuffer_range.offset = 0;
-        cbuffer_range.size = sizeof ( cbuffer_data );
+        cbuffer_range.size = sizeof ( uniforms );
 
         xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer_handle, xg_resource_cmd_buffer_time_workload_complete_m );
     }
 
-    // Bind resources
-#if 0
-    xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_draw_m,
-        .buffer_count = 1,
-        .buffers = {
-            xg_buffer_resource_binding_m (
-                .shader_register = 0,
-                .type = xg_buffer_binding_type_uniform_m,
-                .range = cbuffer_range,
-            )
-        }
-    );
+    xg_resource_bindings_layout_h graphics_layouts[xg_shader_binding_set_count_m];
+    xg->get_pipeline_resource_layouts ( graphics_layouts, frame.graphics_pipeline );
 
-    xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, 0 );
-#else
-    xg_pipeline_resource_group_h group = xg->cmd_create_workload_resource_group ( resource_cmd_buffer, frame.workload, &xg_pipeline_resource_group_params_m (
-        .device = frame.device,
-        .pipeline = frame.graphics_pipeline,
+    // Bind resources
+    xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+        .layout = graphics_layouts[xg_shader_binding_set_dispatch_m],
         .bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_shader_binding_set_per_draw_m,
             .buffer_count = 1,
             .buffers = {
                 xg_buffer_resource_binding_m (
-                    .shader_register = 0,
-                    .type = xg_buffer_binding_type_uniform_m,
                     .range = cbuffer_range,
                 )
             }
         )
     ) );
 
-    xg->cmd_set_resource_group ( cmd_buffer, xg_shader_binding_set_per_draw_m, group, 0 );
-#endif
-
-    xg->cmd_begin_renderpass ( cmd_buffer, frame.renderpass, 0 );
-
     // Draw
-    xg->cmd_draw ( cmd_buffer, 3, 0, 0 );
+    xg->cmd_draw ( cmd_buffer, 0, &xg_cmd_draw_params_m (
+        .pipeline = frame.graphics_pipeline,
+        .bindings[xg_shader_binding_set_dispatch_m] = group,
+        .primitive_count = 1,
+    ) );
 
-    xg->cmd_end_renderpass ( cmd_buffer, frame.renderpass, 0 );
+    xg->cmd_end_renderpass ( cmd_buffer, 0 );
 
     // Transition swapchain texture to present mode
     {
@@ -327,12 +299,9 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .texture_memory_barriers = &texture_barrier,
         );
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
     }
 
-    //xg->close_resource_cmd_buffers ( &resource_cmd_buffer, 1 );
-
-    //xg->close_cmd_buffers ( &cmd_buffer, 1 );
     xg->submit_workload ( frame.workload );
     xg->present_swapchain ( frame.swapchain, frame.workload );
 }
@@ -392,10 +361,10 @@ static void xs_test ( void ) {
     ) );
     xs->build_database ( sdb );
 
-    xs_database_pipeline_h graphics_database_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "test_state" ) );
-    xs_database_pipeline_h compute_database_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "compute_state" ) );
+    xs_database_pipeline_h graphics_database_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle" ) );
+    xs_database_pipeline_h compute_database_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "clear" ) );
 
-    xg_renderpass_h renderpass = xg->create_renderpass ( &xg_graphics_renderpass_params_m ( 
+    xg_renderpass_h renderpass = xg->create_renderpass ( &xg_renderpass_params_m ( 
         .device = device,
         .render_textures = xg_render_textures_layout_m (
             .render_targets_count = 1,
@@ -438,6 +407,17 @@ static void xs_test ( void ) {
 
         if ( window_info.width != new_window_info.width || window_info.height != new_window_info.height ) {
             xg->resize_swapchain ( swapchain, new_window_info.width, new_window_info.height );
+            xg->destroy_renderpass ( renderpass );
+            renderpass = xg->create_renderpass ( &xg_renderpass_params_m ( 
+                .device = device,
+                .render_textures = xg_render_textures_layout_m (
+                    .render_targets_count = 1,
+                    .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
+                ),
+                .resolution_x = new_window_info.width,
+                .resolution_y = new_window_info.height,
+                .debug_name = "xs_test_renderpass"
+            ) );
             xs->set_build_params ( sdb, &xs_database_build_params_m (
                 .base_graphics_state = &xg_graphics_pipeline_state_m ( 
                     .viewport_state.width = new_window_info.width,

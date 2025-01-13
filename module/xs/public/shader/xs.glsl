@@ -1,7 +1,7 @@
-#define xs_shader_binding_set_per_frame_m       0
-#define xs_shader_binding_set_per_view_m        1
-#define xs_shader_binding_set_per_material_m    2
-#define xs_shader_binding_set_per_draw_m        3
+#define xs_shader_binding_set_workload_m    0
+#define xs_shader_binding_set_pass_m        1
+#define xs_shader_binding_set_material_m    2
+#define xs_shader_binding_set_dispatch_m    3
 
 ////////
 // Means that all uniform/storage matrix data is loaded in as-is (assuming calling code is C-like and therefore row-major)

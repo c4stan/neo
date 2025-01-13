@@ -440,6 +440,8 @@ typedef struct {
 
     xg_format_e render_target_format;
     xi_viewport_t viewport;
+    xg_renderpass_h renderpass;
+    xg_render_target_binding_t render_target_binding;
 } xi_flush_params_t;
 
 // Api
@@ -461,7 +463,7 @@ typedef struct {
     void ( *set_workload_view_info ) ( xg_workload_h workload, const rv_view_info_t* view_info ); // TODO remove!
 
     xi_workload_h ( *create_workload ) ( void );
-    void ( *flush_workload ) ( xi_workload_h workload, const xi_flush_params_t* params );
+    uint64_t ( *flush_workload ) ( xi_workload_h workload, const xi_flush_params_t* params );
     // Add api to get oldest non-flushed workload? can avoid having to keep track of created workloads on client side
     // Auto flush all pending workloads on end_frame/end_update?
 

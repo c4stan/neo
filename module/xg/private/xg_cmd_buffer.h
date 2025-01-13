@@ -33,8 +33,9 @@ typedef struct {
     // Abusing the fact that x64 pointers have their top 16 bits unused
     // https://stackoverflow.com/questions/31522582/can-i-use-some-bits-of-pointer-x86-64-for-custom-data-and-how-if-possible
     // Args contains a memory address.
-    uint64_t args : 48;
-    uint64_t type : 16;
+    uint64_t args : 48; // void*
+    uint64_t type : 8; // xg_cmd_type_e
+    uint64_t tag  : 8; // room for custom byte-sized inline arg
     uint64_t key;
 } xg_cmd_header_t;
 
@@ -47,196 +48,36 @@ typedef struct {
 } xg_cmd_buffer_t;
 
 typedef enum {
-    // Graphics pipeline
-    xg_cmd_graphics_streams_bind_m,
-    xg_cmd_graphics_pipeline_state_bind_m,
-    xg_cmd_graphics_render_textures_bind_m,
-
     xg_cmd_graphics_renderpass_begin_m,
     xg_cmd_graphics_renderpass_end_m,
 
-    xg_cmd_graphics_pipeline_state_set_viewport_m,
-    xg_cmd_graphics_pipeline_state_set_scissor_m,
+    xg_cmd_draw_m,
+    xg_cmd_compute_m,
+    xg_cmd_raytrace_m,
 
-    xg_cmd_graphics_streams_submit_m,
-    xg_cmd_graphics_streams_submit_indexed_m,
-    xg_cmd_graphics_streams_submit_instanced_m,
-
-    // Compute pipeline
-    xg_cmd_compute_pipeline_state_bind_m,
-    xg_cmd_compute_dispatch_m,
-
-    // Raytrace
-    xg_cmd_raytrace_pipeline_state_bind_m,
-    xg_cmd_raytrace_trace_rays_m,
-
-    // Copy
     xg_cmd_copy_buffer_m,
     xg_cmd_copy_texture_m,
     xg_cmd_copy_buffer_to_texture_m,
     xg_cmd_copy_texture_to_buffer_m,
 
-    // Misc?
-    xg_cmd_pipeline_resource_bind_m,
-    xg_cmd_pipeline_resource_group_bind_m,
-    xg_cmd_pipeline_constant_write_m,
-    xg_cmd_barrier_set_m,
     xg_cmd_texture_clear_m,
     xg_cmd_texture_depth_stencil_clear_m,
+
+    xg_cmd_barrier_set_m,
+    xg_cmd_bind_queue_m,
+
     xg_cmd_start_debug_capture_m,
     xg_cmd_stop_debug_capture_m,
     xg_cmd_begin_debug_region_m,
     xg_cmd_end_debug_region_m,
-    xg_cmd_write_timestamp_m,
+    //xg_cmd_write_timestamp_m,
 } xg_cmd_type_e;
 
 #define xg_cmd_buffer_cmd_alignment_m 8
 
 int xg_vk_cmd_buffer_header_compare_f ( const void* a, const void* b );
 
-typedef struct {
-    uint32_t bindings_count;
-    xg_vertex_stream_binding_t bindings[];
-} xg_cmd_graphics_streams_bind_t;
-
 int xg_vertex_stream_binding_cmp_f ( const void* a, const void* b );
-
-typedef struct {
-    xg_graphics_pipeline_state_h pipeline;
-} xg_cmd_graphics_pipeline_state_bind_t;
-
-typedef struct {
-    xg_shader_binding_set_e set;
-    uint32_t buffer_count;
-    uint32_t texture_count;
-    uint32_t sampler_count;
-    uint32_t raytrace_world_count;
-    //xg_buffer_resource_binding_t[]
-    //xg_texture_resource_binding_t[]
-    //xg_sampler_resource_binding_t[]
-    //xg_raytrace_world_resource_binding_t[]
-} xg_cmd_pipeline_resource_bind_t;
-
-typedef struct {
-    xg_shader_binding_set_e set;
-    xg_pipeline_resource_group_h group;
-} xg_cmd_pipeline_resource_group_bind_t;
-
-typedef struct {
-    xg_shading_stage_bit_e stages;
-    uint32_t offset;
-    uint32_t size;
-    char data[];
-} xg_cmd_pipeline_constant_data_write_t;
-
-typedef struct {
-    size_t                      render_targets_count;
-    xg_depth_stencil_binding_t  depth_stencil;
-    xg_render_target_binding_t  render_targets[];
-} xg_cmd_graphics_render_texture_bind_t;
-
-typedef struct {
-    uint32_t count;
-} xg_cmd_graphics_invoke_t;
-
-typedef struct {
-    uint32_t base;
-    uint32_t count;
-} xg_cmd_graphics_streams_submit_t;
-
-typedef struct {
-    uint32_t ibuffer_base;
-    uint32_t index_count;
-    xg_buffer_h ibuffer;
-} xg_cmd_graphics_streams_submit_indexed_t;
-
-typedef struct {
-    uint32_t vertex_base;
-    uint32_t vertex_count;
-    uint32_t instance_base;
-    uint32_t instance_count;
-} xg_cmd_graphics_streams_submit_instanced_t;
-
-typedef struct {
-    xg_viewport_state_t viewport;
-} xg_cmd_graphics_pipeline_state_set_viewport_t;
-
-typedef struct {
-    xg_scissor_state_t scissor;
-} xg_cmd_graphics_pipeline_state_set_scissor_t;
-
-typedef struct {
-    xg_renderpass_h renderpass;
-} xg_cmd_graphics_renderpass_begin_t;
-
-typedef struct {
-    xg_renderpass_h renderpass;
-} xg_cmd_graphics_renderpass_end_t;
-
-typedef struct {
-    uint32_t workgroup_count_x;
-    uint32_t workgroup_count_y;
-    uint32_t workgroup_count_z;
-    xg_cmd_queue_e queue;
-} xg_cmd_compute_dispatch_t;
-
-typedef struct {
-    xg_compute_pipeline_state_h pipeline;
-} xg_cmd_compute_pipeline_state_bind_t;
-
-typedef struct {
-    xg_raytrace_pipeline_state_h pipeline;
-} xg_cmd_raytrace_pipeline_state_bind_t;
-
-typedef struct {
-    uint32_t ray_count_x;
-    uint32_t ray_count_y;
-    uint32_t ray_count_z;
-} xg_cmd_raytrace_trace_rays_t;
-
-typedef struct {
-    xg_buffer_h source;
-    xg_buffer_h destination;
-} xg_cmd_copy_buffer_t;
-
-typedef struct {
-    xg_texture_copy_resource_t source;
-    xg_texture_copy_resource_t destination;
-    uint32_t mip_count;
-    uint32_t array_count;
-    xg_texture_aspect_e aspect;
-    xg_sampler_filter_e filter;
-} xg_cmd_copy_texture_t;
-
-typedef struct {
-    xg_buffer_h source;
-    uint64_t source_offset;
-    xg_texture_h destination;
-    uint32_t mip_base;
-    uint32_t array_base;
-    uint32_t array_count;
-    //xg_texture_aspect_e aspect;
-    //xg_texture_layout_e layout;
-} xg_cmd_copy_buffer_to_texture_t;
-
-typedef struct {
-    xg_texture_h source;
-    uint32_t mip_base;
-    uint32_t array_base;
-    uint32_t array_count;
-    xg_buffer_h destination;
-    uint64_t destination_offset;
-} xg_cmd_copy_texture_to_buffer_t;
-
-// The current layout is sent in along with the cmd
-/*
-typedef struct {
-    xg_texture_h texture;
-    xg_texture_layout_e old_layout;
-    xg_texture_layout_e new_layout;
-    xg_memory_barrier_t memory;
-} xg_cmd_memory_barrier_texture_t;
-*/
 
 typedef struct {
     //xg_execution_barrier_t execution_barrier;
@@ -323,65 +164,41 @@ xg_cmd_buffer_t* xg_cmd_buffer_get ( xg_cmd_buffer_h cmd_buffer );
 //                                     G R A P H I C S
 // ======================================================================================= //
 // Begin/end renderpass
-void xg_cmd_buffer_graphics_renderpass_begin ( xg_cmd_buffer_h cmd_buffer, const xg_renderpass_h renderpass, uint64_t key );
-void xg_cmd_buffer_graphics_renderpass_end ( xg_cmd_buffer_h cmd_buffer, const xg_renderpass_h renderpass, uint64_t key );
-
-// Bind pipeline state.
-void xg_cmd_buffer_graphics_pipeline_state_bind ( xg_cmd_buffer_h cmd_buffer, xg_graphics_pipeline_state_h pipeline, uint64_t key );
-
-// Bind render textures.
-void xg_cmd_buffer_graphics_render_textures_bind ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
-
-// Bind input vertex streams.
-void xg_cmd_buffer_graphics_streams_bind ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t bindings_count, uint64_t key );
+void xg_cmd_buffer_cmd_renderpass_begin ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_renderpass_params_t* params );
+void xg_cmd_buffer_cmd_renderpass_end ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
 // Draw calls
-void xg_cmd_buffer_graphics_streams_submit ( xg_cmd_buffer_h cmd_buffer, size_t vertex_count, size_t streams_base, uint64_t key );
-void xg_cmd_buffer_graphics_streams_submit_indexed ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h ibuffer, size_t index_count, size_t ibuffer_base, uint64_t key );
-void xg_cmd_buffer_graphics_streams_submit_instanced ( xg_cmd_buffer_h cmd_buffer, size_t vertex_base, size_t vertex_count, size_t instance_base, size_t instance_count, uint64_t key );
-
-// Set dynamic pipeline state
-void xg_cmd_buffer_graphics_pipeline_state_set_viewport ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
-void xg_cmd_buffer_graphics_pipeline_state_set_scissor ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
+void xg_cmd_buffer_cmd_draw ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );
 
 // ======================================================================================= //
 //                                      C O M P U T E
 // ======================================================================================= //
-void xg_cmd_buffer_compute_dispatch ( xg_cmd_buffer_h buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, xg_cmd_queue_e queue, uint64_t key );
-void xg_cmd_buffer_compute_pipeline_state_bind ( xg_cmd_buffer_h buffer, xg_compute_pipeline_state_h pipeline, uint64_t key );
-//void    xg_cmd_buffer_compute_pipeline_resource_bind    ( xg_cmd_buffer_h buffer, xg_pipeline_resource_bindings_t* bindings, uint64_t key );
+void xg_cmd_buffer_cmd_compute ( xg_cmd_buffer_h buffer, uint64_t key, const xg_cmd_compute_params_t* params );
 
 // ======================================================================================= //
 //                                     R A Y T R A C E
 // ======================================================================================= //
-void xg_cmd_buffer_raytrace_trace_rays ( xg_cmd_buffer_h buffer, uint32_t ray_count_x, uint32_t ray_count_y, uint32_t ray_count_z, uint64_t key );
-void xg_cmd_buffer_raytrace_pipeline_state_bind ( xg_cmd_buffer_h buffer, xg_raytrace_pipeline_state_h pipeline, uint64_t key );
+void xg_cmd_buffer_cmd_raytrace ( xg_cmd_buffer_h buffer, uint64_t key, const xg_cmd_raytrace_params_t* params );
 
 // ======================================================================================= //
 //                                         C O P Y
 // ======================================================================================= //
-void xg_cmd_buffer_copy_buffer ( xg_cmd_buffer_h buffer, xg_buffer_h source, xg_buffer_h dest, uint64_t key );
-void xg_cmd_buffer_copy_texture ( xg_cmd_buffer_h buffer, const xg_texture_copy_params_t* params, uint64_t key );
-//void xg_cmd_buffer_generate_texture_mips ( xg_cmd_buffer_h buffer, xg_texture_h texture, uint32_t mip_base, uint32_t mip_count, uint64_t key );
-void xg_cmd_buffer_copy_buffer_to_texture ( xg_cmd_buffer_h buffer, const xg_buffer_to_texture_copy_params_t* params, uint64_t key );
-void xg_cmd_buffer_copy_texture_to_buffer ( xg_cmd_buffer_h buffer, const xg_texture_to_buffer_copy_params_t* params, uint64_t key );
+void xg_cmd_buffer_copy_buffer ( xg_cmd_buffer_h buffer, uint64_t key, const xg_buffer_copy_params_t* params );
+void xg_cmd_buffer_copy_texture ( xg_cmd_buffer_h buffer, uint64_t key, const xg_texture_copy_params_t* params );
+void xg_cmd_buffer_copy_buffer_to_texture ( xg_cmd_buffer_h buffer, uint64_t key, const xg_buffer_to_texture_copy_params_t* params );
+void xg_cmd_buffer_copy_texture_to_buffer ( xg_cmd_buffer_h buffer, uint64_t key, const xg_texture_to_buffer_copy_params_t* params );
 
 // ======================================================================================= //
 //                                         M I S C
 // ======================================================================================= //
-void    xg_cmd_buffer_pipeline_resources_bind           ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
-void    xg_cmd_buffer_pipeline_resource_group_bind      ( xg_cmd_buffer_h cmd_buffer, xg_shader_binding_set_e set, xg_pipeline_resource_group_h group, uint64_t key );
-
-void    xg_cmd_buffer_barrier_set                       ( xg_cmd_buffer_h cmd_buffer, const xg_barrier_set_t* barrier_set, uint64_t key );
-
-void    xg_cmd_buffer_texture_clear                     ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_color_clear_t clear_color, uint64_t key );
-void    xg_cmd_buffer_texture_depth_stencil_clear       ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_depth_stencil_clear_t clear_value, uint64_t key );
-
-void    xg_cmd_buffer_start_debug_capture               ( xg_cmd_buffer_h cmd_buffer, xg_debug_capture_stop_time_e stop_time, uint64_t key );
-void    xg_cmd_buffer_stop_debug_capture                ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
-
-void    xg_cmd_buffer_begin_debug_region                ( xg_cmd_buffer_h cmd_buffer, const char* name, uint32_t color, uint64_t key );
-void    xg_cmd_buffer_end_debug_region                  ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
+void xg_cmd_buffer_barrier_set ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_barrier_set_t* barrier_set );
+void xg_cmd_bind_queue ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_bind_queue_params_t* params );
+void xg_cmd_buffer_texture_clear ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_color_clear_t clear_color );
+void xg_cmd_buffer_texture_depth_stencil_clear ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear_value );
+void xg_cmd_buffer_start_debug_capture ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_debug_capture_stop_time_e stop_time );
+void xg_cmd_buffer_stop_debug_capture ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
+void xg_cmd_buffer_begin_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const char* name, uint32_t color );
+void xg_cmd_buffer_end_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
 #if 0
     void    xg_cmd_buffer_write_timestamp                   ( xg_cmd_buffer_h cmd_buffer, const xg_timestamp_query_params_t* params, uint64_t key );

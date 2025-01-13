@@ -2,7 +2,7 @@
 
 #include "xs.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
     vec3 color;
 } draw_cbuffer;
 

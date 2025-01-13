@@ -170,7 +170,7 @@ static void se_clear_pass ( const xf_node_execute_args_t* node_args, void* user_
         color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
         color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        xg->cmd_clear_texture ( cmd_buffer, node_args->io->copy_texture_writes[0].texture, color_clear, key++ );
+        xg->cmd_clear_texture ( cmd_buffer, key++, node_args->io->copy_texture_writes[0].texture, color_clear );
     }
 }
 
@@ -197,6 +197,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
+#if 0
     // Bind swapchain texture as render target
     {
         xg_color_clear_t color_clear;
@@ -209,6 +210,13 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
         render_textures.depth_stencil.texture = xg_null_handle_m;
         xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
     }
+#endif
+
+    xg->cmd_begin_renderpass ( cmd_buffer, key, &xg_cmd_renderpass_params_m (
+        .renderpass = node_args->renderpass,
+        .render_targets_count = 1,
+        .render_targets = xf_render_target_binding_m ( node_args->io->render_targets[0] )
+    ) );
 
     se_i* se = std_module_get_m ( se_module_name_m );
 
@@ -225,7 +233,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
         // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( test_pass_component->pipeline_state );
-        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
+        //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
 #if 0
         // Bind resources
@@ -238,7 +246,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
             buffer.range.size = 12; // TODO ...
 
             xg_pipeline_resource_bindings_t bindings = xg_default_pipeline_resource_bindings_m;
-            bindings.set = xg_shader_binding_set_per_draw_m;
+            bindings.set = xg_shader_binding_set_dispatch_m;
             bindings.buffer_count = 1;
             bindings.buffers = &buffer;
 
@@ -248,7 +256,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
             bindings.stages = xg_shading_stage_bit_vertex_m;
             bindings.type = xg_resource_binding_buffer_uniform_m;
             bindings.resource = test_pass_component->vertex_cbuffer;
-            xg->cmd_set_pipeline_resources ( cmd_buffer, xg_shader_binding_set_per_draw_m, &bindings, 1, key );
+            xg->cmd_set_pipeline_resources ( cmd_buffer, xg_shader_binding_set_dispatch_m, &bindings, 1, key );
 #else
             xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
 #endif
@@ -258,19 +266,35 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
         xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .type = xg_buffer_binding_type_uniform_m, .range = vert_uniform_range );
 
-        xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_shader_binding_set_per_draw_m,
-            .buffer_count = 1,
-            .buffers = { buffer },
-        );
+        //xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
+        //    .set = xg_shader_binding_set_dispatch_m,
+        //    .buffer_count = 1,
+        //    .buffers = { buffer },
+        //);
 
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
+        //xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
 
 #endif
 
+        xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( node_args->resource_cmd_buffer, &xg_resource_bindings_params_m (
+            .pipeline = pipeline_state,
+            .set = xg_shader_binding_set_dispatch_m,
+            .bindings = xg_pipeline_resource_bindings_m (
+                .buffer_count = 1,
+                .buffers = { buffer }
+            )
+        ) );
+
         // Draw
-        xg->cmd_draw ( cmd_buffer, 3, 0, key );
+        //xg->cmd_draw ( cmd_buffer, 3, 0, key );
+        xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
+            .pipeline = pipeline_state,
+            .primitive_count = 1,
+            .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings
+        ) );
     }
+
+    xg->cmd_end_renderpass ( cmd_buffer, key );
 }
 
 static void run_se_test_2 ( void ) {
@@ -326,8 +350,8 @@ static void run_se_test_2 ( void ) {
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "main") );
     std_assert_m ( pipeline_state != xg_null_handle_m );
 
-    xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
-    xf_graph_h graph = xf->create_graph ( device );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf_graph_h graph = xf->create_graph( &xf_graph_params_m ( .device = device, .debug_name = "se_test" ) );
     
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "clear",

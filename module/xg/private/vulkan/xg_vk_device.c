@@ -421,13 +421,14 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     uint32_t device_queues_count = 0;
 
     // Find Graphics queue
+    xg_vk_device_cmd_queue_t* graphics_queue = &device->queues[xg_cmd_queue_graphics_m];
     bool graphics_queue_found = false;
     VkQueueFlags graphics_queue_flags = 0;
 
     for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
         if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
             graphics_queue_found = true;
-            device->graphics_queue.vk_family_idx = i;
+            graphics_queue->vk_family_idx = i;
             graphics_queue_flags = device->queues_families_properties[i].queueFlags;
             break;
         }
@@ -437,22 +438,23 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         device_queues[device_queues_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         device_queues[device_queues_count].pNext = NULL;
         device_queues[device_queues_count].flags = 0;
-        device_queues[device_queues_count].queueFamilyIndex = device->graphics_queue.vk_family_idx;
+        device_queues[device_queues_count].queueFamilyIndex = graphics_queue->vk_family_idx;
         device_queues[device_queues_count].queueCount = 1;
         ++device_queues_count;
-        std_log_info_m ( "Graphics queue mapped to family " std_fmt_u32_m, device->graphics_queue.vk_family_idx );
+        std_log_info_m ( "Graphics queue mapped to family " std_fmt_u32_m, graphics_queue->vk_family_idx );
     } else {
         std_log_warn_m ( "Graphics queue not found" );
     }
 
     // Find Compute queue
+    xg_vk_device_cmd_queue_t* compute_queue = &device->queues[xg_cmd_queue_compute_m];
     bool compute_queue_found = false;
     VkQueueFlags compute_queue_flags = 0;
 
     for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
         if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags == VK_QUEUE_COMPUTE_BIT ) {
             compute_queue_found = true;
-            device->compute_queue.vk_family_idx = i;
+            compute_queue->vk_family_idx = i;
             compute_queue_flags = device->queues_families_properties[i].queueFlags;
             break;
         }
@@ -463,13 +465,13 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         device_queues[device_queues_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         device_queues[device_queues_count].pNext = NULL;
         device_queues[device_queues_count].flags = 0;
-        device_queues[device_queues_count].queueFamilyIndex = device->compute_queue.vk_family_idx;
+        device_queues[device_queues_count].queueFamilyIndex = compute_queue->vk_family_idx;
         device_queues[device_queues_count].queueCount = 1;
         ++device_queues_count;
-        std_log_info_m ( "Compute queue mapped to family " std_fmt_u32_m, device->compute_queue.vk_family_idx );
+        std_log_info_m ( "Compute queue mapped to family " std_fmt_u32_m, compute_queue->vk_family_idx );
     } else {
         if ( graphics_queue_found && graphics_queue_flags & VK_QUEUE_COMPUTE_BIT ) {
-            device->compute_queue = device->graphics_queue;
+            *compute_queue = *graphics_queue;
             std_log_info_m ( "Dedicated compute queue not found - fallback to graphics queue" );
         } else {
             std_log_warn_m ( "Compute queue not found" );
@@ -477,12 +479,13 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     }
 
     // Find Copy queue
+    xg_vk_device_cmd_queue_t* copy_queue = &device->queues[xg_cmd_queue_copy_m];
     bool copy_queue_found = false;
 
     for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
         if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags == VK_QUEUE_TRANSFER_BIT ) {
             copy_queue_found = true;
-            device->copy_queue.vk_family_idx = i;
+            copy_queue->vk_family_idx = i;
             break;
         }
     }
@@ -492,19 +495,17 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         device_queues[device_queues_count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         device_queues[device_queues_count].pNext = NULL;
         device_queues[device_queues_count].flags = 0;
-        device_queues[device_queues_count].queueFamilyIndex = device->copy_queue.vk_family_idx;
+        device_queues[device_queues_count].queueFamilyIndex = copy_queue->vk_family_idx;
         device_queues[device_queues_count].queueCount = 1;
         ++device_queues_count;
-        std_log_info_m ( "Copy queue mapped to family " std_fmt_u32_m, device->copy_queue.vk_family_idx );
+        std_log_info_m ( "Copy queue mapped to family " std_fmt_u32_m, copy_queue->vk_family_idx );
     } else {
-        if ( graphics_queue_found && graphics_queue_flags & VK_QUEUE_TRANSFER_BIT ) {
-            device->copy_queue = device->graphics_queue;
-            device->copy_queue.vk_family_idx = device->graphics_queue.vk_family_idx;
-            std_log_info_m ( "Dedicated copy queue not found - fallback to graphics queue" );
-        } else if ( compute_queue_found && compute_queue_flags & VK_QUEUE_TRANSFER_BIT ) {
-            device->copy_queue = device->compute_queue;
-            device->copy_queue.vk_family_idx = device->compute_queue.vk_family_idx;
+        if ( compute_queue_found && compute_queue_flags & VK_QUEUE_TRANSFER_BIT ) {
+            *copy_queue = *compute_queue;
             std_log_info_m ( "Dedicated copy queue not found - fallback to compute queue" );
+        } else if ( graphics_queue_found && graphics_queue_flags & VK_QUEUE_TRANSFER_BIT ) {
+            *copy_queue = *graphics_queue;
+            std_log_info_m ( "Dedicated copy queue not found - fallback to graphics queue" );
         } else {
             std_log_warn_m ( "Copy queue not found" );
         }
@@ -906,9 +907,9 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 
     // Create Device queues
     // We only support one queue per type for now
-    vkGetDeviceQueue ( device->vk_handle, device->graphics_queue.vk_family_idx, 0, &device->graphics_queue.vk_handle );
-    vkGetDeviceQueue ( device->vk_handle, device->compute_queue.vk_family_idx, 0, &device->compute_queue.vk_handle );
-    vkGetDeviceQueue ( device->vk_handle, device->copy_queue.vk_family_idx, 0, &device->copy_queue.vk_handle );
+    vkGetDeviceQueue ( device->vk_handle, device->queues[xg_cmd_queue_graphics_m].vk_family_idx, 0, &device->queues[xg_cmd_queue_graphics_m].vk_handle );
+    vkGetDeviceQueue ( device->vk_handle, device->queues[xg_cmd_queue_compute_m].vk_family_idx, 0, &device->queues[xg_cmd_queue_compute_m].vk_handle );
+    vkGetDeviceQueue ( device->vk_handle, device->queues[xg_cmd_queue_copy_m].vk_family_idx, 0, &device->queues[xg_cmd_queue_copy_m].vk_handle );
 
     // Flag as active
     device->flags |= xg_vk_device_active_m;

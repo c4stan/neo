@@ -2,7 +2,7 @@
 
 #include "xs.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform draw_uniforms_t {
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     mat4 world_from_model;
     mat4 proj_from_world;
     vec4 color;

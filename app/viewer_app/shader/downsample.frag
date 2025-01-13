@@ -4,11 +4,11 @@
 
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_color;
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
 
-layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) uniform sampler tex_sampler;
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform sampler tex_sampler;
 
-layout ( binding = 2, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
     vec2 src_resolution_f32;
     vec2 dst_resolution_f32;
 } draw_cbuffer;

@@ -91,7 +91,7 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     // Null light (radius == 0) at the end needed by the light cull pass
     light_data->lights[light_count] = ( uniform_light_data_t ) {};
 
-    xg->cmd_copy_buffer ( node_args->cmd_buffer, upload_buffer, light_buffer, node_args->base_key );
+    xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( .source = upload_buffer, .destination = light_buffer ) );
 }
 
 xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h upload_buffer, xf_buffer_h light_buffer ) {
@@ -118,6 +118,7 @@ uint32_t uniform_light_size ( void ) {
     return sizeof ( uniform_light_data_t );
 }
 
+#if 0
 static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     std_auto_m args = ( lighting_pass_args_t* ) user_args;
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
@@ -173,7 +174,7 @@ static void lighting_pass ( const xf_node_execute_args_t* node_args, void* user_
     xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
     xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_draw_m,
+        .set = xg_shader_binding_set_dispatch_m,
         .texture_count = 5,
         .textures = {
             xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ),
@@ -249,6 +250,7 @@ xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_
 
     return lighting_node;
 }
+#endif
 
 #if 0
 typedef struct {
@@ -313,7 +315,7 @@ void light_cull_pass ( xf_node_execute_args_t* node_args, void* user_args ) {
     xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
     xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_draw_m,
+        .set = xg_shader_binding_set_dispatch_m,
         .texture_count = 5,
         .textures = {
             xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ),

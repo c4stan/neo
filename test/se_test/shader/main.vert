@@ -2,7 +2,7 @@
 
 #include "xs.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_per_draw_m )
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m )
 uniform object_cbuffer_t {
     vec2 pos;
     float scale;

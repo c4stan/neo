@@ -65,7 +65,6 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
     thread->idx = ( size_t ) ( thread - state->threads_array );
     std_str_copy ( thread->name, std_thread_name_max_len_m, std_thread_main_thread_name_m );
 
-    // TODO isn't this guaranteed to be std_thread_stack_size_m? can this code be removed? can the field also be removed from the thread state? TODO test on win32
 #if defined(std_platform_win32_m)
     ULONG_PTR stack_high;
     ULONG_PTR stack_low;
@@ -74,6 +73,7 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
 #elif defined(std_platform_linux_m)
     thread->stack_size = std_thread_stack_size_m;
 #endif
+    std_assert_m ( thread->stack_size == std_thread_stack_size_m );
     thread->core_mask = std_thread_main_thread_core_mask_m;
 
     ++state->threads_pop;

@@ -29,36 +29,13 @@ typedef struct {
 
 std_warnings_ignore_m ( "-Wunused-function" )
 
-static void clear_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    std_unused_m ( user_args );
-    xg_texture_h texture = node_args->io->copy_texture_writes[0].texture;
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    // TODO pass this with node_args?
-    //      it is possible that the right solution is to have separate APIs in xg for command buffer recording vs the rest,
-    //      and here is passed the cmd buffer API instead of the whole xg api
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    {
-        xg_color_clear_t color_clear;
-        uint64_t t = 500;
-        color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
-        color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        color_clear.f32[0] = 0;
-        color_clear.f32[1] = 0;
-        color_clear.f32[2] = 0;
-        xg->cmd_clear_texture ( cmd_buffer, texture, color_clear, key++ );
-    }
-}
-
 typedef struct {
     xg_device_h device;
     xg_workload_h xg_workload;
     uint64_t resolution_x;
     uint64_t resolution_y;
     xi_workload_h xi_workload;
+    xg_renderpass_h renderpass;
 } xf_ui_pass_args_t;
 
 static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -68,8 +45,9 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
 
     xf_ui_pass_args_t* args = ( xf_ui_pass_args_t* ) user_args;
 
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    //xg_i* xg = std_module_get_m ( xg_module_name_m );
 
+#if 0
     // Bind swapchain texture as render target
     {
         xg_render_textures_binding_t render_textures;
@@ -78,6 +56,7 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
         render_textures.depth_stencil.texture = xg_null_handle_m;
         xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
     }
+#endif
 
     xi_i* xi = std_module_get_m ( xi_module_name_m );
     {
@@ -90,8 +69,10 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
         params.render_target_format = xg_format_b8g8r8a8_unorm_m;
         params.viewport.width = args->resolution_x;
         params.viewport.height = args->resolution_y;
+        params.renderpass = node_args->renderpass;
+        params.render_target_binding = xf_render_target_binding_m ( node_args->io->render_targets[0] );
 
-        xi->flush_workload ( args->xi_workload, &params );
+        key = xi->flush_workload ( args->xi_workload, &params );
     }
 }
 
@@ -179,7 +160,7 @@ static void xi_test ( void ) {
     xf_i* xf = std_module_load_m ( xf_module_name_m );
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "xi_graph" ) );
 
-    xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
 
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "clear",
@@ -191,6 +172,17 @@ static void xi_test ( void ) {
         .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
             .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+        )
+    ) );
+
+    xg_renderpass_h ui_renderpass = xg->create_renderpass ( &xg_renderpass_params_m (
+        .device = device,
+        .debug_name = "xi_test_ui",
+        .resolution_x = resolution_x,
+        .resolution_y = resolution_y,
+        .render_textures = xg_render_textures_layout_m (
+            .render_targets_count = 1,
+            .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
         )
     ) );
 
@@ -529,6 +521,7 @@ static void xi_test ( void ) {
             ui_node_args.resolution_x = new_window_info.width;
             ui_node_args.resolution_y = new_window_info.height;
             ui_node_args.xi_workload = xi_workload;
+            ui_node_args.renderpass = ui_renderpass;
         }
 
         xf->execute_graph ( graph, workload, 0 );

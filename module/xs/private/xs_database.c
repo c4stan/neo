@@ -281,8 +281,6 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
     fs_i* fs = std_module_get_m ( fs_module_name_m );
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-    //std_log_info_m ( "Building shader database " std_fmt_str_m "...", std_debug_string_get ( &db->debug_name ) );
-
     // check headers, froce rebuild all shaders if one changed
     // TODO try to take dependencies into account and avoid rebuilding everything?
     // TODO account for xs.glsl changes
@@ -330,7 +328,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
         xs_parser_shader_references_t* shader_references;
         xs_parser_shader_definitions_t* shader_definitions;
+        xg_resource_bindings_layout_params_t* resource_layouts;
 
+        // TODO move the parsing down to after checking for last build timestamp etc?
         switch ( pipeline_state->type ) {
             case xg_pipeline_graphics_m:
                 parsed_pipeline_state.graphics.params = xg_graphics_pipeline_params_m (
@@ -342,6 +342,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                 shader_references = &parsed_pipeline_state.graphics.shader_references;
                 shader_definitions = &parsed_pipeline_state.graphics.shader_definitions;
+                resource_layouts = parsed_pipeline_state.graphics.resource_layouts;
                 break;
 
             case xg_pipeline_compute_m:
@@ -354,6 +355,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                 shader_references = &parsed_pipeline_state.compute.shader_references;
                 shader_definitions = &parsed_pipeline_state.compute.shader_definitions;
+                resource_layouts = parsed_pipeline_state.compute.resource_layouts;
                 break;
 
             case xg_pipeline_raytrace_m:
@@ -366,6 +368,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                 shader_references = &parsed_pipeline_state.raytrace.shader_references;
                 shader_definitions = &parsed_pipeline_state.raytrace.shader_definitions;
+                resource_layouts = parsed_pipeline_state.raytrace.resource_layouts;
                 break;
         }
 
@@ -448,109 +451,109 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             //for ( xg_shading_stage_e stage = 0; stage < xg_shading_stage_count_m; ++stage ) {
             //    if ( shader_references->referenced_stages & xg_shading_stage_enum_to_bit_m ( stage ) ) {
             for ( uint32_t i = 0; i < shader_references->count; ++i ) {
-                    xs_parser_shader_reference_t* shader = &shader_references->array[i];
+                xs_parser_shader_reference_t* shader = &shader_references->array[i];
 
-                    shader_bytecode_t* bytecode = &shader_bytecode[i];
+                shader_bytecode_t* bytecode = &shader_bytecode[i];
 
-                    // prepare shader code input path
-                    std_str_copy ( shader_path, fs_path_size_m, input_path );
-                    fs->append_path ( shader_path, fs_path_size_m, shader->name );
+                // prepare shader code input path
+                std_str_copy ( shader_path, fs_path_size_m, input_path );
+                fs->append_path ( shader_path, fs_path_size_m, shader->name );
 
-                    // prepare shader bytecode output path
-                    std_str_copy ( binary_path, fs_path_size_m, output_path );
-                    fs->append_path ( binary_path, fs_path_size_m, shader->name );
-                    size_t len = std_str_len ( binary_path );
-                    size_t len2 = std_str_find_reverse ( binary_path, len, "." );
+                // prepare shader bytecode output path
+                std_str_copy ( binary_path, fs_path_size_m, output_path );
+                fs->append_path ( binary_path, fs_path_size_m, shader->name );
+                size_t len = std_str_len ( binary_path );
+                size_t len2 = std_str_find_reverse ( binary_path, len, "." );
 
-                    if ( len2 != std_str_find_null_m ) {
-                        len = len2;
+                if ( len2 != std_str_find_null_m ) {
+                    len = len2;
+                }
+
+                std_stack_t stack = std_static_stack_m ( binary_path );
+                stack.top = stack.begin + len + 1;
+
+                const char* stage_tag = "";
+
+                xg_shading_stage_e stage = shader->stage;
+                if ( stage == xg_shading_stage_vertex_m ) {
+                    stage_tag = "vs";
+                } else if ( stage == xg_shading_stage_fragment_m ) {
+                    stage_tag = "fs";
+                } else if ( stage == xg_shading_stage_compute_m ) {
+                    stage_tag = "cs";
+                } else if ( stage == xg_shading_stage_ray_gen_m ) {
+                    stage_tag = "rg";
+                } else if ( stage == xg_shading_stage_ray_miss_m ) {
+                    stage_tag = "rm";
+                } else if ( stage == xg_shading_stage_ray_hit_closest_m ) {
+                    stage_tag = "rhc";
+                }
+
+                //std_str_append ( binary_path, &array, "-" );
+                //std_str_append ( binary_path, &array, stage_tag );
+                //std_str_append ( binary_path, &array, ".spv" );
+
+                std_stack_string_append ( &stack, "-" );
+                std_stack_string_append ( &stack, stage_tag );
+                std_stack_string_append ( &stack, ".spv" );
+
+                // check if shader needs to be (re)compiled
+                bool skip_compile = false;
+                fs_file_info_t shader_source_info;
+                std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
+                fs_file_info_t shader_output_info;
+                if ( fs->get_file_path_info ( &shader_output_info, binary_path ) ) {
+                    if ( shader_output_info.last_write_time.count > shader_source_info.last_write_time.count
+                        && shader_output_info.last_write_time.count > most_recent_header_edit.count     // if any header got updated after the shader was compiled, need to recompile
+                    ) {
+                        skip_compile = true;
+                        ++shader_skip;
                     }
+                }
 
-                    std_stack_t stack = std_static_stack_m ( binary_path );
-                    stack.top = stack.begin + len + 1;
+                // invoke compiler process
+                if ( !skip_compile ) {
+                    xs_shader_compiler_params_t params;
+                    params.binary_path = binary_path;
+                    params.shader_path = shader_path;
+                    params.global_definitions = db->global_definitions;
+                    params.global_definition_count = db->global_definition_count;
+                    params.shader_definitions = shader_definitions->array;
+                    params.shader_definition_count = shader_definitions->count;
 
-                    const char* stage_tag = "";
+                    bool compile_result = xs_shader_compiler_compile ( &params );
 
-                    xg_shading_stage_e stage = shader->stage;
-                    if ( stage == xg_shading_stage_vertex_m ) {
-                        stage_tag = "vs";
-                    } else if ( stage == xg_shading_stage_fragment_m ) {
-                        stage_tag = "fs";
-                    } else if ( stage == xg_shading_stage_compute_m ) {
-                        stage_tag = "cs";
-                    } else if ( stage == xg_shading_stage_ray_gen_m ) {
-                        stage_tag = "rg";
-                    } else if ( stage == xg_shading_stage_ray_miss_m ) {
-                        stage_tag = "rm";
-                    } else if ( stage == xg_shading_stage_ray_hit_closest_m ) {
-                        stage_tag = "rhc";
+                    std_assert_m ( compile_result );
+
+                    if ( !compile_result ) {
+                        ++shader_fail;
+                        continue;
+                    } else {
+                        ++shader_success;
                     }
+                }
 
-                    //std_str_append ( binary_path, &array, "-" );
-                    //std_str_append ( binary_path, &array, stage_tag );
-                    //std_str_append ( binary_path, &array, ".spv" );
+                // read generated shader bytecode
+                #if 0
+                fs_file_h bytecode_file = fs->open_file ( binary_path, fs_file_read_m );
+                std_assert_m ( bytecode_file != fs_null_handle_m );
 
-                    std_stack_string_append ( &stack, "-" );
-                    std_stack_string_append ( &stack, stage_tag );
-                    std_stack_string_append ( &stack, ".spv" );
+                fs_file_info_t bytecode_file_info;
+                std_verify_m ( fs->get_file_info ( &bytecode_file_info, bytecode_file ) );
 
-                    // check if shader needs to be (re)compiled
-                    bool skip_compile = false;
-                    fs_file_info_t shader_source_info;
-                    std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
-                    fs_file_info_t shader_output_info;
-                    if ( fs->get_file_path_info ( &shader_output_info, binary_path ) ) {
-                        if ( shader_output_info.last_write_time.count > shader_source_info.last_write_time.count
-                            && shader_output_info.last_write_time.count > most_recent_header_edit.count     // if any header got updated after the shader was compiled, need to recompile
-                        ) {
-                            skip_compile = true;
-                            ++shader_skip;
-                        }
-                    }
-
-                    // invoke compiler process
-                    if ( !skip_compile ) {
-                        xs_shader_compiler_params_t params;
-                        params.binary_path = binary_path;
-                        params.shader_path = shader_path;
-                        params.global_definitions = db->global_definitions;
-                        params.global_definition_count = db->global_definition_count;
-                        params.shader_definitions = shader_definitions->array;
-                        params.shader_definition_count = shader_definitions->count;
-
-                        bool compile_result = xs_shader_compiler_compile ( &params );
-
-                        std_assert_m ( compile_result );
-
-                        if ( !compile_result ) {
-                            ++shader_fail;
-                            continue;
-                        } else {
-                            ++shader_success;
-                        }
-                    }
-
-                    // read generated shader bytecode
-                    #if 0
-                    fs_file_h bytecode_file = fs->open_file ( binary_path, fs_file_read_m );
-                    std_assert_m ( bytecode_file != fs_null_handle_m );
-
-                    fs_file_info_t bytecode_file_info;
-                    std_verify_m ( fs->get_file_info ( &bytecode_file_info, bytecode_file ) );
-
-                    {
-                        size_t size = bytecode_file_info.size;
-                        void* alloc = std_virtual_heap_alloc ( size, 16 );
-                        shader_bytecode[stage].size = bytecode_file_info.size;
-                        std_verify_m ( fs->read_file ( alloc, size, bytecode_file ) );
-                        shader_bytecode[stage].base = alloc;
-                        shader_bytecode[stage].size = size;
-                    }
-                    fs->close_file ( bytecode_file );
-                    #else
-                    bytecode->stage = stage;
-                    bytecode->buffer = fs->read_file_path_to_heap ( binary_path );
-                    #endif
+                {
+                    size_t size = bytecode_file_info.size;
+                    void* alloc = std_virtual_heap_alloc ( size, 16 );
+                    shader_bytecode[stage].size = bytecode_file_info.size;
+                    std_verify_m ( fs->read_file ( alloc, size, bytecode_file ) );
+                    shader_bytecode[stage].base = alloc;
+                    shader_bytecode[stage].size = size;
+                }
+                fs->close_file ( bytecode_file );
+                #else
+                bytecode->stage = stage;
+                bytecode->buffer = fs->read_file_path_to_heap ( binary_path );
+                #endif
                 //}
             }
 
@@ -596,6 +599,30 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     break;
                 default:
                     std_assert_m ( false );
+                    break;
+                }
+            }
+
+            for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
+                xg_resource_bindings_layout_params_t* layout_params = &resource_layouts[i];
+                std_stack_t stack = std_static_stack_m ( layout_params->debug_name );
+                std_stack_string_append ( &stack, pipeline_state->name );
+                std_stack_string_append ( &stack, "-" );
+                char buffer[8];
+                std_u32_to_str ( buffer, 8, i, 0 );
+                std_stack_string_append ( &stack, buffer );
+                xg_resource_bindings_layout_h resource_layout = xg->create_resource_layout ( layout_params );
+                pipeline_state->resource_layouts[i] = resource_layout;
+
+                switch ( pipeline_state->type ) {
+                case xg_pipeline_graphics_m:
+                    graphics_state->params.resource_layouts[i] = resource_layout;
+                    break;
+                case xg_pipeline_compute_m:
+                    compute_state->params.resource_layouts[i] = resource_layout;
+                    break;
+                case xg_pipeline_raytrace_m:
+                    raytrace_state->params.resource_layouts[i] = resource_layout;
                     break;
                 }
             }
@@ -749,6 +776,10 @@ void xs_database_destroy ( xs_database_h db_handle ) {
                 xg->destroy_raytrace_pipeline ( state->pipeline_handle );
                 break;
             }
+        }
+
+        for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
+            xg->destroy_resource_layout ( state->resource_layouts[i] );
         }
     }
 

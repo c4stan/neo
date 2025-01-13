@@ -5,6 +5,7 @@
 #include <std_list.h>
 #include <std_log.h>
 
+#define xf_resource_handle_tag_as_multi_m( h ) std_bit_set_ms_64_m ( h, 1 )
 #define xf_resource_handle_is_multi_m( h ) std_bit_test_64_m ( h, 63 )
 #define xf_resource_handle_multi_idx_m( h ) ( h & 0xffff )
 #define xf_resource_handle_sub_idx_m( h ) ( ( h >> 16 ) & 0xffff )
@@ -14,15 +15,19 @@ static xf_resource_state_t* xf_resource_state;
 void xf_resource_load ( xf_resource_state_t* state ) {
     state->buffers_array = std_virtual_heap_alloc_array_m ( xf_buffer_t, xf_resource_max_buffers_m );
     state->buffers_freelist = std_freelist_m ( state->buffers_array, xf_resource_max_buffers_m );
+    state->buffers_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_buffers_m ) );
 
     state->multi_buffers_array = std_virtual_heap_alloc_array_m ( xf_multi_buffer_t, xf_resource_max_multi_buffers_m );
     state->multi_buffers_freelist = std_freelist_m ( state->multi_buffers_array, xf_resource_max_multi_buffers_m );
+    state->multi_buffers_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_multi_buffers_m ) );
 
     state->textures_array = std_virtual_heap_alloc_array_m ( xf_texture_t, xf_resource_max_textures_m );
     state->textures_freelist = std_freelist_m ( state->textures_array, xf_resource_max_textures_m );
+    state->textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_textures_m ) );
 
     state->multi_textures_array = std_virtual_heap_alloc_array_m ( xf_multi_texture_t, xf_resource_max_multi_textures_m );
     state->multi_textures_freelist = std_freelist_m ( state->multi_textures_array, xf_resource_max_multi_textures_m );
+    state->multi_textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_multi_textures_m ) );
 
     xf_resource_state = state;
 }
@@ -36,14 +41,19 @@ void xf_resource_unload ( void ) {
     std_virtual_heap_free ( xf_resource_state->textures_array );
     std_virtual_heap_free ( xf_resource_state->multi_textures_array );
     std_virtual_heap_free ( xf_resource_state->multi_buffers_array );
+    std_virtual_heap_free ( xf_resource_state->buffers_bitset );
+    std_virtual_heap_free ( xf_resource_state->textures_bitset );
+    std_virtual_heap_free ( xf_resource_state->multi_textures_bitset );
+    std_virtual_heap_free ( xf_resource_state->multi_buffers_bitset );
 }
 
-xf_texture_h xf_resource_texture_declare ( const xf_texture_params_t* params ) {
+xf_texture_h xf_resource_texture_create ( const xf_texture_params_t* params ) {
     xf_texture_t* texture = std_list_pop_m ( &xf_resource_state->textures_freelist );
     *texture = xf_texture_m (
         .params = *params
     );
     xf_texture_h handle = ( xf_texture_h ) ( texture - xf_resource_state->textures_array );
+    std_bitset_set ( xf_resource_state->textures_bitset, handle );
     return handle;
 }
 
@@ -56,10 +66,12 @@ void xf_resource_texture_destroy ( xf_texture_h texture_handle ) {
             xf_resource_texture_destroy ( multi_texture->textures[i] );
         }
 
-        std_list_push ( &xf_resource_state->multi_buffers_freelist, multi_texture );
+        std_list_push ( &xf_resource_state->multi_textures_freelist, multi_texture );
+        std_bitset_clear ( xf_resource_state->multi_textures_bitset, multi_idx );
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
-        std_list_push ( &xf_resource_state->textures_freelist, texture);
+        std_list_push ( &xf_resource_state->textures_freelist, texture );
+        std_bitset_clear ( xf_resource_state->textures_bitset, texture_handle );
     }
 }
 
@@ -73,19 +85,19 @@ void xf_resource_buffer_destroy ( xf_buffer_h buffer_handle ) {
         }
 
         std_list_push ( &xf_resource_state->multi_buffers_freelist, multi_buffer );
+        std_bitset_clear ( xf_resource_state->multi_buffers_bitset, multi_idx );
     } else {
         xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
         std_list_push ( &xf_resource_state->buffers_freelist, buffer );
+        std_bitset_clear ( xf_resource_state->buffers_bitset, buffer_handle );
     }
 }
 
-xf_buffer_h xf_resource_buffer_declare ( const xf_buffer_params_t* params ) {
+xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params ) {
     xf_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->buffers_freelist );
-    std_mem_zero_m ( buffer );
-    buffer->xg_handle = xg_null_handle_m;
-    buffer->params = *params;
-    buffer->alias = xf_null_handle_m;
+    *buffer = xf_buffer_m ( .params = *params );
     xf_buffer_h handle = ( xf_buffer_h ) ( buffer - xf_resource_state->buffers_array );
+    std_bitset_set ( xf_resource_state->buffers_bitset, handle );
     return handle;
 }
 
@@ -105,7 +117,7 @@ void xf_resource_texture_get_info ( xf_texture_info_t* info, xf_texture_h textur
     info->view_access = texture->params.view_access;
 }
 
-void xf_resource_buffet_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer_handle ) {
+void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer_handle ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
 
     info->size = buffer->params.size;
@@ -169,6 +181,17 @@ xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture_handle 
     if ( is_multi_texture ) {
         xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
         return multi_texture;
+    } else {
+        return NULL;
+    }
+}
+
+xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer_handle ) {
+    bool is_multi_buffer = xf_resource_handle_is_multi_m ( buffer_handle );
+
+    if ( is_multi_buffer ) {
+        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( buffer_handle )];
+        return multi_buffer;
     } else {
         return NULL;
     }
@@ -341,12 +364,9 @@ static void xf_resource_buffer_add_execution_stage ( xf_buffer_h buffer_handle, 
     buffer->state.stage |= stage;
 }
 
-xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t* params ) {
+xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params ) {
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
-    multi_texture->params = *params;
-    multi_texture->index = 0;
-    multi_texture->alias = xf_null_handle_m;
-    multi_texture->swapchain = xg_null_handle_m;
+    *multi_texture = xf_multi_texture_m ( .params = *params );
 
     for ( uint32_t i = 0; i < params->multi_texture_count; ++i ) {
         char id[8];
@@ -357,17 +377,20 @@ xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t
         std_stack_string_append ( &stack, "(" );
         std_stack_string_append ( &stack, id );
         std_stack_string_append ( &stack, ")" );
-        xf_texture_h handle = xf_resource_texture_declare ( &texture_params );
-        // TODO tag handle here
+        xf_texture_h handle = xf_resource_texture_create ( &texture_params );
+        xf_texture_t* texture = xf_resource_texture_get ( handle );
+        texture->is_multi = true;
+        texture->ref_count = 1;
         multi_texture->textures[i] = handle;
     }
 
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
-    handle = std_bit_set_ms_64_m ( handle, 1 );
+    std_bitset_set ( xf_resource_state->multi_textures_bitset, handle );
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
     return handle;
 }
 
-xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h swapchain ) {
+xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_swapchain_info_t info;
@@ -394,11 +417,13 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
         xg_texture_info_t texture_info;
         xg->get_texture_info ( &texture_info, info.textures[i] );
 
-        xf_texture_h texture_handle = xf_resource_texture_declare ( &params.texture );
+        xf_texture_h texture_handle = xf_resource_texture_create ( &params.texture );
         xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
         texture->xg_handle = info.textures[i];
         texture->is_external = true;
+        texture->is_multi = true;
+        texture->ref_count = 1;
         xf_resource_texture_update_info ( texture_handle, &texture_info );
         // TODO check base texture mip mode
         texture->state.shared = xf_texture_execution_state_m (
@@ -410,9 +435,29 @@ xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h s
     }
 
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
-    handle = std_bit_set_ms_64_m ( handle, 1 );
+    std_bitset_set ( xf_resource_state->multi_textures_bitset, handle );
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
 
     return handle;
+}
+
+void xf_resource_texture_update_external ( xf_texture_h texture_handle ) {
+    if ( xf_resource_handle_is_multi_m ( texture_handle ) ) {
+        uint32_t multi_idx = xf_resource_handle_multi_idx_m ( texture_handle );
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[multi_idx];
+    
+        for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
+            xf_resource_texture_update_external ( multi_texture->textures[i] );
+        }
+    } else {
+        xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
+        if ( texture->is_external ) {
+            xg_i* xg = std_module_get_m ( xg_module_name_m );
+            xg_texture_info_t texture_info;
+            xg->get_texture_info ( &texture_info, texture_handle );
+            xf_resource_texture_update_info ( texture_handle, &texture_info );
+        }
+    }
 }
 
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture_handle ) {
@@ -434,7 +479,7 @@ xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h multi_text
     return multi_texture->swapchain;
 }
 
-xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h xg_texture ) {
+xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_texture_info_t info;
@@ -469,7 +514,7 @@ xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture_
 
     uint64_t handle = multi_texture_handle & 0xffff;
     handle |= index << 16;
-    handle = std_bit_set_ms_64_m ( handle, 1 );
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
     //return multi_texture->textures[index];
     return handle;
 }
@@ -478,7 +523,7 @@ xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture_
     std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
     xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
-    handle = std_bit_set_ms_64_m ( handle, 1 );
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
     return handle;
 }
 
@@ -605,5 +650,105 @@ void xf_resource_swapchain_resize ( xf_texture_h swapchain ) {
     for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
         xf_texture_t* texture = xf_resource_texture_get ( multi_texture->textures[i] );
         texture->state.shared.layout = xg_texture_layout_undefined_m;
+    }
+}
+
+void xf_resource_texture_add_ref ( xf_texture_h handle ) {
+    bool is_multi = xf_resource_handle_is_multi_m ( handle );
+    
+    if ( is_multi ) {
+        xf_multi_texture_t* multi_texture = xf_resource_multi_texture_get ( handle );
+        multi_texture->ref_count += 1;
+    } else {
+        xf_texture_t* texture = xf_resource_texture_get ( handle );
+        texture->ref_count += 1;
+    }
+}
+
+void xf_resource_texture_remove_ref ( xf_texture_h handle ) {
+    bool is_multi = xf_resource_handle_is_multi_m ( handle );
+    
+    if ( is_multi ) {
+        xf_multi_texture_t* multi_texture = xf_resource_multi_texture_get ( handle );
+        uint32_t ref_count = multi_texture->ref_count;
+        if ( ref_count > 0 ) {
+            multi_texture->ref_count = ref_count - 1;
+        }
+    } else {
+        xf_texture_t* texture = xf_resource_texture_get ( handle );
+        uint32_t ref_count = texture->ref_count;
+        if ( ref_count > 0 && !texture->is_multi ) {
+            texture->ref_count = ref_count - 1;
+        }
+    }
+}
+
+void xf_resource_buffer_add_ref ( xf_buffer_h handle ) {
+    bool is_multi = xf_resource_handle_is_multi_m ( handle );
+    
+    if ( is_multi ) {
+        xf_multi_buffer_t* multi_buffer = xf_resource_multi_buffer_get ( handle );
+        multi_buffer->ref_count += 1;
+    } else {
+        xf_buffer_t* buffer = xf_resource_buffer_get ( handle );
+        buffer->ref_count += 1;
+    }
+}
+
+void xf_resource_buffer_remove_ref ( xf_buffer_h handle ) {
+    bool is_multi = xf_resource_handle_is_multi_m ( handle );
+    
+    if ( is_multi ) {
+        xf_multi_buffer_t* multi_buffer = xf_resource_multi_buffer_get ( handle );
+        uint32_t ref_count = multi_buffer->ref_count;
+        if ( ref_count <= 1 ) {
+            xf_resource_buffer_destroy ( handle );
+        } else {
+            multi_buffer->ref_count = ref_count - 1;
+        }
+    } else {
+        xf_buffer_t* buffer = xf_resource_buffer_get ( handle );
+        uint32_t ref_count = buffer->ref_count;
+        if ( ref_count > 0 && !buffer->is_multi ) {
+            buffer->ref_count = ref_count - 1;
+        }
+    }
+}
+
+void xf_resource_clear_unreferenced ( void ) {
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xf_resource_state->textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_textures_m ) ) ) {
+        xf_texture_t* texture = &xf_resource_state->textures_array[idx];
+        if ( texture->ref_count == 0 ) {
+            xf_resource_texture_destroy ( idx );
+        }
+        ++idx;
+    }
+
+    idx = 0;
+    while ( std_bitset_scan ( &idx, xf_resource_state->buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_buffers_m ) ) ) {
+        xf_buffer_t* buffer = &xf_resource_state->buffers_array[idx];
+        if ( buffer->ref_count == 0 ) {
+            xf_resource_buffer_destroy ( idx );
+        }
+        ++idx;
+    }
+
+    idx = 0;
+    while ( std_bitset_scan ( &idx, xf_resource_state->multi_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_textures_m ) ) ) {
+        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[idx];
+        if ( multi_texture->ref_count == 0 ) {
+            xf_resource_texture_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
+        }
+        ++idx;
+    }
+
+    idx = 0;
+    while ( std_bitset_scan ( &idx, xf_resource_state->multi_buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_buffers_m ) ) ) {
+        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[idx];
+        if ( multi_buffer->ref_count == 0 ) {
+            xf_resource_buffer_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
+        }
+        ++idx;
     }
 }

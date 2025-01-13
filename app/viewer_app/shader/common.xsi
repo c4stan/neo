@@ -3,15 +3,6 @@ begin buffer
     stage fragment
     stage compute
     stage ray_gen
-    set frame
-    register 0
-end
-
-begin buffer
-    stage vertex
-    stage fragment
-    stage compute
-    stage ray_gen
-    set view
+    set workload
     register 0
 end

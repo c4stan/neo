@@ -36,8 +36,6 @@ typedef struct {
     VkSemaphore vk_semaphore;
 } xg_vk_gpu_queue_event_t;
 
-typedef uint64_t xg_gpu_queue_event_h;
-
 xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device );
 void xg_gpu_queue_event_destroy ( xg_gpu_queue_event_h handle );
 const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_gpu_queue_event_h handle );

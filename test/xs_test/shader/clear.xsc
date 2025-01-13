@@ -1,0 +1,8 @@
+compute_shader clear.comp
+
+begin texture
+    register 0
+    stage compute
+    access write
+    set dispatch
+end

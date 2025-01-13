@@ -181,26 +181,16 @@ xg_raytrace_geometry_h xg_vk_raytrace_geometry_create ( const xg_raytrace_geomet
     VkResult result = xg_vk_instance_ext_api()->build_acceleration_structures ( device->vk_handle, NULL, 1, &build_info, build_ranges_info );
     std_assert_m ( result == VK_SUCCESS );
 #else
-    xg_workload_h workload = xg_workload_create ( device_handle );
-    xg_vk_workload_submit_context_t* submit_context = xg_vk_workload_submit_context_create ( workload );
-
-    VkCommandBuffer vk_cmd_buffer = submit_context->cmd_allocator.vk_cmd_buffers[0];
-
-    {
-        VkCommandBufferBeginInfo begin_info;
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.pNext = NULL;
-        begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        begin_info.pInheritanceInfo = NULL;
-        vkBeginCommandBuffer ( vk_cmd_buffer, &begin_info );
-    }
-
-    xg_vk_device_ext_api ( device_handle )->cmd_build_acceleration_structures ( vk_cmd_buffer, 1, &build_info, build_ranges_info );
-
-    vkEndCommandBuffer ( vk_cmd_buffer );
-
-    xg_vk_workload_submit_context_submit ( submit_context );
-
+    xg_vk_workload_context_inline_t context = xg_vk_workload_context_create_inline ( device_handle );
+    vkBeginCommandBuffer ( context.cmd_buffer, &( VkCommandBufferBeginInfo ) {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .pNext = NULL,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            .pInheritanceInfo = NULL,
+    } );
+    xg_vk_device_ext_api ( device_handle )->cmd_build_acceleration_structures ( context.cmd_buffer, 1, &build_info, build_ranges_info );
+    vkEndCommandBuffer ( context.cmd_buffer );
+    xg_vk_workload_context_submit_inline ( &context );
     vkDeviceWaitIdle ( device->vk_handle );
 #endif
 
@@ -377,25 +367,17 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( const xg_raytrace_world_params
     VkResult result = xg_vk_instance_ext_api()->build_acceleration_structures ( device->vk_handle, NULL, 1, &build_info, build_ranges_info );
     std_assert_m ( result == VK_SUCCESS );
 #else
-    xg_workload_h workload = xg_workload_create ( device_handle );
-    xg_vk_workload_submit_context_t* submit_context = xg_vk_workload_submit_context_create ( workload );
-
-    VkCommandBuffer vk_cmd_buffer = submit_context->cmd_allocator.vk_cmd_buffers[0];
-
-    {
-        VkCommandBufferBeginInfo begin_info;
-        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        begin_info.pNext = NULL;
-        begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        begin_info.pInheritanceInfo = NULL;
-        vkBeginCommandBuffer ( vk_cmd_buffer, &begin_info );
-    }
-
-    xg_vk_device_ext_api ( device_handle )->cmd_build_acceleration_structures ( vk_cmd_buffer, 1, &build_info, build_ranges_info );
-
-    vkEndCommandBuffer ( vk_cmd_buffer );
-
-    xg_vk_workload_submit_context_submit ( submit_context );
+    xg_vk_workload_context_inline_t context = xg_vk_workload_context_create_inline ( device_handle );
+    vkBeginCommandBuffer ( context.cmd_buffer, &( VkCommandBufferBeginInfo ) {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .pNext = NULL,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            .pInheritanceInfo = NULL,
+    } );
+    xg_vk_device_ext_api ( device_handle )->cmd_build_acceleration_structures ( context.cmd_buffer, 1, &build_info, build_ranges_info );
+    vkEndCommandBuffer ( context.cmd_buffer );
+    xg_vk_workload_context_submit_inline ( &context );
+    vkDeviceWaitIdle ( device->vk_handle );
 #endif
 
     xg_buffer_destroy ( scratch_buffer_handle );

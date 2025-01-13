@@ -61,6 +61,8 @@ typedef struct {
     wm_input_state_t input_state;
 
     std_tick_t frame_tick;
+
+    xg_resource_bindings_layout_h workload_bindings_layout;
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
@@ -142,7 +144,6 @@ typedef struct {
     xs_database_pipeline_h shadow_pipeline;
     xg_buffer_h pos_buffer;
     xg_buffer_h nor_buffer;
-    //xg_buffer_h tan_buffer;
     xg_buffer_h idx_buffer;
     uint32_t vertex_count;
     uint32_t index_count;

@@ -27,6 +27,7 @@ typedef struct {
     std_timestamp_t last_build_timestamp;
     //uint32_t permutation_id;
     //uint32_t reference_count;
+    xg_resource_bindings_layout_h resource_layouts[xg_shader_binding_set_count_m];
 } xs_database_pipeline_state_t;
 
 typedef struct {

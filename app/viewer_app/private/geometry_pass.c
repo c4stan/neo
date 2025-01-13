@@ -26,31 +26,32 @@ typedef struct {
 } geometry_pass_args_t;
 
 static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    std_auto_m pass_args = ( geometry_pass_args_t* ) user_args;
+    //std_auto_m pass_args = ( geometry_pass_args_t* ) user_args;
 
     xg_workload_h workload = node_args->workload;
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
+    xg_resource_cmd_buffer_h resource_cmd_buffer = node_args->resource_cmd_buffer;
     uint64_t key = node_args->base_key;
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     // Bind render targets
-    xg_render_textures_binding_t render_textures = {
-        .render_targets_count = 3,
-        .render_targets = {
-            xf_render_target_binding_m ( node_args->io->render_targets[0] ),
-            xf_render_target_binding_m ( node_args->io->render_targets[1] ),
-            xf_render_target_binding_m ( node_args->io->render_targets[2] ),
-        },
-        .depth_stencil.texture = node_args->io->depth_stencil_target,
-    };
-    xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
+    //xg_render_textures_binding_t render_textures = {
+    //    .render_targets_count = 3,
+    //    .render_targets = {
+    //        xf_render_target_binding_m ( node_args->io->render_targets[0] ),
+    //        xf_render_target_binding_m ( node_args->io->render_targets[1] ),
+    //        xf_render_target_binding_m ( node_args->io->render_targets[2] ),
+    //    },
+    //    .depth_stencil.texture = node_args->io->depth_stencil_target,
+    //};
+    //xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
 
-    xg_viewport_state_t viewport = xg_viewport_state_m (
-        .width = pass_args->width,
-        .height = pass_args->height,
-    );
-    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
+    //xg_viewport_state_t viewport = xg_viewport_state_m (
+    //    .width = pass_args->width,
+    //    .height = pass_args->height,
+    //);
+    //xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
 
     se_i* se = std_module_get_m ( se_module_name_m );
 
@@ -66,7 +67,7 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
         // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->geometry_pipeline );
-        xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
+        //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
         sm_vec_3f_t up = {
             .x = mesh_component->up[0],
@@ -108,42 +109,51 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
         };
 
         // Bind draw resources
-        xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-            .set = xg_shader_binding_set_per_draw_m,
-            .buffer_count = 2,
-            .buffers = {
-                xg_buffer_resource_binding_m (
-                    .shader_register = 0,
-                    .type = xg_buffer_binding_type_uniform_m,
-                    .range = xg->write_workload_uniform ( workload, &vs, sizeof ( vs ) ),
-                ),
-                xg_buffer_resource_binding_m (
-                    .shader_register = 1,
-                    .type = xg_buffer_binding_type_uniform_m,
-                    .range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) ),
-                )
-            }
-        );
+        xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+            .layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m ),
+            .bindings = xg_pipeline_resource_bindings_m (
+                .buffer_count = 2,
+                .buffers = {
+                    xg_buffer_resource_binding_m (
+                        .shader_register = 0,
+                        .range = xg->write_workload_uniform ( workload, &vs, sizeof ( vs ) ),
+                    ),
+                    xg_buffer_resource_binding_m (
+                        .shader_register = 1,
+                        .range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) ),
+                    )
+                }
+            )
+        ) );
 
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
+        //xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
 
         // Set vertex streams
-        xg_vertex_stream_binding_t vertex_bindings[2] = {
-            xg_vertex_stream_binding_m (
-                .buffer = mesh_component->pos_buffer,
-                .stream_id = 0,
-                .offset = 0,
-            ),
-            xg_vertex_stream_binding_m (
-                .buffer = mesh_component->nor_buffer,
-                .stream_id = 1,
-                .offset = 0,
-            )
-        };
-        xg->cmd_set_vertex_streams ( cmd_buffer, vertex_bindings, 2, key );
+        //xg_vertex_stream_binding_t vertex_bindings[2] = {
+        //    xg_vertex_stream_binding_m (
+        //        .buffer = mesh_component->pos_buffer,
+        //        .stream_id = 0,
+        //        .offset = 0,
+        //    ),
+        //    xg_vertex_stream_binding_m (
+        //        .buffer = mesh_component->nor_buffer,
+        //        .stream_id = 1,
+        //        .offset = 0,
+        //    )
+        //};
+        //xg->cmd_set_vertex_streams ( cmd_buffer, vertex_bindings, 2, key );
 
         // Draw
-        xg->cmd_draw_indexed ( cmd_buffer, mesh_component->idx_buffer, mesh_component->index_count, 0, key );
+        //xg->cmd_draw_indexed ( cmd_buffer, mesh_component->idx_buffer, mesh_component->index_count, 0, key );
+    
+        xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
+            .pipeline = pipeline_state,
+            .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings,
+            .index_buffer = mesh_component->idx_buffer,
+            .primitive_count = mesh_component->index_count / 3,
+            .vertex_buffers_count = 2,
+            .vertex_buffers = { mesh_component->pos_buffer, mesh_component->nor_buffer },
+        ) );
     }
 }
 
@@ -164,6 +174,7 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = geometry_pass,
             .user_args = std_buffer_m ( &pass_args ),
+            .auto_renderpass = true,
         ),
         .resources = xf_node_resource_params_m (
             .render_targets_count = 3,

@@ -7,7 +7,7 @@
 
 /*
     Resource flow
-        user declares resources trough declare_texture/buffer api, gets a xf resource handle
+        user declares resources trough create_texture/buffer api, gets a xf resource handle
         user lists resource inputs and outputs when creating a node, using xf resource handles
         at graph build time, before calling the node user callback, an xg resource cmd buffer is used to create the xg resource using the parameters coming from the xf resource declaration
         the create cmd is registered on the resource cmd buffer
@@ -83,6 +83,8 @@ typedef struct {
     } state;
 
     xf_texture_h alias;
+    uint32_t ref_count;
+    bool is_multi;
 } xf_texture_t;
 
 #define xf_texture_m( ... ) ( xf_texture_t ) { \
@@ -93,6 +95,8 @@ typedef struct {
     .params = xf_texture_params_m(), \
     .state.shared = xf_texture_execution_state_m(), \
     .alias = xf_null_handle_m, \
+    .ref_count = 0, \
+    .is_multi = false, \
     ##__VA_ARGS__ \
 }
 
@@ -103,6 +107,8 @@ typedef struct {
     xg_buffer_usage_bit_e allowed_usage;
     xf_buffer_params_t params;
     xf_buffer_h alias;
+    uint32_t ref_count;
+    bool is_multi;
 } xf_buffer_t;
 
 #define xf_buffer_m( ... ) ( xf_buffer_t ) { \
@@ -112,6 +118,8 @@ typedef struct {
     .allowed_usage = xg_buffer_usage_bit_none_m, \
     .params = xf_buffer_params_m(), \
     .alias = xf_null_handle_m, \
+    .ref_count = 0, \
+    .is_multi = false, \
     ##__VA_ARGS__ \
 }
 
@@ -121,27 +129,50 @@ typedef struct {
     xf_texture_h textures[xf_resource_multi_texture_max_textures_m];
     xf_texture_h alias;
     xg_swapchain_h swapchain;
+    uint32_t ref_count;
 } xf_multi_texture_t;
+
+#define xf_multi_texture_m( ... ) ( xf_multi_texture_t ) { \
+    .params = xf_multi_texture_params_m(), \
+    .index = 0, \
+    .alias = xf_null_handle_m, \
+    .swapchain = xg_null_handle_m, \
+    .ref_count = 0, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xf_multi_buffer_params_t params;
     uint32_t index;
     xf_buffer_h buffers[xf_resource_multi_buffer_max_buffers_m];
     xf_buffer_h alias;
+    uint32_t ref_count;
 } xf_multi_buffer_t;
+
+#define xf_multi_buffer_m( ... ) ( xf_multi_buffer_t ) { \
+    .params = xf_multi_buffer_params_t(), \
+    .index = 0, \
+    .alias = xf_null_handle_m, \
+    .ref_count = 0, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xf_buffer_t* buffers_array;
     xf_buffer_t* buffers_freelist;
+    uint64_t* buffers_bitset;
 
     xf_multi_buffer_t* multi_buffers_array;
     xf_multi_buffer_t* multi_buffers_freelist;
+    uint64_t* multi_buffers_bitset;
 
     xf_texture_t* textures_array;
     xf_texture_t* textures_freelist;
+    uint64_t* textures_bitset;
 
     xf_multi_texture_t* multi_textures_array;
     xf_multi_texture_t* multi_textures_freelist;
+    uint64_t* multi_textures_bitset;
 } xf_resource_state_t;
 
 void xf_resource_load ( xf_resource_state_t* state );
@@ -149,9 +180,10 @@ void xf_resource_reload ( xf_resource_state_t* state );
 void xf_resource_unload ( void );
 
 // TODO rename _declare to _create?
-xf_texture_h xf_resource_texture_declare ( const xf_texture_params_t* params );
-xf_texture_h xf_resource_texture_declare_from_external ( xg_texture_h texture );
-xf_buffer_h xf_resource_buffer_declare ( const xf_buffer_params_t* params );
+xf_texture_h xf_resource_texture_create ( const xf_texture_params_t* params );
+xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h texture );
+xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params );
+void xf_resource_clear_unreferenced ( void );
 
 void xf_resource_texture_destroy ( xf_texture_h texture );
 void xf_resource_buffer_destroy ( xf_buffer_h buffer );
@@ -178,6 +210,7 @@ void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h textur
 void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
 
 void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
+void xf_resource_texture_update_external ( xf_texture_h texture );
 
 /*
     Multi texture handle : | multi texture flag | unused | multi texture subtexture index | multi texture index |
@@ -196,8 +229,8 @@ void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
     Every xf_resource function that takes a texture should check for the top bit and if set treat the handle as a multi texture
     handle.
 */
-xf_texture_h xf_resource_multi_texture_declare ( const xf_multi_texture_params_t* params );
-xf_texture_h xf_resource_multi_texture_declare_from_swapchain ( xg_swapchain_h swapchain );
+xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params );
+xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain );
 
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
 void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture, uint32_t index );
@@ -210,3 +243,8 @@ bool xf_resource_texture_is_multi ( xf_texture_h texture );
 bool xf_resource_buffer_is_multi ( xf_buffer_h buffer );
 
 void xf_resource_swapchain_resize ( xf_texture_h swapchain );
+
+void xf_resource_texture_add_ref ( xf_texture_h texture );
+void xf_resource_texture_remove_ref ( xf_texture_h texture );
+void xf_resource_buffer_add_ref ( xf_buffer_h buffer );
+void xf_resource_buffer_remove_ref ( xf_buffer_h buffer );

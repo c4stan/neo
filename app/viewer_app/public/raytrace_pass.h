@@ -2,4 +2,4 @@
 
 #include <xf.h>
 
-xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target, xf_node_h dep );
+xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target );

@@ -122,43 +122,51 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
         instances[i].emissive = mesh_component->material.emissive;
     }
 
-    // Bind
-    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_draw_m,
-        .raytrace_world_count = 1,
-        .raytrace_worlds = { xg_raytrace_world_resource_binding_m (
-            .shader_register = 0,
-            .world = pass_args->world,
-        )},
-        .texture_count = 1,
-        .textures = {  
-            xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[0], 1 ),
-        },
-        .buffer_count = 2,
-        .buffers = {
-            xg_buffer_resource_binding_m ( 
-                .shader_register = 2,
-                .type = xg_buffer_binding_type_storage_m,
-                .range = xg_buffer_range_m ( .handle = shader_instance_buffer, .offset = 0, .size = shader_instance_buffer_size ),
-            ),
-            xg_buffer_resource_binding_m ( 
-                .shader_register = 3,
-                .type = xg_buffer_binding_type_uniform_m,
-                .range = xg->write_workload_uniform ( node_args->workload, &cbuffer, sizeof ( cbuffer ) ),
-            )
-        }
-    );
+    xg_pipeline_state_h pipeline = xs->get_pipeline_state ( pass_args->pipeline );
 
-    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-    xg->cmd_set_raytrace_pipeline_state ( cmd_buffer, xs->get_pipeline_state ( pass_args->pipeline ), key );
+    // Bind
+    xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+        .layout = xg->get_pipeline_resource_layout ( pipeline, xg_shader_binding_set_dispatch_m ),
+        .bindings = xg_pipeline_resource_bindings_m (
+            .raytrace_world_count = 1,
+            .raytrace_worlds = { xg_raytrace_world_resource_binding_m (
+                .shader_register = 0,
+                .world = pass_args->world,
+            )},
+            .texture_count = 1,
+            .textures = {  
+                xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[0], 1 ),
+            },
+            .buffer_count = 2,
+            .buffers = {
+                xg_buffer_resource_binding_m ( 
+                    .shader_register = 2,
+                    .range = xg_buffer_range_m ( .handle = shader_instance_buffer, .offset = 0, .size = shader_instance_buffer_size ),
+                ),
+                xg_buffer_resource_binding_m ( 
+                    .shader_register = 3,
+                    .range = xg->write_workload_uniform ( node_args->workload, &cbuffer, sizeof ( cbuffer ) ),
+                )
+            }
+        )
+    ) );
+
+    //xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
+    //xg->cmd_set_raytrace_pipeline_state ( cmd_buffer, , key );
 
     // Draw
-    xg->cmd_trace_rays ( cmd_buffer, pass_args->width, pass_args->height, 1, key );
+    //xg->cmd_trace_rays ( cmd_buffer, pass_args->width, pass_args->height, 1, key );
+    xg->cmd_raytrace ( cmd_buffer, key, &xg_cmd_raytrace_params_m (
+        .ray_count_x = pass_args->width,
+        .ray_count_y = pass_args->height,
+        .pipeline = pipeline,
+        .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings
+    ) );
 
     xg->cmd_destroy_buffer ( resource_cmd_buffer, shader_instance_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 }
 
-xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target, xf_node_h dep ) {
+xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target ) {
     viewapp_state_t* state = viewapp_state_get();
     xs_i* xs = state->modules.xs;
     xf_i* xf = state->modules.xf;
@@ -185,8 +193,6 @@ xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target, xf_node_h d
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = target, .stage = xg_pipeline_stage_bit_raytrace_shader_m ) },
         ),
-        .node_dependencies_count = 1,
-        .node_dependencies = { dep }
     );
     xf_node_h raytrace_node = xf->add_node ( graph, &node_params );
     return raytrace_node;

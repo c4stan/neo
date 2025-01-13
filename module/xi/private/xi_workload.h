@@ -126,6 +126,12 @@ typedef struct {
     xg_buffer_h vertex_buffer;
 } xi_workload_device_context_t;
 
+typedef struct {
+    xg_renderpass_h xg_handle;
+    uint32_t resolution_x;
+    uint32_t resolution_y;
+} xi_workload_renderpass_t;
+
 // TODO embed all ui state in here? at the moment building multiple workloads at the same time is not supported...
 typedef struct {
     xi_workload_t* workloads_array;
@@ -147,6 +153,10 @@ typedef struct {
     xs_database_pipeline_h geo_pipeline_bgra8;
     xs_database_pipeline_h geo_pipeline_a2bgr10;
 
+    xi_workload_renderpass_t ui_renderpass_rgba8;
+    xi_workload_renderpass_t ui_renderpass_bgra8;
+    xi_workload_renderpass_t ui_renderpass_a2bgr10;
+
     xg_texture_h null_texture;
     xg_sampler_h point_sampler;
     xg_sampler_h linear_sampler;
@@ -162,7 +172,7 @@ xi_workload_h xi_workload_create ( void );
 void xi_workload_cmd_draw ( xi_workload_h workload, const xi_draw_rect_t* rects, uint64_t rect_count );
 void xi_workload_cmd_draw_tri ( xi_workload_h workload, const xi_draw_tri_t* tris, uint64_t tri_count );
 void xi_workload_cmd_draw_mesh ( xi_workload_h workload, const xi_draw_mesh_t* mesh );
-void xi_workload_flush ( xi_workload_h workload, const xi_flush_params_t* params );
+uint64_t xi_workload_flush ( xi_workload_h workload, const xi_flush_params_t* params );
 
 xi_scissor_h xi_workload_add_viewport ( xi_workload_h workload, uint32_t x, uint32_t y, uint32_t width, uint32_t height );
 

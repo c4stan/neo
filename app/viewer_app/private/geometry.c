@@ -254,9 +254,9 @@ geometry_gpu_data_t upload_geometry_to_gpu ( xg_device_h device, const geometry_
         .debug_name = "ibuffer",
     ) );
 
-    xg->cmd_copy_buffer ( cmd_buffer, nor_staging, nor_buffer, 0 );
-    xg->cmd_copy_buffer ( cmd_buffer, pos_staging, pos_buffer, 0 );
-    xg->cmd_copy_buffer ( cmd_buffer, idx_staging, idx_buffer, 0 );
+    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = nor_staging, .destination = nor_buffer ) );
+    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = pos_staging, .destination = pos_buffer ) );
+    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = idx_staging, .destination = idx_buffer ) );
 
     xg->cmd_destroy_buffer ( resource_cmd_buffer, pos_staging, xg_resource_cmd_buffer_time_workload_complete_m );
     xg->cmd_destroy_buffer ( resource_cmd_buffer, nor_staging, xg_resource_cmd_buffer_time_workload_complete_m );

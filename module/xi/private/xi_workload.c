@@ -20,6 +20,10 @@ void xi_workload_load ( xi_workload_state_t* state ) {
 
     // TODO have xg provide some default null textures, similar to default samplers
     xi_workload_state->null_texture = xg_null_handle_m;
+
+    xi_workload_state->ui_renderpass_rgba8.xg_handle = xg_null_handle_m;
+    xi_workload_state->ui_renderpass_bgra8.xg_handle = xg_null_handle_m;
+    xi_workload_state->ui_renderpass_a2bgr10.xg_handle = xg_null_handle_m;
 }
 
 void xi_workload_reload ( xi_workload_state_t* state ) {
@@ -116,7 +120,7 @@ void xi_workload_set_view_info ( xi_workload_h workload_handle, const rv_view_in
     *proj_from_world = sm_matrix_4x4f_mul ( *proj, *view );
 }
 
-void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t* flush_params ) {
+uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t* flush_params ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     // try to recycle old workloads
@@ -172,7 +176,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             barrier_set.texture_memory_barriers_count = 1;
             barrier_set.texture_memory_barriers = &barrier;
 
-            xg->cmd_barrier_set ( flush_params->cmd_buffer, &barrier_set, key );
+            xg->cmd_barrier_set ( flush_params->cmd_buffer, key, &barrier_set );
         }
 
         {
@@ -181,7 +185,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             color_clear.f32[1] = 1;
             color_clear.f32[2] = 1;
             color_clear.f32[3] = 1;
-            xg->cmd_clear_texture ( flush_params->cmd_buffer, texture, color_clear, key );
+            xg->cmd_clear_texture ( flush_params->cmd_buffer, key, texture, color_clear );
         }
 
         {
@@ -199,7 +203,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             barrier_set.texture_memory_barriers_count = 1;
             barrier_set.texture_memory_barriers = &barrier;
 
-            xg->cmd_barrier_set ( flush_params->cmd_buffer, &barrier_set, key );
+            xg->cmd_barrier_set ( flush_params->cmd_buffer, key, &barrier_set );
         }
 
         xi_workload_state->null_texture = texture;
@@ -210,6 +214,43 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
     // setup new workload
     xi_workload_t* workload = &xi_workload_state->workloads_array[workload_handle];
     workload->xg_workload = flush_params->workload;
+
+    // renderpass
+    xi_workload_renderpass_t* renderpass;
+    if ( flush_params->render_target_format == xg_format_r8g8b8a8_unorm_m ) {
+        renderpass = &xi_workload_state->ui_renderpass_rgba8;
+    } else if ( flush_params->render_target_format == xg_format_b8g8r8a8_unorm_m ) {
+        renderpass = &xi_workload_state->ui_renderpass_bgra8;
+    } else if ( flush_params->render_target_format == xg_format_a2b10g10r10_unorm_pack32_m ) {
+        renderpass = &xi_workload_state->ui_renderpass_a2bgr10;
+    } else {
+        renderpass = NULL;
+        std_not_implemented_m();
+    }
+
+    if ( renderpass->xg_handle == xg_null_handle_m || renderpass->resolution_x != viewport_w || renderpass->resolution_y != viewport_h ) {
+        if ( renderpass->xg_handle != xg_null_handle_m ) {
+            xg->cmd_destroy_renderpass ( flush_params->resource_cmd_buffer, renderpass->xg_handle, xg_resource_cmd_buffer_time_workload_complete_m );
+        }
+        renderpass->xg_handle = xg->create_renderpass ( &xg_renderpass_params_m (
+            .device = flush_params->device,
+            .debug_name = "xi_renderpass", // TODO format
+            .resolution_x = viewport_w,
+            .resolution_y = viewport_h,
+            .render_textures = xg_render_textures_layout_m (
+                .render_targets_count = 1,
+                .render_targets = { xg_render_target_layout_m ( .format = flush_params->render_target_format ) }
+            ),
+        ) );
+        renderpass->resolution_x = viewport_w;
+        renderpass->resolution_y = viewport_h;
+    }
+
+    xg->cmd_begin_renderpass ( flush_params->cmd_buffer, key, &xg_cmd_renderpass_params_m (
+        .renderpass = renderpass->xg_handle,
+        .render_targets_count = 1,
+        .render_targets = { flush_params->render_target_binding }
+    ) );
 
     // draw meshes
     // TODO allow mixing meshes and ui sort order, need to properly re-bind whatever needs to be rebound (pipeline state, renderpass, ...) when mixing geo and ui
@@ -228,15 +269,15 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             pipeline_state = xg_null_handle_m;
             std_not_implemented_m();
         }
-        xg->cmd_set_graphics_pipeline_state ( flush_params->cmd_buffer, pipeline_state, key );
-
-        xg->cmd_set_dynamic_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
+        //xg->cmd_set_graphics_pipeline_state ( flush_params->cmd_buffer, pipeline_state, key );
+        //xg->cmd_set_dynamic_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
 
         for ( uint32_t i = 0; i < workload->mesh_count; ++i ) {
             const xi_draw_mesh_t* mesh = &workload->mesh_array[i];
 
             max_mesh_sort_order = std_max ( max_mesh_sort_order, mesh->sort_order );
 
+#if 0
             xg_vertex_stream_binding_t mesh_bindings[3] = {
                 xg_vertex_stream_binding_m (
                     .buffer = mesh->pos_buffer,
@@ -252,6 +293,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                 )
             };
             xg->cmd_set_vertex_streams ( flush_params->cmd_buffer, mesh_bindings, 3, key + mesh->sort_order );
+#endif
 
             sm_vec_3f_t up = { 0, 1, 0 }; // TODO
             sm_vec_3f_t dir = { 0, 0, 1 }; // TODO
@@ -277,10 +319,11 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                 .color = { mesh->color[0], mesh->color[1], mesh->color[2], mesh->color[3] },
             };
 
+#if 0
             xg->cmd_set_pipeline_resources (
                 flush_params->cmd_buffer,
                 &xg_pipeline_resource_bindings_m (
-                    .set = xg_shader_binding_set_per_draw_m,
+                    .set = xg_shader_binding_set_dispatch_m,
                     .buffer_count = 1,
                     .buffers = {
                         xg_buffer_resource_binding_m (
@@ -306,12 +349,53 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                     }
                 ),
                 key + mesh->sort_order );
+#endif
 
-            xg->cmd_draw_indexed ( flush_params->cmd_buffer, mesh->idx_buffer, mesh->idx_count, 0, key + mesh->sort_order );
+            xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m );
+
+            xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( flush_params->resource_cmd_buffer, &xg_resource_bindings_params_m (
+                .layout = layout,
+                .bindings = xg_pipeline_resource_bindings_m (
+                    .buffer_count = 1,
+                    .buffers = {
+                        xg_buffer_resource_binding_m (
+                            .shader_register = 0,
+                            .range = xg->write_workload_uniform ( flush_params->workload, &draw_uniforms, sizeof ( draw_uniforms ) )
+                        )
+                    },
+                    .texture_count = 1,
+                    .textures = {
+                        xg_texture_resource_binding_m (
+                            .shader_register = 1,
+                            .layout = xg_texture_layout_shader_read_m,
+                            .texture = mesh->texture != xg_null_handle_m ? mesh->texture : xi_workload_state->null_texture,
+                        )
+                    },
+                    .sampler_count = 1,
+                    .samplers = {
+                        xg_sampler_resource_binding_m (
+                            .shader_register = 2,
+                            .sampler = mesh->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
+                        )
+                    }
+                )
+            ) );
+
+            xg->cmd_draw ( flush_params->cmd_buffer, key + mesh->sort_order, &xg_cmd_draw_params_m (
+                .pipeline = pipeline_state,
+                .bindings[xg_shader_binding_set_dispatch_m] = group,
+                .primitive_count = mesh->idx_count / 3,
+                .vertex_buffers_count = 3,
+                .vertex_buffers = { mesh->pos_buffer, mesh->nor_buffer, mesh->uv_buffer },
+                .index_buffer = mesh->idx_buffer
+            ) );
+
+            //xg->cmd_draw_indexed ( flush_params->cmd_buffer, mesh->idx_buffer, mesh->idx_count, 0, key + mesh->sort_order );
         }
     }
 
     // draw ui
+    uint32_t max_ui_sort_order = 0;
     {
         key += max_mesh_sort_order;
 
@@ -319,6 +403,8 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
         for ( uint64_t i = 0; i < workload->rect_count; ++i ) {
             const xi_draw_rect_t* rect = &workload->rect_array[i];
             xi_workload_vertex_t* vertex;
+
+            max_ui_sort_order = std_max ( max_ui_sort_order, rect->sort_order );
 
             // the following code remaps position values from <[0, viewport_w], [0, viewport_h]> into <[-1, 1], [-1, 1]>
             // and flips position y axis direction from bottom up to top down
@@ -376,6 +462,8 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
         for ( uint64_t i = 0; i < workload->tri_count; ++i ) {
             const xi_draw_tri_t* tri = &workload->tri_array[i];
             xi_workload_vertex_t* vertex;
+
+            max_ui_sort_order = std_max ( max_ui_sort_order, tri->sort_order );
 
             vertex = &workload->vertex_buffer_data[tri_base + i * 3 + 0];
             vertex->pos[0] = ( tri->xy0[0] / viewport_w ) * 2 - 1;
@@ -439,6 +527,7 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
             pipeline_state = xg_null_handle_m;
             std_not_implemented_m();
         }
+#if 0
         xg->cmd_set_graphics_pipeline_state ( flush_params->cmd_buffer, pipeline_state, key );
 
         // bind vertex buffer
@@ -451,16 +540,18 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
 
         // set viewport
         xg->cmd_set_dynamic_viewport ( flush_params->cmd_buffer, &xg_viewport_state_m ( .width = viewport_w, .height = viewport_h ), key );
+#endif
 
         // TODO single draw call?
         // draw rects
         for ( uint32_t i = 0; i < workload->rect_count; ++i ) {
             const xi_draw_rect_t* rect = &workload->rect_array[i];
 
+#if 0
             xg->cmd_set_pipeline_resources (
                 flush_params->cmd_buffer,
                 &xg_pipeline_resource_bindings_m (
-                    .set = xg_shader_binding_set_per_draw_m,
+                    .set = xg_shader_binding_set_dispatch_m,
                     .texture_count = 1,
                     .textures = {
                         xg_texture_resource_binding_m (
@@ -488,19 +579,52 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                 scissor.height = xi_workload_state->scissor_array[rect->scissor].height;
             }
 
-            //xg->cmd_set_dynamic_scissor ( flush_params->cmd_buffer, &scissor, flush_params->key + rect->sort_order );
+            xg->cmd_set_dynamic_scissor ( flush_params->cmd_buffer, &scissor, flush_params->key + rect->sort_order );
+#endif
+            xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m );
 
-            xg->cmd_draw ( flush_params->cmd_buffer, 6, i * 6, key + rect->sort_order );
+            xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( flush_params->resource_cmd_buffer, &xg_resource_bindings_params_m (
+                .layout = layout,
+                .bindings = xg_pipeline_resource_bindings_m (
+                    .texture_count = 1,
+                    .textures = {
+                        xg_texture_resource_binding_m (
+                            .shader_register = 0,
+                            .layout = xg_texture_layout_shader_read_m,
+                            .texture = rect->texture != xg_null_handle_m ? rect->texture : xi_workload_state->null_texture,
+                        ),
+                    },
+                    .sampler_count = 1,
+                    .samplers = {
+                        xg_sampler_resource_binding_m (
+                            .shader_register = 1,
+                            .sampler = rect->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
+                        )
+                    },
+                ),
+            ) );
+
+            xg->cmd_draw ( flush_params->cmd_buffer, key + rect->sort_order, &xg_cmd_draw_params_m ( 
+                .pipeline = pipeline_state,
+                .bindings[xg_shader_binding_set_dispatch_m] = group,
+                .primitive_count = 2,
+                .vertex_buffers_count = 1,
+                .vertex_buffers = { workload->vertex_buffer },
+                .vertex_offset = i * 6,
+            ) );
+
+            //xg->cmd_draw ( flush_params->cmd_buffer, 6, i * 6, key + rect->sort_order );
         }
 
         // draw tris
         for ( uint32_t i = 0; i < workload->tri_count; ++i ) {
             const xi_draw_tri_t* tri = &workload->tri_array[i];
 
+#if 0
             xg->cmd_set_pipeline_resources (
                 flush_params->cmd_buffer,
                 &xg_pipeline_resource_bindings_m (
-                    .set = xg_shader_binding_set_per_draw_m,
+                    .set = xg_shader_binding_set_dispatch_m,
                     .texture_count = 1,
                     .textures = { 
                         xg_texture_resource_binding_m (
@@ -520,6 +644,39 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
                 key + tri->sort_order );
 
             xg->cmd_draw ( flush_params->cmd_buffer, 3, tri_base + i * 3, key + tri->sort_order );
+#endif
+            xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m );
+
+            xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( flush_params->resource_cmd_buffer, &xg_resource_bindings_params_m (
+                .layout = layout,
+                .bindings = xg_pipeline_resource_bindings_m (
+                    .texture_count = 1,
+                    .textures = { 
+                        xg_texture_resource_binding_m (
+                            .shader_register = 0,
+                            .layout = xg_texture_layout_shader_read_m,
+                            .texture = tri->texture != xg_null_handle_m ? tri->texture : xi_workload_state->null_texture,
+                        ),
+                    },
+                    .sampler_count = 1,
+                    .samplers = {
+                        xg_sampler_resource_binding_m (
+                            .shader_register = 1,
+                            .sampler = tri->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
+                        ),
+                    },
+                ),
+            ) );
+
+            xg->cmd_draw ( flush_params->cmd_buffer, key + tri->sort_order, &xg_cmd_draw_params_m ( 
+                .pipeline = pipeline_state,
+                .bindings[xg_shader_binding_set_dispatch_m] = group,
+                .primitive_count = 1,
+                .vertex_buffers_count = 1,
+                .vertex_buffers = { workload->vertex_buffer },
+                .vertex_offset = tri_base + i * 3,
+            ) );
+
         }
 
         // delete buffer
@@ -534,6 +691,10 @@ void xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_params_t*
     context->workload = workload_handle;
 #endif
 
+    xg->cmd_end_renderpass ( flush_params->cmd_buffer, key + max_ui_sort_order );
+
     std_mem_zero_m ( workload );
     std_list_push ( &xi_workload_state->workloads_freelist, workload );
+
+    return key + max_ui_sort_order;
 }

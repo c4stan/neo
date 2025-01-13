@@ -18,6 +18,7 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 #define     std_mem_copy_static_array_m( dest, source ) std_mem_copy( (dest), (source), sizeof ( source ) )
 #define     std_mem_cmp_array_m(a, b, count) std_mem_cmp( (a), (b), sizeof ( std_typeof_m ( *(a) ) ) * (count) )
 #define     std_mem_set_m( dest, value ) std_mem_set_m ( dest, sizeof ( *dest ), value )
+#define     std_mem_set_static_array_m( array, value ) std_mem_set ( array, sizeof ( array ), value )
 
 // Bit indexing starts from 0.
 // ls/ms suffixed routines operate on count bits starting from ls/ms
@@ -150,6 +151,7 @@ uint64_t    std_2_u32_to_u64 ( uint32_t high, uint32_t low );
 
 uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_size );
 
+#define std_bitset_u64_count_m( capacity ) std_div_ceil_m ( capacity, 64 )
 // call std_mem_set to initialize the bitset to the desired initial value
 void std_bitset_set ( uint64_t* bitset, size_t idx );
 bool std_bitset_test ( const uint64_t* bitset, size_t idx );

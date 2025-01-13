@@ -142,9 +142,10 @@ typedef struct {
     //VkQueue                             copy_queue;
     //uint32_t                            copy_queue_family_index;
     // Command queues
-    xg_vk_device_cmd_queue_t            graphics_queue;
-    xg_vk_device_cmd_queue_t            compute_queue;
-    xg_vk_device_cmd_queue_t            copy_queue;
+    xg_vk_device_cmd_queue_t            queues[xg_cmd_queue_count_m];
+    //xg_vk_device_cmd_queue_t            graphics_queue;
+    //xg_vk_device_cmd_queue_t            compute_queue;
+    //xg_vk_device_cmd_queue_t            copy_queue;
     // Memory heaps
     xg_vk_device_memory_heap_t          memory_heaps[xg_memory_type_count_m];
     //xg_vk_device_memory_heap_t          device_memory_heap;

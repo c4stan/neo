@@ -55,8 +55,6 @@ std_module_export_m void xf_unload ( void );
     and then they're resolved all at once, and finally the results can be consumed by the clients.
 */
 
-
-
 typedef uint64_t xf_resource_h;
 typedef uint64_t xf_texture_h;
 typedef uint64_t xf_buffer_h;
@@ -152,11 +150,6 @@ typedef struct {
     .view = _resource.view, \
 }
 
-#define xf_render_target_binding_m( _resource ) ( xg_render_target_binding_t ) { \
-    .texture = _resource.texture, \
-    .view = _resource.view, \
-}
-
 typedef struct {
     xf_shader_texture_resource_t sampled_textures[xf_node_max_sampled_textures_m];
     xf_shader_texture_resource_t storage_texture_reads[xf_node_max_storage_texture_reads_m];
@@ -180,7 +173,8 @@ typedef struct {
     xg_cmd_buffer_h cmd_buffer;
     xg_resource_cmd_buffer_h resource_cmd_buffer;
     xg_workload_h workload;
-    xg_pipeline_state_h pipeline_state;
+    //xg_pipeline_state_h pipeline_state;
+    xg_renderpass_h renderpass;
     uint64_t base_key;
     const char* debug_name;
 } xf_node_execute_args_t;
@@ -320,6 +314,7 @@ typedef struct {
     xf_node_execute_f* routine;
     std_buffer_t user_args;
     bool copy_args;
+    bool auto_renderpass;
 } xf_node_custom_pass_params_t;
 
 #define xf_node_custom_pass_params_m( ... ) ( xf_node_custom_pass_params_t ) { \
@@ -327,6 +322,7 @@ typedef struct {
     .routine = NULL, \
     .user_args = std_null_buffer_m, \
     .copy_args = true, \
+    .auto_renderpass = false, \
     ##__VA_ARGS__ \
 }
 
@@ -403,6 +399,8 @@ typedef struct {
     xf_node_passthrough_params_t passthrough;
     xf_node_h node_dependencies[xf_graph_max_nodes_m];
     uint32_t node_dependencies_count;
+    xg_resource_bindings_h frame_bindings;
+    xg_resource_bindings_h view_bindings;
 } xf_node_params_t;
 
 #define xf_node_params_m( ... ) ( xf_node_params_t ) { \
@@ -414,6 +412,8 @@ typedef struct {
     .queue = xg_cmd_queue_graphics_m, \
     .pass.custom = xf_node_custom_pass_params_m(), \
     .node_dependencies_count = 0, \
+    .frame_bindings = xg_null_handle_m, \
+    .view_bindings = xg_null_handle_m, \
     ##__VA_ARGS__ \
 }
 
@@ -540,16 +540,17 @@ typedef struct {
 }
 
 typedef struct {
-    xf_texture_h ( *declare_texture ) ( const xf_texture_params_t* params );
-    xf_buffer_h ( *declare_buffer ) ( const xf_buffer_params_t* params );
-    xf_texture_h ( *declare_multi_texture ) ( const xf_multi_texture_params_t* params );
+    xf_texture_h ( *create_texture ) ( const xf_texture_params_t* params );
+    xf_buffer_h ( *create_buffer ) ( const xf_buffer_params_t* params );
+    xf_texture_h ( *create_multi_texture ) ( const xf_multi_texture_params_t* params );
     //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
+    void ( *destroy_unreferenced_resources ) ( void );
 
     void ( *destroy_texture ) ( xf_texture_h texture );
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
     xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
-    void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
+    void ( *finalize_graph ) ( xf_graph_h graph, xg_workload_h workload );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
@@ -563,8 +564,8 @@ typedef struct {
     xf_texture_h ( *get_multi_texture ) ( xf_texture_h multi_texture, int32_t offset );
 
     // TODO prefix declare_ to these
-    xf_texture_h ( *multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
-    xf_texture_h ( *texture_from_external ) ( xg_texture_h texture );
+    xf_texture_h ( *create_multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
+    xf_texture_h ( *create_texture_from_external ) ( xg_texture_h texture );
     void ( *refresh_external_texture ) ( xf_texture_h texture );
 
     void ( *get_texture_info ) ( xf_texture_info_t* info, xf_texture_h texture );

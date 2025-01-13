@@ -27,21 +27,8 @@ begin input 2
     uv R32G32_FLOAT
 end
 
-begin buffer
-    update per_draw
-    register 0
-    stage vertex
-    stage fragment
-end
-
-begin texture
-    update per_draw
-    register 1
-    stage fragment
-end
-
-begin sampler
-    update per_draw
-    register 2
-    stage fragment
+begin bindings
+    buffer uniform
+    texture sampled
+    sampler
 end

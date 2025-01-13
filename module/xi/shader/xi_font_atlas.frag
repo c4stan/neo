@@ -2,16 +2,16 @@
 
 #include "xs.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
     vec3 color;
     vec3 outline_color;
     bool outline; // TODO permutation
     vec2 resolution_f32;
 } draw_cbuffer;
 
-layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) uniform utexture2D tex_atlas;
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform utexture2D tex_atlas;
 
-layout ( binding = 2, set = xs_shader_binding_set_per_draw_m ) uniform sampler sampler_point;
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
 
 layout ( location = 0 ) out vec4 out_color;
 

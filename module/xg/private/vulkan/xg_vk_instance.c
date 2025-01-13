@@ -247,7 +247,7 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
         "VK_LAYER_KHRONOS_synchronization2",
     };
 
-    const char* debug_layers[] = {      // Additional debug info/warning/error reporting
+    const char* debug_layers[] = {
 #if std_build_debug_m
         "VK_LAYER_KHRONOS_validation",
 #endif
@@ -265,7 +265,6 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
         "VK_KHR_surface",
         "VK_KHR_display",
         "VK_EXT_debug_utils", // TODO enable only if a "debug something" define is set?
-        //"VK_KHR_create_renderpass2",
         //"VK_KHR_get_physical_device_properties2", //https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_KHR_synchronization2.html lists it as required, but not enabling it doesn't trigger an error on sync2?
     };
 
@@ -305,46 +304,26 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
 
     for ( size_t i = 0; i < std_static_array_capacity_m ( base_layers ); ++i ) {
         layers[layer_i++] = std_stack_string_copy ( &layers_allocator, base_layers[i] );
-        //size_t size = std_str_len ( base_layers[i] ) + 1;
-        //layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
-        //std_mem_copy ( ( char* ) layers[layer_i], base_layers[i], size );
-        //++layer_i;
     }
 
     if ( layers_flags & xg_runtime_layer_bit_debug_m ) {
         for ( size_t i = 0; i < std_static_array_capacity_m ( debug_layers ); ++i ) {
             layers[layer_i++] = std_stack_string_copy ( &layers_allocator, debug_layers[i] );
-            //size_t size = std_str_len ( debug_layers[i] ) + 1;
-            //layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
-            //std_mem_copy ( ( char* ) layers[layer_i], debug_layers[i], size );
-            //++layer_i;
         }
     }
 
     if ( layers_flags & xg_runtime_layer_bit_renderdoc_m ) {
         for ( size_t i = 0; i < std_static_array_capacity_m ( renderdoc_layers ); ++i ) {
             layers[layer_i++] = std_stack_string_copy ( &layers_allocator, renderdoc_layers[i] );
-            //size_t size = std_str_len ( renderdoc_layers[i] ) + 1;
-            //layers[layer_i] = std_stack_push_array_m ( &layers_allocator, char, size );
-            //std_mem_copy ( ( char* ) layers[layer_i], renderdoc_layers[i], size );
-            //++layer_i;
         }
     }
 
     for ( size_t i = 0; i < std_static_array_capacity_m ( base_extensions ); ++i ) {
         extensions[extension_i++] = std_stack_string_copy ( &extensions_allocator, base_extensions[i] );
-        //size_t size = std_str_len ( base_extensions[i] ) + 1;
-        //extensions[extension_i] = std_stack_push_array_m ( &extensions_allocator, char, size );
-        //std_mem_copy ( ( char* ) extensions[extension_i], base_extensions[i], size );
-        //++extension_i;
     }
 
     for ( size_t i = 0; i < std_static_array_capacity_m ( platform_extensions ); ++i ) {
         extensions[extension_i++] = std_stack_string_copy ( &extensions_allocator, platform_extensions[i] );
-        //size_t size = std_str_len ( platform_extensions[i] ) + 1;
-        //extensions[extension_i] = std_stack_push_array_m ( &extensions_allocator, char, size );
-        //std_mem_copy ( ( char* ) extensions[extension_i], platform_extensions[i], size );
-        //++extension_i;
     }
 
     // Create Instance

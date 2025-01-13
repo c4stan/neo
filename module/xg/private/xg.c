@@ -42,8 +42,12 @@ static void xg_api_init ( xg_i* xg ) {
     xg->destroy_compute_pipeline = xg_vk_compute_pipeline_destroy;
     xg->create_raytrace_pipeline = xg_vk_raytrace_pipeline_create;
     xg->destroy_raytrace_pipeline = xg_vk_raytrace_pipeline_destroy;
-    xg->create_renderpass = xg_vk_graphics_renderpass_create;
-    xg->destroy_renderpass = xg_vk_graphics_renderpass_destroy;
+    xg->create_renderpass = xg_vk_renderpass_create;
+    xg->destroy_renderpass = xg_vk_renderpass_destroy;
+    xg->get_pipeline_resource_layouts = xg_vk_pipeline_resource_binding_set_layouts_get;
+    xg->get_pipeline_resource_layout = xg_vk_pipeline_resource_binding_set_layout_get;
+    xg->create_resource_layout = xg_vk_pipeline_resource_bindings_layout_create;
+    xg->destroy_resource_layout = xg_vk_pipeline_resource_bindings_layout_destroy;
     // Workload
     xg->create_workload = xg_workload_create;
     xg->create_cmd_buffer = xg_workload_add_cmd_buffer;
@@ -51,38 +55,30 @@ static void xg_api_init ( xg_i* xg ) {
     xg->is_workload_complete = xg_workload_is_complete;
     xg->write_workload_uniform = xg_workload_write_uniform;
     xg->wait_all_workload_complete = xg_workload_wait_all_workload_complete;
+    xg->set_workload_global_bindings = xg_workload_set_global_resource_group;
     // Raytrace
     xg->create_raytrace_geometry = xg_vk_raytrace_geometry_create;
     xg->create_raytrace_world = xg_vk_raytrace_world_create;
-    xg->cmd_set_raytrace_pipeline_state = xg_cmd_buffer_raytrace_pipeline_state_bind;
-    xg->cmd_trace_rays = xg_cmd_buffer_raytrace_trace_rays;
+    xg->cmd_raytrace = xg_cmd_buffer_cmd_raytrace;
     xg->destroy_raytrace_world = xg_vk_raytrace_world_destroy;
     // Command Buffer
     xg->cmd_barrier_set = xg_cmd_buffer_barrier_set;
     xg->cmd_clear_texture = xg_cmd_buffer_texture_clear;
     xg->cmd_clear_depth_stencil_texture = xg_cmd_buffer_texture_depth_stencil_clear;
-    xg->cmd_set_vertex_streams = xg_cmd_buffer_graphics_streams_bind;
-    xg->cmd_draw = xg_cmd_buffer_graphics_streams_submit;
-    xg->cmd_draw_indexed = xg_cmd_buffer_graphics_streams_submit_indexed;
-    xg->cmd_draw_instanced = xg_cmd_buffer_graphics_streams_submit_instanced;
-    xg->cmd_dispatch_compute = xg_cmd_buffer_compute_dispatch;
-    xg->cmd_set_graphics_pipeline_state = xg_cmd_buffer_graphics_pipeline_state_bind;
-    xg->cmd_set_compute_pipeline_state = xg_cmd_buffer_compute_pipeline_state_bind;
-    xg->cmd_set_render_textures = xg_cmd_buffer_graphics_render_textures_bind;
+    xg->cmd_draw = xg_cmd_buffer_cmd_draw;
+    xg->cmd_compute = xg_cmd_buffer_cmd_compute;
     xg->cmd_copy_texture = xg_cmd_buffer_copy_texture;
     xg->cmd_copy_buffer = xg_cmd_buffer_copy_buffer;
     xg->cmd_copy_buffer_to_texture = xg_cmd_buffer_copy_buffer_to_texture;
-    xg->cmd_set_pipeline_resources = xg_cmd_buffer_pipeline_resources_bind;
-    xg->cmd_set_dynamic_viewport = xg_cmd_buffer_graphics_pipeline_state_set_viewport;
-    xg->cmd_set_resource_group = xg_cmd_buffer_pipeline_resource_group_bind;
     //#if defined(std_platform_win32_m)
     xg->cmd_start_debug_capture = xg_cmd_buffer_start_debug_capture;
     xg->cmd_stop_debug_capture = xg_cmd_buffer_stop_debug_capture;
     //#endif
     xg->cmd_begin_debug_region = xg_cmd_buffer_begin_debug_region;
     xg->cmd_end_debug_region = xg_cmd_buffer_end_debug_region;
-    xg->cmd_begin_renderpass = xg_cmd_buffer_graphics_renderpass_begin;
-    xg->cmd_end_renderpass = xg_cmd_buffer_graphics_renderpass_end;
+    xg->cmd_begin_renderpass = xg_cmd_buffer_cmd_renderpass_begin;
+    xg->cmd_end_renderpass = xg_cmd_buffer_cmd_renderpass_end;
+    xg->cmd_bind_queue = xg_cmd_bind_queue;
     // Resource command buffer
     xg->create_resource_cmd_buffer = xg_workload_add_resource_cmd_buffer;
     xg->cmd_create_buffer = xg_resource_cmd_buffer_buffer_create;
@@ -90,7 +86,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_destroy_buffer = xg_resource_cmd_buffer_buffer_destroy;
     xg->cmd_destroy_texture = xg_resource_cmd_buffer_texture_destroy;
     xg->cmd_destroy_renderpass = xg_resource_cmd_buffer_graphics_renderpass_destroy;
-    xg->cmd_create_workload_resource_group = xg_resource_cmd_buffer_workload_resource_group_create;
+    xg->cmd_create_workload_bindings = xg_resource_cmd_buffer_workload_resource_bindings_create;
 
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;
@@ -98,6 +94,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->get_texture_info = xg_texture_get_info;
     xg->create_sampler = xg_sampler_create;
     xg->get_default_sampler = xg_sampler_get_default;
+    xg->create_queue_event = xg_gpu_queue_event_create;
     // Allocator
     xg->get_allocator_info = xg_vk_allocator_get_info;
     xg->alloc_memory = xg_alloc;

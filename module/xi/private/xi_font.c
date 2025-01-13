@@ -29,6 +29,7 @@ void xi_font_load ( xi_font_state_t* state ) {
     xi_font_state->fonts_array = std_virtual_heap_alloc_array_m ( xi_font_t, xi_font_max_fonts_m );
     xi_font_state->fonts_freelist = std_freelist_m ( xi_font_state->fonts_array, xi_font_max_fonts_m );
     xi_font_state->uniform_data = NULL;
+    xi_font_state->renderpass = xg_null_handle_m;
 }
 
 void xi_font_load_shaders ( xs_i* xs, xs_database_h sdb ) {
@@ -152,14 +153,14 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         barrier_set.texture_memory_barriers_count = 1;
         barrier_set.texture_memory_barriers = &barrier;
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, key );
+        xg->cmd_barrier_set ( cmd_buffer, key, &barrier_set );
     }
 
     {
         xg_buffer_to_texture_copy_params_t copy_params = xg_default_buffer_to_texture_copy_params_m;
         copy_params.source = staging_buffer;
         copy_params.destination = raster_texture;
-        xg->cmd_copy_buffer_to_texture ( cmd_buffer, &copy_params, key );
+        xg->cmd_copy_buffer_to_texture ( cmd_buffer, key, &copy_params );
     }
 
     xg->cmd_destroy_buffer ( resource_cmd_buffer, staging_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
@@ -205,7 +206,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         barrier_set.texture_memory_barriers_count = 2;
         barrier_set.texture_memory_barriers = barriers;
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, key );
+        xg->cmd_barrier_set ( cmd_buffer, key, &barrier_set );
     }
 
     xg_buffer_h uniform_buffer;
@@ -228,6 +229,28 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         xi_font_state->uniform_data = ( xi_font_atlas_uniform_data_t* ) uniform_buffer_info.allocation.mapped_address;
     }
 
+    if ( xi_font_state->renderpass == xg_null_handle_m ) {
+        xi_font_state->renderpass = xg->create_renderpass ( &xg_renderpass_params_m (
+            .device = params->xg_device,
+            .resolution_x = xi_font_texture_atlas_width_m,
+            .resolution_y = xi_font_texture_atlas_height_m,
+            .debug_name = "xi_font_renderpass",
+            .render_textures = xg_render_textures_layout_m (
+                .render_targets_count = 1,
+                .render_targets = { xg_render_target_layout_m ( .format = xg_format_r8g8b8a8_unorm_m ) }
+            )
+        ) );
+    }
+
+    xg->cmd_begin_renderpass ( cmd_buffer, key, &xg_cmd_renderpass_params_m (
+        .renderpass = xi_font_state->renderpass,
+        .render_targets_count = 1,
+        .render_targets = { xg_render_target_binding_m ( .texture = atlas_texture ) }
+    ) );
+
+    xs_i* xs = std_module_get_m ( xs_module_name_m );
+
+#if 0
     xg->cmd_set_render_textures (
         cmd_buffer,
         &xg_render_textures_binding_m (
@@ -236,14 +259,12 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         ),
         key );
 
-    xs_i* xs = std_module_get_m ( xs_module_name_m );
-
     xg->cmd_set_graphics_pipeline_state ( cmd_buffer, xs->get_pipeline_state ( xi_font_state->font_atlas_pipeline ), key );
 
     xg->cmd_set_pipeline_resources (
         cmd_buffer,
         &xg_pipeline_resource_bindings_m (
-            .set = xg_shader_binding_set_per_draw_m,
+            .set = xg_shader_binding_set_dispatch_m,
             .buffer_count = 1,
             .buffers = {
                 xg_buffer_resource_binding_m (
@@ -270,39 +291,39 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             }
         ), 
         key );
-
-#if 0
-    {
-        xg_buffer_resource_binding_t buffer_resource;
-        buffer_resource.shader_register = 0;
-        buffer_resource.type = xg_buffer_binding_type_uniform_m;
-        //buffer_resource.buffer = uniform_buffer;
-        buffer_resource.range.handle = uniform_buffer;
-        buffer_resource.range.offset = 0;
-        buffer_resource.range.size = sizeof ( xi_font_atlas_uniform_data_t );
-
-        xg_texture_resource_binding_t texture_resource;
-        texture_resource.shader_register = 1;
-        texture_resource.layout = xg_texture_layout_shader_read_m;
-        texture_resource.texture = raster_texture;
-        texture_resource.view = xg_default_texture_view_m;
-
-        xg_sampler_resource_binding_t sampler_resource;
-        sampler_resource.shader_register = 2;
-        sampler_resource.sampler = xg->get_default_sampler ( params->xg_device, xg_default_sampler_point_clamp_m );
-
-        xg_pipeline_resource_bindings_t bindings;
-        bindings.set = xg_shader_binding_set_per_draw_m;
-        bindings.buffer_count = 1;
-        bindings.texture_count = 1;
-        bindings.sampler_count = 1;
-        bindings.buffers = &buffer_resource;
-        bindings.textures = &texture_resource;
-        bindings.samplers = &sampler_resource;
-
-        xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
-    }
 #endif
+    xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( xi_font_state->font_atlas_pipeline );
+
+    xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m );
+
+    xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+        .layout = layout,
+        .bindings = xg_pipeline_resource_bindings_m (
+            .buffer_count = 1,
+            .buffers = {
+                xg_buffer_resource_binding_m (
+                    .shader_register = 0,
+                    .range = { .handle = uniform_buffer, .offset = 0, .size = sizeof ( xi_font_atlas_uniform_data_t ) }
+                ),
+            },
+            .texture_count = 1,
+            .textures = {
+                xg_texture_resource_binding_m (
+                    .shader_register = 1,
+                    .layout = xg_texture_layout_shader_read_m,
+                    .texture = raster_texture,
+                    .view = xg_texture_view_m()
+                ),
+            },
+            .sampler_count = 1,
+            .samplers = {
+                xg_sampler_resource_binding_m (
+                    .shader_register = 2,
+                    .sampler = xg->get_default_sampler ( params->xg_device, xg_default_sampler_point_clamp_m )
+                )
+            }
+        )
+    ) );
 
     xi_font_state->uniform_data->color[0] = 1;
     xi_font_state->uniform_data->color[1] = 1;
@@ -311,7 +332,13 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     xi_font_state->uniform_data->resolution_f32[0] = xi_font_texture_atlas_width_m;
     xi_font_state->uniform_data->resolution_f32[1] = xi_font_texture_atlas_height_m;
 
-    xg->cmd_draw ( cmd_buffer, 3, 0, 0 );
+    xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
+        .primitive_count = 1,
+        .pipeline = pipeline_state,
+        .bindings[xg_shader_binding_set_dispatch_m] = group,
+    ) );
+
+    xg->cmd_end_renderpass ( cmd_buffer, key );
 
     {
         xg_texture_memory_barrier_t barrier = xg_texture_memory_barrier_m (
@@ -328,7 +355,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         barrier_set.texture_memory_barriers_count = 1;
         barrier_set.texture_memory_barriers = &barrier;
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, key );
+        xg->cmd_barrier_set ( cmd_buffer, key, &barrier_set );
     }
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, raster_texture, xg_resource_cmd_buffer_time_workload_complete_m );

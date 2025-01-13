@@ -4,9 +4,9 @@
 
 #include "common.glsl"
 
-layout ( set = xs_shader_binding_set_per_draw_m, binding = 0 ) uniform texture2D tex_color;
-layout ( set = xs_shader_binding_set_per_draw_m, binding = 1, rgb10_a2 ) uniform writeonly image2D img_color;
-layout ( set = xs_shader_binding_set_per_draw_m, binding = 2 ) uniform sampler sampler_point;
+layout ( set = xs_shader_binding_set_dispatch_m, binding = 0 ) uniform texture2D tex_color;
+layout ( set = xs_shader_binding_set_dispatch_m, binding = 1, rgb10_a2 ) uniform writeonly image2D img_color;
+layout ( set = xs_shader_binding_set_dispatch_m, binding = 2 ) uniform sampler sampler_point;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 

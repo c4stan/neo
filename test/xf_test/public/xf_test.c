@@ -22,33 +22,20 @@ static void xf_triangle_pass ( const xf_node_execute_args_t* node_args, void* us
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-    // Bind swapchain texture as render target
-    {
-        xg_render_textures_binding_t render_textures;
-        render_textures.render_targets_count = 1;
-        render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-        render_textures.depth_stencil.texture = xg_null_handle_m;
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
-
-    // Set pipeline
-    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
-
-    xg_viewport_state_t viewport = xg_viewport_state_m (
-        .width = 400,
-        .height = 200,
-    );
-    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
-
-    // Draw
-    xg->cmd_draw ( cmd_buffer, 3, 0, key );
+    xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
+        .pipeline = pipeline_state,
+        .primitive_count = 1,
+    ) );
 }
 
 static void xf_test ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
     std_assert_m ( wm );
 
-    wm_window_params_t window_params = { .name = "xf_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
+    uint32_t resolution_x = 600;
+    uint32_t resolution_y = 400;
+
+    wm_window_params_t window_params = { .name = "xf_test", .x = 0, .y = 0, .width = resolution_x, .height = resolution_y, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &window_params );
     std_log_info_m ( "Creating window "std_fmt_str_m std_fmt_newline_m, window_params.name );
 
@@ -90,11 +77,73 @@ static void xf_test ( void ) {
     xs->add_database_folder ( sdb, "shader/" );
     xs->set_output_folder ( sdb, "output/shader/" );
     xs->build_database ( sdb );
-    xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "test_state" ) );
+    xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle" ) );
 
     xf_i* xf = std_module_load_m ( xf_module_name_m );
 
-    xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain(swapchain);
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain(swapchain);
+
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( 
+        .device = device,
+        .debug_name = "test_graph_1" 
+    ) );
+
+    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = 600,
+        .height = 400,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "color_texture",
+    ) );
+    
+    float color[3] = { 0, 1, 0 };
+    //uint64_t t = 500;
+    //color[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    //color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
+    //color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+
+    xf->add_node ( graph, &xf_node_params_m ( 
+        .debug_name = "clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { color[0], color[1], color[2], 1 } ) ) }
+        ),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+        ),
+    ) );
+
+    xf_triangle_pass_args_t triangle_pass_args = {
+        .pipeline_state = pipeline_state,
+    };
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "triangle",
+        .debug_color = xg_debug_region_color_green_m,
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = xf_triangle_pass,
+            .user_args = std_buffer_m ( &triangle_pass_args ),
+            .auto_renderpass = true,
+        ),
+        .resources = xf_node_resource_params_m (
+            .render_targets_count = 1,
+            .render_targets = { xf_render_target_dependency_m ( .texture = color_texture ) },            
+        ),
+    ) );
+
+    xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
+
+    xf->add_node ( graph2, &xf_node_params_m (
+        .debug_name = "present",
+        .type = xf_node_type_copy_pass_m,
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+            .copy_texture_reads_count = 1,
+            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+            .presentable_texture = swapchain_multi_texture,
+        ),
+    ) );
 
     wm_window_info_t window_info;
     wm->get_window_info ( window, &window_info );
@@ -123,77 +172,16 @@ static void xf_test ( void ) {
         window_info = new_window_info;
 
         xg_workload_h workload = xg->create_workload ( device );
-        xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( 
-            .device = device,
-            .debug_name = "test_graph_1" 
-        ) );
-
-        xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m (
-            .width = 400,
-            .height = 200,
-            .format = xg_format_r8g8b8a8_unorm_m,
-            .debug_name = "color_texture",
-        ) );
-        
-        uint64_t t = 500;
-        float color[3];
-        color[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
-        color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-
-        xf->add_node ( graph, &xf_node_params_m ( 
-            .debug_name = "clear",
-            .type = xf_node_type_clear_pass_m,
-            .pass.clear = xf_node_clear_pass_params_m (
-                .textures = { xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { color[0], color[1], color[2], 1 } ) ) }
-            ),
-            .resources = xf_node_resource_params_m (
-                .copy_texture_writes_count = 1,
-                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
-            ),
-        ) );
-
-        xf_triangle_pass_args_t triangle_pass_args;
-        triangle_pass_args.pipeline_state = pipeline_state;
-        xf->add_node ( graph, &xf_node_params_m (
-            .debug_name = "triangle",
-            .debug_color = xg_debug_region_color_green_m,
-            .type = xf_node_type_custom_pass_m,
-            .pass.custom = xf_node_custom_pass_params_m (
-                .routine = xf_triangle_pass,
-                .user_args = std_buffer_m ( &triangle_pass_args ),
-            ),
-            .resources = xf_node_resource_params_m (
-                .render_targets_count = 1,
-                .render_targets = { xf_render_target_dependency_m ( .texture = color_texture ) },            
-            ),
-        ) );
-
-        xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
-
-        xf->add_node ( graph2, &xf_node_params_m (
-            .debug_name = "present",
-            .type = xf_node_type_copy_pass_m,
-            .resources = xf_node_resource_params_m (
-                .copy_texture_writes_count = 1,
-                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
-                .copy_texture_reads_count = 1,
-                .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
-                .presentable_texture = swapchain_multi_texture,
-            ),
-        ) );
 
         uint64_t id = xf->execute_graph ( graph, workload, 0 );
         xf->execute_graph ( graph2, workload, id );
-        xf->destroy_graph ( graph, workload );
-        xf->destroy_graph ( graph2, workload );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 
         xs->update_pipeline_states ( workload );
-
-        xf->destroy_texture ( color_texture );
     }
+
+    xf->destroy_unreferenced_resources();
 
     std_module_unload_m ( xf_module_name_m );
     std_module_unload_m ( xs_module_name_m );

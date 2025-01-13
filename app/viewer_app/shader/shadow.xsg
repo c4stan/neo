@@ -1,4 +1,4 @@
-vertex_shader depth.vert
+vertex_shader shadow.vert
 
 include common_graphics.xsi
 include depth_write_d16.xsi
@@ -10,4 +10,11 @@ end
 begin buffer
     stage vertex
     register 0
+    set pass
+end
+
+begin buffer
+    stage vertex
+    register 0
+    set dispatch
 end

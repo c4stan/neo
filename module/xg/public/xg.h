@@ -4,38 +4,6 @@
 
 #include <wm.h>
 
-/*
-
-whats missing
-    cmd buffer management/processing
-    cmd buffer resource binding
-    resource storage
-        resource handles are returned by the allocator. all the backend needs to do
-        is store those, create views, get descs
-        two ypes of resources: renderer internal, and asset related. first are very rarely
-        reallocated, second are allocated and released generally in block.
-        might want to reflect this on the internal management? mighe be slighly more
-        efficient to deallocate a block of resources rather than single picking all the
-        resources in the block/level/... and updating the freelist
-        what resources are in a block?
-            textures
-            buffers
-            pipelines?
-                having pipelines makes sense (shaders are level-related) but looking up
-                a pipeline now becomes n lookups instead of 1
-            to be honest basically all resources are level related. if resources are
-            mass allocated/released, locality helps anyway even if it's not explicit
-    resource allocator(s)
-        see xg_vk_memory
-
-module structure
-    this module is meant to be the layer that depends on the hw api system layer and works
-    as a platform independent layer for every other rendering layer. it remains close to the
-    original api, although a few abstractions are taking place, mostly related to cmd buffers
-    and resource binding.
-
-*/
-
 // -- Module --
 #define xg_module_name_m xg
 std_module_export_m void* xg_load ( void* );
@@ -57,21 +25,14 @@ typedef uint64_t xg_resource_h;
 typedef uint64_t xg_buffer_h;
 typedef uint64_t xg_texture_h;
 typedef uint64_t xg_sampler_h;
-typedef uint64_t xg_pipeline_resource_group_h;
+typedef uint64_t xg_resource_bindings_h;
+typedef uint64_t xg_resource_bindings_layout_h;
 
 typedef uint64_t xg_raytrace_geometry_h;
 typedef uint64_t xg_raytrace_world_h;
 typedef uint64_t xg_raytrace_pipeline_state_h;
 
 #define xg_null_handle_m UINT64_MAX
-
-/*
-    Same underlying type, but different type name to make it clear
-    which function calls expect which.
-
-    // TODO decide what to do with this
-*/
-typedef xg_device_h xg_device_mask_t;
 
 // -- Color types --
 typedef enum {
@@ -941,7 +902,7 @@ typedef struct {
     xg_render_target_layout_t   render_targets[xg_pipeline_output_max_color_targets_m];
     bool                        depth_stencil_enabled;
     xg_depth_stencil_layout_t   depth_stencil;
-    // TODO other attachments?
+    // TODO other attachments
 } xg_render_textures_layout_t;
 
 #define xg_render_textures_layout_m( ... ) ( xg_render_textures_layout_t ) { \
@@ -992,10 +953,16 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+// TODO remove struct, just have a texture handle?
 typedef struct {
     //xg_depth_stencil_clear_t clear;
     xg_texture_h texture;
 } xg_depth_stencil_binding_t;
+
+#define xg_depth_stencil_binding_m( ... ) ( xg_depth_stencil_binding_t ) { \
+    .texture = xg_null_handle_m, \
+    ##__VA_ARGS__ \
+}
 
 // depends only on attachments
 typedef struct {
@@ -1043,6 +1010,7 @@ typedef enum {
     xg_shading_stage_bit_ray_hit_closest_m  = 1 << xg_shading_stage_ray_hit_closest_m,
     //xg_shading_stage_bit_ray_hit_any_m      = 1 << xg_shading_stage_ray_hit_any_m,
     //xg_shading_stage_bit_ray_intersection_m = 1 << xg_shading_stage_ray_intersection_m,
+    xg_shading_stage_bit_all_m              = xg_shading_stage_bit_vertex_m | xg_shading_stage_bit_fragment_m | xg_shading_stage_bit_compute_m | xg_shading_stage_bit_ray_gen_m, // TODO include all stages and add an all keyword to xs for binding stages
 } xg_shading_stage_bit_e;
 
 #define xg_shading_stage_enum_to_bit_m( stage ) ( 1 << ( stage ) )
@@ -1059,47 +1027,80 @@ typedef enum {
     xg_resource_binding_buffer_texel_uniform_m,         // VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
     xg_resource_binding_buffer_texel_storage_m,         // VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER
     xg_resource_binding_raytrace_world_m,               // VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR / VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV
-    xg_resource_binding_count_m
+    xg_resource_binding_count_m,
+    xg_resource_binding_invalid_m
     // TODO? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
 } xg_resource_binding_e;
 
-typedef enum {
-    xg_shader_binding_set_per_frame_m,
-    xg_shader_binding_set_per_view_m,
-    xg_shader_binding_set_per_pass_m,
-    xg_shader_binding_set_per_draw_m,
+#if 0
+typedef enum {                          // TODO rename:
+    xg_shader_binding_set_per_frame_m,  // global
+    xg_shader_binding_set_per_view_m,   // renderpass
+    xg_shader_binding_set_per_pass_m,   // shader
+    xg_shader_binding_set_dispatch_m,   // draw (offset)
     xg_shader_binding_set_count_m,
     xg_shader_binding_set_invalid_m
 } xg_shader_binding_set_e;
+#else
+typedef enum {
+    xg_shader_binding_set_workload_m,
+    xg_shader_binding_set_pass_m,
+    xg_shader_binding_set_material_m,
+    xg_shader_binding_set_dispatch_m,
+    xg_shader_binding_set_count_m,
+    xg_shader_binding_set_invalid_m
+} xg_shader_binding_set_e;
+#endif
 
+#if 0
 typedef struct {
     uint32_t shader_register;
     xg_shading_stage_bit_e stages;
     xg_resource_binding_e type;
     xg_shader_binding_set_e set;
 } xg_resource_binding_layout_t;
+#else
+typedef struct {
+    uint32_t shader_register;
+    xg_shading_stage_bit_e stages;
+    xg_resource_binding_e type;
+} xg_resource_binding_layout_t;
+#endif
+
+#define xg_resource_binding_layout_m( ... ) ( xg_resource_binding_layout_t ) { \
+    .shader_register = -1, \
+    .stages = xg_shading_stage_null_m, \
+    .type = xg_resource_binding_invalid_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_device_h device;
+    xg_resource_binding_layout_t resources[xg_pipeline_resource_max_bindings_m];
+    uint32_t resource_count;
+    //uint32_t uniform_buffer_count;
+    //uint32_t texture_count;
+    //uint32_t sampler_count;
+    //uint32_t raytrace_world_count;
+    char debug_name[xg_debug_name_size_m];
+} xg_resource_bindings_layout_params_t;
+
+#define xg_resource_bindings_layout_params_m( ... ) ( xg_resource_bindings_layout_params_t ) { \
+    .device = xg_null_handle_m, \
+    .resource_count = 0, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_shading_stage_bit_e stages;
     uint32_t size;
-    uint32_t id;
 } xg_constant_binding_layout_t;
-
-typedef struct {
-    xg_resource_binding_layout_t binding_points[xg_pipeline_resource_max_bindings_m];
-    size_t binding_points_count;
-} xg_resource_bindings_layout_t;
 
 typedef struct {
     xg_constant_binding_layout_t binding_points[xg_pipeline_constant_max_bindings_m];
     uint32_t binding_points_count;
 } xg_constant_bindings_layout_t;
-
-#define xg_resource_bindings_layout_m( ... ) ( xg_resource_bindings_layout_t ) { \
-    .binding_points = { 0 }, \
-    .binding_points_count = 0, \
-    ##__VA_ARGS__ \
-}
 
 #define xg_constant_bindings_layout_m( ... ) ( xg_constant_bindings_layout_t ) { \
     .binding_points = { 0 }, \
@@ -1128,29 +1129,24 @@ typedef enum {
     xg_graphics_pipeline_dynamic_state_count_m,
 } xg_graphics_pipeline_dynamic_state_e;
 
-typedef struct {
-    // TODO bitset?
-    bool enabled_states[xg_graphics_pipeline_dynamic_state_count_m];
-} xg_graphics_pipeline_dynamic_state_t;
-
-#define xg_graphics_pipeline_dynamic_state_m( ... ) ( xg_graphics_pipeline_dynamic_state_t ) { \
-    .enabled_states = { [0 ... xg_graphics_pipeline_dynamic_state_count_m-1] = false }, \
-}
+typedef enum {
+    xg_graphics_pipeline_dynamic_state_bit_viewport_m = 1 << xg_graphics_pipeline_dynamic_state_viewport_m,
+    xg_graphics_pipeline_dynamic_state_bit_scissor_m  = 1 << xg_graphics_pipeline_dynamic_state_scissor_m,
+} xg_graphics_pipeline_dynamic_state_bit_e;
 
 // -- Graphics Pipeline State --
 // depends on both bindings and attachments
 // TODO rename to raster_pipeline?
 typedef struct {
-    xg_pipeline_state_shader_t              vertex_shader;
-    xg_pipeline_state_shader_t              fragment_shader;
-
-    xg_input_layout_t                       input_layout;
-    xg_rasterizer_state_t                   rasterizer_state;
-    xg_depth_stencil_state_t                depth_stencil_state;
-    xg_blend_state_t                        blend_state;
-    xg_viewport_state_t                     viewport_state;
-    xg_scissor_state_t                      scissor_state;
-    xg_graphics_pipeline_dynamic_state_t    dynamic_state;
+    xg_pipeline_state_shader_t vertex_shader;
+    xg_pipeline_state_shader_t fragment_shader;
+    xg_input_layout_t input_layout;
+    xg_rasterizer_state_t rasterizer_state;
+    xg_depth_stencil_state_t depth_stencil_state;
+    xg_blend_state_t blend_state;
+    xg_viewport_state_t viewport_state;
+    xg_scissor_state_t scissor_state;
+    xg_graphics_pipeline_dynamic_state_bit_e dynamic_state;
 } xg_graphics_pipeline_state_t;
 
 #define xg_graphics_pipeline_state_m( ... ) ( xg_graphics_pipeline_state_t ) { \
@@ -1162,29 +1158,29 @@ typedef struct {
     .blend_state = xg_blend_state_m(), \
     .viewport_state = xg_viewport_state_m(), \
     .scissor_state = xg_scissor_state_m(), \
-    .dynamic_state = xg_graphics_pipeline_dynamic_state_m(), \
+    .dynamic_state = 0, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
     xg_graphics_pipeline_state_t    state;
-    xg_render_textures_layout_t     render_textures; // TOOD rename in render_textures_layout?
-    xg_resource_bindings_layout_t   resource_bindings; // TODO rename in resource_layout. etc.. below
-    xg_constant_bindings_layout_t   constant_bindings;
+    xg_render_textures_layout_t     render_textures_layout;
+    xg_resource_bindings_layout_h   resource_layouts[xg_shader_binding_set_count_m];
+    xg_constant_bindings_layout_t   constant_layout;
     char                            debug_name[xg_debug_name_size_m];
 } xg_graphics_pipeline_params_t;
 
 #define xg_graphics_pipeline_params_m( ... ) ( xg_graphics_pipeline_params_t ) { \
     .state = xg_graphics_pipeline_state_m(), \
-    .render_textures = xg_render_textures_layout_m(), \
-    .resource_bindings = xg_resource_bindings_layout_m(), \
-    .constant_bindings = xg_constant_bindings_layout_m(), \
+    .render_textures_layout = xg_render_textures_layout_m(), \
+    .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
+    .constant_layout = xg_constant_bindings_layout_m(), \
     .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
-    xg_pipeline_state_shader_t      compute_shader;
+    xg_pipeline_state_shader_t compute_shader;
 } xg_compute_pipeline_state_t;
 
 #define xg_compute_pipeline_state_m( ... ) ( xg_compute_pipeline_state_t ) { \
@@ -1193,15 +1189,15 @@ typedef struct {
 
 typedef struct {
     xg_compute_pipeline_state_t     state;
-    xg_resource_bindings_layout_t   resource_bindings;
-    xg_constant_bindings_layout_t   constant_bindings;
+    xg_resource_bindings_layout_h   resource_layouts[xg_shader_binding_set_count_m];
+    xg_constant_bindings_layout_t   constant_layout;
     char                            debug_name[xg_debug_name_size_m];
 } xg_compute_pipeline_params_t;
 
 #define xg_compute_pipeline_params_m( ... ) ( xg_compute_pipeline_params_t ) { \
     .state = xg_compute_pipeline_state_m(), \
-    .resource_bindings = xg_resource_bindings_layout_m(), \
-    .constant_bindings = xg_constant_bindings_layout_m(), \
+    .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
+    .constant_layout = xg_constant_bindings_layout_m(), \
     .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
@@ -1290,15 +1286,15 @@ typedef struct {
 
 typedef struct {
     xg_raytrace_pipeline_state_t    state;
-    xg_resource_bindings_layout_t   resource_bindings;
-    xg_constant_bindings_layout_t   constant_bindings;
+    xg_resource_bindings_layout_h   resource_layouts[xg_shader_binding_set_count_m];
+    xg_constant_bindings_layout_t   constant_layout;
     char                            debug_name[xg_debug_name_size_m];
 } xg_raytrace_pipeline_params_t;
 
 #define xg_raytrace_pipeline_params_m( ... ) ( xg_raytrace_pipeline_params_t ) { \
     .state = xg_raytrace_pipeline_state_m(), \
-    .resource_bindings = xg_resource_bindings_layout_m(), \
-    .constant_bindings = xg_constant_bindings_layout_m(), \
+    .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
+    .constant_layout = xg_constant_bindings_layout_m(), \
     .debug_name = { 0 }, \
     ##__VA_ARGS__ \
 }
@@ -1317,9 +1313,9 @@ typedef struct {
     uint32_t resolution_x;
     uint32_t resolution_y;
     char debug_name[xg_debug_name_size_m];
-} xg_graphics_renderpass_params_t;
+} xg_renderpass_params_t;
 
-#define xg_graphics_renderpass_params_m( ... ) ( xg_graphics_renderpass_params_t ) { \
+#define xg_renderpass_params_m( ... ) ( xg_renderpass_params_t ) { \
     .device = xg_null_handle_m, \
     .render_textures = xg_render_textures_layout_m(), \
     .resolution_x = -1, \
@@ -1485,8 +1481,8 @@ typedef struct {
 */
 
 typedef struct {
-    xg_pipeline_stage_bit_e blocker; // the stage that needs to complete before blocked can be executed
-    xg_pipeline_stage_bit_e blocked; // the stage that needs to wait for blocker to complete before executing
+    xg_pipeline_stage_bit_e blocker; // the stages that need to complete before blocked can be executed
+    xg_pipeline_stage_bit_e blocked; // the stages that need to wait for blocker to complete before executing
 } xg_execution_dependency_t;
 
 #define xg_execution_dependency_m( ... ) ( xg_execution_dependency_t ) { \
@@ -1573,6 +1569,7 @@ typedef enum {
     xg_cmd_queue_compute_m,
     xg_cmd_queue_copy_m,
     xg_cmd_queue_count_m,
+    xg_cmd_queue_invalid_m,
 } xg_cmd_queue_e;
 
 typedef struct {
@@ -1613,40 +1610,13 @@ typedef struct {
 
 #define xg_buffer_range_whole_buffer_m( _handle ) xg_buffer_range_m ( .handle = _handle, .offset = 0, .size = xg_buffer_whole_size_m )
 
-typedef enum {
-    xg_resource_binding_id_shader_register_m,
-    xg_resource_binding_id_name_m, // xss name
-} xg_resource_binding_id_e;
-
-typedef struct {
-    xg_resource_binding_id_e type;
-    union {
-        uint32_t shader_register;
-        uint64_t name;
-    };
-} xg_resource_binding_id_t;
-
-#define xg_resource_binding_shader_register_m( _register ) ( xg_resource_binding_id_t ) { \
-    .type = xg_resource_binding_id_type_shader_register_m, \
-    .shader_register = _register, \
-}
-
-#define xg_resource_binding_name_hash_m( _hash ) ( xg_resource_binding_id_t ) { \
-    .type = xg_resource_binding_id_type_name_m, \
-    .name = _hash, \
-}
-
-#define xg_resource_binding_name_m( _name ) xg_resource_binding_name_hash_m ( std_str_hash_32 ( _name ) )
-
 typedef struct {
     uint32_t shader_register;
-    xg_buffer_binding_e type;
     xg_buffer_range_t range;
 } xg_buffer_resource_binding_t;
 
 #define xg_buffer_resource_binding_m(...) ( xg_buffer_resource_binding_t ) { \
     .shader_register = -1, \
-    .type = xg_buffer_binding_type_invalid_m, \
     .range = { .handle = xg_null_handle_m, .offset = 0, .size = 0 }, \
     ##__VA_ARGS__ \
 }
@@ -1659,18 +1629,17 @@ typedef enum {
 } xg_texture_binding_e;
 
 typedef struct {
-    //xg_resource_binding_id_t id;
     uint32_t shader_register;
-    xg_texture_layout_e layout;
+    xg_texture_layout_e layout; // TODO move to the layout? would artificially reduce layout sharing...
     xg_texture_h texture;
     xg_texture_view_t view;
 } xg_texture_resource_binding_t;
 
 #define xg_texture_resource_binding_m( ... ) ( xg_texture_resource_binding_t ) { \
-    .shader_register = -1, \
     .layout = xg_texture_layout_undefined_m, \
     .texture = xg_null_handle_m, \
     .view = xg_texture_view_m(), \
+    .shader_register = -1, \
     ##__VA_ARGS__ \
 }
 
@@ -1680,7 +1649,6 @@ typedef struct {
 } xg_sampler_resource_binding_t;
 
 #define xg_sampler_resource_binding_m( ... ) ( xg_sampler_resource_binding_t ) { \
-    .shader_register = -1, \
     .sampler = xg_null_handle_m, \
     ##__VA_ARGS__ \
 }
@@ -1691,7 +1659,6 @@ typedef struct {
 } xg_raytrace_world_resource_binding_t;
 
 #define xg_raytrace_world_resource_binding_m( ... ) ( xg_raytrace_world_resource_binding_t ) { \
-    .shader_register = -1, \
     .world = xg_null_handle_m, \
     ##__VA_ARGS__ \
 }
@@ -1710,7 +1677,6 @@ typedef struct {
 } xg_pipeline_resource_bindings_t;
 #else
 typedef struct {
-    xg_shader_binding_set_e set;
     uint32_t buffer_count;
     uint32_t texture_count;
     uint32_t sampler_count;
@@ -1719,7 +1685,7 @@ typedef struct {
     xg_texture_resource_binding_t textures[xg_pipeline_resource_max_textures_per_set_m];
     xg_sampler_resource_binding_t samplers[xg_pipeline_resource_max_samplers_per_set_m];
     xg_raytrace_world_resource_binding_t raytrace_worlds[xg_pipeline_resource_max_raytrace_worlds_per_set_m];
-} xg_pipeline_resource_bindings_t;
+} xg_pipeline_resource_bindings_t; // TODO rename?
 #endif
 
 #if 0
@@ -1735,7 +1701,6 @@ typedef struct {
 }
 #else
 #define xg_pipeline_resource_bindings_m( ... ) ( xg_pipeline_resource_bindings_t ) { \
-    .set = xg_shader_binding_set_invalid_m, \
     .buffer_count = 0, \
     .texture_count = 0, \
     .sampler_count = 0, \
@@ -1748,14 +1713,13 @@ typedef struct {
 #endif
 
 typedef struct {
-    xg_device_h device;
-    xg_pipeline_state_h pipeline;
+    xg_resource_bindings_layout_h layout;
+    //xg_pipeline_state_h pipeline;
     xg_pipeline_resource_bindings_t bindings;
-} xg_pipeline_resource_group_params_t;
+} xg_resource_bindings_params_t;
 
-#define xg_pipeline_resource_group_params_m( ... ) ( xg_pipeline_resource_group_params_t ) { \
-    .device = xg_null_handle_m, \
-    .pipeline = xg_null_handle_m, \
+#define xg_resource_bindings_params_m( ... ) ( xg_resource_bindings_params_t ) { \
+    .layout = xg_null_handle_m, \
     .bindings = xg_pipeline_resource_bindings_m(), \
     ##__VA_ARGS__ \
 }
@@ -1766,6 +1730,80 @@ typedef struct {
     uint32_t size;
     void* base;
 } xg_pipeline_constant_data_t;
+
+typedef struct {
+    xg_compute_pipeline_state_h pipeline;
+    xg_resource_bindings_h bindings[xg_shader_binding_set_count_m];
+    uint32_t workgroup_count_x;
+    uint32_t workgroup_count_y;
+    uint32_t workgroup_count_z;
+} xg_cmd_compute_params_t;
+
+#define xg_cmd_compute_params_m( ... ) ( xg_cmd_compute_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .bindings = { [0 ... xg_shader_binding_set_count_m - 1] = xg_null_handle_m }, \
+    .workgroup_count_x = 1, \
+    .workgroup_count_y = 1, \
+    .workgroup_count_z = 1, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_graphics_pipeline_state_h pipeline;
+    xg_resource_bindings_h bindings[xg_shader_binding_set_count_m];
+    xg_buffer_h index_buffer;
+    xg_buffer_h vertex_buffers[xg_input_layout_max_streams_m];
+    uint32_t index_offset;
+    uint32_t vertex_offset;
+    uint32_t primitive_count;
+    uint32_t vertex_buffers_count;
+    uint32_t instance_count;
+    uint32_t instance_offset;
+    // TODO dynamic buffer offset
+} xg_cmd_draw_params_t;
+
+#define xg_cmd_draw_params_m( ... ) ( xg_cmd_draw_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .bindings = { [0 ... xg_shader_binding_set_count_m - 1] = xg_null_handle_m }, \
+    .index_buffer = xg_null_handle_m, \
+    .index_offset = 0, \
+    .primitive_count = 0, \
+    .vertex_buffers_count = 0, \
+    .instance_count = 1, \
+    .instance_offset = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_renderpass_h renderpass;
+    xg_render_target_binding_t render_targets[xg_pipeline_output_max_color_targets_m];
+    xg_depth_stencil_binding_t depth_stencil;
+    uint32_t render_targets_count;
+} xg_cmd_renderpass_params_t;
+
+#define xg_cmd_renderpass_params_m( ... ) ( xg_cmd_renderpass_params_t ) { \
+    .renderpass = xg_null_handle_m, \
+    .render_targets_count = 0, \
+    .depth_stencil = xg_depth_stencil_binding_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_raytrace_pipeline_state_h pipeline;
+    xg_resource_bindings_h bindings[xg_shader_binding_set_count_m];
+    uint32_t ray_count_x;
+    uint32_t ray_count_y;
+    uint32_t ray_count_z;
+} xg_cmd_raytrace_params_t;
+
+#define xg_cmd_raytrace_params_m( ... ) ( xg_cmd_raytrace_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .bindings = { [0 ... xg_shader_binding_set_count_m - 1] = xg_null_handle_m }, \
+    .ray_count_x = 1, \
+    .ray_count_y = 1, \
+    .ray_count_z = 1, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     //xg_execution_barrier_t execution_barrier;
@@ -1791,8 +1829,24 @@ typedef struct {
 
 // in VK fences can only be signaled when a queue submit has finished executing, so they're workloads in xg
 typedef uint64_t xg_gpu_event_h;    // VK semaphore
+typedef uint64_t xg_gpu_queue_event_h; // TODO rename this to gpu_event, fix backend etc
 // TODO event api: create_event(), destroy_event(), and on cmd buffer dispatch take one array of events to wait for before running and one array of events to signal when cmd buffer is executed
 // TODO what about VkEvent?
+
+typedef struct {
+    xg_cmd_queue_e queue;
+    xg_gpu_queue_event_h signal_event;
+    xg_gpu_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
+    xg_pipeline_stage_bit_e wait_stages[xg_cmd_bind_queue_max_wait_events_m];
+    uint32_t wait_count;
+} xg_cmd_bind_queue_params_t;
+
+#define xg_cmd_bind_queue_params_m( ... ) ( xg_cmd_bind_queue_params_t ) { \
+    .queue = xg_cmd_queue_invalid_m, \
+    .signal_event = xg_null_handle_m, \
+    .wait_count = 0, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_memory_type_e memory_type;
@@ -2050,6 +2104,17 @@ typedef struct {
 
 typedef struct {
     xg_buffer_h source;
+    xg_buffer_h destination;
+} xg_buffer_copy_params_t;
+
+#define xg_buffer_copy_params_m( ... ) ( xg_buffer_copy_params_t ) { \
+    .source = xg_null_handle_m, \
+    .destination = xg_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_buffer_h source;
     uint64_t source_offset;
     xg_texture_h destination;
     uint32_t mip_base;
@@ -2266,59 +2331,68 @@ typedef struct {
 
     double                  ( *get_timestamp_ticks_per_us )         ( void );
 
-    xg_resource_cmd_buffer_h ( *create_resource_cmd_buffer )        ( xg_workload_h workload );
+    xg_resource_cmd_buffer_h( *create_resource_cmd_buffer )        ( xg_workload_h workload );
     //void                    ( *create_resource_cmd_buffers )        ( xg_resource_cmd_buffer_h* cmd_buffers, size_t count, xg_workload_h workload );
     //void                    ( *close_resource_cmd_buffers )         ( xg_resource_cmd_buffer_h* cmd_buffers, size_t count );
 
     // Event
-    xg_gpu_event_h          ( *create_event )                       ( xg_device_h device );
+    //xg_gpu_event_h          ( *create_event )                       ( xg_device_h device );
+    xg_gpu_queue_event_h    ( *create_queue_event )                 ( xg_device_h device );
 
-    xg_renderpass_h         ( *create_renderpass )                  ( const xg_graphics_renderpass_params_t* params );
+    xg_renderpass_h         ( *create_renderpass )                  ( const xg_renderpass_params_t* params );
     void                    ( *destroy_renderpass )                 ( xg_renderpass_h renderpass );
 
     // Command Buffer
     // TODO move these to a separate _i api? have them as static functions?
     // TODO rename all draw/dispatch/trace_rays cmds to graphics/compute/raytrace_dispatch ?
-    void                    ( *cmd_clear_texture )                  ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_color_clear_t clear, uint64_t key );
-    void                    ( *cmd_clear_depth_stencil_texture )    ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_depth_stencil_clear_t clear, uint64_t key );
-    void                    ( *cmd_barrier_set )                    ( xg_cmd_buffer_h cmd_buffer, const xg_barrier_set_t* barrier_set, uint64_t key );
-    void                    ( *cmd_set_vertex_streams )             ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t count, uint64_t key );
-    void                    ( *cmd_draw )                           ( xg_cmd_buffer_h cmd_buffer, size_t vertex_count, size_t streams_base, uint64_t key );
-    void                    ( *cmd_draw_indexed )                   ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h ibuffer, size_t index_count, size_t index_base, uint64_t key );
-    void                    ( *cmd_draw_instanced )                 ( xg_cmd_buffer_h cmd_buffer, size_t vertex_base, size_t vertex_count, size_t instance_base, size_t instance_count, uint64_t key );
-    void                    ( *cmd_set_graphics_pipeline_state )    ( xg_cmd_buffer_h cmd_buffer, xg_graphics_pipeline_state_h pipeline_state, uint64_t key );
-    void                    ( *cmd_set_compute_pipeline_state )     ( xg_cmd_buffer_h cmd_buffer, xg_compute_pipeline_state_h pipeline_state, uint64_t key );
-    void                    ( *cmd_set_render_textures )            ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
-    void                    ( *cmd_set_pipeline_resources )         ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
-    void                    ( *cmd_write_pipeline_constant_data )   ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_constant_data_t* data, uint64_t key );
-    void                    ( *cmd_dispatch_compute )               ( xg_cmd_buffer_h cmd_buffer, uint32_t workgroup_count_x, uint32_t workgroup_count_y, uint32_t workgroup_count_z, xg_cmd_queue_e queue, uint64_t key );
-    void                    ( *cmd_begin_renderpass )               ( xg_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, uint64_t key );
-    void                    ( *cmd_end_renderpass )                 ( xg_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, uint64_t key );
-
-    void                    ( *cmd_set_raytrace_pipeline_state )    ( xg_cmd_buffer_h cmd_buffer, xg_raytrace_pipeline_state_h pipeline_state, uint64_t key );
-    void                    ( *cmd_trace_rays )                     ( xg_cmd_buffer_h cmd_buffer, uint32_t ray_count_x, uint32_t ray_count_y, uint32_t ray_count_z, uint64_t key );
+    void                    ( *cmd_clear_texture )                  ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_color_clear_t clear );
+    void                    ( *cmd_clear_depth_stencil_texture )    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear );
+    // TODO rename to transition_resources or something similar
+    void                    ( *cmd_barrier_set )                    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_barrier_set_t* barrier_set );
+    //void                    ( *cmd_set_vertex_streams )             ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t count, uint64_t key );
+    //void                    ( *cmd_draw_indexed )                   ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h ibuffer, size_t index_count, size_t index_base, uint64_t key );
+    //void                    ( *cmd_draw_instanced )                 ( xg_cmd_buffer_h cmd_buffer, size_t vertex_base, size_t vertex_count, size_t instance_base, size_t instance_count, uint64_t key );
+    //void                    ( *cmd_set_graphics_pipeline_state )    ( xg_cmd_buffer_h cmd_buffer, xg_graphics_pipeline_state_h pipeline_state, uint64_t key );
+    //void                    ( *cmd_set_compute_pipeline_state )     ( xg_cmd_buffer_h cmd_buffer, xg_compute_pipeline_state_h pipeline_state, uint64_t key );
+    //void                    ( *cmd_set_render_textures )            ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
+    //void                    ( *cmd_set_pipeline_resources )         ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
+    //void                    ( *cmd_write_pipeline_constant_data )   ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_constant_data_t* data, uint64_t key );
+    
+    // TODO move key to after cmd buffer instead of last for all cmds
+    void                    ( *cmd_compute )                        ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_compute_params_t* params );
+    void                    ( *cmd_begin_renderpass )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_renderpass_params_t* params );
+    void                    ( *cmd_draw )                           ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );
+    void                    ( *cmd_end_renderpass )                 ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
+    void                    ( *cmd_copy_texture )                   ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_texture_copy_params_t* params );
+    void                    ( *cmd_copy_buffer )                    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_buffer_copy_params_t* params );
+    void                    ( *cmd_copy_buffer_to_texture )         ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_buffer_to_texture_copy_params_t* params );
+    void                    ( *cmd_raytrace )                       ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_raytrace_params_t* params );
+    void                    ( *cmd_bind_queue )                     ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_bind_queue_params_t* params );
 
     void                    ( *cmd_destroy_renderpass )             ( xg_resource_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time );
 
     //void                    ( *cmd_generate_texture_mips )          ( xg_cmd_buffer_h cmd_buffer, xg_texture_h texture, uint32_t mip_base, uint32_t mip_count, uint64_t key );
 
-    xg_pipeline_resource_group_h  ( *cmd_create_resource_group )    ( xg_resource_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_group_params_t* params );
-    void                        ( *cmd_destroy_resource_group )     ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_resource_group_h set, xg_resource_cmd_buffer_time_e destroy_time );
-    void                        ( *cmd_set_resource_group )         ( xg_cmd_buffer_h cmd_buffer, xg_shader_binding_set_e shader_set, xg_pipeline_resource_group_h resource_set, uint64_t key );
-    xg_pipeline_resource_group_h  ( *cmd_create_workload_resource_group ) ( xg_resource_cmd_buffer_h cmd_buffer, xg_workload_h workload, const xg_pipeline_resource_group_params_t* params );
+    xg_resource_bindings_layout_h ( *create_resource_layout )       ( const xg_resource_bindings_layout_params_t* params );
+    void                    ( *destroy_resource_layout )            ( xg_resource_bindings_layout_h layout );
+    void                    ( *get_pipeline_resource_layouts )      ( xg_resource_bindings_layout_h* layouts, xg_pipeline_state_h pipeline );
+    xg_resource_bindings_layout_h ( *get_pipeline_resource_layout ) ( xg_pipeline_state_h pipeline, xg_shader_binding_set_e set );
 
-    void                    ( *cmd_copy_texture )                   ( xg_cmd_buffer_h cmd_buffer, const xg_texture_copy_params_t* params, uint64_t key );
-    void                    ( *cmd_copy_buffer )                    ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h src, xg_buffer_h dest, uint64_t key ); // TODO better args
-    void                    ( *cmd_copy_buffer_to_texture )         ( xg_cmd_buffer_h cmd_buffer, const xg_buffer_to_texture_copy_params_t* params, uint64_t key );
+    xg_resource_bindings_h  ( *cmd_create_bindings )                ( xg_resource_cmd_buffer_h cmd_buffer, const xg_resource_bindings_params_t* params );
+    void                    ( *cmd_destroy_bindings )               ( xg_resource_cmd_buffer_h cmd_buffer, xg_resource_bindings_h bindings, xg_resource_cmd_buffer_time_e destroy_time );
+    xg_resource_bindings_h  ( *cmd_create_workload_bindings )       ( xg_resource_cmd_buffer_h cmd_buffer, const xg_resource_bindings_params_t* params );
+
+    void                    ( *set_workload_global_bindings )       ( xg_workload_h workload, xg_resource_bindings_h bindings );
+
     // TOOD
     //void                    ( *cmd_signal_event )                   ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, xg_pipeline_stage_bit_e signal_stages, uint64_t key );
     //void                    ( *cmd_wait_for_event )                 ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, const xg_barrier_set_t* barrier_set, uint64_t key );
     //void                    ( *cmd_reset_event )                    ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, uint64_t key );
 
-    void                    ( *cmd_start_debug_capture )            ( xg_cmd_buffer_h cmd_buffer, xg_debug_capture_stop_time_e stop_time, uint64_t key );
+    void                    ( *cmd_start_debug_capture )            ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_debug_capture_stop_time_e stop_time );
     void                    ( *cmd_stop_debug_capture )             ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
-    void                    ( *cmd_begin_debug_region )             ( xg_cmd_buffer_h cmd_buffer, const char* name, uint32_t color, uint64_t key );
+    void                    ( *cmd_begin_debug_region )             ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const char* name, uint32_t color );
     void                    ( *cmd_end_debug_region )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
     xg_buffer_h             ( *cmd_create_buffer )                  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params );
@@ -2328,8 +2402,8 @@ typedef struct {
 
     //xg_query_buffer_h       ( *cmd_create_query_buffer )            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_query_buffer_params_t* params );
 
-    void                    ( *cmd_set_dynamic_viewport )           ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
-    void                    ( *cmd_set_dynamic_scissor )            ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
+    //void                    ( *cmd_set_dynamic_viewport )           ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
+    //void                    ( *cmd_set_dynamic_scissor )            ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
 
     xg_buffer_h             ( *create_buffer )                      ( const xg_buffer_params_t* params );
     xg_texture_h            ( *create_texture )                     ( const xg_texture_params_t* params );

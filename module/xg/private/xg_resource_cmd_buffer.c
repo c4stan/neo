@@ -184,21 +184,20 @@ void xg_resource_cmd_buffer_buffer_destroy ( xg_resource_cmd_buffer_h cmd_buffer
     cmd_args->destroy_time = destroy_time;
 }
 
-void xg_resource_cmd_buffer_resource_group_update ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_pipeline_resource_group_h group_handle, const xg_pipeline_resource_group_params_t* params ) {
+void xg_resource_cmd_buffer_resource_bindings_update ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_resource_bindings_h group_handle, const xg_pipeline_resource_bindings_t* bindings ) {
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
-    xg_resource_cmd_resource_group_update_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_resource_group_update_m, xg_resource_cmd_resource_group_update_t );
+    xg_resource_cmd_resource_bindings_update_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_resource_bindings_update_m, xg_resource_cmd_resource_bindings_update_t );
 
-    const xg_pipeline_resource_bindings_t* bindings = &params->bindings;
-    //xg_shader_binding_set_e set = bindings->set;
     uint32_t buffer_count = bindings->buffer_count;
     uint32_t texture_count = bindings->texture_count;
     uint32_t sampler_count = bindings->sampler_count;
+    uint32_t raytrace_world_count = bindings->raytrace_world_count;
 
     cmd_args->group = group_handle;
-    //cmd_args->set = set;
     cmd_args->buffer_count = buffer_count;
     cmd_args->texture_count = texture_count;
     cmd_args->sampler_count = sampler_count;
+    cmd_args->raytrace_world_count = raytrace_world_count;
 
     if ( buffer_count > 0 ) {
         std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_buffer_resource_binding_t ) );
@@ -226,25 +225,35 @@ void xg_resource_cmd_buffer_resource_group_update ( xg_resource_cmd_buffer_h cmd
             samplers[i] = bindings->samplers[i];
         }
     }
+
+    if ( raytrace_world_count > 0 ) {
+        std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_raytrace_world_resource_binding_t ) );
+        xg_raytrace_world_resource_binding_t* worlds = ( xg_raytrace_world_resource_binding_t* ) std_queue_local_emplace_array_m ( &cmd_buffer->cmd_args_allocator, xg_raytrace_world_resource_binding_t, raytrace_world_count );
+
+        for ( uint32_t i = 0; i < raytrace_world_count; ++i ) {
+            worlds[i] = bindings->raytrace_worlds[i];
+        }
+    }
 }
 
-xg_pipeline_resource_group_h xg_resource_cmd_buffer_workload_resource_group_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_workload_h workload_handle, const xg_pipeline_resource_group_params_t* params ) {
-    xg_pipeline_resource_group_h group_handle = xg_workload_create_resource_group ( workload_handle, params->pipeline, params->bindings.set );
-    std_assert_m ( group_handle != xg_null_handle_m );
-    xg_resource_cmd_buffer_resource_group_update ( cmd_buffer_handle, group_handle, params );
-    return group_handle;
-}
-
-xg_pipeline_resource_group_h xg_resource_cmd_buffer_resource_group_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_pipeline_resource_group_params_t* params ) {
-    xg_pipeline_resource_group_h group_handle = xg_vk_pipeline_create_resource_group ( params->device, params->pipeline, params->bindings.set );
-    std_assert_m ( group_handle != xg_null_handle_m );
-    xg_resource_cmd_buffer_resource_group_update ( cmd_buffer_handle, group_handle, params );
-    return group_handle;
-}
-
-void xg_resource_cmd_buffer_resource_group_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_pipeline_resource_group_h group, xg_resource_cmd_buffer_time_e destroy_time ) {
+xg_resource_bindings_h xg_resource_cmd_buffer_workload_resource_bindings_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_resource_bindings_params_t* params ) {
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
-    xg_resource_cmd_resource_group_destroy_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_resource_group_destroy_m, xg_resource_cmd_resource_group_destroy_t );
+    xg_resource_bindings_h group_handle = xg_workload_create_resource_group ( cmd_buffer->workload, params->layout );
+    std_assert_m ( group_handle != xg_null_handle_m );
+    xg_resource_cmd_buffer_resource_bindings_update ( cmd_buffer_handle, group_handle, &params->bindings );
+    return group_handle;
+}
+
+xg_resource_bindings_h xg_resource_cmd_buffer_resource_bindings_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_resource_bindings_params_t* params ) {
+    xg_resource_bindings_h group_handle = xg_vk_pipeline_create_resource_bindings ( params->layout );
+    std_assert_m ( group_handle != xg_null_handle_m );
+    xg_resource_cmd_buffer_resource_bindings_update ( cmd_buffer_handle, group_handle, &params->bindings );
+    return group_handle;
+}
+
+void xg_resource_cmd_buffer_resource_bindings_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_resource_bindings_h group, xg_resource_cmd_buffer_time_e destroy_time ) {
+    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
+    xg_resource_cmd_resource_bindings_destroy_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_resource_bindings_destroy_m, xg_resource_cmd_resource_bindings_destroy_t );
 
     cmd_args->group = group;
     cmd_args->destroy_time = destroy_time;
@@ -252,7 +261,7 @@ void xg_resource_cmd_buffer_resource_group_destroy ( xg_resource_cmd_buffer_h cm
 
 void xg_resource_cmd_buffer_graphics_renderpass_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time ) {
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
-    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_graphics_renderpass_destroy_m, xg_resource_cmd_graphics_renderpass_destroy_t );
+    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_renderpass_destroy_m, xg_resource_cmd_renderpass_destroy_t );
 
     cmd_args->renderpass = renderpass;
     cmd_args->destroy_time = destroy_time;

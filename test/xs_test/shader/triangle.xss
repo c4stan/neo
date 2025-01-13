@@ -1,10 +1,9 @@
-vertex_shader vert_kernel.vert
-
-fragment_shader frag_kernel.frag
+vertex_shader triangle.vert
+fragment_shader triangle.frag
 
 // missing input layout and multisampling (part of rasterizer?) related state
 
-include test_include.xsi
+include triangle_include.xsi
 
 begin viewport
     min_depth 0
@@ -34,8 +33,6 @@ begin depth_stencil
     stencil_test off
 end
 
-begin buffer
-    register 0
-    stage pixel
-    update per_draw
+begin bindings
+    buffer uniform
 end

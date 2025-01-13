@@ -190,7 +190,7 @@ typedef struct {
     xf_node_t nodes_array[xf_graph_max_nodes_m];
     uint32_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
     uint32_t nodes_count;
-    bool dirty;
+    bool is_finalized;
 
     xf_graph_texture_t textures_array[xf_graph_max_textures_m];
     xf_graph_buffer_t buffers_array[xf_graph_max_buffers_m];
@@ -228,7 +228,7 @@ void xf_graph_unload ( void );
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_add_node ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_clear ( xf_graph_h graph );
-void xf_graph_build2 ( xf_graph_h graph, xg_workload_h xg_workload );
+void xf_graph_finalize ( xf_graph_h graph, xg_workload_h workload );
 uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );
 void xf_graph_advance_multi_textures ( xf_graph_h graph );
 void xf_graph_destroy ( xf_graph_h graph, xg_workload_h workload );

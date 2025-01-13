@@ -33,15 +33,7 @@ static viewapp_state_t* m_state;
 
 // ---
 
-typedef struct {
-    float resolution_x_f32;
-    float resolution_y_f32;
-    uint32_t resolution_x_u32;
-    uint32_t resolution_y_u32;
-    uint32_t frame_id;
-    float time_ms;
-} frame_cbuffer_data_t;
-
+#if 0
 typedef struct {
     uint32_t resolution_x;
     uint32_t resolution_y;
@@ -49,6 +41,43 @@ typedef struct {
     float time_ms;
     bool capture_frame;
 } frame_setup_pass_args_t;
+
+typedef struct {
+    float resolution_x_f32;
+    float resolution_y_f32;
+    uint32_t resolution_x_u32;
+    uint32_t resolution_y_u32;
+    uint32_t frame_id;
+    float time_ms;
+} frame_uniforms_t;
+
+typedef struct {
+    rv_matrix_4x4_t view_from_world;
+    rv_matrix_4x4_t proj_from_view;
+    rv_matrix_4x4_t jittered_proj_from_view;
+    rv_matrix_4x4_t view_from_proj;
+    rv_matrix_4x4_t world_from_view;
+    rv_matrix_4x4_t prev_view_from_world;
+    rv_matrix_4x4_t prev_proj_from_view;
+    float z_near;
+    float z_far;
+} view_uniforms_t;
+
+static void viewapp_update_global_bindings ( xg_workload_h workload ) {
+    xg_i* xg = m_state->modules.xg;
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+
+    frame_uniforms_t uniforms = {
+        .frame_id = m_state->render.frame_id,
+        .time_ms = m_state->render.time_ms,
+        .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
+        .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
+        .resolution_x_f32 = ( float ) m_state->render.resolution_x,
+        .resolution_y_f32 = ( float ) m_state->render.resolution_y,
+    };
+
+    xg->create_workload_bindings ( resource_cmd_buffer,  );
+}
 
 static void frame_setup_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     std_unused_m ( node_args );
@@ -60,7 +89,7 @@ static void frame_setup_pass ( const xf_node_execute_args_t* node_args, void* us
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     if ( m_state->render.capture_frame ) {
-        xg->cmd_start_debug_capture ( cmd_buffer, xg_debug_capture_stop_time_workload_present_m, key );
+        xg->cmd_start_debug_capture ( cmd_buffer, key, xg_debug_capture_stop_time_workload_present_m );
         m_state->render.capture_frame = false;
     }
 
@@ -87,17 +116,6 @@ static void frame_setup_pass ( const xf_node_execute_args_t* node_args, void* us
     xg->cmd_set_pipeline_resources ( cmd_buffer, &frame_bindings, key );
 }
 
-typedef struct {
-    rv_matrix_4x4_t view_from_world;
-    rv_matrix_4x4_t proj_from_view;
-    rv_matrix_4x4_t jittered_proj_from_view;
-    rv_matrix_4x4_t view_from_proj;
-    rv_matrix_4x4_t world_from_view;
-    rv_matrix_4x4_t prev_view_from_world;
-    rv_matrix_4x4_t prev_proj_from_view;
-    float z_near;
-    float z_far;
-} view_cbuffer_data_t;
 
 static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     std_unused_m ( user_args );
@@ -116,7 +134,7 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
     rv_view_info_t view_info;
     rv->get_view_info ( &view_info, camera_component->view );
 
-    view_cbuffer_data_t view_data = {
+    frame_cbuffer_data_t view_data = {
         .view_from_world = view_info.view_matrix,
         .proj_from_view = view_info.proj_matrix,
         .jittered_proj_from_view = view_info.jittered_proj_matrix,
@@ -150,6 +168,89 @@ static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* use
 
     xg->cmd_set_pipeline_resources ( node_args->cmd_buffer, &view_bindings, node_args->base_key );
 
+}
+#endif
+
+static void viewapp_boot_workload_resources_layout ( void ) {
+    xg_i* xg = m_state->modules.xg;
+
+    m_state->render.workload_bindings_layout = xg->create_resource_layout ( &xg_resource_bindings_layout_params_m (
+        .device = m_state->render.device,
+        .resource_count = 1,
+        .resources = { xg_resource_binding_layout_m ( .shader_register = 0, .type = xg_resource_binding_buffer_uniform_m, .stages = xg_shading_stage_bit_all_m ) },
+        .debug_name = "workload_globals"
+    ) );
+}
+
+typedef struct {
+    float resolution_x_f32;
+    float resolution_y_f32;
+    uint32_t resolution_x_u32;
+    uint32_t resolution_y_u32;
+    uint32_t frame_id;
+    float time_ms;
+    uint32_t _pad0[2];
+    rv_matrix_4x4_t view_from_world;
+    rv_matrix_4x4_t proj_from_view;
+    rv_matrix_4x4_t jittered_proj_from_view;
+    rv_matrix_4x4_t view_from_proj;
+    rv_matrix_4x4_t world_from_view;
+    rv_matrix_4x4_t prev_view_from_world;
+    rv_matrix_4x4_t prev_proj_from_view;
+    float z_near;
+    float z_far;
+} workload_uniforms_t;
+
+static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
+    xg_i* xg = m_state->modules.xg;
+    se_i* se = m_state->modules.se;
+    xf_i* xf = m_state->modules.xf;
+
+    se_query_result_t camera_query_result;
+    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
+    std_assert_m ( camera_query_result.entity_count == 1 );
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+
+    rv_i* rv = std_module_get_m ( rv_module_name_m );
+    rv_view_info_t view_info;
+    rv->get_view_info ( &view_info, camera_component->view );
+
+    workload_uniforms_t uniforms = {
+        .frame_id = m_state->render.frame_id,
+        .time_ms = m_state->render.time_ms,
+        .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
+        .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
+        .resolution_x_f32 = ( float ) m_state->render.resolution_x,
+        .resolution_y_f32 = ( float ) m_state->render.resolution_y,
+        .view_from_world = view_info.view_matrix,
+        .proj_from_view = view_info.proj_matrix,
+        .jittered_proj_from_view = view_info.jittered_proj_matrix,
+        .world_from_view = view_info.inverse_view_matrix,
+        .view_from_proj = view_info.inverse_proj_matrix,
+        .prev_view_from_world = view_info.prev_frame_view_matrix,
+        .prev_proj_from_view = view_info.prev_frame_proj_matrix,
+        .z_near = view_info.proj_params.near_z,
+        .z_far = view_info.proj_params.far_z,
+    };
+
+    // if TAA is off disable jittering
+    xf_node_info_t taa_node_info;
+    xf->get_node_info ( &taa_node_info, m_state->render.raster_graph,  m_state->render.taa_node );
+    if ( !taa_node_info.enabled ) {
+        uniforms.jittered_proj_from_view = view_info.proj_matrix;
+    }
+
+    xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+    xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+        .layout = m_state->render.workload_bindings_layout, // TODO
+        .bindings = xg_pipeline_resource_bindings_m (
+            .buffer_count = 1,
+            .buffers = { xg_buffer_resource_binding_m ( .shader_register = 0, .range = range ) }
+        )
+    ) );
+    xg->set_workload_global_bindings ( workload, bindings );
 }
 
 // ---
@@ -188,7 +289,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
     ) );
     m_state->render.object_id_readback_texture = readback_texture;
 
-    xf_texture_h copy_dest = xf->texture_from_external ( readback_texture );
+    xf_texture_h copy_dest = xf->create_texture_from_external ( readback_texture );
 
     xf_node_h copy_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "mouse_pick_object_id_copy",
@@ -226,6 +327,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
     m_state->render.raytrace_graph = graph;
 
+#if 0
     // frame setup
     xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "frame_setup",
@@ -245,8 +347,9 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .node_dependencies_count = 1,
         .node_dependencies = { frame_setup_node }
     ) );
+#endif
 
-    xf_texture_h color_texture = xf->declare_texture ( &xf_texture_params_m ( 
+    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m ( 
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
@@ -254,13 +357,13 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ));
 
     // raytrace
-    xf_node_h raytrace_node = add_raytrace_pass ( graph, color_texture, view_setup_node );
+    xf_node_h raytrace_node = add_raytrace_pass ( graph, color_texture );
 
     // ui
     xf_node_h ui_node = add_ui_pass ( graph, color_texture );
 
     // present
-    xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
     xf_node_h present_pass = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
@@ -295,16 +398,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     m_state->render.raster_graph = graph;
 
-    // frame setup
-    xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
-        .debug_name = "frame_setup",
-        .type = xf_node_type_custom_pass_m,
-        .pass.custom = xf_node_custom_pass_params_m (
-            .routine = frame_setup_pass,
-        ),
-    ) );
-
-    xf_texture_h shadow_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
         .width = 1024,
         .height = 1024,
         .format = xg_format_d16_unorm_m,
@@ -330,20 +424,9 @@ static void viewapp_boot_raster_graph ( void ) {
     // TODO support more than one shadow...
     xf_node_h shadow_node = add_shadow_pass ( graph, shadow_texture );
 
-    // view setup
-    xf_node_h view_setup_node = xf->add_node ( graph, &xf_node_params_m (
-        .debug_name = "view_setup",
-        .type = xf_node_type_custom_pass_m,
-        .pass.custom = xf_node_custom_pass_params_m (
-            .routine = view_setup_pass,
-        ),
-        .node_dependencies_count = 1,
-        .node_dependencies = { frame_setup_node }
-    ) );
-
     // gbuffer laydown
     // TODO remove multi?
-    xf_texture_h color_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h color_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -353,14 +436,14 @@ static void viewapp_boot_raster_graph ( void ) {
         .multi_texture_count = 1,
     ) );
 
-    xf_texture_h normal_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "normal_texture",
     ) );
 
-    xf_texture_h object_id_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -372,7 +455,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
     m_state->render.object_id_texture = object_id_texture;
 
-    xf_texture_h depth_stencil_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h depth_stencil_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -401,8 +484,6 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_copy_texture_dependency_m ( .texture = depth_stencil_texture ),
             }
         ),
-        .node_dependencies_count = 1,
-        .node_dependencies = { view_setup_node }
     ) );
 
     xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );
@@ -410,7 +491,7 @@ static void viewapp_boot_raster_graph ( void ) {
     // lighting
     uint32_t light_grid_size[3] = { 16, 8, 24 };
     uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
-    xf_texture_h lighting_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -419,28 +500,28 @@ static void viewapp_boot_raster_graph ( void ) {
 
 #if 1
     // TODO rename these buffers more appropriately both here and in shader code
-    xf_buffer_h light_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = viewapp_max_lights_m * uniform_light_size(),
         .debug_name = "lights",
     ) );
 
-    xf_buffer_h light_upload_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_upload_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = viewapp_max_lights_m * uniform_light_size(),
         .debug_name = "lights_upload",
         .upload = true,
     ) );
 
-    xf_buffer_h light_list_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_list_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = sizeof ( uint32_t ) * light_cluster_count * 8,
         .debug_name = "light_list",
     ) );
 
-    xf_buffer_h light_grid_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_grid_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = sizeof ( uint32_t ) * 2 * light_cluster_count,
         .debug_name = "light_grid"
     ) );
 
-    xf_buffer_h light_cluster_buffer = xf->declare_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_cluster_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = sizeof ( float ) * 4 * 2 * light_cluster_count,
         .debug_name = "light_clusters"
     ) );
@@ -461,8 +542,8 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_buffer_dependency_m ( .buffer = light_cluster_buffer )
             }
         ),
-        .node_dependencies_count = 2,
-        .node_dependencies = { view_setup_node, light_update_node }
+        .node_dependencies_count = 1,
+        .node_dependencies = { light_update_node }
     ) );
 
     xf_node_h light_cull_node = xf->add_node ( graph, &xf_node_params_m ( 
@@ -533,15 +614,13 @@ static void viewapp_boot_raster_graph ( void ) {
             .enable = true,
             .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color_texture ) },
         ),
-        .node_dependencies_count = 1,
-        .node_dependencies = { view_setup_node },
     ) );
 
     // hi-z
     uint32_t hiz_mip_count = 8;
     std_assert_m ( resolution_x % ( 1 << ( hiz_mip_count - 1 ) ) == 0 );
     std_assert_m ( resolution_y % ( 1 << ( hiz_mip_count - 1 ) ) == 0 );
-    xf_texture_h hiz_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h hiz_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r32_sfloat_m,
@@ -559,7 +638,7 @@ static void viewapp_boot_raster_graph ( void ) {
     // ssgi
     // TODO use prev frame final color texture?
     //xf_texture_h prev_color_texture = color_texture;//xf->get_multi_texture ( color_texture, -1 );
-    //xf_texture_h ssgi_raymarch_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    //xf_texture_h ssgi_raymarch_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
     //    .texture = xf_texture_params_m (
     //        .width = resolution_x,
     //        .height = resolution_y,
@@ -567,7 +646,7 @@ static void viewapp_boot_raster_graph ( void ) {
     //        .debug_name = "ssgi_raymarch_texture",
     //    ),
     //) );
-    xf_texture_h ssgi_raymarch_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -576,7 +655,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ssgi_raymarch_node = add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, lighting_texture, hiz_texture );
 
     // ssgi blur
-    xf_texture_h ssgi_blur_x_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_blur_x_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -584,7 +663,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_node_h ssgi_blur_x_node = add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
 
-    xf_texture_h ssgi_blur_y_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -593,7 +672,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ssgi_blur_y_node = add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_blur_y" );
 
     // ssgi temporal accumulation
-    xf_texture_h ssgi_accumulation_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -630,7 +709,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // ssgi2
-    xf_texture_h ssgi_2_raymarch_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_2_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -639,7 +718,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ssgi_2_raymarch_node = add_ssgi_raymarch_pass ( graph, "ssgi_2", ssgi_2_raymarch_texture, normal_texture, color_texture, ssgi_raymarch_texture, hiz_texture );
 
     // ssgi2 blur
-    xf_texture_h ssgi_2_blur_x_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_2_blur_x_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -647,7 +726,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_node_h ssgi_2_blur_x_node = add_bilateral_blur_pass ( graph, ssgi_2_blur_x_texture, ssgi_2_raymarch_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_2_blur_x" );
 
-    xf_texture_h ssgi_2_blur_y_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_2_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -656,7 +735,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ssgi_2_blur_y_node = add_bilateral_blur_pass ( graph, ssgi_2_blur_y_texture, ssgi_2_blur_x_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_2_blur_y" );
 
     // ssgi2 temporal accumulation
-    xf_texture_h ssgi_2_accumulation_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h ssgi_2_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -692,7 +771,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // ssr
-    xf_texture_h ssr_raymarch_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssr_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -701,7 +780,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ssr_trace_node = add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, normal_texture, lighting_texture, hiz_texture );
 
     // ssr blur
-    xf_texture_h ssr_blur_x_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssr_blur_x_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -709,7 +788,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_node_h ssr_blur_x_node = add_bilateral_blur_pass ( graph, ssr_blur_x_texture, ssr_raymarch_texture, normal_texture, depth_stencil_texture, 1, 5, blur_pass_direction_horizontal_m, "ssr_blur_x" );
 
-    xf_texture_h ssr_blur_y_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h ssr_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format  = xg_format_b10g11r11_ufloat_pack32_m,
@@ -718,7 +797,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ssr_blur_y_node = add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_stencil_texture, 1, 5, blur_pass_direction_vertical_m, "ssr_blur_y" );
 
     // ssr ta
-    xf_texture_h ssr_accumulation_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -756,7 +835,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // combine
-    xf_texture_h combine_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h combine_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -785,7 +864,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // taa
-    xf_texture_h taa_accumulation_texture = xf->declare_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -826,7 +905,7 @@ static void viewapp_boot_raster_graph ( void ) {
     m_state->render.taa_node = taa_node;
 
     // tonemap
-    xf_texture_h tonemap_texture = xf->declare_texture ( &xf_texture_params_m (
+    xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
@@ -861,7 +940,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h ui_node = add_ui_pass ( graph, tonemap_texture );
 
     // present
-    xf_texture_h swapchain_multi_texture = xf->multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
     xf_node_h present_pass = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
@@ -1674,6 +1753,8 @@ static void viewapp_boot ( void ) {
         ) );
     }
 
+    viewapp_boot_workload_resources_layout();
+
     viewapp_boot_scene_cornell_box();
     //viewapp_boot_scene_field();
     viewapp_build_raytrace_geo();
@@ -1684,8 +1765,8 @@ static void viewapp_boot ( void ) {
     viewapp_boot_mouse_pick_graph();
 
     m_state->render.active_graph = m_state->render.raster_graph;
-    
-    xf_i* xf = m_state->modules.xf;
+
+    //xf_i* xf = m_state->modules.xf;
     //xf->debug_print_graph ( m_state->render.active_graph );
 }
 
@@ -2272,6 +2353,8 @@ static std_app_state_e viewapp_update ( void ) {
         xf->destroy_graph ( m_state->render.raytrace_graph, workload );
         xf->destroy_graph ( m_state->render.mouse_pick_graph, workload );
 
+        xf->destroy_unreferenced_resources();
+
         viewapp_boot_raster_graph();
         viewapp_boot_raytrace_graph();
         viewapp_boot_mouse_pick_graph();
@@ -2281,6 +2364,8 @@ static std_app_state_e viewapp_update ( void ) {
         m_state->reload = false;
     }
 
+    viewapp_update_workload_uniforms ( workload );
+
     uint64_t key = 0;
     key = xf->execute_graph ( m_state->render.active_graph, workload, key );
     key = xf->execute_graph ( m_state->render.mouse_pick_graph, workload, key );
@@ -2289,6 +2374,7 @@ static std_app_state_e viewapp_update ( void ) {
     xg->present_swapchain ( m_state->render.swapchain, workload );
 
     xs->update_pipeline_states ( workload );
+    xf->destroy_unreferenced_resources();
 
     return std_app_state_tick_m;
 }

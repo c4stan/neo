@@ -64,34 +64,26 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
     uint64_t key = node_args->base_key;
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    xg_render_textures_binding_t render_textures = xg_render_textures_binding_m (
-        .render_targets_count = 1,
-        .render_targets = { xf_render_target_binding_m ( node_args->io->render_targets[0] ) },
-    );
-    xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-
     xs_i* xs = std_module_get_m ( xs_module_name_m );
+
     xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( pass_args->pipeline );
-    xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
+    //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-    xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_draw_m,
-        .texture_count = 1,
-        .textures = { xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ) },
-        .sampler_count = 1,
-        .samplers = xg_sampler_resource_binding_m ( .sampler = pass_args->sampler, .shader_register = 1 ),
-    );
+    xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( node_args->resource_cmd_buffer, &xg_resource_bindings_params_m (
+        .layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m ),
+        .bindings = xg_pipeline_resource_bindings_m (
+            .texture_count = 1,
+            .textures = { xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 0 ) },
+            .sampler_count = 1,
+            .samplers = xg_sampler_resource_binding_m ( .sampler = pass_args->sampler, .shader_register = 1 ),
+        )
+    ) );
 
-    xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-
-    xg_viewport_state_t viewport = xg_viewport_state_m (
-        .width = pass_args->width,
-        .height = pass_args->height,
-    );
-    xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, key );
-
-    xg->cmd_draw ( cmd_buffer, 3, 0, key );
+    xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
+        .pipeline = pipeline_state,
+        .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings,
+        .primitive_count = 1,
+    ) );
 }
 #endif
 
@@ -121,6 +113,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = hz_gen_mip0_copy_pass,
             .user_args = std_buffer_m ( &args ),
+            .auto_renderpass = true,
         ),
         .resources = xf_node_resource_params_m (
             .render_targets_count = 1,

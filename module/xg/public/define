@@ -17,6 +17,8 @@ xg_pipeline_resource_max_textures_per_set_m     16
 xg_pipeline_resource_max_samplers_per_set_m     4
 xg_pipeline_resource_max_raytrace_worlds_per_set_m 2
 
+xg_cmd_bind_queue_max_wait_events_m             4
+
 xg_pipeline_output_max_color_targets_m          8
 
 xg_swapchain_max_textures_m                     8

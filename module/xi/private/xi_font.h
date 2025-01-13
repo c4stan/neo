@@ -33,6 +33,7 @@ typedef struct {
     xs_database_pipeline_h font_atlas_pipeline;
     //xg_buffer_h uniform_buffer; // TODO have a per-device cache instead of creating a new one on font creation
     xi_font_atlas_uniform_data_t* uniform_data;
+    xg_renderpass_h renderpass;
 } xi_font_state_t;
 
 void xi_font_load ( xi_font_state_t* state );

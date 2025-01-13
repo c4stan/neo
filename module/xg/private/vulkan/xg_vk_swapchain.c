@@ -149,7 +149,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
 
     // Test for present support on given device
     VkBool32 is_surface_supported = VK_FALSE;
-    xg_vk_safecall_m ( vkGetPhysicalDeviceSurfaceSupportKHR ( device->vk_physical_handle, device->graphics_queue.vk_family_idx, swapchain->surface, &is_surface_supported ), xg_null_handle_m );
+    xg_vk_safecall_m ( vkGetPhysicalDeviceSurfaceSupportKHR ( device->vk_physical_handle, device->queues[xg_cmd_queue_graphics_m].vk_family_idx, swapchain->surface, &is_surface_supported ), xg_null_handle_m );
 
     if ( is_surface_supported == VK_FALSE ) {
         return xg_null_handle_m;
@@ -314,6 +314,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     // see _create
     allowed_usage |= xg_texture_usage_bit_copy_source_m;
     allowed_usage |= xg_texture_usage_bit_sampled_m;
+    allowed_usage |= xg_texture_usage_bit_storage_m;
 
     VkSwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -363,7 +364,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
         .format = swapchain->format,
         .allowed_usage = allowed_usage,
         .initial_layout = xg_texture_layout_undefined_m, // ?
-        .samples_per_pixel = 1,
+        .samples_per_pixel = xg_sample_count_1_m,
     );
     std_str_copy_static_m ( swapchain_texture_params.debug_name, swapchain->debug_name );
 
@@ -547,7 +548,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
 #endif
 
     swapchain->acquired = false;
-    VkResult result = vkQueuePresentKHR ( device->graphics_queue.vk_handle, &present_info );
+    VkResult result = vkQueuePresentKHR ( device->queues[xg_cmd_queue_graphics_m].vk_handle, &present_info );
 
     if ( result == VK_ERROR_OUT_OF_DATE_KHR ) {
         std_log_warn_m ( "Swapchain " std_fmt_u64_m " out of date, present call failed", swapchain_handle );

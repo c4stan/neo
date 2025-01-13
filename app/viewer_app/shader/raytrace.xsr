@@ -16,25 +16,25 @@ begin ray_world
     register 0
     stage ray_gen
     stage ray_hit_closest
-    update per_draw
+    update dispatch
 end
 
 begin texture
     register 1
     stage ray_gen
     access write
-    update per_draw
+    update dispatch
 end
 
 begin buffer
     register 2
     stage ray_hit_closest
-    update per_draw
+    update dispatch
     access write
 end
 
 begin buffer
     register 3
     stage ray_hit_closest
-    update per_draw
+    update dispatch
 end

@@ -13,5 +13,5 @@ end
 begin buffer
     register 0
     stage vertex
-    update per_draw
+    update dispatch
 end

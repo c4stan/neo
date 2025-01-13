@@ -95,6 +95,7 @@ typedef struct {
     xg_graphics_pipeline_params_t params;
     xs_parser_shader_references_t shader_references;
     xs_parser_shader_definitions_t shader_definitions;
+    xg_resource_bindings_layout_params_t resource_layouts[xg_shader_binding_set_count_m];
 } xs_parser_graphics_pipeline_state_t;
 
 typedef struct {
@@ -102,6 +103,7 @@ typedef struct {
     xg_compute_pipeline_params_t params;
     xs_parser_shader_references_t shader_references;
     xs_parser_shader_definitions_t shader_definitions;
+    xg_resource_bindings_layout_params_t resource_layouts[xg_shader_binding_set_count_m];
 } xs_parser_compute_pipeline_state_t;
 
 typedef struct {
@@ -109,6 +111,7 @@ typedef struct {
     xg_raytrace_pipeline_params_t params;
     xs_parser_shader_references_t shader_references;
     xs_parser_shader_definitions_t shader_definitions;
+    xg_resource_bindings_layout_params_t resource_layouts[xg_shader_binding_set_count_m];
 } xs_parser_raytrace_pipeline_state_t;
 
 bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipeline_state_t* state, const char* path );

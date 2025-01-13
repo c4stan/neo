@@ -1,20 +1,19 @@
 #include <xs.glsl>
 
 #define PI 3.1415f
-#define REVERSE_Z 1
+#define REVERSE_Z 0 // TODO
 
 // ======================================================================================= //
-//                              U N I F O R M   B U F F E R S
+//                                     U N I F O R M S
 // ======================================================================================= //
 
-layout ( binding = 0, set = xs_shader_binding_set_per_frame_m ) uniform frame_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_cbuffer_t {
     vec2 resolution_f32;
     uvec2 resolution_u32;
     uint frame_id; // TODO enable GL_ARB_gpu_shader_int64 and use uint64_t
     float time_ms;
-} frame_cbuffer;
+    uvec2 _pad0;
 
-layout ( binding = 0, set = xs_shader_binding_set_per_view_m ) uniform view_cbuffer_t {
     mat4 view_from_world;
     mat4 proj_from_view;
     mat4 jittered_proj_from_view;
@@ -24,7 +23,7 @@ layout ( binding = 0, set = xs_shader_binding_set_per_view_m ) uniform view_cbuf
     mat4 prev_proj_from_view;
     float z_near;
     float z_far;
-} view_cbuffer;
+} frame_cbuffer; // TODO rename
 
 // ======================================================================================= //
 //                                     R A Y T R A C E
@@ -112,8 +111,8 @@ float proj_depth_diff ( float a, float b ) {
 
 // https://stackoverflow.com/questions/51108596/linearize-depth
 float linearize_depth ( float d ) {
-    float z_near = view_cbuffer.z_near;
-    float z_far = view_cbuffer.z_far;
+    float z_near = frame_cbuffer.z_near;
+    float z_far = frame_cbuffer.z_far;
     return z_near * z_far / ( z_far + d * ( z_near - z_far ) );
 }
 
@@ -122,13 +121,13 @@ vec3 view_from_depth ( vec2 screen_uv, float depth ) {
     float proj_x = screen_uv.x * 2 - 1;
     float proj_y = ( 1 - screen_uv.y ) * 2 - 1;
     vec3 proj_pos = vec3 ( proj_x, proj_y, depth );
-    vec4 unnormalized_view_pos = view_cbuffer.view_from_proj * vec4 ( proj_pos, 1 );
+    vec4 unnormalized_view_pos = frame_cbuffer.view_from_proj * vec4 ( proj_pos, 1 );
     vec3 view_pos = unnormalized_view_pos.xyz / unnormalized_view_pos.w;
     return view_pos;
 }
 
 vec3 screen_from_view ( vec3 view ) {
-    vec4 proj = view_cbuffer.proj_from_view * vec4 ( view, 1 );
+    vec4 proj = frame_cbuffer.proj_from_view * vec4 ( view, 1 );
     proj /= proj.w;
     vec3 screen = vec3 ( proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, proj.z );
     return screen;
@@ -140,8 +139,8 @@ vec3 view_from_screen ( vec3 screen ) {
 
 // https://mynameismjp.wordpress.com/the-museum/samples-tutorials-tools/motion-blur-sample/
 vec3 prev_screen_from_world ( vec3 world ) {
-    vec3 prev_view = ( view_cbuffer.prev_view_from_world * vec4 ( world, 1 ) ).xyz;
-    vec4 prev_proj = ( view_cbuffer.prev_proj_from_view * vec4 ( prev_view, 1 ) );
+    vec3 prev_view = ( frame_cbuffer.prev_view_from_world * vec4 ( world, 1 ) ).xyz;
+    vec4 prev_proj = ( frame_cbuffer.prev_proj_from_view * vec4 ( prev_view, 1 ) );
     prev_proj /= prev_proj.w;
     vec3 screen = vec3 ( prev_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, prev_proj.z );
     return screen;
@@ -149,7 +148,7 @@ vec3 prev_screen_from_world ( vec3 world ) {
 
 // takes in post-divide by w coords, before moving from NDC to screen
 vec2 dejitter_ndc ( vec2 ndc ) {
-    vec2 jitter = vec2 ( view_cbuffer.jittered_proj_from_view[2][0], view_cbuffer.jittered_proj_from_view[2][1] );
+    vec2 jitter = vec2 ( frame_cbuffer.jittered_proj_from_view[2][0], frame_cbuffer.jittered_proj_from_view[2][1] );
     return ndc - jitter;
 }
 

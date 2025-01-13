@@ -21,14 +21,7 @@ begin input 0
     color R32G32B32A32_FLOAT
 end
 
-begin texture
-    update per_draw
-    register 0
-    stage fragment
-end
-
-begin sampler
-    update per_draw
-    register 1
-    stage fragment
+begin bindings
+    texture sampled
+    sampler
 end

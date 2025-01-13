@@ -13,6 +13,7 @@ uint32_t    std_hash_djb2_32 ( const void* base, size_t size );
 uint64_t    std_hash_djb2_64 ( const void* base, size_t size );
 
 // https://github.com/jandrewrogers/MetroHash
+// TODO this is broken?
 uint64_t    std_hash_metro ( const void* base, size_t size );
 
 typedef struct {

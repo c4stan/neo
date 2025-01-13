@@ -4,7 +4,7 @@
 
 #include "common.glsl"
 
-layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
     vec3 color;
     uint object_id;
     float roughness;

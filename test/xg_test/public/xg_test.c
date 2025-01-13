@@ -21,12 +21,12 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
     xg_texture_h texture = acquire.texture;
 
     if ( capture ) {
-        xg->cmd_start_debug_capture ( cmd_buffer, xg_debug_capture_stop_time_workload_present_m, 0 );
+        xg->cmd_start_debug_capture ( cmd_buffer, 0, xg_debug_capture_stop_time_workload_present_m );
     }
 
-    xg->cmd_begin_debug_region ( cmd_buffer, "Test region", xg_debug_region_color_yellow_m, 0 );
+    xg->cmd_begin_debug_region ( cmd_buffer, 0, "Test region", xg_debug_region_color_yellow_m );
 
-    xg->cmd_barrier_set ( cmd_buffer, &xg_barrier_set_m (
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
         .texture_memory_barriers_count = 1,
         .texture_memory_barriers = &xg_texture_memory_barrier_m (
             .texture = texture,
@@ -37,22 +37,22 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
             .execution.blocker = xg_pipeline_stage_bit_transfer_m,
             .execution.blocked = xg_pipeline_stage_bit_transfer_m,
         ),
-    ), 0 );
+    ) );
 
     xg_color_clear_t color_clear;
     const uint64_t t = 500;
     color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
     color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
     color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-    xg->cmd_clear_texture ( cmd_buffer, texture, color_clear, 2 );
+    xg->cmd_clear_texture ( cmd_buffer, 2, texture, color_clear );
 
-    xg->cmd_clear_texture ( cmd_buffer, texture, xg_color_clear_m (
+    xg->cmd_clear_texture ( cmd_buffer, 1, texture, xg_color_clear_m (
         .f32[0] = 0,
         .f32[1] = 0,
         .f32[2] = 0,
-    ), 1 );
+    ) );
 
-    xg->cmd_barrier_set ( cmd_buffer, &xg_barrier_set_m(
+    xg->cmd_barrier_set ( cmd_buffer, 3, &xg_barrier_set_m(
         .texture_memory_barriers_count = 1,
         .texture_memory_barriers = &xg_texture_memory_barrier_m (
             .texture = texture,
@@ -63,7 +63,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
             .execution.blocker = xg_pipeline_stage_bit_transfer_m,
             .execution.blocked = xg_pipeline_stage_bit_bottom_of_pipe_m,
         ),
-    ), 3 );
+    ) );
 
     xg_texture_h temp_texture = xg->create_texture ( &xg_texture_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
@@ -91,7 +91,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
             .texture_memory_barriers = &texture_barrier
         );
 
-        xg->cmd_barrier_set ( cmd_buffer, &barrier_set, 0 );
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
     }
 
     {
@@ -100,7 +100,7 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
         color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        xg->cmd_clear_texture ( cmd_buffer, temp_texture, color_clear, 2 );
+        xg->cmd_clear_texture ( cmd_buffer, 2, temp_texture, color_clear );
     }
 
     {

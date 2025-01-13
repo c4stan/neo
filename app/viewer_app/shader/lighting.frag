@@ -5,17 +5,17 @@
 #include "common.glsl"
 #include "lighting_common.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_color;
-layout ( binding = 1, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_normal;
-layout ( binding = 2, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_material;
-layout ( binding = 3, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_depth;
-layout ( binding = 4, set = xs_shader_binding_set_per_draw_m ) uniform texture2D tex_shadows;
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_shadows;
 
-layout ( binding = 5, set = xs_shader_binding_set_per_draw_m ) uniform sampler sampler_point;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
 
 #define MAX_LIGHT_COUNT 32
 
-layout ( binding = 6, set = xs_shader_binding_set_per_draw_m ) uniform draw_cbuffer_t {
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
     uint light_count;
     uint _pad0;
     uint _pad1;
@@ -41,7 +41,7 @@ void main ( void ) {
     // https://c0de517e.blogspot.com/2011/05/shadowmap-bias-notes.html
     // https://ndotl.wordpress.com/2014/12/19/notes-on-shadow-bias/
     view_geo_pos += view_normal * 0.01;
-    vec4 world_geo_pos = view_cbuffer.world_from_view * vec4 ( view_geo_pos, 1.f );
+    vec4 world_geo_pos = frame_cbuffer.world_from_view * vec4 ( view_geo_pos, 1.f );
 
     vec3 irradiance = vec3 ( 0, 0, 0 );
 
@@ -93,7 +93,7 @@ void main ( void ) {
         float light_visibility = 1.f - shadow;
         //float shadow_occlusion = shadow_depth + 0.001 > shadow_proj.z ? 1.f : 0.f;
 
-        vec3 view_light_pos = ( view_cbuffer.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
+        vec3 view_light_pos = ( frame_cbuffer.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
         vec3 view_light_dir = normalize ( view_light_pos - view_geo_pos );
         float nl = clamp ( dot ( view_light_dir, view_normal ), 0, 1 );
         float d = distance ( view_geo_pos, view_light_pos );
