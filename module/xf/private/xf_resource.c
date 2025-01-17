@@ -660,8 +660,11 @@ void xf_resource_texture_add_ref ( xf_texture_h handle ) {
         xf_multi_texture_t* multi_texture = xf_resource_multi_texture_get ( handle );
         multi_texture->ref_count += 1;
     } else {
-        xf_texture_t* texture = xf_resource_texture_get ( handle );
+        xf_texture_t* texture = xf_resource_texture_get_no_alias ( handle );
         texture->ref_count += 1;
+        if ( texture->alias != xf_null_handle_m ) {
+            xf_resource_texture_add_ref ( texture->alias );
+        }
     }
 }
 
@@ -675,10 +678,13 @@ void xf_resource_texture_remove_ref ( xf_texture_h handle ) {
             multi_texture->ref_count = ref_count - 1;
         }
     } else {
-        xf_texture_t* texture = xf_resource_texture_get ( handle );
+        xf_texture_t* texture = xf_resource_texture_get_no_alias ( handle );
         uint32_t ref_count = texture->ref_count;
         if ( ref_count > 0 && !texture->is_multi ) {
             texture->ref_count = ref_count - 1;
+        }
+        if ( texture->alias != xf_null_handle_m ) {
+            xf_resource_texture_remove_ref ( texture->alias );
         }
     }
 }

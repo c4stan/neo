@@ -275,7 +275,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
     // TODO
     xg_format_e object_id_format = xg_format_r8g8b8a8_uint_m;
 
-    // TODO redo an object id pass here to remove dependency on the raster graph
+    // TODO redo an object id pass here to remove dependency on the raster graph?
 
     xg_texture_h readback_texture = xg->create_texture ( &xg_texture_params_m (
         .memory_type = xg_memory_type_readback_m,
@@ -306,9 +306,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
         )
     ) );
 
-    //xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    //xf->build_graph ( graph, workload );
-    //xg->submit_workload ( workload );
+    xf->finalize_graph ( graph );
 }
 
 static void viewapp_boot_raytrace_graph ( void ) {
@@ -376,9 +374,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
         )
     ) );
 
-    //xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    //xf->build_graph ( graph, workload );
-    //xg->submit_workload ( workload );
+    xf->finalize_graph ( graph );
 }
 
 static void viewapp_boot_raster_graph ( void ) {
@@ -953,9 +949,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    //xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    //xf->build_graph ( graph, workload );
-    //xg->submit_workload ( workload );
+    xf->finalize_graph ( graph );
 }
 
 static void viewapp_build_raytrace_geo ( void ) {
@@ -2352,6 +2346,9 @@ static std_app_state_e viewapp_update ( void ) {
         xf->destroy_graph ( m_state->render.raster_graph, workload );
         xf->destroy_graph ( m_state->render.raytrace_graph, workload );
         xf->destroy_graph ( m_state->render.mouse_pick_graph, workload );
+
+        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+        xg->cmd_destroy_texture ( resource_cmd_buffer, m_state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 
         xf->destroy_unreferenced_resources();
 

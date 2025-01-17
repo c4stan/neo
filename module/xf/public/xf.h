@@ -333,6 +333,7 @@ typedef struct {
     bool copy_uniform_data;
     xg_sampler_h samplers[xg_pipeline_resource_max_samplers_per_set_m];
     uint32_t samplers_count;
+    bool compute_queue;
 } xf_node_compute_pass_params_t;
 
 #define xf_node_compute_pass_params_m( ... ) ( xf_node_compute_pass_params_t ) { \
@@ -342,6 +343,7 @@ typedef struct {
     .copy_uniform_data = true, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
     .samplers_count = 0, \
+    .compute_queue = false, \
     ##__VA_ARGS__ \
 }
 
@@ -550,7 +552,8 @@ typedef struct {
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
     xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
-    void ( *finalize_graph ) ( xf_graph_h graph, xg_workload_h workload );
+    void ( *finalize_graph ) ( xf_graph_h graph );
+    void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );

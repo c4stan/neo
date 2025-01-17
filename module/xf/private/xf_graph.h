@@ -191,6 +191,7 @@ typedef struct {
     uint32_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
     uint32_t nodes_count;
     bool is_finalized;
+    bool is_built;
 
     xf_graph_texture_t textures_array[xf_graph_max_textures_m];
     xf_graph_buffer_t buffers_array[xf_graph_max_buffers_m];
@@ -213,6 +214,8 @@ typedef struct {
     std_hash_map_t buffers_map;
 
     xf_graph_memory_heap_t heap; // TODO one per mem type?
+    uint32_t owned_textures_array[32];
+    uint32_t owned_textures_count;
 } xf_graph_t;
 
 typedef struct {
@@ -228,7 +231,8 @@ void xf_graph_unload ( void );
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_add_node ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_clear ( xf_graph_h graph );
-void xf_graph_finalize ( xf_graph_h graph, xg_workload_h workload );
+void xf_graph_finalize ( xf_graph_h graph );
+void xf_graph_build ( xf_graph_h graph, xg_workload_h workload );
 uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );
 void xf_graph_advance_multi_textures ( xf_graph_h graph );
 void xf_graph_destroy ( xf_graph_h graph, xg_workload_h workload );

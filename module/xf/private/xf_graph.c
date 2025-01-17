@@ -42,7 +42,6 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     xf_graph_t* graph = std_list_pop_m ( &xf_graph_state->graphs_freelist );
     std_mem_zero_m ( graph );
     graph->params = *params;
-    graph->is_finalized = false;
     graph->heap.memory_handle = xg_null_memory_handle_m;
 
     xf_graph_h handle = ( xf_graph_h ) ( graph - xf_graph_state->graphs_array );
@@ -1157,6 +1156,9 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
     // Sort the transient textures by descending size
     std_sort_insertion ( transient_textures_array, sizeof ( xf_graph_transient_texture_t ), transient_textures_count, xf_graph_transient_texture_sort, &transient_textures_array[xf_graph_max_textures_m] );
 
+    bool alias_resources = true;
+    bool alias_memory = true;
+
     // Alias identical transient textures onto the same committed texture
     xf_graph_committed_texture_t committed_textures_array[xf_graph_max_textures_m];
     uint32_t committed_textures_count = 0;
@@ -1166,29 +1168,31 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         xf_graph_texture_t* graph_texture = &graph->textures_array[transient_texture->handle];
 
         xf_graph_committed_texture_t* backing_texture = NULL;
-        for ( uint32_t j = 0; j < committed_textures_count; ++j ) {
-            xf_graph_committed_texture_t* committed_texture = &committed_textures_array[j];
+        if ( alias_resources ) {
+            for ( uint32_t j = 0; j < committed_textures_count; ++j ) {
+                xf_graph_committed_texture_t* committed_texture = &committed_textures_array[j];
 
-            if ( !xf_graph_texture_params_test ( &transient_texture->params, &committed_texture->params ) ) {
-                continue;
-            }
+                if ( !xf_graph_texture_params_test ( &transient_texture->params, &committed_texture->params ) ) {
+                    continue;
+                }
 
-            bool overlap = false;
-            for ( uint32_t k = 0; k < committed_texture->lifespans_count; ++k ) {
-                if ( xf_graph_lifespan_overlap_test ( graph_handle, &committed_texture->lifespans[k], &graph_texture->lifespan ) == 0 ) {
-                    overlap = true;
+                bool overlap = false;
+                for ( uint32_t k = 0; k < committed_texture->lifespans_count; ++k ) {
+                    if ( xf_graph_lifespan_overlap_test ( graph_handle, &committed_texture->lifespans[k], &graph_texture->lifespan ) == 0 ) {
+                        overlap = true;
+                        break;
+                    }
+                }
+
+                if ( !overlap ) {
+                    xf_resource_texture_alias ( graph_texture->handle, committed_texture->handle );
+                    //xf_resource_texture_map_to_new ( graph_texture->handle, committed_texture->handle, committed_texture->params.allowed_usage );
+                    committed_texture->lifespans[committed_texture->lifespans_count++] = graph_texture->lifespan;
+                    transient_texture->next = committed_texture->transient_textures_list;
+                    committed_texture->transient_textures_list = transient_texture;
+                    backing_texture = committed_texture;
                     break;
                 }
-            }
-
-            if ( !overlap ) {
-                xf_resource_texture_alias ( graph_texture->handle, committed_texture->handle );
-                //xf_resource_texture_map_to_new ( graph_texture->handle, committed_texture->handle, committed_texture->params.allowed_usage );
-                committed_texture->lifespans[committed_texture->lifespans_count++] = graph_texture->lifespan;
-                transient_texture->next = committed_texture->transient_textures_list;
-                committed_texture->transient_textures_list = transient_texture;
-                backing_texture = committed_texture;
-                break;
             }
         }
 
@@ -1206,7 +1210,8 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
             std_str_copy_static_m ( xf_params.debug_name, params.debug_name );
             xf_texture_h xf_handle = xf_resource_texture_create ( &xf_params );
             xf_resource_texture_alias ( graph_texture->handle, xf_handle );
-            
+            xf_resource_texture_add_ref ( xf_handle );
+
             committed_textures_array[committed_textures_count++] = ( xf_graph_committed_texture_t ) {
                 .params = params,
                 .req = transient_texture->req,
@@ -1235,13 +1240,12 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         }
     }
 
-    // Alias non time overlapping committed textures into the same memory heap
-    // committed resource r to place into a heap
-    // list of committed resources that go into a heap
-    //  gather all resources from the list that lifespan overlap with r
-    //  compute the list of memory ranges that those resources occupy inside the heap
-    //  find a free space to be inside those ranges, if it exists
-    //  if found, end. if not found, grow the heap and place it there.
+    // Alias non time overlapping committed textures into the same memory heap.
+    // given a committed resource r to place into a heap and the list of resources already allocated into the heap:
+    //  - gather all resources from the list that lifespan overlap with r
+    //  - compute the list of memory ranges that those resources occupy inside the heap
+    //  - find a free space to be inside those ranges, if it exists
+    //  - if found, end. if not found, grow the end of the heap and place it there.
     // once done for all r, allocate the heap and create the resources at the computed offsets
     xf_graph_memory_heap_build_t heap = {
         .size = 0,
@@ -1275,7 +1279,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         // Sort the ranges from heap start to end
         std_sort_insertion ( ranges_array, sizeof ( xf_graph_memory_range_t ), ranges_count, xf_graph_memory_range_sort, &ranges_array[xf_graph_max_textures_m] );
 
-        // Merge the overlapping ranges (happens when two heap textures don't temporally overlap each other but both overlap the new texture)
+        // Merge the overlapping ranges (happens when two heap textures don't temporally overlap each other but both overlap the new heap texture candidate)
         xf_graph_memory_range_t merged_ranges_array[xf_graph_max_textures_m];
         uint32_t merged_ranges_count = 0;
         if ( ranges_count > 0 ) {
@@ -1325,8 +1329,11 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
 
         // Add the heap texture in the found location or grow the heap to make up space for it
         xf_graph_heap_texture_t heap_texture = { .committed_texture = texture };
-        if ( best_fit == -1 ) {
+        if ( best_fit == -1 || !alias_memory ) {
             uint64_t heap_end = merged_ranges_count > 0 ? merged_ranges_array[merged_ranges_count - 1].end : 0;
+            if ( !alias_memory ) {
+                heap_end = heap.size;
+            }
             uint64_t aligned_begin = std_align_u64 ( heap_end, req.align );
             uint64_t end = aligned_begin + req.size;
             std_assert_m ( end >= heap.size );
@@ -1382,6 +1389,9 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
             xg_texture_params_t params = xf_graph_texture_params ( graph->params.device, texture_handle );
             xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params );
             xf_resource_texture_map_to_new ( texture_handle, xg_handle, params.allowed_usage );
+
+            uint32_t graph_texture_idx = graph_texture - graph->textures_array;
+            graph->owned_textures_array[graph->owned_textures_count++] = graph_texture_idx;
         }
     }
 
@@ -1403,6 +1413,7 @@ static void xf_graph_build_resources ( xf_graph_h graph_handle, xg_i* xg, xg_cmd
 
     xf_graph_build_textures ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
 
+    // TODO
     for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
         xf_graph_build_buffer ( graph->buffers_array[i].handle, graph->params.device, xg, cmd_buffer, resource_cmd_buffer );
     }
@@ -1578,11 +1589,8 @@ static void xf_graph_remove_resource_refs ( xf_graph_h graph_handle ) {
     }
 }
 
-void xf_graph_finalize ( xf_graph_h graph_handle, xg_workload_h workload ) {
+void xf_graph_finalize ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     xf_graph_scan_resources ( graph_handle );
     xf_graph_clear_resource_dependencies ( graph_handle );
@@ -1597,21 +1605,34 @@ void xf_graph_finalize ( xf_graph_h graph_handle, xg_workload_h workload ) {
     xf_graph_accumulate_node_dependencies ( graph_handle );
     xf_graph_linearize ( graph_handle );
     xf_graph_compute_resource_lifespans ( graph_handle );
-    xf_graph_build_resources ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
 
     xf_graph_add_resource_refs ( graph_handle );
 
     graph->is_finalized = true;
 }
 
+void xf_graph_build ( xf_graph_h graph_handle, xg_workload_h workload ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+
+    xf_graph_build_resources ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
+ 
+    graph->is_built = true;
+}
+
 static void xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
     if ( !graph->is_finalized ) {
-        // TODO
-        //std_log_warn_m ( "Graph " std_fmt_str_m " is not finalized", graph->params.debug_name );
-        xf_graph_finalize ( graph_handle, workload );
-        graph->is_finalized = true;
+        std_log_warn_m ( "Graph " std_fmt_str_m " is not finalized", graph->params.debug_name );
+        xf_graph_finalize ( graph_handle );
+    }
+
+    if ( !graph->is_built ) {
+        xf_graph_build ( graph_handle, workload );
     }
 
     xf_graph_remap_upload_buffers ( graph_handle, xg, resource_cmd_buffer );
@@ -1804,6 +1825,12 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
         xg->free_memory ( graph->heap.memory_handle );
     }
 
+    for ( uint32_t i = 0; i < graph->owned_textures_count; ++i ) {
+        xf_graph_texture_t* graph_texture = &graph->textures_array[graph->owned_textures_array[i]];
+        xf_texture_t* texture = xf_resource_texture_get ( graph_texture->handle );
+        xg->cmd_destroy_texture ( resource_cmd_buffer, texture->xg_handle, xg_resource_cmd_buffer_time_workload_complete_m );
+    }
+
     xf_graph_remove_resource_refs ( graph_handle );
 
     std_list_push ( &xf_graph_state->graphs_freelist, graph );
@@ -1842,16 +1869,8 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
     }
 #endif
 
-    // Build
-    // TODO pass sort key as param
+    // Prepare
     xf_graph_prepare_for_execute ( graph_handle, xg, xg_workload, resource_cmd_buffer );
-    
-    // Build resources
-    // TODO double check why this is needed here - is it because of multi textures?
-    //xf_graph_build_resources ( graph, xg, cmd_buffer, resource_cmd_buffer );
-
-    // TODO run this only when needed - flag dirty on build and on graph creation?
-    //xf_graph_linearize ( graph );
 
     // Update swapchain resources
     // TODO only do this for write-swapchains? Or forbit reads from swapchains completely?
