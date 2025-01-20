@@ -475,7 +475,7 @@ void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_acquire_result_t* resul
     swapchain->acquired_texture_idx = texture_idx;
     xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
 #else
-    //xg_gpu_queue_event_h vk_acquire_event_handle = xg_gpu_queue_event_create ( swapchain->device );
+    //xg_queue_event_h vk_acquire_event_handle = xg_gpu_queue_event_create ( swapchain->device );
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
     // TODO this isn't very nice? create the event here and pass it to the workload?
     xg_workload_init_swapchain_texture_acquired_gpu_event ( workload_handle );

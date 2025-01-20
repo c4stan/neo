@@ -33,144 +33,6 @@ static viewapp_state_t* m_state;
 
 // ---
 
-#if 0
-typedef struct {
-    uint32_t resolution_x;
-    uint32_t resolution_y;
-    uint32_t frame_id;
-    float time_ms;
-    bool capture_frame;
-} frame_setup_pass_args_t;
-
-typedef struct {
-    float resolution_x_f32;
-    float resolution_y_f32;
-    uint32_t resolution_x_u32;
-    uint32_t resolution_y_u32;
-    uint32_t frame_id;
-    float time_ms;
-} frame_uniforms_t;
-
-typedef struct {
-    rv_matrix_4x4_t view_from_world;
-    rv_matrix_4x4_t proj_from_view;
-    rv_matrix_4x4_t jittered_proj_from_view;
-    rv_matrix_4x4_t view_from_proj;
-    rv_matrix_4x4_t world_from_view;
-    rv_matrix_4x4_t prev_view_from_world;
-    rv_matrix_4x4_t prev_proj_from_view;
-    float z_near;
-    float z_far;
-} view_uniforms_t;
-
-static void viewapp_update_global_bindings ( xg_workload_h workload ) {
-    xg_i* xg = m_state->modules.xg;
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-
-    frame_uniforms_t uniforms = {
-        .frame_id = m_state->render.frame_id,
-        .time_ms = m_state->render.time_ms,
-        .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
-        .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
-        .resolution_x_f32 = ( float ) m_state->render.resolution_x,
-        .resolution_y_f32 = ( float ) m_state->render.resolution_y,
-    };
-
-    xg->create_workload_bindings ( resource_cmd_buffer,  );
-}
-
-static void frame_setup_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    std_unused_m ( node_args );
-    std_unused_m ( user_args );
-
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    if ( m_state->render.capture_frame ) {
-        xg->cmd_start_debug_capture ( cmd_buffer, key, xg_debug_capture_stop_time_workload_present_m );
-        m_state->render.capture_frame = false;
-    }
-
-    frame_cbuffer_data_t frame_data = {
-        .frame_id = m_state->render.frame_id,
-        .time_ms = m_state->render.time_ms,
-        .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
-        .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
-        .resolution_x_f32 = ( float ) m_state->render.resolution_x,
-        .resolution_y_f32 = ( float ) m_state->render.resolution_y,
-    };
-
-    xg_pipeline_resource_bindings_t frame_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_frame_m,
-        .buffer_count = 1,
-        .buffers = {
-            xg_buffer_resource_binding_m (
-                .shader_register = 0,
-                .type = xg_buffer_binding_type_uniform_m,
-                .range = xg->write_workload_uniform ( node_args->workload, &frame_data, sizeof ( frame_data ) ),
-            ),
-        }
-    );
-    xg->cmd_set_pipeline_resources ( cmd_buffer, &frame_bindings, key );
-}
-
-
-static void view_setup_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    std_unused_m ( user_args );
-
-    xg_i* xg = m_state->modules.xg;
-    se_i* se = m_state->modules.se;
-    xf_i* xf = m_state->modules.xf;
-
-    se_query_result_t camera_query_result;
-    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
-    std_assert_m ( camera_query_result.entity_count == 1 );
-    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
-    viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
-
-    rv_i* rv = std_module_get_m ( rv_module_name_m );
-    rv_view_info_t view_info;
-    rv->get_view_info ( &view_info, camera_component->view );
-
-    frame_cbuffer_data_t view_data = {
-        .view_from_world = view_info.view_matrix,
-        .proj_from_view = view_info.proj_matrix,
-        .jittered_proj_from_view = view_info.jittered_proj_matrix,
-        .world_from_view = view_info.inverse_view_matrix,
-        .view_from_proj = view_info.inverse_proj_matrix,
-        .prev_view_from_world = view_info.prev_frame_view_matrix,
-        .prev_proj_from_view = view_info.prev_frame_proj_matrix,
-        .z_near = view_info.proj_params.near_z,
-        .z_far = view_info.proj_params.far_z,
-    };
-
-    // if TAA is off disable jittering
-    xf_node_info_t taa_node_info;
-    xf->get_node_info ( &taa_node_info, m_state->render.raster_graph,  m_state->render.taa_node );
-    if ( !taa_node_info.enabled ) {
-        view_data.jittered_proj_from_view = view_info.proj_matrix;
-    }
-
-    // Bind view resources
-    xg_pipeline_resource_bindings_t view_bindings = xg_pipeline_resource_bindings_m (
-        .set = xg_shader_binding_set_per_view_m,
-        .buffer_count = 1,
-        .buffers = {
-            xg_buffer_resource_binding_m ( 
-                .shader_register = 0,
-                .type = xg_buffer_binding_type_uniform_m,
-                .range = xg->write_workload_uniform ( node_args->workload, &view_data, sizeof ( view_data ) ),
-            ),
-        }
-    );
-
-    xg->cmd_set_pipeline_resources ( node_args->cmd_buffer, &view_bindings, node_args->base_key );
-
-}
-#endif
-
 static void viewapp_boot_workload_resources_layout ( void ) {
     xg_i* xg = m_state->modules.xg;
 
@@ -208,49 +70,56 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
 
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
-    std_assert_m ( camera_query_result.entity_count == 1 );
     se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
-    viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+    for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
+        viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
 
-    rv_i* rv = std_module_get_m ( rv_module_name_m );
-    rv_view_info_t view_info;
-    rv->get_view_info ( &view_info, camera_component->view );
+        if ( !camera_component->enabled ) {
+            continue;
+        }
 
-    workload_uniforms_t uniforms = {
-        .frame_id = m_state->render.frame_id,
-        .time_ms = m_state->render.time_ms,
-        .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
-        .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
-        .resolution_x_f32 = ( float ) m_state->render.resolution_x,
-        .resolution_y_f32 = ( float ) m_state->render.resolution_y,
-        .view_from_world = view_info.view_matrix,
-        .proj_from_view = view_info.proj_matrix,
-        .jittered_proj_from_view = view_info.jittered_proj_matrix,
-        .world_from_view = view_info.inverse_view_matrix,
-        .view_from_proj = view_info.inverse_proj_matrix,
-        .prev_view_from_world = view_info.prev_frame_view_matrix,
-        .prev_proj_from_view = view_info.prev_frame_proj_matrix,
-        .z_near = view_info.proj_params.near_z,
-        .z_far = view_info.proj_params.far_z,
-    };
+        rv_i* rv = std_module_get_m ( rv_module_name_m );
+        rv_view_info_t view_info;
+        rv->get_view_info ( &view_info, camera_component->view );
 
-    // if TAA is off disable jittering
-    xf_node_info_t taa_node_info;
-    xf->get_node_info ( &taa_node_info, m_state->render.raster_graph,  m_state->render.taa_node );
-    if ( !taa_node_info.enabled ) {
-        uniforms.jittered_proj_from_view = view_info.proj_matrix;
+        workload_uniforms_t uniforms = {
+            .frame_id = m_state->render.frame_id,
+            .time_ms = m_state->render.time_ms,
+            .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
+            .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
+            .resolution_x_f32 = ( float ) m_state->render.resolution_x,
+            .resolution_y_f32 = ( float ) m_state->render.resolution_y,
+            .view_from_world = view_info.view_matrix,
+            .proj_from_view = view_info.proj_matrix,
+            .jittered_proj_from_view = view_info.jittered_proj_matrix,
+            .world_from_view = view_info.inverse_view_matrix,
+            .view_from_proj = view_info.inverse_proj_matrix,
+            .prev_view_from_world = view_info.prev_frame_view_matrix,
+            .prev_proj_from_view = view_info.prev_frame_proj_matrix,
+            .z_near = view_info.proj_params.near_z,
+            .z_far = view_info.proj_params.far_z,
+        };
+
+        // if TAA is off disable jittering
+        xf_node_info_t taa_node_info;
+        xf->get_node_info ( &taa_node_info, m_state->render.raster_graph,  m_state->render.taa_node );
+        if ( !taa_node_info.enabled ) {
+            uniforms.jittered_proj_from_view = view_info.proj_matrix;
+        }
+
+        xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
+        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+        xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+            .layout = m_state->render.workload_bindings_layout, // TODO
+            .bindings = xg_pipeline_resource_bindings_m (
+                .buffer_count = 1,
+                .buffers = { xg_buffer_resource_binding_m ( .shader_register = 0, .range = range ) }
+            )
+        ) );
+        xg->set_workload_global_bindings ( workload, bindings );
+
+        break;
     }
-
-    xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-    xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
-        .layout = m_state->render.workload_bindings_layout, // TODO
-        .bindings = xg_pipeline_resource_bindings_m (
-            .buffer_count = 1,
-            .buffers = { xg_buffer_resource_binding_m ( .shader_register = 0, .range = range ) }
-        )
-    ) );
-    xg->set_workload_global_bindings ( workload, bindings );
 }
 
 // ---
@@ -324,28 +193,6 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .debug_name = "raytrace_graph"
     ) );
     m_state->render.raytrace_graph = graph;
-
-#if 0
-    // frame setup
-    xf_node_h frame_setup_node = xf->add_node ( graph, &xf_node_params_m (
-        .debug_name = "frame_setup",
-        .type = xf_node_type_custom_pass_m,
-        .pass.custom = xf_node_custom_pass_params_m (
-            .routine = frame_setup_pass,
-        ),
-    ) );
-
-    // view setup
-    xf_node_h view_setup_node = xf->add_node ( graph, &xf_node_params_m (
-        .debug_name = "view_setup",
-        .type = xf_node_type_custom_pass_m,
-        .pass.custom = xf_node_custom_pass_params_m (
-            .routine = view_setup_pass,
-        ),
-        .node_dependencies_count = 1,
-        .node_dependencies = { frame_setup_node }
-    ) );
-#endif
 
     xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m ( 
         .width = resolution_x,
@@ -527,6 +374,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h light_clusters_build_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "light_cluster_build",
         .type = xf_node_type_compute_pass_m,
+        .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cluster_build" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
@@ -1130,7 +978,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { -1.1, -1.45, 1 },
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1214,7 +1062,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 plane_up[i][1],
                 plane_up[i][2],
             },
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
                     plane_col[i][0],
@@ -1256,7 +1104,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { 0, 1.5, 0 },
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1340,7 +1188,7 @@ static void viewapp_boot_scene_field ( void ) {
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
                     powf ( 240 / 255.f, 2.2 ),
@@ -1381,7 +1229,7 @@ static void viewapp_boot_scene_field ( void ) {
             .position = { x, 5, 0 },
             .orientation = { 0, 1, 0 },
             .up = { 0, 0, -1 },
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
                     powf ( 240 / 255.f, 2.2 ),
@@ -1420,7 +1268,7 @@ static void viewapp_boot_scene_field ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { 10, 10, -10 },
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1490,7 +1338,7 @@ static void viewapp_boot_scene_field ( void ) {
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
             .position = { -10, 10, -10 },
-            .object_id = m_state->render.object_id++,
+            .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
                     powf ( 240 / 255.f, 2.2 ),
@@ -1730,18 +1578,35 @@ static void viewapp_boot ( void ) {
             ),
         );
 
-        viewapp_camera_component_t camera_component = {
+        // cameras
+        viewapp_camera_component_t arcball_camera_component = {
             .view = rv->create_view ( &view_params ),
             .enabled = true,
+            .type = viewapp_camera_type_arcball_m
         };
 
-        // camera
+        viewapp_camera_component_t flycam_camera_component = {
+            .view = rv->create_view ( &view_params ),
+            .enabled = false,
+            .type = viewapp_camera_type_flycam_m
+        };
+
         se->create_entity ( &se_entity_params_m (
-            .debug_name = "camera",
+            .debug_name = "arcball_camera",
             .update = se_entity_update_m (
                 .components = { se_component_update_m (
                     .id = viewapp_camera_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &camera_component ) }
+                    .streams = { se_stream_update_m ( .data = &arcball_camera_component ) }
+                ) }
+            )
+        ) );
+
+        se->create_entity ( &se_entity_params_m (
+            .debug_name = "flycam_camera",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m (
+                    .id = viewapp_camera_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &flycam_camera_component ) }
                 ) }
             )
         ) );
@@ -1771,7 +1636,7 @@ static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
 
-    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( camera_query_result.components, 0 );
     for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
         viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
 
@@ -1798,7 +1663,7 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
 
-    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( camera_query_result.components, 0 );
     for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
         viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
 
@@ -1814,6 +1679,7 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
         rv_view_transform_t xform = view_info.transform;
         bool dirty_xform = false;
 
+        // drag
         if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
             float drag_scale = -1.f / 400;
             sm_vec_3f_t v;
@@ -1849,6 +1715,7 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             }
         }
 
+        // zoom
         if ( xi->get_hovered_element_id() == 0 ) {
             if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] || new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
                 int8_t wheel = ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_up_m] - ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_down_m];
@@ -1892,7 +1759,7 @@ static void duplicate_selection ( void ) {
     viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
 
     viewapp_mesh_component_t new_mesh = *mesh;
-    new_mesh.object_id = m_state->render.object_id++;
+    new_mesh.object_id = m_state->render.next_object_id++;
     new_mesh.position[0] = 0;
     new_mesh.position[1] = 0;
     new_mesh.position[2] = 0;

@@ -766,7 +766,6 @@ static void xf_graph_resource_lifespan_extend ( xf_graph_resource_lifespan_t* li
     lifespan->last[queue] = std_max_i32 ( lifespan->last[queue], node );
 }
 
-std_unused_static_m()
 static int xf_graph_lifespan_overlap_test ( xf_graph_h graph_handle, const xf_graph_resource_lifespan_t* a, const xf_graph_resource_lifespan_t* b ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
@@ -1254,7 +1253,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
     for ( uint32_t i = 0; i < committed_textures_count; ++i ) {
         xf_graph_committed_texture_t* texture = &committed_textures_array[i];
 
-        // Collect all memory ranges of overlapping heap textures
+        // Collect memory ranges of time overlapping heap textures
         xf_graph_memory_range_t ranges_array[xf_graph_max_textures_m + 1];
         uint32_t ranges_count = 0;
         for ( uint32_t j = 0; j < heap.textures_count; ++j ) {
@@ -1279,7 +1278,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         // Sort the ranges from heap start to end
         std_sort_insertion ( ranges_array, sizeof ( xf_graph_memory_range_t ), ranges_count, xf_graph_memory_range_sort, &ranges_array[xf_graph_max_textures_m] );
 
-        // Merge the overlapping ranges (happens when two heap textures don't temporally overlap each other but both overlap the new heap texture candidate)
+        // Merge the overlapping memory ranges (can happen when two heap textures don't temporally overlap each other but both overlap the new heap texture candidate)
         xf_graph_memory_range_t merged_ranges_array[xf_graph_max_textures_m];
         uint32_t merged_ranges_count = 0;
         if ( ranges_count > 0 ) {
@@ -1898,6 +1897,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
     xf_graph_build_renderpasses ( graph, xg, resource_cmd_buffer );
 
     // Execute
+    xg_cmd_queue_e queue = xg_cmd_queue_graphics_m;
     uint64_t sort_key = base_key;
     {
         for ( size_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
@@ -2251,6 +2251,15 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
                 io.depth_stencil_target = texture->xg_handle;
             } else {
                 io.depth_stencil_target = xg_null_handle_m;
+            }
+
+            if ( node->params.queue != queue ) {
+                queue = node->params.queue;
+                // TODO events
+                // TODO queue ownership barriers
+                xg->cmd_bind_queue ( cmd_buffer, sort_key, &xg_cmd_bind_queue_params_m (
+                    .queue = queue,
+                ) );
             }
 
             xg->cmd_begin_debug_region ( cmd_buffer, sort_key, node->params.debug_name, node->params.debug_color );

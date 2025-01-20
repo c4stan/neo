@@ -56,8 +56,37 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
     const bool compute_clear = true;
 
+    xg_queue_event_h event = xg_null_handle_m;
+    if ( compute_clear ) {
+        event = xg->create_queue_event ( frame.device );
+        xg->cmd_destroy_queue_event ( resource_cmd_buffer, event, xg_resource_cmd_buffer_time_workload_complete_m );
+    }
+
     // Clear temp texture
-    if ( !compute_clear ) {
+    if ( compute_clear ) {
+        xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+            .queue = xg_cmd_queue_compute_m,
+            .signal_event = event,
+        ) );
+        
+        // transition to storage image
+        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+            .texture = temp_texture,
+            .layout.old = xg_texture_layout_undefined_m,
+            .layout.new = xg_texture_layout_shader_write_m,
+            .memory.flushes = xg_memory_access_bit_none_m,
+            .memory.invalidations = xg_memory_access_bit_none_m,
+            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+            .execution.blocked = xg_pipeline_stage_bit_compute_shader_m,
+        );
+
+        xg_barrier_set_t barrier_set = xg_barrier_set_m (
+            .texture_memory_barriers_count = 1,
+            .texture_memory_barriers = &texture_barrier,
+        );
+
+        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
+    } else {
         // transition to copy_dest
         xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
             .texture = temp_texture,
@@ -76,24 +105,6 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         );
 
         xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
-    } else {
-        // transition to storage image
-        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
-            .texture = temp_texture,
-            .layout.old = xg_texture_layout_undefined_m,
-            .layout.new = xg_texture_layout_shader_write_m,
-            .memory.flushes = xg_memory_access_bit_none_m,
-            .memory.invalidations = xg_memory_access_bit_none_m,
-            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-            .execution.blocked = xg_pipeline_stage_bit_compute_shader_m,
-        );
-
-        xg_barrier_set_t barrier_set = xg_barrier_set_m (
-            .texture_memory_barriers_count = 1,
-            .texture_memory_barriers = &texture_barrier,
-        );
-
-        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
     }
 
     {
@@ -103,9 +114,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
 
-        if ( !compute_clear ) {
-            xg->cmd_clear_texture ( cmd_buffer, 0, temp_texture, color_clear );
-        } else {
+        if ( compute_clear ) {
             // TODO upload color_clear to compute cbuffer...
 
             xg_resource_bindings_layout_h compute_layouts[xg_shader_binding_set_count_m];
@@ -125,10 +134,6 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
                 )
             ) );
 
-            xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
-                .queue = xg_cmd_queue_compute_m,
-            ) );
-
             xg->cmd_compute ( cmd_buffer, 0, &xg_cmd_compute_params_m (
                 .workgroup_count_x = swapchain_texture_info.width,
                 .workgroup_count_y = swapchain_texture_info.height,
@@ -136,9 +141,33 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
                 .bindings[xg_shader_binding_set_dispatch_m] = group,
             ) );
 
-             xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+            // release
+            xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+                .texture = temp_texture,
+                .layout.old = xg_texture_layout_shader_write_m,
+                .layout.new = xg_texture_layout_copy_source_m,
+                .memory.flushes = xg_memory_access_bit_shader_write_m,
+                .memory.invalidations = xg_memory_access_bit_transfer_read_m,
+                .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
+                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+                .queue.old = xg_cmd_queue_compute_m,
+                .queue.new = xg_cmd_queue_graphics_m
+            );
+
+            xg_barrier_set_t barrier_set = xg_barrier_set_m (
+                .texture_memory_barriers_count = 1,
+                .texture_memory_barriers = &texture_barrier,
+            );
+            xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
+
+            xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
                 .queue = xg_cmd_queue_graphics_m,
+                .wait_count = 1,
+                .wait_events = { event },
+                .wait_stages = { xg_pipeline_stage_bit_compute_shader_m }
             ) );
+        } else {
+            xg->cmd_clear_texture ( cmd_buffer, 0, temp_texture, color_clear );
         }
     }
 
@@ -148,24 +177,27 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         // transition to copy_source
         xg_texture_memory_barrier_t texture_barrier[2];
 
-        if ( !compute_clear ) {
-            texture_barrier[0] = xg_texture_memory_barrier_m (
-                .texture = temp_texture,
-                .layout.old = xg_texture_layout_copy_dest_m,
-                .layout.new = xg_texture_layout_copy_source_m,
-                .memory.flushes = xg_memory_access_bit_transfer_write_m,
-                .memory.invalidations = xg_memory_access_bit_transfer_write_m,
-                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-            );
-        } else {
+        if ( compute_clear ) {
+            // acquire
             texture_barrier[0] = xg_texture_memory_barrier_m (
                 .texture = temp_texture,
                 .layout.old = xg_texture_layout_shader_write_m,
                 .layout.new = xg_texture_layout_copy_source_m,
                 .memory.flushes = xg_memory_access_bit_shader_write_m,
-                .memory.invalidations = xg_memory_access_bit_transfer_write_m, // xg_memory_access_bit_transfer_read_m?
+                .memory.invalidations = xg_memory_access_bit_transfer_read_m,
                 .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
+                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+                .queue.old = xg_cmd_queue_compute_m,
+                .queue.new = xg_cmd_queue_graphics_m
+            );
+        } else {
+            texture_barrier[0] = xg_texture_memory_barrier_m (
+                .texture = temp_texture,
+                .layout.old = xg_texture_layout_copy_dest_m,
+                .layout.new = xg_texture_layout_copy_source_m,
+                .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                .memory.invalidations = xg_memory_access_bit_transfer_read_m,
+                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
                 .execution.blocked = xg_pipeline_stage_bit_transfer_m,
             );
         }
@@ -267,6 +299,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .buffer_count = 1,
             .buffers = {
                 xg_buffer_resource_binding_m (
+                    .shader_register = 0,
                     .range = cbuffer_range,
                 )
             }
@@ -349,7 +382,7 @@ static void xs_test ( void ) {
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     xs_database_h sdb = xs->create_database ( &xs_database_params_m (
         .device = device,
-        std_debug_string_assign_m ( .debug_name, "shader_db" )
+        .debug_name = "shader_db"
     ) );
     xs->add_database_folder ( sdb, "shader/" );
     xs->set_output_folder ( sdb, "output/shader/" );

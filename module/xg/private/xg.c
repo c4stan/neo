@@ -87,6 +87,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_destroy_texture = xg_resource_cmd_buffer_texture_destroy;
     xg->cmd_destroy_renderpass = xg_resource_cmd_buffer_graphics_renderpass_destroy;
     xg->cmd_create_workload_bindings = xg_resource_cmd_buffer_workload_resource_bindings_create;
+    xg->cmd_destroy_queue_event = xg_resource_cmd_buffer_queue_event_destroy;
 
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;

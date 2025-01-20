@@ -50,7 +50,7 @@ xg_vk_max_texture_views_m                       1024 * 10
 xg_vk_max_samplers_m                            512
 xg_vk_max_gpu_events_m                          1024
 # one per workload + one per swapchain image (x number of swapchains? in theory)
-xg_vk_max_gpu_queue_events_m                    (xg_workload_max_allocated_workloads_m + xg_swapchain_max_textures_m)
+xg_vk_max_gpu_queue_events_m                    1024
 # one per workload
 xg_vk_max_cpu_queue_events_m                    xg_workload_max_allocated_workloads_m
 xg_vk_max_resource_bindings_layouts_m           1024 * 2
@@ -79,6 +79,7 @@ xg_vk_workload_max_memory_barriers_per_cmd_m        8
 xg_vk_workload_max_buffer_barriers_per_cmd_m        16
 xg_vk_workload_max_texture_barriers_per_cmd_m       16
 xg_vk_workload_max_translate_contexts_per_submit_m  8
+xg_vk_workload_max_queue_chunks_m                   8
 
 # descriptor management
 xg_vk_max_sets_per_descriptor_pool_m                    1024*10

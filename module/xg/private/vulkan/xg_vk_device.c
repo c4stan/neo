@@ -452,7 +452,10 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     VkQueueFlags compute_queue_flags = 0;
 
     for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
-        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags == VK_QUEUE_COMPUTE_BIT ) {
+        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT ) {
+            if ( i == graphics_queue->vk_family_idx ) {
+                continue;
+            }
             compute_queue_found = true;
             compute_queue->vk_family_idx = i;
             compute_queue_flags = device->queues_families_properties[i].queueFlags;
@@ -483,7 +486,11 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     bool copy_queue_found = false;
 
     for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
-        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags == VK_QUEUE_TRANSFER_BIT ) {
+        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT ) {
+            if ( i == graphics_queue->vk_family_idx || i == compute_queue->vk_family_idx ) {
+                continue;
+            }
+            
             copy_queue_found = true;
             copy_queue->vk_family_idx = i;
             break;
@@ -806,10 +813,8 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 #endif
         "VK_KHR_deferred_host_operations",
 #endif
-        // debugPrintfEXT - TODO enable in debug only
+        // debugPrintfEXT - TODO enable in debug only?
         "VK_KHR_shader_non_semantic_info",
-        //"VK_EXT_validation_features",
-        //"VK_EXT_debug_utils",
     };
     size_t required_extensions_count = std_static_array_capacity_m ( required_extensions );
 

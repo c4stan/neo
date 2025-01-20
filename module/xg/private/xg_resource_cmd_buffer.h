@@ -25,6 +25,8 @@ typedef enum {
 
     xg_resource_cmd_renderpass_destroy_m,
 
+    xg_resource_cmd_queue_event_destroy_m,
+
     // TODO pipeline create/destroy
     //      once that is available, rewrite pipeline destrouction in xs pipeline update to use resource cmd buffers instead of tracking workloads internally?
 
@@ -85,6 +87,11 @@ typedef struct {
     xg_resource_cmd_buffer_time_e destroy_time;
 } xg_resource_cmd_renderpass_destroy_t;
 
+typedef struct {
+    xg_queue_event_h event;
+    xg_resource_cmd_buffer_time_e destroy_time;
+} xg_resource_cmd_queue_event_destroy_t;
+
 #if 0
 typedef struct {
     xg_timestamp_query_buffer_h buffer;
@@ -131,6 +138,8 @@ void            xg_resource_cmd_buffer_resource_bindings_update    ( xg_resource
 void            xg_resource_cmd_buffer_resource_bindings_destroy   ( xg_resource_cmd_buffer_h cmd_buffer, xg_resource_bindings_h group, xg_resource_cmd_buffer_time_e destroy_time );
 
 void            xg_resource_cmd_buffer_graphics_renderpass_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time );
+
+void            xg_resource_cmd_buffer_queue_event_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_queue_event_h event, xg_resource_cmd_buffer_time_e destroy_time );
 
 #if 0
     //xg_query_buffer_h xg_resource_cmd_buffer_query_buffer_create    ( xg_resource_cmd_buffer_h cmd_buffer, const xg_query_buffer_params_t* params );

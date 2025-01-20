@@ -19,6 +19,7 @@ void std_main ( void ) {
         app_name = process_info.args[0];
     }
 
+    std_log_info_m ( "Launching app " std_fmt_str_m, app_name );
     std_auto_m app = ( std_app_i* ) std_module_load ( app_name );
 
     for ( ;; ) {

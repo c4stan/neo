@@ -15,6 +15,7 @@ typedef struct {
     VkEvent vk_event;
 } xg_vk_gpu_event_t;
 
+#if 0
 xg_gpu_event_h xg_gpu_event_create ( xg_device_h device );
 void xg_gpu_event_destroy ( xg_gpu_event_h handle );
 const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h handle );
@@ -22,6 +23,7 @@ const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h handle );
 // Queue events (semaphores and fences)
 // Not visible from outside of xg_vk
 // TODO prefix these with xg_vk ?
+#endif
 
 /*
     swapchain texture acquire:  vkAcquireNextImageKHR -> vkQueueSubmit
@@ -36,11 +38,11 @@ typedef struct {
     VkSemaphore vk_semaphore;
 } xg_vk_gpu_queue_event_t;
 
-xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device );
-void xg_gpu_queue_event_destroy ( xg_gpu_queue_event_h handle );
-const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_gpu_queue_event_h handle );
-void xg_gpu_queue_event_log_wait ( xg_gpu_queue_event_h handle );
-void xg_gpu_queue_event_log_signal ( xg_gpu_queue_event_h handle );
+xg_queue_event_h xg_gpu_queue_event_create ( xg_device_h device );
+void xg_gpu_queue_event_destroy ( xg_queue_event_h handle );
+const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_queue_event_h handle );
+void xg_gpu_queue_event_log_wait ( xg_queue_event_h handle );
+void xg_gpu_queue_event_log_signal ( xg_queue_event_h handle );
 
 /*
     gpu execution complete:     vkQueueSubmit -> vkWaitForFences

@@ -1,8 +1,6 @@
 vertex_shader triangle.vert
 fragment_shader triangle.frag
 
-// missing input layout and multisampling (part of rasterizer?) related state
-
 include triangle_include.xsi
 
 begin viewport

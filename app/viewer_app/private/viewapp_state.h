@@ -34,10 +34,13 @@ typedef struct {
     bool capture_frame;
     float time_ms;
     float delta_time_ms;
+    std_tick_t frame_tick;
 
-    uint32_t object_id;
+    uint32_t next_object_id;
 
     wm_window_h window;
+    wm_window_info_t window_info;
+    wm_input_state_t input_state;
 
     xg_device_h device;
     xg_swapchain_h swapchain;
@@ -46,7 +49,6 @@ typedef struct {
 
     xf_graph_h raster_graph;
     xf_graph_h raytrace_graph;
-
     xf_graph_h active_graph;
 
     xf_graph_h mouse_pick_graph;
@@ -54,14 +56,7 @@ typedef struct {
     xg_texture_h object_id_readback_texture;
 
     xf_node_h taa_node;
-
     xg_raytrace_world_h raytrace_world;
-
-    wm_window_info_t window_info;
-    wm_input_state_t input_state;
-
-    std_tick_t frame_tick;
-
     xg_resource_bindings_layout_h workload_bindings_layout;
 } viewapp_render_state_t;
 
@@ -72,7 +67,7 @@ typedef struct {
     .capture_frame = false, \
     .time_ms = 0, \
     .delta_time_ms = 0, \
-    .object_id = 1, \
+    .next_object_id = 1, \
     .window = wm_null_handle_m, \
     .device = xg_null_handle_m, \
     .swapchain = xg_null_handle_m, \
@@ -176,9 +171,15 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    viewapp_camera_type_arcball_m,
+    viewapp_camera_type_flycam_m,
+} viewapp_camera_type_e;
+
 typedef struct {
     rv_view_h view;
     bool enabled;
+    viewapp_camera_type_e type;
 } viewapp_camera_component_t;
 
 typedef struct {

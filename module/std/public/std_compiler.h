@@ -92,9 +92,9 @@
     #define std_auto_m                                            __auto_type
 
     #if defined(std_platform_win32_m)
-        #define std_debug_break_m()                                   __debugbreak()
+        #define std_debug_break_m()                             __debugbreak()
     #else
-        #define std_debug_break_m()                                   __builtin_debugtrap()
+        #define std_debug_break_m()                             __builtin_debugtrap()
     #endif
 
     #define std_div_ceil_m( dividend, divisor )                 ( ( (dividend) + (divisor) - 1 ) / (divisor) )

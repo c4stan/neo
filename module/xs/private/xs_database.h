@@ -59,7 +59,7 @@ typedef struct {
     std_timestamp_t pipeline_state_headers_last_build_timestamp;
 
     char output_path[fs_path_size_m];
-    std_debug_string_t debug_name;
+    char debug_name[32];
 } xs_database_t;
 
 #define xs_database_bitset_u64_count_m std_div_ceil_m ( xs_database_max_databases_m, 64 )

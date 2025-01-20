@@ -86,7 +86,7 @@ def print_help():
     print('\t\t' + Color.OKBLUE + '-v' + Color.ENDC + ' to enable verbose build log output')
     print('\t\t' + Color.OKBLUE + '-asm' + Color.ENDC + ' to output asm')
     print('\t\t' + Color.OKBLUE + '-pp' + Color.ENDC + ' to output the preprocessor result')
-    print('\t\t' + Color.OKBLUE + '-opt' + Color.ENDC + ' to enable optimization flags')
+    print('\t\t' + Color.OKBLUE + '-o' + Color.ENDC + ' to enable optimization flags')
     print('\t\t' + Color.OKBLUE + '-d' + Color.ENDC + ' to enable permissive warnings')
     print('\t' + Color.OKGREEN + 'makegen' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run makegen on a workspace')
     print('\t' + Color.OKGREEN + 'clear' + Color.ENDC + ' to clear the console')
@@ -391,7 +391,7 @@ def run_app(name, flags, params):
     makedef = makegen.parse_makedef(makedef_path, None)
 
     config = 'debug'
-    if ('-opt' in flags):
+    if ('-o' in flags):
         config = 'release'
 
     env_vars = os.environ.copy()
@@ -416,7 +416,7 @@ def debug_app(name, flags):
     makedef = makegen.parse_makedef(makedef_path, None)
 
     config = 'debug'
-    if ('-opt' in flags):
+    if ('-o' in flags):
         config = 'release'
     if platform.system() == 'Windows':
         if makedef['output'] == ['app']:
@@ -441,7 +441,7 @@ def fixup_debug_app(name, flags):
     makedef = makegen.parse_makedef(makedef_path, None)
 
     config = 'debug'
-    if ('-opt' in flags):
+    if ('-o' in flags):
         config = 'release'
     if platform.system() == 'Linux':
         if makedef['output'] == ['app']:

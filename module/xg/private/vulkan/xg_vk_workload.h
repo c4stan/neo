@@ -10,7 +10,7 @@
 
 // A workload is the smallest unit of GPU work that can be submitted for execution and checked for completion.
 
-typedef uint64_t xg_gpu_queue_event_h;
+typedef uint64_t xg_queue_event_h;
 typedef uint64_t xg_cpu_queue_event_h;
 
 typedef struct {
@@ -59,9 +59,12 @@ typedef struct {
     uint64_t id;
     uint64_t gen;
 
-    xg_gpu_queue_event_h swapchain_texture_acquired_event; // wait on before starting the workload. part of VkSubmitInfo
-    xg_gpu_queue_event_h execution_complete_gpu_event; // signal at the very end of the workload. part of VkSubmitInfo
-    xg_cpu_queue_event_h execution_complete_cpu_event; // for cpu to check workload completion. TODO currently never used
+    // wait on before starting the workload. part of VkSubmitInfo
+    xg_queue_event_h swapchain_texture_acquired_event;
+    // signal at the very end of the workload. part of VkSubmitInfo
+    xg_queue_event_h execution_complete_gpu_event;
+    // for cpu to check workload completion. TODO currently never used
+    xg_cpu_queue_event_h execution_complete_cpu_event;
 
     bool stop_debug_capture_on_present;
 
@@ -113,8 +116,8 @@ typedef struct {
     uint32_t begin;
     uint32_t end;
     xg_cmd_queue_e queue;
-    xg_gpu_queue_event_h signal_event;
-    xg_gpu_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
+    xg_queue_event_h signal_event;
+    xg_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
     xg_pipeline_stage_bit_e wait_stages[xg_cmd_bind_queue_max_wait_events_m];
     uint32_t wait_count;
 } xg_vk_workload_queue_chunk_t;
@@ -144,13 +147,19 @@ typedef struct {
 } xg_vk_workload_translate_context_t;
 
 typedef struct {
+    xg_queue_event_h events_array[xg_vk_workload_max_queue_chunks_m]; // TODO grow dynamically instead?
+    uint32_t events_count;
+} xg_vk_workload_submit_context_t;
+
+typedef struct {
     xg_workload_h workload;
-    bool is_submitted;
+    bool is_submitted; // TODO remove?
 
     xg_vk_workload_sort_context_t sort;
     xg_vk_workload_chunk_context_t chunk;
     //xg_vk_workload_translate_context_t* translate_array[xg_vk_workload_max_translate_contexts_per_submit_m];
     xg_vk_workload_translate_context_t translate;
+    xg_vk_workload_submit_context_t submit;
 
     // Translation context
     //xg_cmd_header_t* cmd_headers;
@@ -205,8 +214,8 @@ void xg_vk_workload_queue_debug_capture_stop_on_present ( xg_workload_h workload
     void xg_vk_workload_add_timestamp_query_pool ( xg_workload_h workload, xg_timestamp_query_pool_h pool, std_buffer_t buffer );
 #endif
 // TODO prefix these with xg_vk ?
-//void xg_workload_set_swapchain_texture_acquired_event ( xg_workload_h workload, xg_gpu_queue_event_h event );
-void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload, xg_gpu_queue_event_h event );
+//void xg_workload_set_swapchain_texture_acquired_event ( xg_workload_h workload, xg_queue_event_h event );
+void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload, xg_queue_event_h event );
 void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workload );
 void xg_vk_workload_activate_device ( xg_device_h device );
 void xg_vk_workload_deactivate_device ( xg_device_h device );

@@ -4,6 +4,8 @@
 
 #include "xi_update.h"
 
+#include "std_string.h"
+
 static xs_database_h xi_sdb = xs_null_handle_m;
 
 static void xi_load_shaders ( xg_device_h device ) {
@@ -14,7 +16,7 @@ static void xi_load_shaders ( xg_device_h device ) {
     std_stack_string_append ( &stack, std_module_path_m );
     std_stack_string_append ( &stack, "shader/");
     
-    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, std_debug_string_assign_m ( .debug_name, "xi_sdb" ) ) );
+    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "xi_sdb" ) );
     xs->add_database_folder ( sdb, path );
     xs->set_output_folder ( sdb, "output/shader/" );
     xi_workload_load_shaders ( xs, sdb );

@@ -29,52 +29,8 @@ uint64_t    std_hash_metro_end ( std_hash_metro_state_t* state );
 
 #define std_hash_metro_add_m( state, item ) std_hash_metro_add ( state, item, sizeof ( *(item) ) )
 
-#define std_hash_32_m(value) std_hash_murmur_mixer_32(value)
-#define std_hash_64_m(value) std_hash_murmur_mixer_64(value)
-
-//
-// Custom hash/cmp functions makes possible to e.g. store idx to keys/payloads and hash/compare those by passing the base as custom arg.
-// map_lookup returns a pointer to the payload, or NULL on miss.
-// you should NOT store pointers to payloads for a long time, as those can get moved around on any remove
-// remove takes a payload ptr, not a key, and assumes that the payload provided is valid (the map contains a valid key for it)
-//
-// TODO rework to not use any fun ptr
-//
-#if 0
-typedef bool        ( std_map_cmp_f )  ( uint64_t hash1, const void* key1, const void* key2, void* usr_arg );
-typedef uint64_t    ( std_map_hash_f ) ( const void* key, void* usr_arg );
-typedef struct {
-    void* keys;
-    void* payloads;
-    size_t pop;
-    size_t mask;
-    std_map_hash_f* hasher;
-    std_map_cmp_f* cmp;
-    void* hash_arg;
-    void* cmp_arg;
-    size_t key_stride;
-    size_t payload_stride;
-} std_map_t;
-
-// NOTE: The capacity for the map is determined at the min value between keys and payloads buffers capacity.
-//       This value is expected to be a power of two. If not, the capacity goes down to the closes pow2 and
-//       a warning is produced.
-std_map_t                       std_map          ( void* keys, void* payloads, size_t key_stride, size_t payload_stride, size_t capacity, 
-                                                    std_map_hash_f* key_hash, void* hash_arg, std_map_cmp_f* key_cmp, void* cmp_arg );
-std_map_t                       std_map_u64      ( std_buffer_t keys, std_buffer_t payloads );
-void*                           std_map_insert   ( std_map_t* map, const void* key, const void* payload );  // returns pointer to payload copy
-void                            std_map_remove   ( std_map_t* map, const void* payload );
-void*                           std_map_lookup   ( const std_map_t* map, const void* key );
-const void*                     std_map_get_key  ( const std_map_t* map, const void* payload );
-void                            std_map_clear    ( std_map_t* map );
-
-bool std_map_cmp_u64 ( uint64_t hash1, const void* key1, const void* key2, void* unused );
-uint64_t std_map_hasher_u64 ( const void* key, void* unused );
-
-#define std_static_map_m( keys, payloads, hasher, hasher_arg, cmp, cmp_arg ) \
-    std_map ( std_static_buffer_m ( keys ), std_static_buffer_m ( payloads ), sizeof( *keys ), sizeof( *payloads ), \
-    hasher, hasher_arg, cmp, cmp_arg )
-#endif
+#define std_hash_32_m( value ) std_hash_murmur_mixer_32(value)
+#define std_hash_64_m( value ) std_hash_murmur_mixer_64(value)
 
 // Differently from std_map, std_hash_map doesn't store the original key value, and only works with hashes
 // The hash function is expected to be handled from outside and there's no internal guard against 2 different keys

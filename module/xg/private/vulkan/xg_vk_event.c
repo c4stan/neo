@@ -34,6 +34,7 @@ void xg_vk_event_unload ( void ) {
     std_virtual_heap_free ( xg_vk_event_state->cpu_queue_events_array );
 }
 
+#if 0
 xg_gpu_event_h xg_gpu_event_create ( xg_device_h device_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
@@ -71,10 +72,11 @@ void xg_gpu_event_destroy ( xg_gpu_event_h event_handle ) {
 const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h event_handle ) {
     return &xg_vk_event_state->gpu_events_array[event_handle];
 }
+#endif
 
 // --
 
-xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
+xg_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
     std_mutex_lock ( &xg_vk_event_state->gpu_queue_events_mutex );
@@ -97,10 +99,10 @@ xg_gpu_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
 
     std_mutex_unlock ( &xg_vk_event_state->gpu_queue_events_mutex );
 
-    return ( xg_gpu_queue_event_h ) ( event - xg_vk_event_state->gpu_queue_events_array );
+    return ( xg_queue_event_h ) ( event - xg_vk_event_state->gpu_queue_events_array );
 }
 
-void xg_gpu_queue_event_destroy ( xg_gpu_queue_event_h event_handle ) {
+void xg_gpu_queue_event_destroy ( xg_queue_event_h event_handle ) {
     std_mutex_lock ( &xg_vk_event_state->gpu_queue_events_mutex );
 
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
@@ -117,11 +119,11 @@ void xg_gpu_queue_event_destroy ( xg_gpu_queue_event_h event_handle ) {
     std_mutex_unlock ( &xg_vk_event_state->gpu_queue_events_mutex );
 }
 
-const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_gpu_queue_event_h event_handle ) {
+const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_queue_event_h event_handle ) {
     return &xg_vk_event_state->gpu_queue_events_array[event_handle];
 }
 
-void xg_gpu_queue_event_log_wait ( xg_gpu_queue_event_h event_handle ) {
+void xg_gpu_queue_event_log_wait ( xg_queue_event_h event_handle ) {
 #if xg_debug_enable_events_log_m
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
     std_log_info_m ( "[XG-VK-EVENT] Wait " std_fmt_u64_m, event->vk_semaphore );
@@ -130,7 +132,7 @@ void xg_gpu_queue_event_log_wait ( xg_gpu_queue_event_h event_handle ) {
 #endif
 }
 
-void xg_gpu_queue_event_log_signal ( xg_gpu_queue_event_h event_handle ) {
+void xg_gpu_queue_event_log_signal ( xg_queue_event_h event_handle ) {
 #if xg_debug_enable_events_log_m
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
     std_log_info_m ( "[XG-VK-EVENT] Signal " std_fmt_u64_m, event->vk_semaphore );

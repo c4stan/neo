@@ -659,8 +659,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
     std_log_info_m ( "Shader database build " std_fmt_str_m std_fmt_newline_m 
         "Pipeline states: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached" std_fmt_newline_m 
-        "Shaders: " std_fmt_tab_m std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", 
-        std_debug_string_get ( &db->debug_name ),
+        "Shaders: " std_fmt_tab_m std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", db->debug_name,
         result.failed_pipeline_states, result.successful_pipeline_states, result.skipped_pipeline_states,
         result.failed_shaders, result.successful_shaders, result.skipped_shaders );
 
@@ -739,7 +738,7 @@ xs_database_h xs_database_create ( const xs_database_params_t* params ) {
     db->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
     db->pipeline_name_hash_to_state_map = std_hash_map_create ( xs_database_max_pipeline_states_m * 2 );
     db->pipeline_state_headers_array = std_virtual_heap_alloc_array_m ( xs_database_pipeline_state_header_t, xs_database_max_pipeline_state_headers_m );
-    std_debug_string_copy ( &db->debug_name, &params->debug_name );
+    std_str_copy_static_m ( db->debug_name, params->debug_name );
 
     db->base_graphics_state = xg_graphics_pipeline_state_m();
     db->base_compute_state = xg_compute_pipeline_state_m();

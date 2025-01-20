@@ -5,7 +5,6 @@
 #include <fs.h>
 
 std_warnings_ignore_m ( "-Wunused-function" )
-std_warnings_ignore_m ( "-Wunused-macros" )
 std_warnings_ignore_m ( "-Wunused-variable" )
 
 #define se_test_component_0_m 0
@@ -48,19 +47,7 @@ static void run_se_test_1 ( void ) {
     se_component_h c0 = 1;
     se_component_h c1 = 2;
 
-#if 0
-    std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 16 );
-    se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-
-    se_entity_h entity = se->create_entity();
-
-    se_entity_params_alloc_entity ( &allocator, entity );
-    se_entity_params_alloc_monostream_component_inline ( &allocator, se_test_component_0_m, &c0, sizeof ( se_component_h ) );
-    se_entity_params_alloc_monostream_component_inline ( &allocator, se_test_component_1_m, &c1, sizeof ( se_component_h ) );
-    
-    se->init_entities ( allocator.entities );
-#else
-    se_entity_h entity = se->create_entity ( &se_entity_params_m (
+    se->create_entity ( &se_entity_params_m (
         .debug_name = "entity",
         .update = se_entity_update_m (
             .component_count = 2,
@@ -80,49 +67,6 @@ static void run_se_test_1 ( void ) {
             }
         )
     ) );
-#endif
-
-    /*
-    se_alloc_entity ( entity_params_m (
-        .component_count 2
-        .components = {
-            component_m (
-                .id = se_test_component_0_m,
-                .stream_count = 1,
-                .streams = {
-                    stream_m (
-                        .id = 0, 
-                        .data = &c0,
-                        .size = sizeof ( se_component_h )
-                    )    
-                }
-            ),
-            component_m (
-                .id = se_test_component_1_m,
-                .stream_count = 1,
-                .streams = { 
-                    .id = 0,
-                    .data = &c1,
-                    .size = sizeof ( se_component_h )
-                }
-            )
-        }
-    ) )
-    */
-
-#if 0
-    se_entity_params_t entity_params = se_entity_params_m (
-        //.update = {
-        .component_count = 2,
-        .components = { 
-            se_component_update_monostream_m ( se_test_component_0_m, &c0 ),
-            se_component_update_monostream_m ( se_test_component_1_m, &c1 ),
-        }
-        //}
-    );
-    //std_bitset_set ( entity_params.mask.u64, se_test_component_0_m );
-    //std_bitset_set ( entity_params.mask.u64, se_test_component_1_m );
-#endif
 
 
     se_query_result_t query_result;
@@ -182,7 +126,8 @@ typedef struct {
 
 typedef struct {
     xs_database_pipeline_h pipeline_state;
-    //xg_buffer_h vertex_cbuffer;
+    float vel_x;
+    float vel_y;
     vertex_cbuffer_data_t vertex_cbuffer_data;
 } se_test_pass_component_t;
 
@@ -196,21 +141,6 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     xs_i* xs = std_module_get_m ( xs_module_name_m );
-
-#if 0
-    // Bind swapchain texture as render target
-    {
-        xg_color_clear_t color_clear;
-        color_clear.f32[0] = 0;
-        color_clear.f32[1] = 0;
-        color_clear.f32[2] = 0;
-        xg_render_textures_binding_t render_textures;
-        render_textures.render_targets_count = 1;
-        render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-        render_textures.depth_stencil.texture = xg_null_handle_m;
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
-#endif
 
     xg->cmd_begin_renderpass ( cmd_buffer, key, &xg_cmd_renderpass_params_m (
         .renderpass = node_args->renderpass,
@@ -231,54 +161,13 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
     for ( uint64_t i = 0; i < query_result.entity_count; ++i ) {
         se_test_pass_component_t* test_pass_component = ( se_test_pass_component_t* ) se_stream_iterator_next ( &it );
 
-        // Set pipeline
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( test_pass_component->pipeline_state );
-        //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-#if 0
-        // Bind resources
-        {
-            xg_buffer_resource_binding_t buffer;
-            buffer.shader_register = 0;
-            buffer.type = xg_buffer_binding_type_uniform_m;
-            buffer.range.handle = test_pass_component->vertex_cbuffer;
-            buffer.range.offset = 0;
-            buffer.range.size = 12; // TODO ...
-
-            xg_pipeline_resource_bindings_t bindings = xg_default_pipeline_resource_bindings_m;
-            bindings.set = xg_shader_binding_set_dispatch_m;
-            bindings.buffer_count = 1;
-            bindings.buffers = &buffer;
-
-#if 0
-            xg_resource_binding_t bindings;
-            bindings.shader_register = 0;
-            bindings.stages = xg_shading_stage_bit_vertex_m;
-            bindings.type = xg_resource_binding_buffer_uniform_m;
-            bindings.resource = test_pass_component->vertex_cbuffer;
-            xg->cmd_set_pipeline_resources ( cmd_buffer, xg_shader_binding_set_dispatch_m, &bindings, 1, key );
-#else
-            xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
-#endif
-        }
-#else
         xg_buffer_range_t vert_uniform_range = xg->write_workload_uniform ( node_args->workload, &test_pass_component->vertex_cbuffer_data, sizeof ( vertex_cbuffer_data_t ) );
+        xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .range = vert_uniform_range );
 
-        xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .type = xg_buffer_binding_type_uniform_m, .range = vert_uniform_range );
-
-        //xg_pipeline_resource_bindings_t bindings = xg_pipeline_resource_bindings_m (
-        //    .set = xg_shader_binding_set_dispatch_m,
-        //    .buffer_count = 1,
-        //    .buffers = { buffer },
-        //);
-
-        //xg->cmd_set_pipeline_resources ( cmd_buffer, &bindings, key );
-
-#endif
-
-        xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( node_args->resource_cmd_buffer, &xg_resource_bindings_params_m (
-            .pipeline = pipeline_state,
-            .set = xg_shader_binding_set_dispatch_m,
+        xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( node_args->resource_cmd_buffer, &xg_resource_bindings_params_m ( 
+            .layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m ),
             .bindings = xg_pipeline_resource_bindings_m (
                 .buffer_count = 1,
                 .buffers = { buffer }
@@ -286,7 +175,6 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
         ) );
 
         // Draw
-        //xg->cmd_draw ( cmd_buffer, 3, 0, key );
         xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
             .pipeline = pipeline_state,
             .primitive_count = 1,
@@ -295,6 +183,23 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
     }
 
     xg->cmd_end_renderpass ( cmd_buffer, key );
+}
+
+static void update_entities ( float t ) {
+    se_i* se = std_module_get_m ( se_module_name_m );
+
+    se_query_result_t query_result;
+    se->query_entities ( &query_result, &se_query_params_m ( .component_count = 1, .components = { se_test_pass_component_m } ) );
+    se_stream_iterator_t iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+
+    for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
+        se_test_pass_component_t* component = se_stream_iterator_next ( &iterator );
+        float o = ( std_hash_32_m ( i ) / ( (float)UINT32_MAX ) );
+        float oscillation_x = sinf ( t * 0.001 + o * 10 ) * 0.002;
+        float oscillation_y = cosf ( t * 0.001 + o * 10 ) * 0.002;
+        component->vertex_cbuffer_data.pos_x += oscillation_x;
+        component->vertex_cbuffer_data.pos_y += oscillation_y;
+    }
 }
 
 static void run_se_test_2 ( void ) {
@@ -339,15 +244,9 @@ static void run_se_test_2 ( void ) {
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "se_test_sdb" ) );
     xs->add_database_folder ( sdb, "shader/" );
     xs->set_output_folder ( sdb, "output/shader/" );
-        xs->set_build_params ( sdb, &xs_database_build_params_m (
-            .base_graphics_state = &xg_graphics_pipeline_state_m ( 
-            .viewport_state.width = 600,
-            .viewport_state.height = 400,
-        ),
-    ) );
     xs->build_database ( sdb );
 
-    xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "main") );
+    xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle") );
     std_assert_m ( pipeline_state != xg_null_handle_m );
 
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
@@ -395,38 +294,16 @@ static void run_se_test_2 ( void ) {
         }
     ) );
 
-#define N (1024*4)
-
     srand ( ( unsigned int ) std_tick_now() );
 
-#if 0
-    std_virtual_stack_t stack = std_virtual_stack_create ( 1024 * 1024 );
-    se_entity_params_allocator_t allocator = se_entity_params_allocator ( &stack );
-
-    for ( uint64_t i = 0; i < N; ++i ) {
-        se_test_pass_component_t component_data;
-        component_data.vertex_cbuffer_data.pos_x = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
-        component_data.vertex_cbuffer_data.pos_y = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
-        component_data.vertex_cbuffer_data.scale = 0.2f;
-        component_data.pipeline_state = pipeline_state;
-
-        se_entity_h entity = se->create_entity();
-
-        se_entity_params_alloc_entity ( &allocator, entity );
-        se_entity_params_alloc_monostream_component_inline_m ( &allocator, se_test_pass_component_m, &component_data );
-    }
-
-    se->init_entities ( allocator.entities );
-    std_virtual_stack_destroy ( &stack );
-#else
-    for ( uint64_t i = 0; i < N; ++i ) {
+    for ( uint64_t i = 0; i < 1024*2; ++i ) {
         se_test_pass_component_t component_data;
         component_data.vertex_cbuffer_data.pos_x = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
         component_data.vertex_cbuffer_data.pos_y = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
         component_data.vertex_cbuffer_data.scale = 0.05f;
         component_data.pipeline_state = pipeline_state;
 
-        se_entity_h entity = se->create_entity ( &se_entity_params_m (
+        se->create_entity ( &se_entity_params_m (
             .debug_name = "entity",
             .update = se_entity_update_m (
                 .components = { se_component_update_m ( 
@@ -438,11 +315,10 @@ static void run_se_test_2 ( void ) {
             )
         ) );
     }    
-#endif
-
-#undef N
 
     xf->debug_print_graph ( graph );
+
+    std_tick_t begin = std_tick_now();
 
     while ( true ) {
         wm->update_window ( window );
@@ -458,9 +334,11 @@ static void run_se_test_2 ( void ) {
             break;
         }
 
-        xg_workload_h workload = xg->create_workload ( device );
+        std_tick_t now = std_tick_now();
+        float t = std_tick_to_milli_f32 ( now - begin );
+        update_entities ( t );
 
-        //xg->acquire_swapchain ( swapchain, workload );
+        xg_workload_h workload = xg->create_workload ( device );
 
         xf->execute_graph ( graph, workload, 0 );
         xg->submit_workload ( workload );

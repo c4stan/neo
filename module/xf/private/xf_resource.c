@@ -527,7 +527,7 @@ xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture_
     return handle;
 }
 
-// TODO try using VkEvents instead of barriers
+// TODO try using VkEvents instead of barriers?
 static void xf_resource_texture_barrier ( std_stack_t* stack, xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
     const xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
 
@@ -541,17 +541,19 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_texture_h textu
         // just accumulate the stage and do layout transition if necessary
         if ( prev_state->layout != new_state->layout ) {
             std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
-            barrier->texture = texture->xg_handle;
-            barrier->mip_base = view.mip_base;
-            barrier->mip_count = view.mip_count;
-            barrier->array_base = view.array_base;
-            barrier->array_count = view.array_count;
-            barrier->layout.old = prev_state->layout;
-            barrier->layout.new = new_state->layout;
-            barrier->memory.flushes = xg_memory_access_bit_none_m;
-            barrier->memory.invalidations = new_state->access;
-            barrier->execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m;
-            barrier->execution.blocked = new_state->stage;
+            *barrier = xg_texture_memory_barrier_m (
+                .texture = texture->xg_handle,
+                .mip_base = view.mip_base,
+                .mip_count = view.mip_count,
+                .array_base = view.array_base,
+                .array_count = view.array_count,
+                .layout.old = prev_state->layout,
+                .layout.new = new_state->layout,
+                .memory.flushes = xg_memory_access_bit_none_m,
+                .memory.invalidations = new_state->access,
+                .execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m,
+                .execution.blocked = new_state->stage,
+            );
 
             xf_resource_texture_set_execution_layout ( texture_handle, view, new_state->layout );
         }
@@ -560,17 +562,19 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_texture_h textu
     } else {
         // wait on previous access and update the resource state
         std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
-        barrier->texture = texture->xg_handle;
-        barrier->mip_base = view.mip_base;
-        barrier->mip_count = view.mip_count;
-        barrier->array_base = view.array_base;
-        barrier->array_count = view.array_count;
-        barrier->layout.old = prev_state->layout;
-        barrier->layout.new = new_state->layout;
-        barrier->memory.flushes = prev_state->access;
-        barrier->memory.invalidations = new_state->access;
-        barrier->execution.blocker = prev_state->stage;
-        barrier->execution.blocked = new_state->stage;
+        *barrier = xg_texture_memory_barrier_m (
+            .texture = texture->xg_handle,
+            .mip_base = view.mip_base,
+            .mip_count = view.mip_count,
+            .array_base = view.array_base,
+            .array_count = view.array_count,
+            .layout.old = prev_state->layout,
+            .layout.new = new_state->layout,
+            .memory.flushes = prev_state->access,
+            .memory.invalidations = new_state->access,
+            .execution.blocker = prev_state->stage,
+            .execution.blocked = new_state->stage,
+        );
 
         xf_resource_texture_set_execution_state ( texture_handle, view, new_state );
     }
@@ -612,11 +616,13 @@ static void xf_resource_buffer_barrier ( std_stack_t* stack, xf_buffer_h buffer_
     } else {
         // wait on previous access and update the resource state
         std_auto_m barrier = std_stack_alloc_m ( stack, xg_buffer_memory_barrier_t );
-        barrier->buffer = buffer->xg_handle;
-        barrier->memory.flushes = prev_state->access;
-        barrier->memory.invalidations = new_state->access;
-        barrier->execution.blocker = prev_state->stage;
-        barrier->execution.blocked = new_state->stage;
+        *barrier = xg_buffer_memory_barrier_m (
+            .buffer = buffer->xg_handle,
+            .memory.flushes = prev_state->access,
+            .memory.invalidations = new_state->access,
+            .execution.blocker = prev_state->stage,
+            .execution.blocked = new_state->stage,
+        );
 
         xf_resource_buffer_set_execution_state ( buffer_handle, new_state );
     }

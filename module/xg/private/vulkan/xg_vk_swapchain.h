@@ -29,9 +29,8 @@ typedef struct {
     size_t acquired_texture_idx;
     bool acquired;
 
-    //xg_gpu_queue_event_h texture_acquire_event;
     // Signaled by vkQueueSubmit and waited on by vkQueuePresent
-    xg_gpu_queue_event_h execution_complete_gpu_events[xg_swapchain_max_textures_m];
+    xg_queue_event_h execution_complete_gpu_events[xg_swapchain_max_textures_m];
 } xg_vk_swapchain_t;
 
 typedef struct {

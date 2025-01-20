@@ -194,12 +194,12 @@ typedef struct {
 
 typedef struct {
     xg_device_h device;
-    std_debug_string_t debug_name;
+    char debug_name[32];
 } xs_database_params_t;
 
 #define xs_database_params_m(...) ( xs_database_params_t ) { \
     .device = xg_null_handle_m, \
-    .debug_name = std_null_debug_string_m, \
+    .debug_name = "", \
     ##__VA_ARGS__ \
 }
 

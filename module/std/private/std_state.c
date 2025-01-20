@@ -5,6 +5,17 @@
 // Will contain state address on app memory and null (zero) on dll memory.
 static std_runtime_state_t* std_runtime_state_ptr;
 
+static void std_init_log ( void ) {
+    std_process_info_t proc_info;
+    std_process_info ( &proc_info, std_process_this() );
+#if std_build_debug_m
+    char* build_mode = "debug";
+#else
+    char* build_mode = "optimized";
+#endif
+    std_log_info_m ( "Running executable " std_fmt_str_m " in " std_fmt_str_m " mode", proc_info.executable_path, build_mode );
+}
+
 void std_init ( int argc, char** argv ) {
     std_log_boot();
 
@@ -33,6 +44,8 @@ void std_init ( int argc, char** argv ) {
     std_module_init ( &state->module_state );
 
     std_runtime_bind ( state );
+
+    std_init_log();
 
     // TODO pass these to std_process_init?
     //std_process_set_args ( ( const char** ) argv, ( size_t ) argc );

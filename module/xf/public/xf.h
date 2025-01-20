@@ -333,7 +333,6 @@ typedef struct {
     bool copy_uniform_data;
     xg_sampler_h samplers[xg_pipeline_resource_max_samplers_per_set_m];
     uint32_t samplers_count;
-    bool compute_queue;
 } xf_node_compute_pass_params_t;
 
 #define xf_node_compute_pass_params_m( ... ) ( xf_node_compute_pass_params_t ) { \
@@ -343,7 +342,6 @@ typedef struct {
     .copy_uniform_data = true, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
     .samplers_count = 0, \
-    .compute_queue = false, \
     ##__VA_ARGS__ \
 }
 

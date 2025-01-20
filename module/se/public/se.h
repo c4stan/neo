@@ -209,7 +209,7 @@ typedef struct {
 
 typedef struct {
     uint32_t entity_count;
-    se_data_stream_t entities;
+    se_data_stream_t entities;  // se_entity_h
     se_component_data_t components[se_max_components_per_entity_m];
 } se_query_result_t;
 

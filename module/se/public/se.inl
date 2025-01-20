@@ -11,7 +11,7 @@ typedef struct {
 } se_stream_iterator_t;
 
 #define se_component_iterator_m( component, stream_id ) ( se_stream_iterator_t ) { \
-    .stream = &(component)->streams[stream_id], \
+    .stream = &( (component)->streams[stream_id] ), \
     .page = 0, \
     .page_count = 0 \
 }

@@ -1,9 +1,13 @@
-vertex_shader main.vert
-fragment_shader main.frag
+vertex_shader triangle.vert
+fragment_shader triangle.frag
 
 begin rasterizer
     cull back
     front clockwise
+end
+
+begin viewport
+    dynamic on
 end
 
 begin render_target 0

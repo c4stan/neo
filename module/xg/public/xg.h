@@ -314,6 +314,14 @@ typedef enum {
     xg_runtime_layer_bit_renderdoc_m  = 1 << 1,
 } xg_runtime_layer_bit_e;
 
+typedef enum {
+    xg_cmd_queue_graphics_m,
+    xg_cmd_queue_compute_m,
+    xg_cmd_queue_copy_m,
+    xg_cmd_queue_count_m,
+    xg_cmd_queue_invalid_m,
+} xg_cmd_queue_e;
+
 // -- Display --
 // TODO is this working?
 typedef struct {
@@ -1492,8 +1500,8 @@ typedef struct {
 }
 
 typedef struct {
-    xg_memory_access_bit_e flushes; // make any cache that can possibly contain one of these memory accesses flush its content, making the changes visible from outside
-    xg_memory_access_bit_e invalidations; // make any cache that can possibly contain one of these memory accesses invalidate its content, making it able to see outside changes
+    xg_memory_access_bit_e flushes;         // prev access. make any cache that can possibly contain one of these memory accesses flush its content, making the changes visible from outside
+    xg_memory_access_bit_e invalidations;   // next access. make any cache that can possibly contain one of these memory accesses invalidate its content, making it able to see outside changes
 } xg_memory_dependency_t;
 
 #define xg_memory_dependency_m( ... ) ( xg_memory_dependency_t ) { \
@@ -1515,6 +1523,17 @@ typedef struct {
 }
 
 typedef struct {
+    xg_cmd_queue_e old;
+    xg_cmd_queue_e new;
+} xg_queue_ownership_transfer_t;
+
+#define xg_queue_ownership_transfer_m( ... ) ( xg_queue_ownership_transfer_t ) { \
+    .old = xg_cmd_queue_invalid_m, \
+    .new = xg_cmd_queue_invalid_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xg_execution_dependency_t execution;
     xg_memory_dependency_t memory;
 } xg_memory_barrier_t;
@@ -1529,6 +1548,7 @@ typedef struct {
     xg_execution_dependency_t execution;
     xg_memory_dependency_t memory;
     xg_texture_layout_dependency_t layout;
+    xg_queue_ownership_transfer_t queue;
 } xg_texture_memory_barrier_t;
 
 #define xg_texture_memory_barrier_m( ... ) ( xg_texture_memory_barrier_t ) { \
@@ -1540,6 +1560,7 @@ typedef struct {
     .execution = xg_execution_dependency_m(), \
     .memory = xg_memory_dependency_m(), \
     .layout = xg_layout_dependency_m(), \
+    .queue = xg_queue_ownership_transfer_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -1549,6 +1570,7 @@ typedef struct {
     uint64_t size;
     xg_execution_dependency_t execution;
     xg_memory_dependency_t memory;
+    xg_queue_ownership_transfer_t queue;
 } xg_buffer_memory_barrier_t;
 
 #define xg_buffer_memory_barrier_m( ... ) ( xg_buffer_memory_barrier_t ) { \
@@ -1557,20 +1579,13 @@ typedef struct {
     .size = 0, \
     .execution = xg_execution_dependency_m(), \
     .memory = xg_memory_dependency_m(), \
+    .queue = xg_queue_ownership_transfer_m(), \
     ##__VA_ARGS__ \
 }
 
 // -- Commands --
 typedef uint64_t xg_workload_h;
 #define xg_workload_null_m UINT64_MAX;
-
-typedef enum {
-    xg_cmd_queue_graphics_m,
-    xg_cmd_queue_compute_m,
-    xg_cmd_queue_copy_m,
-    xg_cmd_queue_count_m,
-    xg_cmd_queue_invalid_m,
-} xg_cmd_queue_e;
 
 typedef struct {
     xg_buffer_h buffer;
@@ -1827,16 +1842,12 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
-// in VK fences can only be signaled when a queue submit has finished executing, so they're workloads in xg
-typedef uint64_t xg_gpu_event_h;    // VK semaphore
-typedef uint64_t xg_gpu_queue_event_h; // TODO rename this to gpu_event, fix backend etc
-// TODO event api: create_event(), destroy_event(), and on cmd buffer dispatch take one array of events to wait for before running and one array of events to signal when cmd buffer is executed
-// TODO what about VkEvent?
+typedef uint64_t xg_queue_event_h;
 
 typedef struct {
     xg_cmd_queue_e queue;
-    xg_gpu_queue_event_h signal_event;
-    xg_gpu_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
+    xg_queue_event_h signal_event;
+    xg_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
     xg_pipeline_stage_bit_e wait_stages[xg_cmd_bind_queue_max_wait_events_m];
     uint32_t wait_count;
 } xg_cmd_bind_queue_params_t;
@@ -2337,7 +2348,8 @@ typedef struct {
 
     // Event
     //xg_gpu_event_h          ( *create_event )                       ( xg_device_h device );
-    xg_gpu_queue_event_h    ( *create_queue_event )                 ( xg_device_h device );
+    xg_queue_event_h        ( *create_queue_event )                 ( xg_device_h device );
+    void                    ( *cmd_destroy_queue_event )            ( xg_resource_cmd_buffer_h cmd_buffer, xg_queue_event_h event, xg_resource_cmd_buffer_time_e destroy_time );
 
     xg_renderpass_h         ( *create_renderpass )                  ( const xg_renderpass_params_t* params );
     void                    ( *destroy_renderpass )                 ( xg_renderpass_h renderpass );
