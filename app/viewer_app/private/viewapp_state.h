@@ -179,8 +179,17 @@ typedef enum {
 typedef struct {
     rv_view_h view;
     bool enabled;
+    float move_speed;
     viewapp_camera_type_e type;
 } viewapp_camera_component_t;
+
+#define viewapp_camera_component_m( ... ) { \
+    .view = rv_null_handle_m, \
+    .enabled = false, \
+    .move_speed = 0.00002, \
+    .type = viewapp_camera_type_flycam_m, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     bool shadow_casting;

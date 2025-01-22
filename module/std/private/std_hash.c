@@ -3,12 +3,13 @@
 #include <std_compiler.h>
 #include <std_log.h>
 #include <std_atomic.h>
+#include <std_allocator.h>
 
 // ------------------------------------------------------------------------------------------------------
 // Hash
 // ------------------------------------------------------------------------------------------------------
 // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
-uint32_t std_hash_murmur_mixer_32 ( uint32_t h ) {
+uint32_t std_hash_murmur_32 ( uint32_t h ) {
     h ^= h >> 16;
     h *= 0x85ebca6b;
     h ^= h >> 13;
@@ -18,7 +19,7 @@ uint32_t std_hash_murmur_mixer_32 ( uint32_t h ) {
     return h;
 }
 
-uint64_t std_hash_murmur_mixer_64 ( uint64_t k ) {
+uint64_t std_hash_murmur_64 ( uint64_t k ) {
     k ^= k >> 33;
     k *= 0xff51afd7ed558ccdLLU;
     k ^= k >> 33;
@@ -28,60 +29,56 @@ uint64_t std_hash_murmur_mixer_64 ( uint64_t k ) {
     return k;
 }
 
-uint32_t std_hash_murmur_32 ( const void* base, uint32_t size ) {
-    uint32_t len = size;
-    uint32_t seed = 0;
-    uint32_t c1 = 0xcc9e2d51;
-    uint32_t c2 = 0x1b873593;
-    uint32_t r1 = 15;
-    uint32_t r2 = 13;
-    uint32_t m = 5;
-    uint32_t n = 0xe6546b64;
-    uint32_t h = 0;
-    uint32_t k = 0;
-    uint8_t* d = ( uint8_t* ) base; // 32 bit extract from `key'
-    const uint32_t* chunks = NULL;
-    const uint8_t* tail = NULL;  // tail - last 8 bytes
-    int i = 0;
-    int l = len / 4;  // chunk length
-    h = seed;
-    chunks = ( const uint32_t* ) ( d + l * 4 ); // body
-    tail = ( const uint8_t* ) ( d + l * 4 ); // last 8 byte chunk of `key'
+uint32_t std_hash_fnv1a_block_32 ( const void* base, uint32_t size ) {
+    unsigned int hash = 0x811C9DC5;
+    unsigned int prime = 0x01000193;
+    unsigned char* data = ( unsigned char* ) base;
 
-    // for each 4 byte chunk of `key'
-    for ( i = -l; i != 0; ++i ) {
-        // next 4 byte chunk of `key'
-        k = chunks[i];
-        // encode next 4 byte chunk of `key'
-        k *= c1;
-        k = ( k << r1 ) | ( k >> ( 32 - r1 ) );
-        k *= c2;
-        // append to hash
-        h ^= k;
-        h = ( h << r2 ) | ( h >> ( 32 - r2 ) );
-        h = h * m + n;
+    for ( uint32_t i = 0; i < size; ++i ) {
+        hash ^= data[i];
+        hash *= prime;
     }
 
-    k = 0;
+    return hash;
+}
 
-    // remainder
-    switch ( len & 3 ) { // `len % 4'
-        case 3:
-            k ^= ( uint32_t ) ( tail[2] << 16 );
+uint64_t std_hash_fnv1a_block_64 ( const void* base, uint32_t size ) {
+    uint64_t hash = 0xCBF29CE484222325;
+    uint64_t prime = 0x100000001B3;
+    unsigned char* data = ( unsigned char* ) base;
 
-        case 2:
-            k ^= ( uint32_t ) ( tail[1] << 8 );
-
-        case 1:
-            k ^= tail[0];
-            k *= c1;
-            k = ( k << r1 ) | ( k >> ( 32 - r1 ) );
-            k *= c2;
-            h ^= k;
+    for ( uint32_t i = 0; i < size; ++i ) {
+        hash ^= data[i];
+        hash *= prime;
     }
 
-    h ^= len;
-    return std_hash_murmur_mixer_32 ( h );
+    return hash;
+}
+
+uint32_t std_hash_fnv1a_string_32 ( const char* data ) {
+    unsigned int hash = 0x811C9DC5;
+    unsigned int prime = 0x01000193;
+
+    while ( *data ) {
+        hash ^= ( unsigned char )( *data );
+        hash *= prime;
+        data++;
+    }
+
+    return hash;
+}
+
+uint64_t std_hash_fnv1a_string_64 ( const char* data ) {
+    uint64_t hash = 0xCBF29CE484222325;
+    uint64_t prime = 0x100000001B3;
+
+    while ( *data ) {
+        hash ^= ( unsigned char ) ( *data );
+        hash *= prime;
+        data++;
+    }
+
+    return hash;
 }
 
 uint32_t std_hash_djb2_32 ( const void* base, size_t size ) {
@@ -106,6 +103,7 @@ uint64_t std_hash_djb2_64 ( const void* base, size_t size ) {
     return hash;
 }
 
+#if 0
 static uint64_t std_hash_metro_rotate_right ( uint64_t v, uint32_t k ) {
     return ( v >> k ) | ( v << ( 64 - k ) );
 }
@@ -211,182 +209,7 @@ uint64_t std_hash_metro ( const void* base, size_t length ) {
 
     return h;
 }
-
-void std_hash_metro_begin ( std_hash_metro_state_t* state ) {
-    static const uint64_t k0 = 0xD6D018F5;
-    //static const uint64_t k1 = 0xA2AA033B;
-    static const uint64_t k2 = 0x62992FC1;
-    //static const uint64_t k3 = 0x30BC5B29;
-
-    uint64_t seed = 0;
-    uint64_t vseed = ( seed + k2 ) * k0;
-
-    state->v[0] = vseed;
-    state->v[1] = vseed;
-    state->v[2] = vseed;
-    state->v[3] = vseed;
-    state->vseed = vseed;
-    state->bytes = 0;
-}
-
-// TODO isn't this slow?
-void std_hash_metro_add ( std_hash_metro_state_t* metro_state, const void* base, size_t length ) {
-    static const uint64_t k0 = 0xD6D018F5;
-    static const uint64_t k1 = 0xA2AA033B;
-    static const uint64_t k2 = 0x62992FC1;
-    static const uint64_t k3 = 0x30BC5B29;
-
-    const uint8_t* ptr = ( const uint8_t* ) ( base );
-    const uint8_t* const end = ptr + length;
-
-    // TODO avoid this copy back and forth
-    uint64_t bytes = metro_state->bytes;
-    struct {
-        uint64_t v[4];
-    } state;
-    struct {
-        uint8_t b[32];
-    } input;
-    std_mem_copy ( state.v, metro_state->v, sizeof ( uint64_t ) * 4 );
-    std_mem_copy ( input.b, metro_state->b, sizeof ( uint8_t ) * 32 );
-
-    // input buffer may be partially filled
-    if ( bytes % 32 ) {
-        uint64_t fill = 32 - ( bytes % 32 );
-
-        if ( fill > length ) {
-            fill = length;
-        }
-
-        memcpy ( input.b + ( bytes % 32 ), ptr, fill );
-        ptr   += fill;
-        bytes += fill;
-
-        // input buffer is still partially filled
-        if ( ( bytes % 32 ) != 0 ) {
-            return;
-        }
-
-        // process full input buffer
-        state.v[0] += std_hash_metro_read_u64 ( &input.b[ 0] ) * k0;
-        state.v[0] = std_hash_metro_rotate_right ( state.v[0], 29 ) + state.v[2];
-        state.v[1] += std_hash_metro_read_u64 ( &input.b[ 8] ) * k1;
-        state.v[1] = std_hash_metro_rotate_right ( state.v[1], 29 ) + state.v[3];
-        state.v[2] += std_hash_metro_read_u64 ( &input.b[16] ) * k2;
-        state.v[2] = std_hash_metro_rotate_right ( state.v[2], 29 ) + state.v[0];
-        state.v[3] += std_hash_metro_read_u64 ( &input.b[24] ) * k3;
-        state.v[3] = std_hash_metro_rotate_right ( state.v[3], 29 ) + state.v[1];
-    }
-
-    // bulk update
-    bytes += ( uint64_t ) ( end - ptr );
-
-    while ( ptr <= ( end - 32 ) ) {
-        // process directly from the source, bypassing the input buffer
-        state.v[0] += std_hash_metro_read_u64 ( ptr ) * k0;
-        ptr += 8;
-        state.v[0] = std_hash_metro_rotate_right ( state.v[0], 29 ) + state.v[2];
-        state.v[1] += std_hash_metro_read_u64 ( ptr ) * k1;
-        ptr += 8;
-        state.v[1] = std_hash_metro_rotate_right ( state.v[1], 29 ) + state.v[3];
-        state.v[2] += std_hash_metro_read_u64 ( ptr ) * k2;
-        ptr += 8;
-        state.v[2] = std_hash_metro_rotate_right ( state.v[2], 29 ) + state.v[0];
-        state.v[3] += std_hash_metro_read_u64 ( ptr ) * k3;
-        ptr += 8;
-        state.v[3] = std_hash_metro_rotate_right ( state.v[3], 29 ) + state.v[1];
-    }
-
-    // store remaining bytes in input buffer
-    if ( ptr < end ) {
-        memcpy ( input.b, ptr, ( size_t ) ( end - ptr ) );
-    }
-
-    // TODO avoid this copy back and forth
-    metro_state->bytes = bytes;
-    std_mem_copy ( metro_state->v, state.v, sizeof ( uint64_t ) * 4 );
-    std_mem_copy ( metro_state->b, input.b, sizeof ( uint8_t ) * 32 );
-}
-
-uint64_t std_hash_metro_end ( std_hash_metro_state_t* metro_state ) {
-    static const uint64_t k0 = 0xD6D018F5;
-    static const uint64_t k1 = 0xA2AA033B;
-    static const uint64_t k2 = 0x62992FC1;
-    static const uint64_t k3 = 0x30BC5B29;
-
-    // TODO avoid this copy
-    uint64_t bytes = metro_state->bytes;
-    uint64_t vseed = metro_state->vseed;
-    struct {
-        uint64_t v[4];
-    } state;
-    struct {
-        uint8_t b[32];
-    } input;
-    std_mem_copy ( state.v, metro_state->v, sizeof ( uint64_t ) * 4 );
-    std_mem_copy ( input.b, metro_state->b, sizeof ( uint8_t ) * 32 );
-
-    // finalize bulk loop, if used
-    if ( bytes >= 32 ) {
-        state.v[2] ^= std_hash_metro_rotate_right ( ( ( state.v[0] + state.v[3] ) * k0 ) + state.v[1], 37 ) * k1;
-        state.v[3] ^= std_hash_metro_rotate_right ( ( ( state.v[1] + state.v[2] ) * k1 ) + state.v[0], 37 ) * k0;
-        state.v[0] ^= std_hash_metro_rotate_right ( ( ( state.v[0] + state.v[2] ) * k0 ) + state.v[3], 37 ) * k1;
-        state.v[1] ^= std_hash_metro_rotate_right ( ( ( state.v[1] + state.v[3] ) * k1 ) + state.v[2], 37 ) * k0;
-
-        state.v[0] = vseed + ( state.v[0] ^ state.v[1] );
-    }
-
-    // process any bytes remaining in the input buffer
-    const uint8_t* ptr = ( const uint8_t* ) input.b;
-    const uint8_t* const end = ptr + ( bytes % 32 );
-
-    if ( ( end - ptr ) >= 16 ) {
-        state.v[1]  = state.v[0] + ( std_hash_metro_read_u64 ( ptr ) * k2 );
-        ptr += 8;
-        state.v[1] = std_hash_metro_rotate_right ( state.v[1], 29 ) * k3;
-        state.v[2]  = state.v[0] + ( std_hash_metro_read_u64 ( ptr ) * k2 );
-        ptr += 8;
-        state.v[2] = std_hash_metro_rotate_right ( state.v[2], 29 ) * k3;
-        state.v[1] ^= std_hash_metro_rotate_right ( state.v[1] * k0, 21 ) + state.v[2];
-        state.v[2] ^= std_hash_metro_rotate_right ( state.v[2] * k3, 21 ) + state.v[1];
-        state.v[0] += state.v[2];
-    }
-
-    if ( ( end - ptr ) >= 8 ) {
-        state.v[0] += std_hash_metro_read_u64 ( ptr ) * k3;
-        ptr += 8;
-        state.v[0] ^= std_hash_metro_rotate_right ( state.v[0], 55 ) * k1;
-    }
-
-    if ( ( end - ptr ) >= 4 ) {
-        state.v[0] += std_hash_metro_read_u32 ( ptr ) * k3;
-        ptr += 4;
-        state.v[0] ^= std_hash_metro_rotate_right ( state.v[0], 26 ) * k1;
-    }
-
-    if ( ( end - ptr ) >= 2 ) {
-        state.v[0] += std_hash_metro_read_u16 ( ptr ) * k3;
-        ptr += 2;
-        state.v[0] ^= std_hash_metro_rotate_right ( state.v[0], 48 ) * k1;
-    }
-
-    if ( ( end - ptr ) >= 1 ) {
-        state.v[0] += std_hash_metro_read_u8 ( ptr ) * k3;
-        state.v[0] ^= std_hash_metro_rotate_right ( state.v[0], 37 ) * k1;
-    }
-
-    state.v[0] ^= std_hash_metro_rotate_right ( state.v[0], 28 );
-    state.v[0] *= k0;
-    state.v[0] ^= std_hash_metro_rotate_right ( state.v[0], 29 );
-
-    metro_state->bytes = 0;
-    std_mem_copy ( metro_state->v, state.v, sizeof ( uint64_t ) * 4 );
-    std_mem_copy ( metro_state->b, input.b, sizeof ( uint8_t ) * 32 );
-
-    // do any endian conversion here
-
-    return state.v[0];
-}
+#endif
 
 // ------------------------------------------------------------------------------------------------------
 // Map
@@ -421,7 +244,7 @@ std_map_t std_map ( std_buffer_t keys, std_buffer_t payloads, size_t key_stride,
 uint64_t std_map_hasher_u64 ( const void* key_u64, void* unused ) {
     std_unused_m ( unused );
     uint64_t key = * ( uint64_t* ) key_u64;
-    return std_hash_murmur_mixer_64 ( key );
+    return std_hash_murmur_64 ( key );
 }
 
 bool std_map_cmp_u64 ( uint64_t hash1, const void* key1_u64, const void* key2_u64, void* unused ) {
@@ -763,7 +586,7 @@ static bool std_hash_map_remove_at_idx ( std_hash_map_t* map, size_t idx ) {
     return true;
 }
 
-bool std_hash_map_remove ( std_hash_map_t* map, uint64_t hash ) {
+bool std_hash_map_remove_hash ( std_hash_map_t* map, uint64_t hash ) {
     // Load
     size_t      mask = map->mask;
     uint64_t*   hashes = map->hashes;

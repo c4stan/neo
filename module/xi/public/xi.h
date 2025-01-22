@@ -330,6 +330,7 @@ typedef enum {
     xi_property_3f32_m,
     xi_property_4f32_m,
     xi_property_string_m,
+    xi_property_bool_m,
     xi_property_invalid_m,
 } xi_property_e;
 
@@ -480,12 +481,13 @@ typedef struct {
     void ( *end_section )   ( xi_workload_h workload );
 
     // TODO rename these, remove add_ and leave just element name? replace with draW?
+    // TODO return bool true if internal value changed
     bool ( *add_button )    ( xi_workload_h workload, xi_button_state_t* state );
     void ( *add_slider )    ( xi_workload_h workload, xi_slider_state_t* state );
     //void ( *add_text )     ( xi_workload_h workload, xi_text_state_t*   state );
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );
     void ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
-    void ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
+    bool ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
     bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
     bool ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
 

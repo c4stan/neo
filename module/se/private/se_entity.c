@@ -106,7 +106,7 @@ bool se_entity_component_add ( se_entity_h entity_handle, se_component_e compone
     std_assert_m ( std_bitset_test ( se_entity_state->entity_bitset, entity_idx ) );
 
     // TODO
-    uint64_t hash = std_hash_murmur_mixer_64 ( component_type );
+    uint64_t hash = std_hash_murmur_64 ( component_type );
     //std_assert_m ( hash != 0 );
 
     std_hash_map_t map;
@@ -133,7 +133,7 @@ bool se_entity_component_remove ( se_entity_h entity_handle, se_component_e comp
     std_assert_m ( std_bitset_test ( se_entity_state->entity_bitset, entity_idx ) );
 
     // TODO
-    uint64_t hash = std_hash_murmur_mixer_64 ( component_type );
+    uint64_t hash = std_hash_murmur_64 ( component_type );
     //std_assert_m ( hash != 0 );
 
     std_hash_map_t map;
@@ -142,7 +142,7 @@ bool se_entity_component_remove ( se_entity_h entity_handle, se_component_e comp
     map.count = component_table->count;
     map.mask = component_table->mask;
 
-    bool result = std_hash_map_remove ( &map, hash );
+    bool result = std_hash_map_remove_hash ( &map, hash );
 
     if ( result ) {
         component_table->count = map.count;
@@ -160,7 +160,7 @@ se_component_h se_entity_component_get ( se_entity_h entity_handle, se_component
     std_assert_m ( std_bitset_test ( se_entity_state->entity_bitset, entity_idx ) );
 
     // TODO
-    uint64_t hash = std_hash_murmur_mixer_64 ( component_type );
+    uint64_t hash = std_hash_murmur_64 ( component_type );
     //std_assert_m ( hash != 0 );
 
     std_hash_map_t map;
@@ -214,14 +214,7 @@ size_t se_entity_extract ( se_component_mask_t* out_component_masks, se_entity_h
 
 
 static uint64_t se_entity_component_mask_hash ( se_component_mask_t mask ) {
-    std_hash_metro_state_t hash_state;
-    std_hash_metro_begin ( &hash_state );
-
-    for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
-        std_hash_metro_add_m ( &hash_state, &mask.u64[i] );
-    }
-
-    uint64_t hash = std_hash_metro_end ( &hash_state );
+    uint64_t hash = std_hash_block_64_m ( mask.u64, se_component_mask_block_count_m * sizeof ( uint64_t ) );
     return hash;
 }
 
@@ -235,7 +228,7 @@ void se_entity_family_create ( const se_entity_family_params_t* params ) {
     std_mem_set ( family->component_slots, sizeof ( family->component_slots ), 0xff );
 
     se_component_mask_t mask;
-    std_mem_zero_m ( mask.u64 );
+    std_mem_zero_static_array_m ( mask.u64 );
 
     for ( uint32_t i = 0; i < component_count; ++i ) {
         const se_component_layout_t* component = &params->components[i];
@@ -761,6 +754,7 @@ void se_entity_property_get ( se_entity_properties_t* out_props, se_entity_h ent
 
 static uint32_t se_entity_property_stride ( se_property_e property ) {
     switch ( property ) {
+    case se_property_bool_m:
     case se_property_f32_m:
     case se_property_u32_m:
     case se_property_i32_m:

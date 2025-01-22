@@ -935,7 +935,7 @@ static uint32_t xs_parser_parse_shader ( xs_parser_parsing_context_t* context, x
         size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len > 0 );
 
-        uint64_t hash = std_hash_djb2_64 ( token, len );
+        uint64_t hash = std_hash_block_64_m ( token, len );
         if ( std_hash_set_lookup ( &context->shader_references->set, hash ) ) {
             // TODO optional?
             return idx;

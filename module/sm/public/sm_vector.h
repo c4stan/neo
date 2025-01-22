@@ -10,17 +10,29 @@ typedef union {
     float e[$SIZE];
     struct {
         $TYPE x;
-#if $SIZE > 1
+$IF $SIZE > 1
         $TYPE y;
-#endif
-#if $SIZE > 2
+$END_IF
+$IF $SIZE > 2
         $TYPE z;
-#endif
-#if $SIZE > 3
+$END_IF
+$IF $SIZE > 3
         $TYPE w;
-#endif
+$END_IF
     };
 } sm_vec_$SIZE$PREFIX_t;
+
+#define sm_vec_$SIZE$PREFIX_log_m( v ) std_log_info_m ( \
+    std_fmt_f32_m \
+    $FOR 1 $SIZE
+    " " std_fmt_f32_m \
+    $END_FOR
+    , \
+    v.e[0] \
+    $FOR 1 $SIZE
+    , v.e[$i] \
+    $END_FOR
+)
 
 make <float, f, 3>
 
@@ -32,33 +44,42 @@ typedef union {
     float e[3];
     struct {
         float x;
-#if 3 > 1
         float y;
-#endif
-#if 3 > 2
         float z;
-#endif
-#if 3 > 3
-        float w;
-#endif
     };
 } sm_vec_3f_t;
+
+#define sm_vec_3f_log_m( v ) std_log_info_m ( \
+    std_fmt_f32_m \
+    " " std_fmt_f32_m \
+    " " std_fmt_f32_m \
+    , \
+    v.e[0] \
+    , v.e[1] \
+    , v.e[2] \
+)
 
 typedef union {
     float e[4];
     struct {
         float x;
-#if 4 > 1
         float y;
-#endif
-#if 4 > 2
         float z;
-#endif
-#if 4 > 3
         float w;
-#endif
     };
 } sm_vec_4f_t;
+
+#define sm_vec_4f_log_m( v ) std_log_info_m ( \
+    std_fmt_f32_m \
+    " " std_fmt_f32_m \
+    " " std_fmt_f32_m \
+    " " std_fmt_f32_m \
+    , \
+    v.e[0] \
+    , v.e[1] \
+    , v.e[2] \
+    , v.e[3] \
+)
 // template generation end
 
 // ======================================================================================= //

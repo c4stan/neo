@@ -1577,7 +1577,7 @@ bool wm_window_destroy ( wm_window_h handle ) {
         std_log_os_error_m();
     }
     uint64_t hash = std_hash_64_m ( ( uint64_t ) window->info.os_handle.window );
-    bool remove_result = std_hash_map_remove ( &wm_window_state->map, hash );
+    bool remove_result = std_hash_map_remove_hash ( &wm_window_state->map, hash );
     std_verify_m ( remove_result );
 #elif defined(std_platform_linux_m)
     XDestroyWindow ( ( Display* ) window->info.os_handle.root, ( Window ) window->info.os_handle.window );

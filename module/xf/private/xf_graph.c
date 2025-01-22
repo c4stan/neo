@@ -1786,6 +1786,10 @@ void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, vo
 }
 
 void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
+    if ( graph_handle == xg_null_handle_m ) {
+        return;
+    }
+
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     //xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( xg_workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( xg_workload );

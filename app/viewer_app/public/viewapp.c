@@ -68,6 +68,8 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
     se_i* se = m_state->modules.se;
     xf_i* xf = m_state->modules.xf;
 
+    bool camera_found = false;
+
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
     se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
@@ -110,7 +112,7 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
         xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
-            .layout = m_state->render.workload_bindings_layout, // TODO
+            .layout = m_state->render.workload_bindings_layout,
             .bindings = xg_pipeline_resource_bindings_m (
                 .buffer_count = 1,
                 .buffers = { xg_buffer_resource_binding_m ( .shader_register = 0, .range = range ) }
@@ -118,7 +120,30 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
         ) );
         xg->set_workload_global_bindings ( workload, bindings );
 
+        camera_found = true;
         break;
+    }
+
+    if ( !camera_found ) {
+        workload_uniforms_t uniforms = {
+            .frame_id = m_state->render.frame_id,
+            .time_ms = m_state->render.time_ms,
+            .resolution_x_u32 = ( uint32_t ) m_state->render.resolution_x,
+            .resolution_y_u32 = ( uint32_t ) m_state->render.resolution_y,
+            .resolution_x_f32 = ( float ) m_state->render.resolution_x,
+            .resolution_y_f32 = ( float ) m_state->render.resolution_y,
+        };
+
+        xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
+        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+        xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+            .layout = m_state->render.workload_bindings_layout,
+            .bindings = xg_pipeline_resource_bindings_m (
+                .buffer_count = 1,
+                .buffers = { xg_buffer_resource_binding_m ( .shader_register = 0, .range = range ) }
+            )
+        ) );
+        xg->set_workload_global_bindings ( workload, bindings );
     }
 }
 
@@ -179,6 +204,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
 }
 
 static void viewapp_boot_raytrace_graph ( void ) {
+#if xg_enable_raytracing_m
     xg_device_h device = m_state->render.device;    
     xg_swapchain_h swapchain = m_state->render.swapchain;    
     uint32_t resolution_x = m_state->render.resolution_x;
@@ -222,6 +248,9 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     xf->finalize_graph ( graph );
+#else
+    m_state->render.raytrace_graph = xf_null_handle_m;
+#endif
 }
 
 static void viewapp_boot_raster_graph ( void ) {
@@ -840,6 +869,7 @@ static void viewapp_build_raytrace_geo ( void ) {
 }
 
 static void viewapp_build_raytrace_world ( void ) {
+#if xg_enable_raytracing_m
     xg_device_h device = m_state->render.device;
     xg_i* xg = m_state->modules.xg;
     xs_i* xs = m_state->modules.xs;
@@ -909,6 +939,7 @@ static void viewapp_build_raytrace_world ( void ) {
     ) );
 
     m_state->render.raytrace_world = rt_world;
+#endif
 }
 
 static void viewapp_boot_scene_raytrace ( void ) {
@@ -1495,8 +1526,9 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_camera_component_id_m, "Camera component", &se_component_properties_params_m (
-        .count = 0,
+        .count = 1, // TODO
         .properties = {
+            se_field_property_m ( 0, viewapp_camera_component_t, enabled, se_property_bool_m ),
         }
     ) );
 
@@ -1579,17 +1611,17 @@ static void viewapp_boot ( void ) {
         );
 
         // cameras
-        viewapp_camera_component_t arcball_camera_component = {
+        viewapp_camera_component_t arcball_camera_component = viewapp_camera_component_m (
             .view = rv->create_view ( &view_params ),
             .enabled = true,
             .type = viewapp_camera_type_arcball_m
-        };
+        );
 
-        viewapp_camera_component_t flycam_camera_component = {
+        viewapp_camera_component_t flycam_camera_component = viewapp_camera_component_m (
             .view = rv->create_view ( &view_params ),
             .enabled = false,
             .type = viewapp_camera_type_flycam_m
-        };
+        );
 
         se->create_entity ( &se_entity_params_m (
             .debug_name = "arcball_camera",
@@ -1651,7 +1683,7 @@ static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
     return false;
 }
 
-static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_state_t* new_input_state ) {
+static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_state_t* new_input_state, float dt ) {
     se_i* se = m_state->modules.se;
     xi_i* xi = m_state->modules.xi;
     rv_i* rv = m_state->modules.rv;
@@ -1679,72 +1711,136 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
         rv_view_transform_t xform = view_info.transform;
         bool dirty_xform = false;
 
-        // drag
-        if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
-            float drag_scale = -1.f / 400;
-            sm_vec_3f_t v;
-            v.x = xform.position[0] - xform.focus_point[0];
-            v.y = xform.position[1] - xform.focus_point[1];
-            v.z = xform.position[2] - xform.focus_point[2];
+        if ( camera_component->type == viewapp_camera_type_arcball_m ) {
+            // drag
+            if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
+                float drag_scale = -1.f / 400;
+                sm_vec_3f_t v = {
+                    xform.position[0] - xform.focus_point[0],
+                    xform.position[1] - xform.focus_point[1],
+                    xform.position[2] - xform.focus_point[2],
+                };
 
-            int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
-            int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
+                int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
+                int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
 
-            if ( delta_x != 0 ) {
-                sm_vec_3f_t up = { 0, 1, 0 };
-                sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
+                if ( delta_x != 0 ) {
+                    sm_vec_3f_t up = { 0, 1, 0 };
+                    sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
 
-                v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
+                    v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
+                }
+
+                if ( delta_y != 0 ) {
+                    sm_vec_3f_t up = { 0, 1, 0 };
+                    sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
+                    axis = sm_vec_3f_norm ( axis );
+
+                    sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( axis, -delta_y * drag_scale );
+                    v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
+                }
+
+                if ( delta_x != 0 || delta_y != 0 ) {
+                    xform.position[0] = xform.focus_point[0] + v.x;
+                    xform.position[1] = xform.focus_point[1] + v.y;
+                    xform.position[2] = xform.focus_point[2] + v.z;
+
+                    dirty_xform = true;
+                }
             }
 
-            if ( delta_y != 0 ) {
-                sm_vec_3f_t up = { 0, 1, 0 };
-                sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
-                axis = sm_vec_3f_norm ( axis );
+            // zoom
+            if ( xi->get_hovered_element_id() == 0 ) {
+                if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] || new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
+                    int8_t wheel = ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_up_m] - ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_down_m];
+                    float zoom_step = -0.1;
+                    float zoom_min = 0.001;
 
-                sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( axis, -delta_y * drag_scale );
-                v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
+                    sm_vec_3f_t v = {
+                        xform.position[0] - xform.focus_point[0],
+                        xform.position[1] - xform.focus_point[1],
+                        xform.position[2] - xform.focus_point[2],
+                    };
+
+                    float dist = sm_vec_3f_len ( v );
+                    float new_dist = fmaxf ( zoom_min, dist + ( zoom_step * wheel ) * dist );
+                    v = sm_vec_3f_mul ( v, new_dist / dist );
+
+                    xform.position[0] = xform.focus_point[0] + v.x;
+                    xform.position[1] = xform.focus_point[1] + v.y;
+                    xform.position[2] = xform.focus_point[2] + v.z;
+
+                    dirty_xform = true;
+                }
             }
+        } else if ( camera_component->type == viewapp_camera_type_flycam_m ) {
+            bool forward_press = new_input_state->keyboard[wm_keyboard_state_w_m];
+            bool backward_press = new_input_state->keyboard[wm_keyboard_state_s_m];
+            bool right_press = new_input_state->keyboard[wm_keyboard_state_d_m];
+            bool left_press = new_input_state->keyboard[wm_keyboard_state_a_m];
 
-            if ( delta_x != 0 || delta_y != 0 ) {
-                xform.position[0] = view_info.transform.focus_point[0] + v.x;
-                xform.position[1] = view_info.transform.focus_point[1] + v.y;
-                xform.position[2] = view_info.transform.focus_point[2] + v.z;
+            float speed = camera_component->move_speed;
+            if ( ( forward_press && !backward_press ) || ( backward_press && !forward_press ) 
+                || ( right_press && !left_press ) || ( left_press && !right_press ) ) {
+                sm_vec_3f_t z_axis = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( xform.focus_point ), sm_vec_3f ( xform.position ) ) );
+                sm_vec_3f_t up = { 0, 1, 0 };
+                sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
+                sm_vec_3f_t y_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( x_axis, z_axis ) );
 
+                float forward = ( forward_press ? 1.f : 0.f ) - ( backward_press ? 1.f : 0.f );
+                float right = ( right_press ? 1.f : 0.f ) - ( left_press ? 1.f : 0.f );
+                sm_vec_3f_t move_dir = sm_vec_3f_norm ( sm_vec_3f_add ( sm_vec_3f_mul ( x_axis, right ), sm_vec_3f_mul ( z_axis, forward) ) );
+                sm_vec_3f_t move = sm_vec_3f_mul ( move_dir, speed * dt );
+
+                xform.position[0] += move.e[0];
+                xform.position[1] += move.e[1];
+                xform.position[2] += move.e[2];
+                xform.focus_point[0] += move.e[0];
+                xform.focus_point[1] += move.e[1];
+                xform.focus_point[2] += move.e[2];
                 dirty_xform = true;
             }
-        }
 
-        // zoom
-        if ( xi->get_hovered_element_id() == 0 ) {
-            if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] || new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
-                int8_t wheel = ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_up_m] - ( int8_t ) new_input_state->mouse[wm_mouse_state_wheel_down_m];
-                float zoom_step = -0.1;
-                float zoom_min = 0.001;
-
-                sm_vec_3f_t v;
-                v.x = xform.position[0] - xform.focus_point[0];
-                v.y = xform.position[1] - xform.focus_point[1];
-                v.z = xform.position[2] - xform.focus_point[2];
-
-                float dist = sm_vec_3f_len ( v );
-                float new_dist = fmaxf ( zoom_min, dist + ( zoom_step * wheel ) * dist );
-                v = sm_vec_3f_mul ( v, new_dist / dist );
-
-                xform.position[0] = view_info.transform.focus_point[0] + v.x;
-                xform.position[1] = view_info.transform.focus_point[1] + v.y;
-                xform.position[2] = view_info.transform.focus_point[2] + v.z;
-
+            bool up_press = new_input_state->keyboard[wm_keyboard_state_shift_left_m];
+            bool down_press = new_input_state->keyboard[wm_keyboard_state_ctrl_left_m];
+            if ( ( up_press && !down_press ) || ( !up_press && down_press ) ) {
+                float above = ( up_press ? 1.f : 0.f ) - ( down_press ? 1.f : 0.f );
+                xform.position[1] += above * speed * dt;
+                xform.focus_point[1] += above * speed * dt;
                 dirty_xform = true;
             }
+
+            if ( new_input_state->mouse[wm_mouse_state_right_m] ) {
+                int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
+                int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
+
+                sm_vec_3f_t z_axis = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( xform.focus_point ), sm_vec_3f ( xform.position ) ) );
+                sm_vec_3f_t up = { 0, 1, 0 };
+                sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
+                sm_vec_3f_t dir = z_axis;
+                float drag_scale = -1.f / 400;
+
+                if ( delta_x != 0 ) {
+                    sm_vec_3f_t up = { 0, 1, 0 };
+                    sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
+                    dir = sm_matrix_4x4f_transform_f3_dir ( mat, dir );
+                }
+
+                if ( delta_y != 0 ) {
+                    sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( x_axis, delta_y * drag_scale );
+                    dir = sm_matrix_4x4f_transform_f3_dir ( mat, dir );
+                }
+
+                xform.focus_point[0] = xform.position[0] + dir.x;
+                xform.focus_point[1] = xform.position[1] + dir.y;
+                xform.focus_point[2] = xform.position[2] + dir.z;
+                dirty_xform = true;
+            }
+
         }
 
         if ( dirty_xform ) {
             rv->update_view_transform ( camera_component->view, &xform );
-        }
-
-        if ( camera_component->enabled ) {
-            break;
         }
     }
 }
@@ -1825,7 +1921,19 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
     m_state->ui.mouse_pick_entity = se_null_handle_m;
 }
 
-static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state ) {
+// TODO
+static void update_raytrace_world ( xg_workload_h workload ) {
+#if xg_enable_raytracing_m
+    xg_i* xg = m_state->modules.xg;
+    xf_i* xf = m_state->modules.xf;
+    xg->wait_all_workload_complete();
+    viewapp_build_raytrace_world();
+    xf->destroy_graph ( m_state->render.raytrace_graph, workload );
+    viewapp_boot_raytrace_graph();
+#endif
+}
+
+static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state, xg_workload_h workload ) {
     wm_i* wm = m_state->modules.wm;
     xg_i* xg = m_state->modules.xg;
     xf_i* xf = m_state->modules.xf;
@@ -1949,7 +2057,11 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         );
         xi->add_label ( xi_workload, &graph_select_label );
 
+#if xg_enable_raytracing_m
         const char* graph_select_items[] = { "raster", "raytrace" };
+#else
+        const char* graph_select_items[] = { "raster" };
+#endif
         xi_select_state_t graph_select = xi_select_state_m (
             .items = graph_select_items,
             .item_count = std_static_array_capacity_m ( graph_select_items ),
@@ -2080,11 +2192,13 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
                     // property editor
                     void* component_data = se->get_entity_component ( entity_list[i], component->id, property->stream );
+                    xi_property_e type = ( xi_property_e ) property->type; // This assumes the se and xi enums are laid out identical...
                     xi_property_editor_state_t property_editor_state = xi_property_editor_state_m ( 
-                        .type = ( xi_property_e ) property->type,
+                        .type = type,
                         .data = component_data + property->offset,
-                        .property_width = 64,
-                        .id = ( ( ( uint64_t ) i ) << 32 ) + ( ( ( uint64_t ) j ) << 16 ) + ( ( uint64_t ) k ),
+                        .property_width = type == xi_property_bool_m ? 14 : 64,
+                        .property_height = type == xi_property_bool_m ? 14 : 0,
+                        .id = ( ( ( uint64_t ) i ) << 32 ) + ( ( ( uint64_t ) j ) << 16 ) + ( ( uint64_t ) k + 1 ),
                         .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
                     );
                     entity_edit |= xi->add_property_editor ( xi_workload, &property_editor_state );
@@ -2096,12 +2210,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     xi->end_section ( xi_workload );
 
     if ( entity_edit ) {
-        xg->wait_all_workload_complete();
-        // TODO this is currently broken:
-        //      - world handle 0 gets deleted and recreated, the handle is immediately reused and thus remains the same
-        //      - function that creates the raytrace pass takes world handle as param and never updates after
-        //      - since the handle ends up being reused this ends up working out but IT IS BROKEN and needs to be fixed one way or another.
-        viewapp_build_raytrace_world();
+        update_raytrace_world ( workload );
     }
 
     xi->end_window ( xi_workload );
@@ -2120,9 +2229,22 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         );
         xi->draw_transform ( xi_workload, &xform );
 
+        bool rtworld_needs_update = false;
+        if ( ( mesh->position[0] != xform.position[0] 
+            || mesh->position[1] != xform.position[1] 
+            || mesh->position[2] != xform.position[2] )
+            && m_state->render.active_graph == m_state->render.raytrace_graph )
+        {
+            rtworld_needs_update = true;
+        }
+
         mesh->position[0] = xform.position[0];
         mesh->position[1] = xform.position[1];
         mesh->position[2] = xform.position[2];
+    
+        if ( rtworld_needs_update ) {
+            update_raytrace_world ( workload );
+        }
     }
 
     xi->end_update();
@@ -2197,17 +2319,17 @@ static std_app_state_e viewapp_update ( void ) {
 
     m_state->render.frame_id += 1;
 
-    viewapp_update_camera ( input_state, &new_input_state );
+    viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
 
     wm_window_info_t new_window_info;
     wm->get_window_info ( window, &new_window_info );
 
-    viewapp_update_ui ( &new_window_info, input_state, &new_input_state );
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+
+    viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
 
     m_state->render.window_info = new_window_info;
     m_state->render.input_state = new_input_state;
-
-    xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
     if ( m_state->reload ) {
         xf->destroy_graph ( m_state->render.raster_graph, workload );

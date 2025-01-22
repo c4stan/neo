@@ -1145,7 +1145,7 @@ static void test_map ( void ) {
         std_hash_map_t map = std_hash_map ( keys_alloc, payloads_alloc, n * 2 );
 
         for ( size_t i = n; i > 0; --i ) {
-            uint64_t key = std_hash_murmur_mixer_64 ( i - 1 );
+            uint64_t key = std_hash_64_m ( i - 1 );
             uint64_t payload = i - 1;
             std_hash_map_insert ( &map, key, payload );
 
@@ -1158,7 +1158,7 @@ static void test_map ( void ) {
         std_assert_m ( map.count == n );
 
         for ( size_t i = 0; i < n; ++i ) {
-            uint64_t key = std_hash_murmur_mixer_64 ( i );
+            uint64_t key = std_hash_64_m ( i );
             uint64_t payload = i;
 
             void* lookup = std_hash_map_lookup ( &map, key );
@@ -1168,18 +1168,18 @@ static void test_map ( void ) {
         }
 
         for ( size_t i = 0; i < n; ++i ) {
-            uint64_t key = std_hash_murmur_mixer_64 ( i );
+            uint64_t key = std_hash_64_m ( i );
 
             void* lookup = std_hash_map_lookup ( &map, key );
             std_assert_m ( lookup != NULL );
 
-            std_assert_m ( std_hash_map_remove ( &map, key ) );
+            std_assert_m ( std_hash_map_remove_hash ( &map, key ) );
 
             lookup = std_hash_map_lookup ( &map, key );
             std_assert_m ( lookup == NULL );
 
             for ( size_t j = i + 1; j < n; ++j ) {
-                key = std_hash_murmur_mixer_64 ( j );
+                key = std_hash_64_m ( j );
                 uint64_t payload = j;
 
                 lookup = std_hash_map_lookup ( &map, key );

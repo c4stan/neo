@@ -1040,16 +1040,6 @@ typedef enum {
     // TODO? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
 } xg_resource_binding_e;
 
-#if 0
-typedef enum {                          // TODO rename:
-    xg_shader_binding_set_per_frame_m,  // global
-    xg_shader_binding_set_per_view_m,   // renderpass
-    xg_shader_binding_set_per_pass_m,   // shader
-    xg_shader_binding_set_dispatch_m,   // draw (offset)
-    xg_shader_binding_set_count_m,
-    xg_shader_binding_set_invalid_m
-} xg_shader_binding_set_e;
-#else
 typedef enum {
     xg_shader_binding_set_workload_m,
     xg_shader_binding_set_pass_m,
@@ -1058,7 +1048,6 @@ typedef enum {
     xg_shader_binding_set_count_m,
     xg_shader_binding_set_invalid_m
 } xg_shader_binding_set_e;
-#endif
 
 #if 0
 typedef struct {

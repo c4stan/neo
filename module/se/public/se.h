@@ -249,6 +249,7 @@ typedef enum {
     se_property_3f32_m,
     se_property_4f32_m,
     se_property_string_m,
+    se_property_bool_m,
 } se_property_e;
 
 typedef struct {

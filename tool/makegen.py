@@ -22,7 +22,7 @@ BUILD_CHANGES_OUTPUT_PIPE_NAME = 'std_module_update_pipe'
 WINNT_VERSION = '0x0A000005' # win10
 
 # -- Warnings
-CORE_WARNINGS_FLAGS = (
+CORE_WARNING_FLAGS = (
     '-Wno-switch-enum'                          # Having a _COUNT enum not explicitly handled in a switch throws this
     ' -Wno-gnu-zero-variadic-macro-arguments'   # Allow 0 args variadic macros and ending ', ##__VA_ARGS__' trick (std_log uses this extensively)
     ' -Wno-reserved-id-macro'                   # Allow e.g. names starting with __. Although not using it is probably a good idea, the Win32 API does, so.
@@ -49,10 +49,9 @@ CORE_WARNINGS_FLAGS = (
     ' -Wno-comment'
     ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
     ' -Wno-missing-braces'                      # suggested braces warnings?
-    ' -Wno-assign-enum'                         # only exists on CLANG
 )
 
-EXTENDED_WARNINGS_FLAGS = (
+EXTENDED_WARNING_FLAGS = (
     '-Werror'                                   # Treat warnings as errors
 )
 
@@ -78,15 +77,15 @@ BUILD_FLAGS = BUILD_FLAG_NONE
 CONFIG_DEBUG = 1    # default
 CONFIG_RELEASE = 2  # -opt
 
-# -- Custom Make targets
+# -- Make targets
 TARGET_ALL = 1
 TARGET_CLEAN = 2
+
+MAKE_TARGETS = [TARGET_ALL]#, TARGET_CLEAN]
 
 # -- Compilers
 COMPILER_CLANG = 1
 COMPILER_GCC = 2
-
-DEFAULT_CUSTOM_TARGETS = [TARGET_ALL]#, TARGET_CLEAN]
 
 """
     todos:
@@ -96,6 +95,7 @@ DEFAULT_CUSTOM_TARGETS = [TARGET_ALL]#, TARGET_CLEAN]
 
 # -----------------------------------------------------------------------------
 
+# Concatenates the strings by placing a space in between each. Ignores empty strings
 def concat(strings):
     return ' '.join(filter(None, strings))
 
@@ -805,11 +805,11 @@ class Project:
         elif platform.system() == 'Linux':
             platform_flags = '-funsigned-char' # default char to unsigned
 
-        compile_flags = concat(['-Wall', platform_flags, config_flags, CORE_WARNINGS_FLAGS])
-        #compile_flags = '-Wall' + ' ' + platform_flags + ' ' + config_flags + ' ' + CORE_WARNINGS_FLAGS
+        compile_flags = concat(['-Wall', platform_flags, config_flags, CORE_WARNING_FLAGS])
+        #compile_flags = '-Wall' + ' ' + platform_flags + ' ' + config_flags + ' ' + CORE_WARNING_FLAGS
         if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-            #compile_flags += ' ' + EXTENDED_WARNINGS_FLAGS
-            compile_flags = concat([compile_flags, EXTENDED_WARNINGS_FLAGS])
+            #compile_flags += ' ' + EXTENDED_WARNING_FLAGS
+            compile_flags = concat([compile_flags, EXTENDED_WARNING_FLAGS])
 
         compiler_flags_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/flags')
         compiler_flags_file.write(compile_flags)
@@ -838,9 +838,9 @@ class Project:
                         #      that way it would be easier to configure external references when sharing the generated makefile
                         #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
-                    #target.cmd += ' -Wall /J ' + CORE_WARNINGS_FLAGS
+                    #target.cmd += ' -Wall /J ' + CORE_WARNING_FLAGS
                     #if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                    #    target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
+                    #    target.cmd += ' ' + EXTENDED_WARNING_FLAGS
                     target.cmd += ' -o $@ -c ' + relpath(src, rootpath + '/' + build_path)
                     #target.cmd += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION
                     target.cmd += ' ' + src_def_cmd
@@ -856,9 +856,9 @@ class Project:
                         target.cmd += ' -I' + path
                     for path in self.external_paths:
                         target.cmd += ' -I' + path
-                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNINGS_FLAGS
+                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNING_FLAGS
                     if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                        target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
+                        target.cmd += ' ' + EXTENDED_WARNING_FLAGS
                     target.cmd += ' -g -c ' + relpath(src, rootpath + '/' + build_path)
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -o ' + normpath(output_path + '/' + name + '.asm')
@@ -880,9 +880,9 @@ class Project:
                         #      that way it would be easier to configure external references when sharing the generated makefile
                         #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
-                    #target.cmd += ' -Wall /J ' + CORE_WARNINGS_FLAGS
+                    #target.cmd += ' -Wall /J ' + CORE_WARNING_FLAGS
                     #if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                    #    target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
+                    #    target.cmd += ' ' + EXTENDED_WARNING_FLAGS
                     target.cmd += ' -o $@ -c ' + relpath(src, rootpath + '/' + build_path)
                     #target.cmd += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION
                     target.cmd += ' ' + src_def_cmd
@@ -898,9 +898,9 @@ class Project:
                         target.cmd += ' -I' + path
                     for path in self.external_paths:
                         target.cmd += ' -I' + path
-                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNINGS_FLAGS
+                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNING_FLAGS
                     if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                        target.cmd += ' ' + EXTENDED_WARNINGS_FLAGS
+                        target.cmd += ' ' + EXTENDED_WARNING_FLAGS
                     target.cmd += ' -g -c ' + relpath(src, rootpath + '/' + build_path)
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -o ' + normpath(output_path + '/' + name + '.asm')
@@ -1017,7 +1017,7 @@ class Solution:
         self.root = root
         self.name = name
         self.projects = {}
-        self.custom_targets = DEFAULT_CUSTOM_TARGETS
+        self.targets = MAKE_TARGETS
         self.defines = []
         self.main_project = None
 
@@ -1092,13 +1092,13 @@ class Solution:
         log.verbose('Writing makefile (' + makefile_path + ')')
         phony = []
         # --- ALL target ---
-        if TARGET_ALL in self.custom_targets:
+        if TARGET_ALL in self.targets:
             makefile.write('all:')
             makefile.write(' ' + self.main_project.main_targets[0].name)
             makefile.write('\n\n')
             phony.append('all')
         # --- CLEAN target ---
-        if TARGET_CLEAN in self.custom_targets:
+        if TARGET_CLEAN in self.targets:
             makefile.write('clean:\n\t')
             separator = ''
             path = relpath(self.main_project.path + '/build/' + config_path + '/output/*', self.root)

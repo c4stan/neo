@@ -407,7 +407,7 @@ xg_resource_bindings_layout_h xg_vk_pipeline_resource_bindings_layout_create ( c
         xg_vk_pipeline_hash_resource_binding_layout ( &hash_allocator, &params->resources[i] );
     }
 
-    uint64_t hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
+    uint64_t hash = std_hash_block_64_m ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
 
     xg_resource_bindings_layout_h handle;
     xg_resource_bindings_layout_h* lookup = std_hash_map_lookup ( &xg_vk_pipeline_state->resource_bindings_layouts_map, hash );
@@ -472,7 +472,7 @@ void xg_vk_pipeline_resource_bindings_layout_destroy ( xg_resource_bindings_layo
     if ( --layout->ref_count == 0 ) {
         const xg_vk_device_t* device = xg_vk_device_get ( layout->params.device );
         vkDestroyDescriptorSetLayout ( device->vk_handle, layout->vk_handle, xg_vk_cpu_allocator() );
-        std_verify_m ( std_hash_map_remove ( &xg_vk_pipeline_state->resource_bindings_layouts_map, layout->hash ) );
+        std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->resource_bindings_layouts_map, layout->hash ) );
         std_list_push ( &xg_vk_pipeline_state->resource_bindings_layouts_freelist, layout );
         std_bitset_clear ( xg_vk_pipeline_state->resource_bindings_layouts_bitset, layout_handle );
     }
@@ -583,7 +583,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
     }
 
     // Pipeline
-    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
+    uint64_t pipeline_hash = std_hash_block_64_m ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
     uint64_t* pipeline_lookup = std_hash_map_lookup ( &xg_vk_pipeline_state->raytrace_pipelines_map, pipeline_hash );
     xg_raytrace_pipeline_state_h xg_vk_pipeline_handle;
 
@@ -914,7 +914,7 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
     //}
 
     std_list_push ( &xg_vk_pipeline_state->raytrace_pipelines_freelist, pipeline );
-    std_verify_m ( std_hash_map_remove ( &xg_vk_pipeline_state->raytrace_pipelines_map, pipeline->common.hash ) );
+    std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->raytrace_pipelines_map, pipeline->common.hash ) );
 #else
     std_unused_m ( pipeline_handle );
 #endif
@@ -935,7 +935,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
     }
 
     // Pipeline
-    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
+    uint64_t pipeline_hash = std_hash_block_64_m ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
     uint64_t* pipeline_lookup = std_hash_map_lookup ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline_hash );
     xg_compute_pipeline_state_h xg_vk_pipeline_handle;
 
@@ -1092,7 +1092,7 @@ static uint64_t xg_vk_renderpass_params_hash ( const xg_render_textures_layout_t
         }
     }
 
-    uint64_t hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
+    uint64_t hash = std_hash_block_64_m ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
     return hash;
 }
 
@@ -1442,7 +1442,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
     // Pipeline
     // TODO try to batch vkCreateGraphicsPipelines calls
-    uint64_t pipeline_hash = std_hash_metro ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
+    uint64_t pipeline_hash = std_hash_block_64_m ( hash_allocator.begin, hash_allocator.top - hash_allocator.begin );
 
     uint64_t* pipeline_lookup = std_hash_map_lookup ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline_hash );
 
@@ -1455,9 +1455,6 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         size_t shader_count = 0;
         {
             VkShaderModuleCreateInfo module_info[xg_shading_stage_count_m];
-
-            std_hash_metro_state_t hash_state;
-            std_hash_metro_begin ( &hash_state );
 
             if ( params->state.vertex_shader.enable ) {
                 module_info[shader_count].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1636,7 +1633,7 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
     //}
 
     std_list_push ( &xg_vk_pipeline_state->graphics_pipelines_freelist, pipeline );
-    std_verify_m ( std_hash_map_remove ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline->common.hash ) );
+    std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline->common.hash ) );
 }
 
 xg_renderpass_h xg_vk_renderpass_create ( const xg_renderpass_params_t* params ) {
@@ -1685,7 +1682,7 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
     //}
 
     std_list_push ( &xg_vk_pipeline_state->compute_pipelines_freelist, pipeline );
-    std_verify_m ( std_hash_map_remove ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline->common.hash ) );
+    std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline->common.hash ) );
 }
 
 void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {

@@ -38,9 +38,6 @@
 #define std_fmt_u32_pad_m(X) "%0" std_pp_string_m(X) PRIu32
 #define std_fmt_u64_pad_m(X) "%0" std_pp_string_m(X) PRIu64
 
-
-
-// TODO make these bits (1, 2, 4, ...), delete std_log_level_bit_..., and remove bitflag from std_log_enabled_levels_bitflag_m ?
 typedef enum {
     std_log_level_info_m = 0,
     std_log_level_debug_m = 1,
@@ -49,16 +46,6 @@ typedef enum {
     std_log_level_crash_m = 4,
 } std_log_level_e;
 
-#if 0
-typedef enum {
-    std_log_level_bit_info_m = 1 << std_log_level_info_m,
-    std_log_level_bit_debug_m = 1 << std_log_level_debug_m,
-    std_log_level_bit_warn_m = 1 << std_log_level_warn_m,
-    std_log_level_bit_error_m = 1 << std_log_level_error_m,
-    std_log_level_bit_crash_m = 1 << std_log_level_crash_m,
-    std_log_level_bit_all_m = ( std_log_level_bit_info_m | std_log_level_bit_debug_m | std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ),
-} std_log_level_bit_e;
-#else
 #define std_log_level_bit_info_m  ( 1 << std_log_level_info_m )
 #define std_log_level_bit_debug_m ( 1 << std_log_level_debug_m )
 #define std_log_level_bit_warn_m  ( 1 << std_log_level_warn_m )
@@ -69,7 +56,7 @@ typedef enum {
                                     std_log_level_bit_warn_m  | \
                                     std_log_level_bit_error_m | \
                                     std_log_level_bit_crash_m )
-#endif
+
 // Boolean values that can be tested for code that should only be executed
 // depending on which logging is enabled.
 #define std_log_info_enabled_m        ( std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m )

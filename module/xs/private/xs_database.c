@@ -269,7 +269,7 @@ typedef struct {
 static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* shader, const shader_bytecode_t* bytecode ) {
     shader->enable = true;
     shader->stage = bytecode->stage;
-    shader->hash = std_hash_metro ( bytecode->buffer.base, bytecode->buffer.size );
+    shader->hash = std_hash_block_64_m ( bytecode->buffer.base, bytecode->buffer.size );
     shader->buffer = bytecode->buffer;
 }
 

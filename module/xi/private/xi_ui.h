@@ -129,7 +129,7 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state );
 void xi_ui_section_end ( xi_workload_h workload );
 
 void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state );
-void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state );
+bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state );
 void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state );
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state );
 void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );

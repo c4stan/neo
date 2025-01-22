@@ -343,6 +343,7 @@ void rv_view_get_info ( rv_view_info_t* info, rv_view_h view_handle ) {
     // Inverse view matrix
     // it's the result of view_orientation^-1 * view_translation^-1
     {
+        std_mem_zero_m ( &info->inverse_view_matrix );
         for ( uint32_t i = 0; i < 3; ++i ) {
             for ( uint32_t j = 0; j < 3; ++j ) {
                 info->inverse_view_matrix.m[i][j] = info->view_matrix.m[j][i];

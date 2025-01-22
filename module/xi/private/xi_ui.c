@@ -984,94 +984,7 @@ bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state ) {
     return xi_ui_textfield_internal ( workload, state, 0 );
 }
 
-static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_editor_state_t* state, uint32_t data_offset, uint64_t xi_id, uint64_t sub_id ) {
-    xi_textfield_state_t textfield = xi_textfield_state_m (
-        .font = state->font,
-        .width = state->property_width,
-        .height = state->property_height,
-        .id = state->id,// ^ xi_id,
-        .sort_order = state->sort_order,
-        .style = state->style,
-    );
-
-    //bool had_focus = xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id && !xi_ui_state->focus_stack_change;
-
-    bool had_focus = ( xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id && xi_ui_state->focus_time > 0 );
-
-    if ( had_focus ) {
-        std_str_copy_static_m ( textfield.text, xi_ui_state->property_editor_buffer );
-    } else {
-        std_f32_to_str ( *( float* ) ( state->data + data_offset ), textfield.text, xi_textfield_text_size_m );
-    }
-    
-    bool enter = xi_ui_textfield_internal ( workload, &textfield, sub_id );
-
-    bool has_focus = xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id;// && xi_ui_state->focus_stack_prev_id == 0;
-    
-    bool result = false;
-
-    //if ( !had_focus && has_focus ) 
-    //    std_log_info_m ( "hit");
-
-    //if (xi_ui_state->focus_stack_prev_id != 0)
-    //    std_log_info_m ( std_fmt_u64_m, xi_ui_state->focus_stack_prev_id );
-
-#if 0
-    if ( had_focus ) {
-        if ( has_focus ) {
-            if ( enter ) {
-                float f32 = std_str_to_f32 ( textfield.text );
-                *( float* ) ( state->data + data_offset ) = f32;
-                result = true;
-                xi_ui_release_focus();
-            } else {
-                std_str_copy_static_m ( xi_ui_state->property_editor_buffer, textfield.text );
-            }
-        } else {
-            float f32 = std_str_to_f32 ( textfield.text );
-            *( float* ) ( state->data + data_offset ) = f32;
-            result = true;
-        }
-    } else {
-        if ( has_focus ) {
-                std_log_info_m ( "hit " std_fmt_u64_m, sub_id );
-            if ( enter ) {
-                float f32 = std_str_to_f32 ( textfield.text );
-                *( float* ) ( state->data + data_offset ) = f32;
-                result = true;
-            } else {
-                std_str_copy_static_m ( xi_ui_state->property_editor_buffer, textfield.text );
-            }
-        }
-    }
-#else
-    if ( had_focus && enter ) {
-        float f32 = std_str_to_f32 ( textfield.text );
-        *( float* ) ( state->data + data_offset ) = f32;
-        result = true;
-    } else if ( has_focus ) {
-        std_str_copy_static_m ( xi_ui_state->property_editor_buffer, textfield.text );
-    }
-#endif
-
-    return result;
-}
-
-bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state ) {
-    bool edited = false;
-    if ( state->type == xi_property_3f32_m ) {
-        edited |= xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
-        edited |= xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
-        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
-    } else if ( state->type == xi_property_f32_m ) {
-        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
-    } else {
-        std_not_implemented_m();
-    }
-    return edited;
-}
-
-void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
+bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
     uint32_t padding = 2;
@@ -1082,7 +995,7 @@ void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     //std_log_info_m ( std_fmt_i64_m, layer->delta_y );
 
     if ( !xi_ui_layer_add_element ( &x, &y, state->width, state->height, &style ) ) {
-        return;
+        return false;
     }
 
     if ( xi_ui_cursor_test ( x, y, state->width, state->height ) ) {
@@ -1096,10 +1009,12 @@ void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     }
 
     // state update
+    bool changed = false;
     // TODO change value on mouse release (!xi_ui_state->mouse_down seems to cause issues of non-registered clicks?)
     if ( xi_ui_state->active_id == state->id && xi_ui_state->update.mouse_down ) {
         if ( xi_ui_state->hovered_id == state->id ) {
             state->value = ! ( state->value );
+            changed = true;
         }
 
         xi_ui_release_active ( state->id );
@@ -1132,6 +1047,7 @@ void xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style->color, color_scale ), layer->x + x, layer->y + y, state->width * 2 + padding * 2, state->height + padding * 2, state->sort_order );
     xi_ui_draw_rect ( workload, style->color, layer->x + x + x_offset + padding, layer->y + y + padding, state->width, state->height, state->sort_order );
 #endif
+    return changed;
 }
 
 void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
@@ -1355,6 +1271,115 @@ void xi_ui_text ( xi_workload_h workload, xi_text_state_t* state, const xi_style
     std_unused_m ( style );
 }
 #endif
+
+static bool xi_ui_property_editor_bool ( xi_workload_h workload, xi_property_editor_state_t* state, uint32_t data_offset, uint64_t xi_id, uint64_t sub_id ) {
+    bool value = * ( bool* ) ( state->data + data_offset );
+    xi_switch_state_t switch_state = xi_switch_state_m (
+        .width = state->property_width,
+        .height = state->property_height,
+        .id = state->id,
+        .sort_order = state->sort_order,
+        .style = state->style,
+        .value = value
+    );
+    std_unused_m ( sub_id );
+
+    bool changed = xi_ui_switch ( workload, &switch_state );
+
+    if ( changed ) {
+        * ( bool* ) ( state->data + data_offset ) = switch_state.value;
+    }
+    return changed;
+}
+
+static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_editor_state_t* state, uint32_t data_offset, uint64_t xi_id, uint64_t sub_id ) {
+    xi_textfield_state_t textfield = xi_textfield_state_m (
+        .font = state->font,
+        .width = state->property_width,
+        .height = state->property_height,
+        .id = state->id,// ^ xi_id,
+        .sort_order = state->sort_order,
+        .style = state->style,
+    );
+
+    //bool had_focus = xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id && !xi_ui_state->focus_stack_change;
+
+    bool had_focus = ( xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id && xi_ui_state->focus_time > 0 );
+
+    if ( had_focus ) {
+        std_str_copy_static_m ( textfield.text, xi_ui_state->property_editor_buffer );
+    } else {
+        std_f32_to_str ( *( float* ) ( state->data + data_offset ), textfield.text, xi_textfield_text_size_m );
+    }
+    
+    bool enter = xi_ui_textfield_internal ( workload, &textfield, sub_id );
+
+    bool has_focus = xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id;// && xi_ui_state->focus_stack_prev_id == 0;
+    
+    bool result = false;
+
+    //if ( !had_focus && has_focus ) 
+    //    std_log_info_m ( "hit");
+
+    //if (xi_ui_state->focus_stack_prev_id != 0)
+    //    std_log_info_m ( std_fmt_u64_m, xi_ui_state->focus_stack_prev_id );
+
+#if 0
+    if ( had_focus ) {
+        if ( has_focus ) {
+            if ( enter ) {
+                float f32 = std_str_to_f32 ( textfield.text );
+                *( float* ) ( state->data + data_offset ) = f32;
+                result = true;
+                xi_ui_release_focus();
+            } else {
+                std_str_copy_static_m ( xi_ui_state->property_editor_buffer, textfield.text );
+            }
+        } else {
+            float f32 = std_str_to_f32 ( textfield.text );
+            *( float* ) ( state->data + data_offset ) = f32;
+            result = true;
+        }
+    } else {
+        if ( has_focus ) {
+                std_log_info_m ( "hit " std_fmt_u64_m, sub_id );
+            if ( enter ) {
+                float f32 = std_str_to_f32 ( textfield.text );
+                *( float* ) ( state->data + data_offset ) = f32;
+                result = true;
+            } else {
+                std_str_copy_static_m ( xi_ui_state->property_editor_buffer, textfield.text );
+            }
+        }
+    }
+#else
+    if ( had_focus && enter ) {
+        float f32 = std_str_to_f32 ( textfield.text );
+        *( float* ) ( state->data + data_offset ) = f32;
+        result = true;
+    } else if ( has_focus ) {
+        std_str_copy_static_m ( xi_ui_state->property_editor_buffer, textfield.text );
+    }
+#endif
+
+    return result;
+}
+
+bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state ) {
+    bool edited = false;
+    if ( state->type == xi_property_3f32_m ) {
+        edited |= xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
+    } else if ( state->type == xi_property_f32_m ) {
+        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
+    } else if ( state->type == xi_property_bool_m ) {
+        edited |= xi_ui_property_editor_bool ( workload, state, 0, xi_line_id_m(), 0 );
+    } else {
+        std_not_implemented_m();
+    }
+    return edited;
+}
 
 void xi_ui_geo_init ( xg_device_h device_handle ) {
     xi_ui_state->device = device_handle;

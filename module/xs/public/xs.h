@@ -11,7 +11,7 @@ std_module_export_m void* xs_load ( void* );
 std_module_export_m void xs_reload ( void*, void* );
 std_module_export_m void xs_unload ( void );
 
-#define xs_hash_string_m( str, len ) std_hash_metro( (str), (len) )
+#define xs_hash_string_m( str, len ) std_hash_block_64_m( (str), (len) )
 #define xs_hash_static_string_m( str ) xs_hash_string_m ( str, sizeof ( str ) - 1 ) // -1 to match str_len
 typedef uint64_t xs_string_hash_t;
 //typedef uint64_t xs_pipeline_hash_t;

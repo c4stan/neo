@@ -49,7 +49,7 @@ size_t wm_display_get ( wm_display_h* displays, size_t cap ) {
             device.cb = sizeof ( device );
 
             while ( EnumDisplayDevicesW ( adapter.DeviceName, device_index, &device, 0 ) ) {
-                uint64_t key_hash = std_hash_djb2_32 ( device.DeviceKey, 256 );
+                uint64_t key_hash = std_hash_block_32_m ( device.DeviceKey, 256 );
 
                 if ( display_count >= cap ) {
                     std_log_warn_m ( "Found display count higher than display limit!" );
@@ -104,7 +104,7 @@ static bool wm_display_get_devices ( DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* 
             std_verify_m ( result );
         }
 
-        uint32_t display_key_hash = std_hash_djb2_32 ( display->DeviceKey, 256 );
+        uint32_t display_key_hash = std_hash_block_32_m ( display->DeviceKey, 256 );
 
         if ( key_hash != display_key_hash || display->StateFlags & DISPLAY_DEVICE_ACTIVE == 0 ) {
             std_log_warn_m ( "Invalid display handle" );

@@ -41,7 +41,7 @@ static std_module_state_t* std_module_state;
 //static uint64_t std_module_hash_api ( const void* api, void* _ ) {
 //    std_unused_m ( _ );
 //    uint64_t key = * ( const size_t* ) api;
-//    uint64_t hash = std_hash_murmur_mixer_64 ( key );
+//    uint64_t hash = std_hash_murmur_64 ( key );
 //    return hash;
 //}
 
@@ -102,7 +102,7 @@ void std_module_fakeload_api ( const char* name, void* api ) {
     std_rwmutex_lock ( &std_module_state->modules_mutex );
     std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
-    module->name.hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
+    module->name.hash = std_hash_string_64_m ( name );
     std_str_copy ( module->name.string, std_module_name_max_len_m, name );
 #ifdef std_platform_win32_m
     module->handle = 0;
@@ -115,7 +115,7 @@ void std_module_fakeload_api ( const char* name, void* api ) {
 // ----------------------------------------------------------------------------
 
 static std_module_t* std_module_lookup ( const char* name ) {
-    uint64_t name_hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
+    uint64_t name_hash = std_hash_string_64_m ( name );
 
     uint64_t* module_lookup = std_hash_map_lookup ( &std_module_state->modules_name_map, name_hash );
 
@@ -257,7 +257,7 @@ static std_module_t* std_module_load_internal ( const char* name ) {
         std_log_info_m ( "Load of module " std_fmt_str_m " complete.", name );
     }
 
-    uint64_t hash = std_hash_djb2_64 ( name, std_str_len ( name ) );
+    uint64_t hash = std_hash_string_64_m ( name );
 
     std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
@@ -351,7 +351,7 @@ static void std_module_unload_internal ( std_module_t* module ) {
 
     std_list_push ( &std_module_state->modules_freelist, module );
 
-    std_verify_m ( std_hash_map_remove ( &std_module_state->modules_name_map, module->name.hash ) );
+    std_verify_m ( std_hash_map_remove_hash ( &std_module_state->modules_name_map, module->name.hash ) );
 
     std_log_info_m ( "Unload of module " std_fmt_str_m " complete.", module->name.string );
 }

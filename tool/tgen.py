@@ -1,14 +1,18 @@
 import sublime
 import sublime_plugin
 
+# Deployed in %APPDATA%\Sublime Text\Packages\User
+
 '''
 /* template begin
 
 def<T, P, N> $T add_$P ( $T* a, $T* b ) {
     $FOR $N
-    // for $i;
-    // for $i;
+    // $i
     $END_FOR
+    $IF $N > 1
+    // 3
+    $END_IF
     return *a + *b;
 }
 
@@ -18,20 +22,46 @@ make <float, float, 2>
 */
 // template generation begin
 int add_int ( int* a, int* b ) {
-    // for 0;
-    // for 0;
-    // for 1;
-    // for 1;
+    // 0
+    // 1
+    // 3
     return *a + *b;
 }
 
 float add_float ( float* a, float* b ) {
-    // for 0;
-    // for 0;
-    // for 1;
-    // for 1;
+    // 0
+    // 1
+    // 3
     return *a + *b;
 }
+// template generation end
+'''
+
+'''
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+typedef union {
+    float e[$SIZE];
+    struct {
+        $TYPE x;
+$IF $SIZE > 1
+        $TYPE y;
+$END_IF
+    };
+} sm_vec_$SIZE$PREFIX_t;
+
+make <float, f, 3>
+
+*/
+// template generation begin
+typedef union {
+    float e[3];
+    struct {
+        float x;
+        float y;
+    };
+} sm_vec_3f_t;
 // template generation end
 '''
 
@@ -89,6 +119,7 @@ def generate_template(body):
         arg_end = make.find('>')
         arg_string = make[1:arg_end]
         arg_list = arg_string.split(',')
+        arg_list = [s.strip() for s in arg_list]
 
         # begin code generation...
         generated_code = template
@@ -111,15 +142,52 @@ def generate_template(body):
             for_condition = for_args[1]
             if for_condition[0] == '$':
                 idx = param_list.index(for_condition[1:])
-                assert idx != -1
                 for_condition = arg_list[idx]
             while i < int(for_condition):
                 generated_body += for_body.replace('$i', str(i))
                 i = i + 1
 
-            generated_code = generated_code[:for_begin - len(for_begin_token)].rstrip() + generated_body + generated_code[for_end + len(for_end_token):]
+            generated_code = generated_code[:for_begin].rstrip() + generated_body + generated_code[for_end + len(for_end_token):]
 
             for_begin = generated_code.find(for_begin_token)
+
+        # resolve $IF tokens
+        if_begin_token = '$IF'
+        if_end_token = '$END_IF'
+        if_begin = generated_code.find(if_begin_token)
+        while if_begin != -1:
+            if_args_end = generated_code.find('\n', if_begin)
+            if_args = generated_code[if_begin : if_args_end].split(' ')
+            if_end = generated_code.find(if_end_token, if_begin)
+            if_body = generated_code[if_args_end : if_end].rstrip()
+
+            print(generated_code[if_begin:if_end])
+
+            assert if_end != -1
+
+            # evaluate condition
+            ops = [ '<',           '>',           '<=',             '>=',            '==',            '!='           ]
+            evs = [lambda a,b:a<b, lambda a,b:a>b, lambda a,b:a<=b, lambda a,b:a>=b, lambda a,b:a==b, lambda a,b:a!=b]
+            lhs = if_args[1]
+            if lhs[0] == '$':
+                idx = param_list.index(lhs[1:])
+                lhs = arg_list[idx]
+            rhs = if_args[3]
+            if rhs[0] == '$':
+                idx = param_list.index(rhs[1:])
+                rhs = arg_list[idx]
+            if_op = if_args[2]
+            op_idx = ops.index(if_op)
+            op_result = evs[op_idx](lhs, rhs)
+
+            # generate if body
+            generated_body = ''
+            if op_result:
+                generated_body = if_body
+
+            generated_code = generated_code[:if_begin].rstrip() + generated_body + generated_code[if_end + len(if_end_token):]
+
+            if_begin = generated_code.find(if_begin_token)
 
         # replace $ tokens in the template with the tokens coming from the make args list
         assert len(arg_list) == len(param_list)
