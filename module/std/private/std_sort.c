@@ -20,7 +20,7 @@ uint64_t std_xorshift64 ( std_xorshift64_state_t* state ) {
 }
 
 // https://rosettacode.org/wiki/Sorting_algorithms/Insertion_sort#C
-void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_comp_f* compare, void* tmp ) {
+void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_comp_f* compare, const void* compare_arg, void* tmp ) {
     char* base = ( char* ) _base;
 
     for ( size_t i = 1; i < count; ++i ) {
@@ -32,7 +32,7 @@ void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_com
         // This could overwrite the pivot, which is fine, because we have it stored in tmp
         size_t j = i;
 
-        while ( j > 0 && compare ( base + ( j - 1 ) * stride, tmp ) > 0 ) {
+        while ( j > 0 && compare ( base + ( j - 1 ) * stride, tmp, compare_arg ) > 0 ) {
             std_mem_copy ( base + j * stride, base + ( j - 1 ) * stride, stride );
             --j;
         }
@@ -43,7 +43,7 @@ void std_sort_insertion ( void* _base, size_t stride, size_t count, std_sort_com
     }
 }
 
-void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, size_t count, std_sort_comp_f* compare ) {
+void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, size_t count, std_sort_comp_f* compare, const void* compare_arg ) {
     char* base = ( char* ) _base;
     char* dest = ( char* ) _dest;
 
@@ -54,7 +54,7 @@ void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, si
         // This could overwrite the pivot, which is fine, because we have it stored in tmp
         size_t j = i;
 
-        while ( j > 0 && compare ( dest + ( j - 1 ) * stride, base + i * stride ) > 0 ) {
+        while ( j > 0 && compare ( dest + ( j - 1 ) * stride, base + i * stride, compare_arg ) > 0 ) {
             std_mem_copy ( dest + j * stride, dest + ( j - 1 ) * stride, stride );
             --j;
         }
@@ -66,7 +66,7 @@ void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, si
 }
 
 // https://rosettacode.org/wiki/Sorting_algorithms/Quicksort
-static void std_sort_quick_rec ( void* _base, size_t stride, size_t a, size_t b, std_sort_comp_f* compare, void* tmp ) {
+static void std_sort_quick_rec ( void* _base, size_t stride, size_t a, size_t b, std_sort_comp_f* compare, const void* compare_arg, void* tmp ) {
     char* base = ( char* ) ( _base );
 
     if ( a == b ) {
@@ -79,11 +79,11 @@ static void std_sort_quick_rec ( void* _base, size_t stride, size_t a, size_t b,
     void* pivot = base + i * stride;
 
     while ( i < j ) {
-        while ( compare ( base + j * stride, pivot ) > 0 ) {
+        while ( compare ( base + j * stride, pivot, compare_arg ) > 0 ) {
             --j;
         }
 
-        while ( compare ( base + i * stride, pivot ) < 0 ) {
+        while ( compare ( base + i * stride, pivot, compare_arg ) < 0 ) {
             ++i;
         }
 
@@ -103,13 +103,13 @@ static void std_sort_quick_rec ( void* _base, size_t stride, size_t a, size_t b,
     std_mem_copy ( base + j * stride, tmp, stride );
 
     // rec call
-    std_sort_quick_rec ( base, stride, a, j, compare, tmp );
-    std_sort_quick_rec ( base, stride, j + 1, b, compare, tmp );
+    std_sort_quick_rec ( base, stride, a, j, compare, compare_arg, tmp );
+    std_sort_quick_rec ( base, stride, j + 1, b, compare, compare_arg, tmp );
 }
 
 // TODO test this
-void std_sort_quick ( void* base, size_t stride, size_t count, std_sort_comp_f* compare, void* tmp ) {
-    std_sort_quick_rec ( base, stride, 0, count - 1, compare, tmp );
+void std_sort_quick ( void* base, size_t stride, size_t count, std_sort_comp_f* compare, const void* compare_arg, void* tmp ) {
+    std_sort_quick_rec ( base, stride, 0, count - 1, compare, compare_arg, tmp );
 }
 
 // Fisher–Yates shuffle

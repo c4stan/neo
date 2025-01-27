@@ -5,47 +5,12 @@
 #include <std_log.h>
 #include <std_byte.h>
 
-// https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
-// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples
-
-typedef struct {
-    char* base;
-    char* alias;
-    size_t top;
-    size_t bot;
-    size_t mask;        // Equals to (size - 1). Size must be pow2.
-} std_queue_local_t;    // TODO rename to std_queue_t
-
-// TODO base the implementation on std_ring_t
-// The implementation wraps the stores when the queue buffer wraps around. In that case alignment is not guaranteed.
-//std_queue_local_t   std_queue_local             ( void* base, size_t size );
-std_queue_local_t   std_queue_local_create      ( size_t size );
-void                std_queue_local_destroy     ( std_queue_local_t* queue );
-void                std_queue_local_clear       ( std_queue_local_t* queue );
-size_t              std_queue_local_size        ( const std_queue_local_t* queue );
-size_t              std_queue_local_used_size   ( const std_queue_local_t* queue );
-
-void                std_queue_local_push        ( std_queue_local_t* queue, const void* item, size_t size );
-void                std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size );
-void                std_queue_local_pop_move    ( std_queue_local_t* queue, void* dest, size_t size );
-
-void*               std_queue_local_emplace     ( std_queue_local_t* queue, size_t size );
-
-void*               std_queue_local_ptr         ( std_queue_local_t* queue, size_t size );
-
-void                std_queue_local_align_push  ( std_queue_local_t* queue, size_t align );
-void                std_queue_local_align_pop   ( std_queue_local_t* queue, size_t align );
-
-#define std_queue_local_emplace_array_m( queue, type, count ) ( type* ) std_queue_local_emplace( (queue), sizeof ( type ) * (count) )
-#define std_queue_local_ptr_m( queue, type, idx )   ( type* ) std_queue_local_ptr( (queue), sizeof ( type ) * idx )
-#define std_static_local_queue_m( array )           std_queue_local ( std_static_buffer_m ( array ) )
-
-// Ring buffer
+// Ring logic
 // https://fgiesen.wordpress.com/2010/12/14/ring-buffers-and-queues/
 typedef struct {
     uint64_t top;
     uint64_t bot;
-    uint64_t mask;
+    uint64_t mask; // Equals to (size - 1). Size must be pow2.
 } std_ring_t;
 
 std_ring_t std_ring ( uint64_t capacity );
@@ -56,9 +21,36 @@ uint64_t std_ring_bot_idx ( const std_ring_t* ring );
 uint64_t std_ring_idx ( const std_ring_t* ring, uint64_t virtual_idx );
 void std_ring_push ( std_ring_t* ring, uint64_t count );
 void std_ring_pop ( std_ring_t* ring, uint64_t count );
+void std_ring_clear ( std_ring_t* ring );
 
-// ----------
+// Single thread access queue
+typedef struct {
+    char* base;
+    char* alias;
+    std_ring_t ring;
+} std_queue_local_t;
 
+std_queue_local_t   std_queue_local             ( void* base, size_t size );
+std_queue_local_t   std_queue_local_create      ( size_t size );
+void                std_queue_local_destroy     ( std_queue_local_t* queue );
+void                std_queue_local_clear       ( std_queue_local_t* queue );
+size_t              std_queue_local_size        ( const std_queue_local_t* queue );
+size_t              std_queue_local_used_size   ( const std_queue_local_t* queue );
+
+void                std_queue_local_push        ( std_queue_local_t* queue, const void* item, size_t size );
+void                std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size );
+void                std_queue_local_pop_move    ( std_queue_local_t* queue, void* dest, size_t size );
+
+void*               std_queue_local_emplace     ( std_queue_local_t* queue, size_t size ); // TODO rename to reserve?
+
+void                std_queue_local_align_push  ( std_queue_local_t* queue, size_t align );
+void                std_queue_local_align_pop   ( std_queue_local_t* queue, size_t align );
+
+#define std_queue_local_emplace_array_m( queue, type, count ) ( type* ) std_queue_local_emplace( (queue), sizeof ( type ) * (count) )
+#define std_static_local_queue_m( array )           std_queue_local ( std_static_buffer_m ( array ) )
+
+// Multi thread access queue
+// pad contents to avoid false sharing cache lines
 std_static_align_m ( std_l1d_size_m ) typedef struct {
     char*    base;
     char*   alias;
@@ -71,11 +63,7 @@ std_static_align_m ( std_l1d_size_m ) typedef struct {
     char    _p3[std_l1d_size_m - sizeof ( size_t )];
 } std_queue_shared_t;
 
-/*
-    https://fastcompression.blogspot.com/2015/08/accessing-unaligned-memory.html
-*/
-
-//std_queue_shared_t  std_queue_shared            ( void* base, size_t size );
+// Must be allocated though the heap, to be able to map adjacent virtual pages to the same physical memory
 std_queue_shared_t  std_queue_shared_create     ( size_t size );
 void                std_queue_shared_destroy    ( std_queue_shared_t* queue );
 void                std_queue_shared_clear      ( std_queue_shared_t* queue );
@@ -86,8 +74,6 @@ const void*         std_queue_shared_sc_peek    ( std_queue_shared_t* queue );
 
 #define std_static_queue_shared( array ) std_queue_shared ( array, sizeof ( array ) )
 
-// TODO implement peek for sc ?
-
 // SPSC queue API never fails, because it assumes that the caller checks free/used size before calling push/pop.
 // It also doesn't store any additional info in the queue other than the payload, because no publish flag is necessary.
 // If dynamic payload size is required the user can implement that anyway using a 2-message protocol, where the first
@@ -97,10 +83,10 @@ void                std_queue_spsc_push         ( std_queue_shared_t* queue, con
 void                std_queue_spsc_pop_discard  ( std_queue_shared_t* queue, size_t size );
 void                std_queue_spsc_pop_move     ( std_queue_shared_t* queue, void* dest, size_t size );
 
-// MPSC, SPMC and MPMC queue APIs can all fail because of concurrency, so calling push/pop should always happen in
-// a loop that checks the returned value. They also store the size of the payload in the queue along with the payload
-// itself. This allows for popping without knowing the exact size of the item. This is because a publish flag is
-// necessary in the implementation to ensure correctness. So instead of a flag, 4 bytes are used to contain the size.
+// MPSC, SPMC and MPMC queue APIs can all fail because of concurrency, so calling code should check the return code
+// and react accordingly. They also store the size of the payload in the queue along with the payload
+// itself. This allows for popping without knowing the exact size of the item. A publish flag is already necessary 
+// for the implementation to be correct. So instead of a flag, 4 bytes are used to contain the size.
 // This also enforces the queue alignment to 4 bytes, meaning that the user payload size must be a multiple of 4,
 // and the max size of an item to UINT32_MAX.
 bool                std_queue_mpsc_push         ( std_queue_shared_t* queue, const void* item, size_t size );
@@ -119,16 +105,15 @@ size_t              std_queue_mpmc_pop_move     ( std_queue_shared_t* queue, voi
 #define             std_queue_mpmc_pop_m( queue, item )     std_queue_mpmc_pop_move ( queue, item, sizeof ( *(item) ) )
 
 // 32 and 64 bit element size queues specialization - the APIs can't be mixed!
+// No extra space per item is allocated for these, but the reserved values cannot be stored as data.
 #define             std_queue_shared_32_reserved_value_m 0xffffffff
 #define             std_queue_shared_64_reserved_value_m 0xffffffffffffffff
 
-//std_queue_shared_t  std_queue_mpmc_32               ( void* base, size_t size );
 std_queue_shared_t  std_queue_mpmc_32_create        ( size_t size );
 bool                std_queue_mpmc_push_32          ( std_queue_shared_t* queue, const void* item );
 bool                std_queue_mpmc_pop_discard_32   ( std_queue_shared_t* queue );
 bool                std_queue_mpmc_pop_move_32      ( std_queue_shared_t* queue, void* dest );
 
-//std_queue_shared_t  std_queue_mpmc_64               ( void* base, size_t size );
 std_queue_shared_t  std_queue_mpmc_64_create        ( size_t size );
 bool                std_queue_mpmc_push_64          ( std_queue_shared_t* queue, const void* item );
 bool                std_queue_mpmc_pop_discard_64   ( std_queue_shared_t* queue );
@@ -136,3 +121,4 @@ bool                std_queue_mpmc_pop_move_64      ( std_queue_shared_t* queue,
 
 // TODO 32 and 64 bit specializations for mpsc queue
 // TODO name the calls that can fail with a `try` and include the loop inside the call for others?
+// TODO implement peek for sc

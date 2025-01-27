@@ -103,21 +103,34 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
     std_tick_t now = std_tick_now();
     float delta_millis = std_tick_to_milli_f32 ( now - program_start );
 
-    printf ( std_fmt_str_m
-        "[" std_fmt_f32_dec_m(3) "] "
-        "[" std_fmt_u32_m "/" std_fmt_str_m "] "
-        "[" std_fmt_str_m ":" std_fmt_size_m "] "
-        std_fmt_str_m
-        std_fmt_str_m
-        std_fmt_str_m,
-        color_prefix,
-        delta_millis / 1000.f,
-        std_thread_uid ( std_thread_this() ),
-        std_thread_name ( std_thread_this() ),
-        msg->scope.file, msg->scope.line,
-        type_prefix,
-        msg->payload,
-        std_terminal_color_reset_m );
+    bool verbose_format = false;
+    if ( verbose_format ) {
+        printf ( std_fmt_str_m
+            "[" std_fmt_f32_dec_m(3) "] "
+            "[" std_fmt_u32_m "/" std_fmt_str_m "] "
+            "[" std_fmt_str_m ":" std_fmt_size_m "] "
+            std_fmt_str_m
+            std_fmt_str_m
+            std_fmt_str_m,
+            color_prefix,
+            delta_millis / 1000.f,
+            std_thread_uid ( std_thread_this() ),
+            std_thread_name ( std_thread_this() ),
+            msg->scope.file, msg->scope.line,
+            type_prefix,
+            msg->payload,
+            std_terminal_color_reset_m );
+    } else {
+        printf ( std_fmt_str_m
+            "" std_fmt_u32_m "|" std_fmt_f32_dec_m(3) "|"
+            std_fmt_str_m
+            std_fmt_str_m,
+            color_prefix,
+            std_thread_uid ( std_thread_this() ),
+            delta_millis / 1000.f,
+            msg->payload,
+            std_terminal_color_reset_m );
+    }
 
     if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         std_log_print_callstack();

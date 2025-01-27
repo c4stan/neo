@@ -2265,7 +2265,7 @@ static std_app_state_e viewapp_update ( void ) {
     wm_window_info_t* window_info = &m_state->render.window_info;
     wm_input_state_t* input_state = &m_state->render.input_state;
 
-    float target_fps = 60.f;
+    float target_fps = 30.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;

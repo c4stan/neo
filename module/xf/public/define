@@ -1,20 +1,15 @@
 xf_node_max_sampled_textures_m          16
 xf_node_max_storage_texture_reads_m     16
 xf_node_max_storage_texture_writes_m    16
-
 xf_node_max_uniform_buffers_m           8
 xf_node_max_storage_buffer_reads_m      16
 xf_node_max_storage_buffer_writes_m     16
-
 xf_node_max_copy_texture_reads_m        16
 xf_node_max_copy_texture_writes_m       16
-
 xf_node_max_copy_buffer_reads_m         16
 xf_node_max_copy_buffer_writes_m        16
-
 xf_node_max_render_targets_m            16
-
-xf_node_max_resources_m                 64
+xf_node_max_texture_barriers_m          64
 
 xf_node_max_node_dependencies_m         8
 xf_node_max_node_edges_m                16

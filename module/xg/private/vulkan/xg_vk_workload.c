@@ -1511,6 +1511,8 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 
                 // vkCmdPipelineBarrier2KHR
                 xg_vk_instance_ext_api()->cmd_sync2_pipeline_barrier ( vk_cmd_buffer, &vk_dependency_info );
+
+                std_noop_m;
             }
             break;
             case xg_cmd_start_debug_capture_m:

@@ -78,7 +78,8 @@ const xg_vk_renderpass_t* xg_vk_renderpass_get ( xg_renderpass_h renderpass_hand
     return xg_vk_renderpass;
 }
 
-static int xg_vk_pipeline_vertex_stream_cmp ( const void* a, const void* b ) {
+static int xg_vk_pipeline_vertex_stream_cmp ( const void* a, const void* b, const void* arg ) {
+    std_unused_m ( arg );
     xg_vertex_stream_t* p1 = ( xg_vertex_stream_t* ) a;
     xg_vertex_stream_t* p2 = ( xg_vertex_stream_t* ) b;
 
@@ -91,7 +92,8 @@ static int xg_vk_pipeline_vertex_stream_cmp ( const void* a, const void* b ) {
     }
 }
 
-static int xg_vk_pipeline_vertex_attribute_cmp ( const void* a, const void* b ) {
+static int xg_vk_pipeline_vertex_attribute_cmp ( const void* a, const void* b, const void* arg ) {
+    std_unused_m ( arg );
     xg_vertex_attribute_t* p1 = ( xg_vertex_attribute_t* ) a;
     xg_vertex_attribute_t* p2 = ( xg_vertex_attribute_t* ) b;
 
@@ -104,7 +106,8 @@ static int xg_vk_pipeline_vertex_attribute_cmp ( const void* a, const void* b ) 
     }
 }
 
-static int xg_vk_pipeline_render_target_blend_state_cmp ( const void* a, const void* b ) {
+static int xg_vk_pipeline_render_target_blend_state_cmp ( const void* a, const void* b, const void* arg ) {
+    std_unused_m ( arg );
     xg_render_target_blend_state_t* p1 = ( xg_render_target_blend_state_t* ) a;
     xg_render_target_blend_state_t* p2 = ( xg_render_target_blend_state_t* ) b;
 
@@ -1048,7 +1051,8 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
 }
 #endif
 
-static int xg_vk_pipeline_render_target_layout_cmp ( const void* a, const void* b ) {
+static int xg_vk_pipeline_render_target_layout_cmp ( const void* a, const void* b, const void* arg ) {
+    std_unused_m ( arg );
     xg_render_target_layout_t* p1 = ( xg_render_target_layout_t* ) a;
     xg_render_target_layout_t* p2 = ( xg_render_target_layout_t* ) b;
 
@@ -1084,7 +1088,7 @@ static uint64_t xg_vk_renderpass_params_hash ( const xg_render_textures_layout_t
         std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_render_target_layout_t ) );
         std_auto_m sorted_render_targets = std_stack_alloc_array_m ( &hash_allocator, xg_render_target_layout_t, render_textures_layout->render_targets_count );
         std_mem_zero_array_m ( sorted_render_targets, render_textures_layout->render_targets_count );
-        std_sort_insertion_copy ( sorted_render_targets, render_textures_layout->render_targets, sizeof ( xg_render_target_layout_t ), render_textures_layout->render_targets_count, xg_vk_pipeline_render_target_layout_cmp );
+        std_sort_insertion_copy ( sorted_render_targets, render_textures_layout->render_targets, sizeof ( xg_render_target_layout_t ), render_textures_layout->render_targets_count, xg_vk_pipeline_render_target_layout_cmp, NULL );
 
         for ( size_t i = 0; i < render_textures_layout->render_targets_count; ++i ) {
             std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].format );
@@ -1151,12 +1155,12 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_vertex_stream_t ) );
             std_auto_m sorted_input_streams = std_stack_alloc_array_m ( &hash_allocator, xg_vertex_stream_t, params->state.input_layout.stream_count );
             std_mem_zero_array_m ( sorted_input_streams, params->state.input_layout.stream_count );
-            std_sort_insertion_copy ( sorted_input_streams, params->state.input_layout.streams, sizeof ( xg_vertex_stream_t ), params->state.input_layout.stream_count, xg_vk_pipeline_vertex_stream_cmp );
+            std_sort_insertion_copy ( sorted_input_streams, params->state.input_layout.streams, sizeof ( xg_vertex_stream_t ), params->state.input_layout.stream_count, xg_vk_pipeline_vertex_stream_cmp, NULL );
 
             for ( size_t i = 0; i < params->state.input_layout.stream_count; ++i ) {
                 xg_vertex_attribute_t tmp;
                 std_mem_zero_m ( &tmp );
-                std_sort_insertion ( sorted_input_streams[i].attributes, sizeof ( xg_vertex_attribute_t ), sorted_input_streams[i].attribute_count, xg_vk_pipeline_vertex_attribute_cmp, &tmp );
+                std_sort_insertion ( sorted_input_streams[i].attributes, sizeof ( xg_vertex_attribute_t ), sorted_input_streams[i].attribute_count, xg_vk_pipeline_vertex_attribute_cmp, NULL, &tmp );
             }
         }
     }
@@ -1390,7 +1394,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             std_auto_m sorted_render_targets = std_stack_alloc_array_m ( &hash_allocator, xg_render_target_blend_state_t, params->state.blend_state.render_targets_count );
             std_mem_zero_array_m ( sorted_render_targets, params->state.blend_state.render_targets_count );
 
-            std_sort_insertion_copy ( sorted_render_targets, params->state.blend_state.render_targets, sizeof ( xg_render_target_blend_state_t ), params->state.blend_state.render_targets_count, xg_vk_pipeline_render_target_blend_state_cmp );
+            std_sort_insertion_copy ( sorted_render_targets, params->state.blend_state.render_targets, sizeof ( xg_render_target_blend_state_t ), params->state.blend_state.render_targets_count, xg_vk_pipeline_render_target_blend_state_cmp, NULL );
 
             for ( size_t i = 0; i < params->state.blend_state.render_targets_count; ++i ) {
                 if ( !sorted_render_targets[i].enable_blend ) {

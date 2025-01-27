@@ -16,57 +16,57 @@ static void std_queue_virtual_alloc_aliased ( char** base, char** alias, size_t*
     *base = NULL;
     *alias = NULL;
 
-    void* p1 = NULL;
-    void* p2 = NULL;
-    HANDLE s = NULL;
-    void* v1 = NULL;
-    void* v2 = NULL;
+    void* base1 = NULL;
+    void* base2 = NULL;
+    HANDLE section = NULL;
+    void* view1 = NULL;
+    void* view2 = NULL;
 
-    p1 = VirtualAlloc2 ( NULL, NULL, 2 * queue_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, NULL, 0 );
-    if ( !p1 ) {
+    base1 = VirtualAlloc2 ( NULL, NULL, 2 * queue_size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS, NULL, 0 );
+    if ( !base1 ) {
         std_log_os_error_m();
         goto exit;
     }
 
-    BOOL result = VirtualFree ( p1, queue_size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
+    BOOL result = VirtualFree ( base1, queue_size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
     if ( result == FALSE ) {
         std_log_os_error_m();
         goto exit;
     }
 
-    p2 = p1 + queue_size;
+    base2 = base1 + queue_size;
     
-    s = CreateFileMapping ( INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, queue_size, NULL );
-    if ( !s ) {
+    section = CreateFileMapping ( INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, queue_size, NULL );
+    if ( !section ) {
         std_log_os_error_m();
         goto exit;
     }
 
-    v1 = MapViewOfFile3 ( s, NULL, p1, 0, queue_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0 );
-    if ( !v1 ) {
+    view1 = MapViewOfFile3 ( section, NULL, base1, 0, queue_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0 );
+    if ( !view1 ) {
         std_log_os_error_m();
         goto exit;
     }
-    p1 = NULL;
+    base1 = NULL;
 
-    v2 = MapViewOfFile3 ( s, NULL, p2, 0, queue_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0 );
-    if ( !v2 ) {
+    view2 = MapViewOfFile3 ( section, NULL, base2, 0, queue_size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0 );
+    if ( !view2 ) {
         std_log_os_error_m();
         goto exit;
     }
-    p2 = NULL;
+    base2 = NULL;
 
-    *base = v1;
-    *alias = v2;
+    *base = view1;
+    *alias = view2;
     *size = queue_size;
     return;
 
 exit:
-    if ( p1 ) VirtualFree ( p1, 0, MEM_RELEASE );
-    if ( p2 ) VirtualFree ( p2, 0, MEM_RELEASE );
-    if ( s ) CloseHandle ( s );
-    if ( v1 ) UnmapViewOfFileEx ( v1, 0 );
-    if ( v2 ) UnmapViewOfFileEx ( v2, 0 );
+    if ( base1 ) VirtualFree ( base1, 0, MEM_RELEASE );
+    if ( base2 ) VirtualFree ( base2, 0, MEM_RELEASE );
+    if ( section ) CloseHandle ( section );
+    if ( view1 ) UnmapViewOfFileEx ( view1, 0 );
+    if ( view2 ) UnmapViewOfFileEx ( view2, 0 );
 }
 #elif defined ( std_platform_linux_m ) 
     // TODO
@@ -74,7 +74,6 @@ exit:
 
 //==============================================================================
 
-#if 0
 std_queue_local_t std_queue_local ( void* base, size_t size ) {
     if ( !std_pow2_test ( size ) ) {
         size = std_pow2_round_down ( size );
@@ -82,19 +81,14 @@ std_queue_local_t std_queue_local ( void* base, size_t size ) {
 
     std_queue_local_t queue;
     queue.base = base;
-    queue.mask = size - 1;
-    queue.top = 0;
-    queue.bot = 0;
+    queue.ring = std_ring ( size );
     return queue;
 }
-#endif
 
 std_queue_local_t std_queue_local_create ( size_t size ) {
     std_queue_local_t queue;
     std_queue_virtual_alloc_aliased ( &queue.base, &queue.alias, &size );
-    queue.mask = size - 1;
-    queue.top = 0;
-    queue.bot = 0;
+    queue.ring = std_ring ( size );
     return queue;
 }
 
@@ -104,130 +98,74 @@ void std_queue_local_destroy ( std_queue_local_t* queue ) {
 }
 
 void std_queue_local_clear ( std_queue_local_t* queue ) {
-    queue->top = 0;
-    queue->bot = 0;
+    std_ring_clear ( &queue->ring );
 }
 
 size_t std_queue_local_size ( const std_queue_local_t* queue ) {
-    return queue->mask + 1;
+    return std_ring_capacity ( &queue->ring );
 }
 
 size_t std_queue_local_used_size ( const std_queue_local_t* queue ) {
-    return queue->top - queue->bot;
+    return std_ring_count ( &queue->ring );
 }
 
 void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t size ) {
     std_assert_m ( item != NULL );
-    // Load
     char* base = queue->base;
-    size_t mask = queue->mask;
-    size_t top = queue->top;
-
-    size_t cap = mask + 1;
-#if std_log_assert_enabled_m
-    // Test for enough free space
-    size_t bot = queue->bot;
-    size_t used_size = top - bot;
-    std_assert_m ( cap - used_size >= size );
-#endif
-
-    // Push the data
-    size_t offset = top & mask;
+    uint64_t offset = std_ring_top_idx ( &queue->ring );
     std_mem_copy ( base + offset, item, size );
-    queue->top = top + size;
+    std_ring_push ( &queue->ring, size );
 }
 
 void std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size ) {
-    // Load
-    size_t bot = queue->bot;
-
-#if std_log_assert_enabled_m
-    size_t top = queue->top;
-    // Make sure enough allocated space for the data
-    size_t used_size = top - bot;
-    std_assert_m ( used_size >= size );
-#endif
-
-    queue->bot = bot + size;
+    std_ring_pop ( &queue->ring, size );
 }
 
 void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t size ) {
-    // Load
     char* base = queue->base;
-    size_t mask = queue->mask;
-    size_t bot = queue->bot;
-
-#if std_log_assert_enabled_m
-    size_t  top = queue->top;
-    // Make sure enough allocated space for the data
-    size_t used_size = top - bot;
-    std_assert_m ( used_size >= size );
-#endif
-
-    // Read the data
-    size_t offset = bot & mask;
+    uint64_t offset = std_ring_bot_idx ( &queue->ring );
     std_mem_copy ( dest, base + offset, size );
-
-    queue->bot = bot + size;
+    std_ring_pop ( &queue->ring, size );
 }
 
 void* std_queue_local_emplace ( std_queue_local_t* queue, size_t size ) {
-    // Load
     char* base = queue->base;
-    size_t mask = queue->mask;
-    size_t top = queue->top;
-
-    size_t offset = top & mask;
-
-#if std_log_assert_enabled_m
-    // Test for enough free space
-    size_t cap = mask + 1;
-    size_t bot = queue->bot;
-    size_t used_size = top - bot;
-    std_assert_m ( cap - used_size >= size );
-#endif
-
-    queue->top += size;
+    uint64_t offset = std_ring_top_idx ( &queue->ring );
+    std_ring_push ( &queue->ring, size );
     return base + offset;
-}
-
-void* std_queue_local_ptr ( std_queue_local_t* queue, size_t size ) {
-    return queue->base + size;
 }
 
 void std_queue_local_align_push ( std_queue_local_t* queue, size_t align ) {
     // Load
-    size_t top = queue->top;
-
+    size_t top = queue->ring.top;
     size_t new_top = std_align ( top, align );
 
 #if std_log_assert_enabled_m
     // Test for enough free space
     size_t size = new_top - top;
-    size_t cap = queue->mask + 1;
-    size_t used_size = top - queue->bot;
+    size_t cap = queue->ring.mask + 1;
+    size_t used_size = top - queue->ring.bot;
     std_assert_m ( cap - used_size >= size );
 #endif
 
     // Align
-    queue->top = new_top;
+    queue->ring.top = new_top;
 }
 
 void std_queue_local_align_pop ( std_queue_local_t* queue, size_t align ) {
     // Load
-    size_t bot = queue->bot;
-
+    size_t bot = queue->ring.bot;
     size_t new_bot = std_align ( bot, align );
 
 #if std_log_assert_enabled_m
     // Make sure enough allocated space
-    size_t top = queue->top;
+    size_t top = queue->ring.top;
     size_t size = new_bot - bot;
     std_assert_m ( top - bot >= size );
 #endif
 
     // Pop
-    queue->bot = new_bot;
+    queue->ring.bot = new_bot;
 }
 
 // --------------------------
@@ -284,6 +222,11 @@ void std_ring_pop ( std_ring_t* ring, uint64_t count ) {
 #endif
 
     ring->bot = bot + count;
+}
+
+void std_ring_clear ( std_ring_t* ring ) {
+    ring->top = 0;
+    ring->bot = 0;
 }
 
 #if 0
@@ -403,27 +346,10 @@ void* std_circular_pool_at_pool ( const std_circular_pool_t* pool, size_t idx ) 
 //==============================================================================
 // Shared
 
-#if 0
-std_queue_shared_t std_queue_shared ( void* base, size_t size ) {
-    if ( !std_pow2_test ( size ) ) {
-        //std_log_warn_m ( "Shared queue buffer size is not power of two, rounding it down." );
-        size = std_pow2_round_down ( size );
-    }
-
-    std_mem_zero ( base, size );
-
-    std_queue_shared_t queue;
-    queue.base = base;
-    queue.mask = size - 1;
-    queue.top = 0;
-    queue.bot = 0;
-    return queue;
-}
-#endif
-
 std_queue_shared_t std_queue_shared_create ( size_t size ) {
     std_queue_shared_t queue;
     std_queue_virtual_alloc_aliased ( &queue.base, &queue.alias, &size );
+    std_mem_zero ( queue.base, size );
     queue.mask = size - 1;
     queue.top = 0;
     queue.bot = 0;
@@ -516,52 +442,42 @@ void std_queue_spsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t siz
 //==============================================================================
 // MPMC
 // http://www.1024cores.net/home/lock-free-algorithms/queues/bounded-mpmc-queue
-// WARNING: comments are outdated for the most part, TODO update them
-// - Each item in the queue is preceeded by a small u64 header (called tag in the code)
-//   that effectively contains the size of the item that comes after but also works as
-//   a publish flag for the item itself.
-// - We clear it to 0 before even trying to advance top because we want to make sure that
-//   when that memory initially starts to be a part of the valid segment (between bot and top)
-//   it is marked as not yet valid (tag == 0) and any pop on it will fail.
-// - Then we copy the actual item data and finally use the tag as publish flag, and write the
-//   item size to it. This way we can write generic sizes to the queue aswell (although it
-//   does come at the small cost of having to handle possible truncated items at the buffer end)
+// CAS on top/bot increment and dedicated 4 bytes tag slot per item. Contains
+// item size or 0.
+// Needs more testing.
+//
 
 bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t size ) {
-    std_assert_m ( std_align_test ( size, 4 ), "Queue payload size must be a multiple of 8." );
+    std_assert_m ( std_align_test ( size, 4 ), "Queue payload size must be a multiple of 4." );
     std_assert_m ( size < UINT32_MAX );
 
-    // Load
     char* base = queue->base;
-    size_t  mask = queue->mask;
-    size_t  bot = queue->bot;
-    size_t  top = queue->top;
+    size_t mask = queue->mask;
+    size_t bot = queue->bot;
+    size_t top = queue->top;
 
-    // If tag is 0, no consumer will try to consume this until a producer sets it
-    size_t offset = top & mask;
-    uint32_t* tag = ( uint32_t* ) ( base + offset );
-
-    if ( *tag != 0 ) {
-        return false;
-    }
-
+    // Protect vs. full queue
     size_t cap = mask + 1;
     size_t used_size = top - bot;
-
-    // Check for enough free size
-    // TODO branching here might slow things down, just revert the CAS if not enough free size?
     if ( cap - used_size < sizeof ( uint32_t ) + size ) {
         return false;
     }
 
-    // Advance top, write the data, set the publish flag to size
-    size_t new_top = top + sizeof ( uint32_t ) + size;
+    // Protect vs. writing to a slot that's currently being read (pending read)
+    size_t offset = top & mask;
+    uint32_t* tag = ( uint32_t* ) ( base + offset );
+    if ( *tag != 0 ) {
+        return false;
+    }
 
+    // Acquire the slot and begin the pending write
+    size_t new_top = top + sizeof ( uint32_t ) + size;
     if ( std_compare_and_swap_u64 ( &queue->top, &top, new_top ) ) {
         top += sizeof ( uint32_t );
         offset = top & mask;
         std_mem_copy ( base + offset, item, size );
         std_compiler_fence();
+        // Write the size to end the pending write
         *tag = ( uint32_t ) size;
         return true;
     }
@@ -570,35 +486,32 @@ bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t s
 }
 
 size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
-    // Load
-    size_t  mask = queue->mask;
+    size_t mask = queue->mask;
     char* base = queue->base;
-#if std_log_assert_enabled_m
     size_t top = queue->top;
-#endif
     size_t bot = queue->bot;
 
-    // Read and validate the publish flag (size value)
+    // Protect vs. writing to a slot that's currently being read (pending read)
     size_t offset = bot & mask;
     uint32_t* tag = ( uint32_t* ) ( base + offset );
     uint32_t size = *tag;
-
     if ( size == 0 ) {
         return 0;
     }
 
-#if std_log_assert_enabled_m
+    // Protect vs. empty queue
     size_t used_size = top - bot;
-    std_assert_m ( size % 4 == 0 );
-    std_assert_m ( used_size >= size + sizeof ( uint32_t ) );
-#endif
+    if ( used_size < size + sizeof ( uint32_t ) ) {
+        return 0;
+    }
 
-    // Advance bot, set the publish flag to 0
+    // Consume the slot and begin the pending read
     size_t new_bot = bot + sizeof ( uint32_t ) + size;
-
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
-        *tag = 0;
+        std_mem_zero ( base + offset, size );
         std_compiler_fence();
+        // Zero the tag to end the pending read
+        *tag = 0;
         return size;
     }
 
@@ -606,33 +519,29 @@ size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
 }
 
 size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t dest_cap ) {
-    // Load
     char* base = queue->base;
-    size_t  mask = queue->mask;
-    size_t  top = queue->top;
-    size_t  bot = queue->bot;
+    size_t mask = queue->mask;
+    size_t top = queue->top;
+    size_t bot = queue->bot;
 
-    // Read and validate the publish flag (size value)
+    // Protect vs. writing to a slot that's currently being read (pending read)
     size_t offset = bot & mask;
     uint32_t* tag = ( uint32_t* ) ( base + offset );
     uint32_t size = *tag;
-
     if ( size == 0 ) {
         return 0;
     }
 
+    // Protect vs. empty queue
     std_assert_m ( size % 4 == 0 );
     std_assert_m ( size <= dest_cap );
-
     size_t used_size = top - bot;
-
     if ( used_size < size + sizeof ( uint32_t ) ) {
         return 0;
     }
 
-    // Advance bot, read the data, set the publish flag to 0
+    // Consume the slot and begin the pending read
     size_t new_bot = bot + sizeof ( uint32_t ) + size;
-
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
         bot += sizeof ( uint32_t );
         offset = bot & mask;
@@ -643,6 +552,7 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
         // To solve that need to clear all popped data to 0, or establish a stride and just clear the tag on pop
         std_mem_zero ( base + offset, size );
         std_compiler_fence();
+        // Zero the tag to end the pending read
         *tag = 0;
         return size;
     }
@@ -650,7 +560,11 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
     return 0;
 }
 
-// 32
+
+//==============================================================================
+// 4 bytes MPMC
+// Avoids allocating 4 extra bytes per item, instead reserves just one value
+// to flag items.
 #if 0
 std_queue_shared_t std_queue_mpmc_32 ( void* base, size_t size ) {
     std_queue_shared_t queue = std_queue_shared ( base, size );
@@ -666,23 +580,27 @@ std_queue_shared_t std_queue_mpmc_32_create ( size_t size ) {
 }
 
 bool std_queue_mpmc_push_32 ( std_queue_shared_t* queue, const void* item ) {
-    // Load
     char* base = queue->base;
-    size_t  mask = queue->mask;
-    size_t  top = queue->top;
+    size_t mask = queue->mask;
+    size_t top = queue->top;
+    size_t bot = queue->bot;
 
-    // If dest is reserved value, no consumer will try to consume this until a producer sets it
+    // Protect vs. full queue
+    if ( top - bot == mask + 1 ) {
+        return false;
+    }
+
+    // Protect vs. writing to a slot that's currently being read (pending read)
     size_t offset = top & mask;
     uint32_t* dest = ( uint32_t* ) ( base + offset );
-
     if ( *dest != std_queue_shared_32_reserved_value_m ) {
         return false;
     }
 
-    // Advance top, write the data
+    // Acquire the slot and begin the pending write
     size_t new_top = top + sizeof ( uint32_t );
-
     if ( std_compare_and_swap_u64 ( &queue->top, &top, new_top ) ) {
+        // Write the data to end the pending write
         *dest = * ( const uint32_t* ) item;
         return true;
     }
@@ -691,28 +609,27 @@ bool std_queue_mpmc_push_32 ( std_queue_shared_t* queue, const void* item ) {
 }
 
 bool std_queue_mpmc_pop_discard_32 ( std_queue_shared_t* queue ) {
-    // Load
     size_t  mask = queue->mask;
     char* base = queue->base;
     size_t top = queue->top;
     size_t bot = queue->bot;
 
+    // Protect vs. empty queue
     if ( top - bot < 4 ) {
         return false;
     }
 
-    // Read and validate the publish flag
+    // Protect vs. reading a slot that's currently being written (pending write)
     size_t offset = bot & mask;
     uint32_t* data = ( uint32_t* ) ( base + offset );
-
     if ( *data == std_queue_shared_32_reserved_value_m ) {
         return false;
     }
 
-    // Advance bot, set data to reserved value
+    // Consume the slot and begin the pending read
     size_t new_bot = bot + sizeof ( uint32_t );
-
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
+        // Write back the invalid value to end the pending read
         *data = std_queue_shared_32_reserved_value_m;
         return true;
     }
@@ -752,6 +669,8 @@ bool std_queue_mpmc_pop_move_32 ( std_queue_shared_t* queue, void* dest ) {
     return false;
 }
 
+//==============================================================================
+// 8 bytes MPMC
 // 64
 #if 0
 std_queue_shared_t std_queue_mpmc_64 ( void* base, size_t size ) {

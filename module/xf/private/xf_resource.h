@@ -22,23 +22,33 @@ typedef struct {
     xg_texture_layout_e layout;
     xg_pipeline_stage_bit_e stage;
     xg_memory_access_bit_e access;
+    xg_cmd_queue_e queue;
 } xf_texture_execution_state_t;
+
+#define xf_texture_execution_state_cmp_m( a, b ) ( \
+    a.layout == b.layout && \
+    a.state == b.stage && \
+    a.access == b.access && \
+    a.queue == b.queue )
 
 #define xf_texture_execution_state_m( ... ) ( xf_texture_execution_state_t ) { \
     .layout = xg_texture_layout_undefined_m, \
     .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
+    .queue = xg_cmd_queue_invalid_m, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
     xg_pipeline_stage_bit_e stage;
     xg_memory_access_bit_e access;
+    xg_cmd_queue_e queue;
 } xf_buffer_execution_state_t;
 
 #define xf_buffer_execution_state_m( ... ) ( xf_buffer_execution_state_t ) { \
     .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
+    .queue = xg_cmd_queue_invalid_m, \
     ##__VA_ARGS__ \
 }
 

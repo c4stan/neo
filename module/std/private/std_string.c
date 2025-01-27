@@ -177,8 +177,8 @@ size_t std_u32_to_str ( char* str, size_t size, uint32_t u32, uint32_t pad ) {
         pad = len;
     }
 
-    std_mem_set ( str, len, ' ' );
-    str[len] = '\0';    
+    std_mem_set ( str, pad, ' ' );
+    str[pad] = '\0';    
     snprintf ( str + pad - len, size, "%u", u32 );
     return ( size_t ) len;
 }

@@ -72,7 +72,7 @@ static void xf_test ( void ) {
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     xs_database_h sdb = xs->create_database ( &xs_database_params_m (
         .device = device,
-        std_debug_string_assign_m ( .debug_name, "shader_db" )
+        .debug_name = "shader_db"
     ) );
     xs->add_database_folder ( sdb, "shader/" );
     xs->set_output_folder ( sdb, "output/shader/" );

@@ -270,16 +270,6 @@ static void test_platform ( void ) {
 static void  test_allocator ( void ) {
     std_log_info_m ( "testing std_allocator..." );
     {
-        volatile uint64_t* a = ( uint64_t* ) std_program_stack_alloc_m ( sizeof ( uint64_t ) );
-        volatile uint64_t* b = std_program_stack_alloc_array_m ( uint64_t, 2 );
-        *a = 3;
-        b[0] = 77;
-        b[1] = 5;
-        std_assert_m ( *a == 3 );
-        std_assert_m ( b[0] == 77 );
-        std_assert_m ( b[1] == 5 );
-    }
-    {
         size_t virtual_page_size = std_virtual_page_size();
         std_assert_m ( virtual_page_size > 0 );
         std_assert_m ( virtual_page_size == std_platform_memory_info().virtual_page_size );

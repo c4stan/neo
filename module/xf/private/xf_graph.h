@@ -4,6 +4,8 @@
 
 #include <std_hash.h>
 
+#include "xf_resource.h"
+
 /*
     Full rebuild every frame vs rebuild on user request/fraph change only?
         Every frame probably makes the most sense
@@ -82,6 +84,17 @@ typedef struct {
     xf_graph_texture_h depth_stencil_target;
 } xf_graph_node_resource_refs_t;
 
+typedef struct {
+    xf_texture_execution_state_t state;
+    xf_graph_texture_h handle;
+} xf_graph_texture_barrier_t;
+
+#define xf_graph_texture_barrier_m( ... ) ( xf_graph_texture_barrier_t ) { \
+    .state = xf_texture_execution_state_m(), \
+    .handle = xf_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
 typedef struct xf_node_t {
     xf_node_params_t params;
     xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
@@ -101,37 +114,49 @@ typedef struct xf_node_t {
     xf_node_h prev_nodes[xf_graph_max_nodes_m]; // nodes that have an arc ending on this node. must be executed before this node
     uint32_t prev_nodes_count;
     uint32_t execution_order; // indexes graph nodes_execution_order
+    uint32_t segment; // indexes graph segments_array
 } xf_node_t;
 
 // TODO move out
 #define xf_graph_max_swapchain_multi_textures_per_graph_m 4
 
 typedef enum {
-    xf_graph_resource_access_read_m,
-    xf_graph_resource_access_write_m,
+    //xf_graph_resource_access_read_m,
+    //xf_graph_resource_access_write_m,
+    xf_graph_resource_access_sampled_m,
+    xf_graph_resource_access_uniform_m,
+    xf_graph_resource_access_storage_read_m,
+    xf_graph_resource_access_copy_read_m,
+    xf_graph_resource_access_render_target_m,
+    xf_graph_resource_access_depth_target_m,
+    xf_graph_resource_access_storage_write_m,
+    xf_graph_resource_access_copy_write_m,
     xf_graph_resource_access_invalid_m,
-} xf_graph_resource_access_action_e;
+} xf_graph_resource_access_e;
+
+#define xf_graph_resource_access_is_read( a ) ( a <= xf_graph_resource_access_copy_read_m )
+#define xf_graph_resource_access_is_write( a ) ( a > xf_graph_resource_access_copy_read_m && a <= xf_graph_resource_access_copy_write_m )
 
 typedef struct {
     xf_node_h node;
-    xf_graph_resource_access_action_e action;
+    xf_graph_resource_access_e access;
 } xf_graph_resource_access_t;
 
 #define xf_graph_resource_access_m( ... ) ( xf_graph_resource_access_t ) { \
     .node = xf_null_handle_m, \
-    .action = xf_graph_resource_access_invalid_m, \
+    .access = xf_graph_resource_access_invalid_m, \
     ##__VA_ARGS__ \
 }
 
 // Stores what kind of access the graph nodes do on a (sub) resource
 // Filled when adding nodes to a graph and never updated after
 typedef struct {
-    xf_graph_resource_access_t access[xf_graph_max_nodes_m];
-    uint32_t access_count;
+    xf_graph_resource_access_t array[xf_graph_max_nodes_m];
+    uint32_t count;
 } xf_resource_dependencies_t;
 
 #define xf_resource_dependencies_m( ... ) ( xf_resource_dependencies_t ) { \
-    .access_count = 0, \
+    .count = 0, \
     ##__VA_ARGS__ \
 }
 
@@ -147,6 +172,33 @@ typedef struct {
 }
 
 typedef struct {
+    xf_texture_execution_state_t state;
+    // TODO node is unused?
+    //      texture is only used in the pre-execute queue release pass
+    xf_node_h node;
+    xf_texture_h texture; 
+} xf_graph_texture_transition_t;
+
+#define xf_graph_texture_transition_m( ... ) ( xf_graph_texture_transition_t ) { \
+    .state = xf_texture_execution_state_m(), \
+    .node = xf_null_handle_m, \
+    .texture = xf_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_graph_texture_transition_t array[xf_graph_max_nodes_m];
+    uint32_t count;
+    uint32_t idx;
+} xf_graph_texture_transitions_t;
+
+#define xf_graph_texture_transitions_m( ... ) { \
+    .count = 0, \
+    .idx = 0 , \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xf_texture_h handle;
     bool disable_aliasing;
     xf_graph_resource_lifespan_t lifespan;
@@ -155,6 +207,13 @@ typedef struct {
         xf_resource_dependencies_t mips[16]; // TODO make storage external?
         // TODO external hash table to support dynamic view access
     } deps;
+    union {
+        xf_graph_texture_transitions_t shared;
+        xf_graph_texture_transitions_t mips[16]; // TODO make storage external?
+    } transitions;
+    // cached from underlying texture
+    xg_texture_view_access_e view_access;
+    uint32_t mip_levels;
 } xf_graph_texture_t;
 
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
@@ -162,13 +221,33 @@ typedef struct {
     .disable_aliasing = false, \
     .lifespan = xf_graph_resource_lifespan_m(), \
     .deps.mips = { [0 ... 15] = xf_resource_dependencies_m() }, \
+    .transitions.mips = { [0 ... 15] = xf_graph_texture_transitions_m() }, \
+    .view_access = xg_texture_view_access_invalid_m, \
     ##__VA_ARGS__ \
 }
+
+typedef struct {
+    xf_buffer_execution_state_t state;
+    xf_node_h node;
+} xf_graph_buffer_transition_t;
+
+#define xf_graph_buffer_transition_m( ... ) ( xf_graph_buffer_transition_t ) { \
+    .state = xf_buffer_execution_state_m(), \
+    .node = xf_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_graph_buffer_transition_t array[xf_graph_max_nodes_m];
+    uint32_t count;
+    uint32_t idx;
+} xf_graph_buffer_transitions_t;
 
 typedef struct {
     xf_buffer_h handle;
     xf_graph_resource_lifespan_t lifespan;
     xf_resource_dependencies_t deps;
+    xf_graph_buffer_transitions_t transitions;
 } xf_graph_buffer_t;
 
 #define xf_graph_buffer_m( ... ) ( xf_graph_buffer_t ) { \
@@ -183,6 +262,34 @@ typedef struct {
     xf_texture_h textures_array[xf_graph_max_textures_m];
     uint32_t textures_count;
 } xf_graph_memory_heap_t;
+
+// TODO:
+//      segment nodes in execution order by queue
+//          for each segment determine its dependencies
+//              for each node in segment look at cross queue deps,
+//              if node depends on other node outside of segment,
+//              add dependency between segments
+//
+//
+typedef struct {
+    uint32_t begin; // indexes nodes_execution_order
+    uint32_t end;
+    xg_cmd_queue_e queue;
+    xg_queue_event_h event;
+    uint32_t deps[xf_graph_max_nodes_m]; // indexes other segments. list of segments that need to execute directly before this one.
+    uint32_t deps_count;
+    bool is_depended; // flagged if some other segment depends on this one. means it needs a valid event
+} xf_graph_segment_t;
+
+#define xf_graph_segment_m( ... ) ( xf_graph_segment_t ) { \
+    .begin = -1, \
+    .end = -1, \
+    .queue = xg_cmd_queue_invalid_m, \
+    .event = xg_null_handle_m, \
+    .deps_count = 0, \
+    .is_depended = false, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xf_graph_params_t params;
@@ -216,6 +323,9 @@ typedef struct {
     xf_graph_memory_heap_t heap; // TODO one per mem type?
     uint32_t owned_textures_array[32];
     uint32_t owned_textures_count;
+
+    xf_graph_segment_t segments_array[xf_graph_max_nodes_m];
+    uint32_t segments_count;
 } xf_graph_t;
 
 typedef struct {
@@ -229,7 +339,7 @@ void xf_graph_reload ( xf_graph_state_t* state );
 void xf_graph_unload ( void );
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
-xf_node_h xf_graph_add_node ( xf_graph_h graph, const xf_node_params_t* params );
+xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_clear ( xf_graph_h graph );
 void xf_graph_finalize ( xf_graph_h graph );
 void xf_graph_build ( xf_graph_h graph, xg_workload_h workload );

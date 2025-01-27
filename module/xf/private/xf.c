@@ -6,7 +6,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->create_texture = xf_resource_texture_create;
     xf->create_buffer = xf_resource_buffer_create;
     xf->create_graph = xf_graph_create;
-    xf->add_node = xf_graph_add_node;
+    xf->add_node = xf_graph_node_create;
     xf->finalize_graph = xf_graph_finalize;
     xf->build_graph = xf_graph_build;
     xf->execute_graph = xf_graph_execute;

@@ -1876,6 +1876,7 @@ typedef enum {
     xg_texture_view_access_default_only_m,
     xg_texture_view_access_separate_mips_m,
     xg_texture_view_access_dynamic_m, // TODO
+    xg_texture_view_access_invalid_m,
 } xg_texture_view_access_e;
 
 typedef struct {
