@@ -1,7 +1,6 @@
 import os
 import uuid
 import xml.dom.minidom
-import distutils.version
 import shutil
 import ntpath
 import pprint

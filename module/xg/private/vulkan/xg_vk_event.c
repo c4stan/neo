@@ -76,26 +76,36 @@ const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h event_handle ) {
 
 // --
 
-xg_queue_event_h xg_gpu_queue_event_create ( xg_device_h device_handle ) {
-    const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
-
+xg_queue_event_h xg_gpu_queue_event_create ( const xg_queue_event_params_t* params ) {
+    const xg_vk_device_t* device = xg_vk_device_get ( params->device );
     std_mutex_lock ( &xg_vk_event_state->gpu_queue_events_mutex );
-
     xg_vk_gpu_queue_event_t* event = std_list_pop_m ( &xg_vk_event_state->gpu_queue_events_freelist );
     std_assert_m ( event )
 
-    VkSemaphoreCreateInfo semaphore_create_info;
-    semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    semaphore_create_info.pNext = NULL;
-    semaphore_create_info.flags = 0;
+    VkSemaphoreCreateInfo semaphore_create_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+    };
     VkResult result = vkCreateSemaphore ( device->vk_handle, &semaphore_create_info, xg_vk_cpu_allocator(), &event->vk_semaphore );
     std_verify_m ( result == VK_SUCCESS );
+
+    {
+        VkDebugUtilsObjectNameInfoEXT debug_name_info = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_SEMAPHORE,
+            .objectHandle = ( uint64_t ) event->vk_semaphore,
+            .pObjectName = params->debug_name,
+        };
+        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+    }
 
 #if xg_debug_enable_events_log_m
     std_log_info_m ( "[XG-VK-EVENT] Create " std_fmt_u64_m, event->vk_semaphore );
 #endif
 
-    event->device = device_handle;
+    event->params = *params;
 
     std_mutex_unlock ( &xg_vk_event_state->gpu_queue_events_mutex );
 
@@ -106,7 +116,7 @@ void xg_gpu_queue_event_destroy ( xg_queue_event_h event_handle ) {
     std_mutex_lock ( &xg_vk_event_state->gpu_queue_events_mutex );
 
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
-    const xg_vk_device_t* device = xg_vk_device_get ( event->device );
+    const xg_vk_device_t* device = xg_vk_device_get ( event->params.device );
 
 #if xg_debug_enable_events_log_m
     std_log_info_m ( "[XG-VK-EVENT] Destroy " std_fmt_u64_m, event->vk_semaphore );

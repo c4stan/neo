@@ -20,9 +20,6 @@ static std_app_test_state_t* m_state;
 
 static std_app_state_e std_app_test_tick ( void ) {
     if ( m_state->boot ) {
-        void* p = std_virtual_heap_alloc ( 16, 16 );
-        std_unused_m ( p );
-
         wm_i* wm = std_module_get_m ( wm_module_name_m );
         std_assert_m ( wm );
 
@@ -80,6 +77,9 @@ static std_app_state_e std_app_test_tick ( void ) {
         }
 
         if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
+            std_allocator_info_t alloc_info;
+            std_virtual_heap_allocator_info ( &alloc_info );
+            std_log_info_m ( std_fmt_size_m, alloc_info.allocated_size );
             return std_app_state_reboot_m;
             m_state->first_print = true;
         }

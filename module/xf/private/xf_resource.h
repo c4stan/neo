@@ -79,32 +79,20 @@ typedef struct {
 } xf_texture_view_table_t;
 #endif
 
+typedef uint64_t xf_device_texture_h;
+
 typedef struct {
-    bool is_external; // lifetime not owned by xf. never allocated, just used
-    xg_texture_h xg_handle;
+    xf_device_texture_h device_texture_handle;
     xg_texture_usage_bit_e required_usage;
-    xg_texture_usage_bit_e allowed_usage;
     xf_texture_params_t params;
-
-    union {
-        xf_texture_execution_state_t shared;
-        xf_texture_execution_state_t mips[16]; // TODO make storage external?
-        // TODO external hash table to support dynamic view access
-    } state;
-
-    xf_texture_h alias;
     uint32_t ref_count;
     bool is_multi;
 } xf_texture_t;
 
 #define xf_texture_m( ... ) ( xf_texture_t ) { \
-    .is_external = false, \
-    .xg_handle = xg_null_handle_m, \
+    .device_texture_handle = xf_null_handle_m, \
     .required_usage = xg_texture_usage_bit_none_m, \
-    .allowed_usage = xg_texture_usage_bit_none_m, \
     .params = xf_texture_params_m(), \
-    .state.shared = xf_texture_execution_state_m(), \
-    .alias = xf_null_handle_m, \
     .ref_count = 0, \
     .is_multi = false, \
     ##__VA_ARGS__ \
@@ -116,7 +104,6 @@ typedef struct {
     xg_buffer_usage_bit_e required_usage;
     xg_buffer_usage_bit_e allowed_usage;
     xf_buffer_params_t params;
-    xf_buffer_h alias;
     uint32_t ref_count;
     bool is_multi;
 } xf_buffer_t;
@@ -127,7 +114,6 @@ typedef struct {
     .required_usage = xg_buffer_usage_bit_none_m, \
     .allowed_usage = xg_buffer_usage_bit_none_m, \
     .params = xf_buffer_params_m(), \
-    .alias = xf_null_handle_m, \
     .ref_count = 0, \
     .is_multi = false, \
     ##__VA_ARGS__ \
@@ -137,7 +123,6 @@ typedef struct {
     xf_multi_texture_params_t params;
     uint32_t index;
     xf_texture_h textures[xf_resource_multi_texture_max_textures_m];
-    xf_texture_h alias;
     xg_swapchain_h swapchain;
     uint32_t ref_count;
 } xf_multi_texture_t;
@@ -145,7 +130,6 @@ typedef struct {
 #define xf_multi_texture_m( ... ) ( xf_multi_texture_t ) { \
     .params = xf_multi_texture_params_m(), \
     .index = 0, \
-    .alias = xf_null_handle_m, \
     .swapchain = xg_null_handle_m, \
     .ref_count = 0, \
     ##__VA_ARGS__ \
@@ -168,6 +152,41 @@ typedef struct {
 }
 
 typedef struct {
+    bool is_external; // lifetime not owned by xf. never allocated, just used
+    xg_texture_h handle;
+    xg_texture_info_t info;
+} xf_device_texture_params_t;
+
+#define xf_device_texture_params_m( ... ) ( xf_device_texture_params_t ) { \
+    .is_external = false, \
+    .handle = xg_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    bool is_external;
+    xg_texture_h handle;
+    uint32_t ref_count;
+    xg_texture_info_t info;
+    char debug_name[xf_debug_name_size_m];
+    union {
+        xf_texture_execution_state_t shared;
+        xf_texture_execution_state_t mips[16]; // TODO make storage external?
+        // TODO external hash table to support dynamic view access
+    } state;
+} xf_device_texture_t;
+
+#define xf_device_texture_m( ... ) ( xf_device_texture_t ) { \
+    .is_external = false, \
+    .handle = xg_null_handle_m, \
+    .info = { 0 }, \
+    .debug_name = "", \
+    .ref_count = 0, \
+    .state.shared = xf_texture_execution_state_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xf_buffer_t* buffers_array;
     xf_buffer_t* buffers_freelist;
     uint64_t* buffers_bitset;
@@ -183,6 +202,10 @@ typedef struct {
     xf_multi_texture_t* multi_textures_array;
     xf_multi_texture_t* multi_textures_freelist;
     uint64_t* multi_textures_bitset;
+
+    xf_device_texture_t* device_textures_array;
+    xf_device_texture_t* device_textures_freelist;
+    uint64_t* device_textures_bitset;
 } xf_resource_state_t;
 
 void xf_resource_load ( xf_resource_state_t* state );
@@ -193,7 +216,6 @@ void xf_resource_unload ( void );
 xf_texture_h xf_resource_texture_create ( const xf_texture_params_t* params );
 xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h texture );
 xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params );
-void xf_resource_clear_unreferenced ( void );
 
 void xf_resource_texture_destroy ( xf_texture_h texture );
 void xf_resource_buffer_destroy ( xf_buffer_h buffer );
@@ -204,9 +226,9 @@ void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture );
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer );
-xf_texture_t* xf_resource_texture_get_no_alias ( xf_texture_h texture );
+xf_device_texture_t* xf_resource_texture_get_device_texture ( xf_texture_h texture );
+xf_device_texture_t* xf_resource_device_texture_get ( xf_device_texture_h texture );
 
-void xf_resource_texture_map_to_new ( xf_texture_h texture, xg_texture_h xg_handle, xg_texture_usage_bit_e allowed_usage );
 void xf_resource_buffer_map_to_new ( xf_buffer_h buffer, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage );
 void xf_resource_texture_unmap ( xf_texture_h texture );
 void xf_resource_buffer_unmap ( xf_buffer_h buffer );
@@ -258,3 +280,17 @@ void xf_resource_texture_add_ref ( xf_texture_h texture );
 void xf_resource_texture_remove_ref ( xf_texture_h texture );
 void xf_resource_buffer_add_ref ( xf_buffer_h buffer );
 void xf_resource_buffer_remove_ref ( xf_buffer_h buffer );
+
+// --
+
+void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time );
+
+void xf_resource_device_texture_map_to_new ( xf_device_texture_h device_textre_handle, xg_texture_h xg_handle, const xg_texture_info_t* info );
+
+void xf_resource_texture_bind ( xf_texture_h texture, xf_device_texture_h device_texture );
+void xf_resource_texture_unbind ( xf_texture_h texture );
+
+xf_device_texture_h xf_resource_device_texture_create ( const xf_device_texture_params_t* params );
+void xf_resource_device_texture_destroy ( xf_device_texture_h texture );
+void xf_resource_device_texture_add_ref ( xf_device_texture_h texture );
+void xf_resource_device_texture_remove_ref ( xf_device_texture_h texture );

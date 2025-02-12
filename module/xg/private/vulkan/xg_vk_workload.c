@@ -1578,7 +1578,7 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
         //        xg_gpu_queue_event_log_signal ( workload->execution_complete_gpu_event );
         //    }
         //} else {
-        xg_queue_event_h chunk_complete_event_handle = xg_gpu_queue_event_create ( workload->device );
+        xg_queue_event_h chunk_complete_event_handle = xg_gpu_queue_event_create ( &xg_queue_event_params_m ( .device = workload->device, .debug_name = "workload_cmd_chunk_event" ) );
         context->events_array[context->events_count++] = chunk_complete_event_handle;
         const xg_vk_gpu_queue_event_t* chunk_complete_event = xg_vk_gpu_queue_event_get ( chunk_complete_event_handle );
         chunk_semaphores_array[queue_chunk_it] = chunk_complete_event->vk_semaphore;
@@ -4020,7 +4020,7 @@ void xg_workload_set_execution_complete_gpu_event ( xg_workload_h workload_handl
 void xg_workload_init_swapchain_texture_acquired_gpu_event ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     if ( workload->swapchain_texture_acquired_event == xg_null_handle_m ) {
-        workload->swapchain_texture_acquired_event = xg_gpu_queue_event_create ( workload->device );
+        workload->swapchain_texture_acquired_event = xg_gpu_queue_event_create ( &xg_queue_event_params_m ( .device = workload->device, .debug_name = "workload_swapchain_acquire" ) );
     }
 }
 

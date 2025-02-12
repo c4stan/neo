@@ -181,7 +181,7 @@ static void xf_test ( void ) {
         xs->update_pipeline_states ( workload );
     }
 
-    xf->destroy_unreferenced_resources();
+    //xf->destroy_unreferenced_resources();
 
     std_module_unload_m ( xf_module_name_m );
     std_module_unload_m ( xs_module_name_m );

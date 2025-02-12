@@ -1884,10 +1884,16 @@ static void duplicate_selection ( void ) {
 static void mouse_pick ( uint32_t x, uint32_t y ) {
     xg_i* xg = m_state->modules.xg;
     xi_i* xi = m_state->modules.xi;
+    xf_i* xf = m_state->modules.xf;
 
     if ( xi->get_active_element_id () != 0 ) {
         return;
     }
+
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xf->execute_graph ( m_state->render.mouse_pick_graph, workload, 0 );
+    xg->submit_workload ( workload );
+    xg->wait_all_workload_complete();
 
     uint32_t resolution_x = m_state->render.resolution_x;
     uint32_t resolution_y = m_state->render.resolution_y;
@@ -2339,7 +2345,7 @@ static std_app_state_e viewapp_update ( void ) {
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg->cmd_destroy_texture ( resource_cmd_buffer, m_state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 
-        xf->destroy_unreferenced_resources();
+        //xf->destroy_unreferenced_resources();
 
         viewapp_boot_raster_graph();
         viewapp_boot_raytrace_graph();
@@ -2354,13 +2360,12 @@ static std_app_state_e viewapp_update ( void ) {
 
     uint64_t key = 0;
     key = xf->execute_graph ( m_state->render.active_graph, workload, key );
-    key = xf->execute_graph ( m_state->render.mouse_pick_graph, workload, key );
     xf->advance_multi_texture ( m_state->render.object_id_texture );
     xg->submit_workload ( workload );
     xg->present_swapchain ( m_state->render.swapchain, workload );
 
     xs->update_pipeline_states ( workload );
-    xf->destroy_unreferenced_resources();
+    //xf->destroy_unreferenced_resources();
 
     return std_app_state_tick_m;
 }

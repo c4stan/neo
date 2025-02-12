@@ -71,7 +71,8 @@ void wm_window_load ( wm_window_state_t* state ) {
     wm_window_state->windows_freelist = std_freelist_m ( wm_window_state->windows_array, wm_max_windows_m );
     wm_window_state->windows_list = NULL;
     wm_window_state->windows_bitset = std_virtual_heap_alloc_array_m ( uint64_t, wm_window_bitset_u64_count_m );
-    std_mem_zero ( wm_window_state->windows_bitset, sizeof ( uint64_t ) * wm_window_bitset_u64_count_m );
+    std_mem_zero_array_m ( wm_window_state->windows_array, wm_max_windows_m );
+    std_mem_zero_array_m ( wm_window_state->windows_bitset, wm_window_bitset_u64_count_m );
 
     std_mutex_init ( &wm_window_state->mutex );
 
@@ -105,6 +106,7 @@ void wm_window_unload ( void ) {
     while ( std_bitset_scan ( &idx, wm_window_state->windows_bitset, idx, wm_window_bitset_u64_count_m ) ) {
         wm_window_h handle = idx;
         wm_window_destroy ( handle );
+        ++idx;
     }
 
     std_virtual_heap_free ( wm_window_state->windows_array );

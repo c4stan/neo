@@ -34,11 +34,11 @@ const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h handle );
         swapchain texture and reuse them when the same texture gets acquired again by the acquire call
 */
 typedef struct {
-    xg_device_h device;
+    xg_queue_event_params_t params;
     VkSemaphore vk_semaphore;
 } xg_vk_gpu_queue_event_t;
 
-xg_queue_event_h xg_gpu_queue_event_create ( xg_device_h device );
+xg_queue_event_h xg_gpu_queue_event_create ( const xg_queue_event_params_t* params );
 void xg_gpu_queue_event_destroy ( xg_queue_event_h handle );
 const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_queue_event_h handle );
 void xg_gpu_queue_event_log_wait ( xg_queue_event_h handle );

@@ -233,6 +233,10 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         std_stack_string_append ( &stack, ")" );
 
         swapchain->textures[i] = xg_vk_texture_register_swapchain_texture ( &texture_params, swapchain_textures[i] );
+
+        xg_queue_event_params_t event_params = xg_queue_event_params_m ( .device = params->device );
+        std_str_copy_static_m ( event_params.debug_name, texture_params.debug_name );
+        swapchain->execution_complete_gpu_events[i] = xg_gpu_queue_event_create ( &event_params );
     }
 
     swapchain->texture_count = texture_count;
@@ -244,11 +248,6 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain->display = xg_null_handle_m;
     swapchain->acquired = false;
     std_str_copy_static_m ( swapchain->debug_name, params->debug_name );
-
-    //swapchain->texture_acquire_event = xg_gpu_queue_event_create ( params->device );
-    for ( size_t i = 0; i < texture_count; ++i ) {
-        swapchain->execution_complete_gpu_events[i] = xg_gpu_queue_event_create ( params->device );
-    }
 
     return swapchain_handle;
 }
@@ -475,7 +474,6 @@ void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_acquire_result_t* resul
     swapchain->acquired_texture_idx = texture_idx;
     xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
 #else
-    //xg_queue_event_h vk_acquire_event_handle = xg_gpu_queue_event_create ( swapchain->device );
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
     // TODO this isn't very nice? create the event here and pass it to the workload?
     xg_workload_init_swapchain_texture_acquired_gpu_event ( workload_handle );

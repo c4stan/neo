@@ -14,7 +14,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->destroy_graph = xf_graph_destroy;
     //xf.declare_swapchain = xf_resource_swapchain_declare;
     //xf.bind_texture = xf_resource_texture_bind;
-    xf->destroy_unreferenced_resources = xf_resource_clear_unreferenced;
+    xf->destroy_unreferenced_resources = xf_resource_destroy_unreferenced;
 
     xf->enable_node = xf_graph_node_enable;
     xf->disable_node = xf_graph_node_disable;
@@ -66,8 +66,11 @@ void xf_reload ( void* std_runtime, void* api ) {
 }
 
 void xf_unload ( void ) {
-    xf_resource_unload();
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg->wait_all_workload_complete();
+    
     xf_graph_unload();
+    xf_resource_unload();
 
     xf_state_free();
 }

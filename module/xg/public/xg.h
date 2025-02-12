@@ -1834,6 +1834,17 @@ typedef struct {
 typedef uint64_t xg_queue_event_h;
 
 typedef struct {
+    xg_device_h device;
+    char debug_name[xg_debug_name_size_m];
+} xg_queue_event_params_t;
+
+#define xg_queue_event_params_m( ... ) ( xg_queue_event_params_t ) { \
+    .device = xg_null_handle_m, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xg_cmd_queue_e queue;
     xg_queue_event_h signal_event;
     xg_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
@@ -2005,6 +2016,8 @@ typedef struct {
     xg_format_e format;
     xg_texture_usage_bit_e allowed_usage;
     xg_sample_count_e samples_per_pixel;
+    xg_texture_tiling_e tiling;
+    xg_texture_view_access_e view_access;
     xg_texture_flag_bit_e flags;
     xg_texture_aspect_e default_aspect;
     uint64_t os_handle; // TODO replace with monotonically increasing resource uid
@@ -2338,7 +2351,7 @@ typedef struct {
 
     // Event
     //xg_gpu_event_h          ( *create_event )                       ( xg_device_h device );
-    xg_queue_event_h        ( *create_queue_event )                 ( xg_device_h device );
+    xg_queue_event_h        ( *create_queue_event )                 ( const xg_queue_event_params_t* params );
     void                    ( *cmd_destroy_queue_event )            ( xg_resource_cmd_buffer_h cmd_buffer, xg_queue_event_h event, xg_resource_cmd_buffer_time_e destroy_time );
 
     xg_renderpass_h         ( *create_renderpass )                  ( const xg_renderpass_params_t* params );

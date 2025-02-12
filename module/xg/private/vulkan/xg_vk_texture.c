@@ -407,6 +407,8 @@ bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle 
     info->format = texture->params.format;
     info->allowed_usage = texture->params.allowed_usage;
     info->samples_per_pixel = texture->params.samples_per_pixel;
+    info->tiling = texture->params.tiling;
+    info->view_access = texture->params.view_access;
     info->flags = texture->flags;
     info->default_aspect = texture->default_aspect;
     info->os_handle = ( uint64_t ) texture->vk_handle;

@@ -544,7 +544,7 @@ typedef struct {
     xf_buffer_h ( *create_buffer ) ( const xf_buffer_params_t* params );
     xf_texture_h ( *create_multi_texture ) ( const xf_multi_texture_params_t* params );
     //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
-    void ( *destroy_unreferenced_resources ) ( void );
+    void ( *destroy_unreferenced_resources ) ( xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time );
 
     void ( *destroy_texture ) ( xf_texture_h texture );
 

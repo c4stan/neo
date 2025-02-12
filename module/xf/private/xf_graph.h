@@ -259,7 +259,7 @@ typedef struct {
 
 typedef struct {
     xg_memory_h memory_handle;
-    xf_texture_h textures_array[xf_graph_max_textures_m];
+    xf_device_texture_h textures_array[xf_graph_max_textures_m];
     uint32_t textures_count;
 } xf_graph_memory_heap_t;
 
