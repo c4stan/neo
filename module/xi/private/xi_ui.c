@@ -20,6 +20,7 @@ void xi_ui_load ( xi_ui_state_t* state ) {
 
     std_mem_zero_m ( xi_ui_state );
     xi_ui_state->focus_stack_idx = -1;
+    xi_ui_state->device = xg_null_handle_m;
 }
 
 void xi_ui_reload ( xi_ui_state_t* state ) {
@@ -27,6 +28,10 @@ void xi_ui_reload ( xi_ui_state_t* state ) {
 }
 
 void xi_ui_unload ( void ) {
+    if ( xi_ui_state->device != xg_null_handle_m ) {
+        xg_geo_util_free_data ( &xi_ui_state->transform_geo.cpu );
+        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu );
+    }
 }
 
 static bool xi_ui_cursor_test ( int64_t x, int64_t y, int64_t width, int64_t height ) {

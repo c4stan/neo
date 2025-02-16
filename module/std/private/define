@@ -1,6 +1,5 @@
 # std_module
 std_module_max_modules_m                    256
-std_module_name_max_len_m                   128
 
 # std_log
 std_enable_log_colored_console_output_m     1
@@ -21,6 +20,7 @@ std_process_max_pipes_m                     32
 #std_allocator
 #std_segment_pool_max_bins_m                8
 std_tagged_allocator_max_bins_m             128
+std_allocator_max_debug_records_m           1024 * 32
 
 #std_string
 std_string_static_table_max_size_m          1024 * 1024 * 4

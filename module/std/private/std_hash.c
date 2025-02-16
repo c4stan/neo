@@ -545,6 +545,40 @@ uint64_t* std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ) {
     return NULL;
 }
 
+uint64_t* std_hash_map_lookup_insert ( std_hash_map_t* map, uint64_t hash, bool* insert ) {
+    // Load
+    size_t          mask = map->mask;
+    uint64_t*       hashes = map->hashes;
+    uint64_t*       payloads = map->payloads;
+
+    // Compute idx
+    size_t          idx = hash & mask;
+    uint64_t        map_hash = hashes[idx];
+
+    // Try compare until success or empty slot (linear probing)
+    for ( size_t i = 0; i < mask + 1; ++i ) {
+        if ( map_hash == UINT64_MAX ) {
+            hashes[idx] = hash;
+            ++map->count;
+            *insert = true;
+            return &payloads[idx];
+        }
+
+        if ( hash == map_hash ) {
+            // Success
+            *insert = false;
+            return &payloads[idx];
+        }
+
+        idx = ( idx + 1 ) & mask;
+        map_hash = hashes[idx];
+    }
+
+    std_log_error_m ( "hash map is full!" );
+    *insert = false;
+    return NULL;
+}
+
 static bool std_hash_map_remove_at_idx ( std_hash_map_t* map, size_t idx ) {
     // Load
     size_t      mask = map->mask;

@@ -73,6 +73,7 @@ void xg_cmd_buffer_unload ( void ) {
     }
 
     std_virtual_heap_free ( xg_cmd_buffer_state->cmd_buffers_array );
+    std_virtual_heap_free ( xg_cmd_buffer_state->cmd_buffers_bitset );
     std_mutex_deinit ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 }
 

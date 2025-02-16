@@ -2,10 +2,9 @@
 
 #include <std_hash.h>
 #include <std_log.h>
+#include <std_file.h>
 
 #include "xs_database.h"
-
-#include <fs.h>
 
 #define xs_parser_line_comment_token_m "//"
 #define xs_parser_multiline_comment_begin_token_m "/*"
@@ -1615,11 +1614,10 @@ static void xs_parser_parse_include ( xs_parser_parsing_context_t* context ) {
         size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len > 0 );
 
-        char path[fs_path_size_m];
-        fs_i* fs = std_module_get_m ( fs_module_name_m );
-        std_str_copy ( path, fs_path_size_m, context->path );
-        len = fs->pop_path ( path );
-        fs->append_path ( path, fs_path_size_m - len, token );
+        char path[std_path_size_m];
+        std_str_copy ( path, std_path_size_m, context->path );
+        len = std_path_pop ( path );
+        std_path_append ( path, std_path_size_m - len, token );
 
         if ( context->pipeline_type == xg_pipeline_graphics_m ) {
             std_auto_m state = ( xs_parser_graphics_pipeline_state_t* ) context->state;
@@ -1726,8 +1724,6 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
 }
 
 bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipeline_state_t* state, const char* path ) {
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
-
 #if 0
     fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
     std_assert_m ( pipeline_state_file != fs_null_handle_m );
@@ -1737,7 +1733,7 @@ bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipe
     std_verify_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
     fs->close_file ( pipeline_state_file );
 #else
-    std_buffer_t file_buffer = fs->read_file_path_to_heap ( path );
+    std_buffer_t file_buffer = std_virtual_heap_read_file ( path );
 #endif
 
     //state_alloc.buffer.base[pipeline_state_file_info.size] = 0;
@@ -1878,8 +1874,6 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
 }
 
 bool xs_parser_parse_compute_pipeline_state_from_path ( xs_parser_compute_pipeline_state_t* state, const char* path ) {
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
-
 #if 0
     fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
     std_assert_m ( pipeline_state_file != fs_null_handle_m );
@@ -1889,7 +1883,7 @@ bool xs_parser_parse_compute_pipeline_state_from_path ( xs_parser_compute_pipeli
     std_verify_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
     fs->close_file ( pipeline_state_file );
 #else
-    std_buffer_t file_buffer = fs->read_file_path_to_heap ( path );
+    std_buffer_t file_buffer = std_virtual_heap_read_file ( path );
 #endif
 
     xs_parser_parsing_context_t context;

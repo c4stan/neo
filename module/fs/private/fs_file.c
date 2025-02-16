@@ -599,7 +599,7 @@ std_buffer_t fs_file_path_read_alloc ( const char* path ) {
         return std_null_buffer_m;
     }
     
-    void* buffer = std_virtual_heap_alloc ( file_info.size, 16 );
+    void* buffer = std_virtual_heap_alloc_m ( file_info.size, 16 );
     uint64_t read_size = fs_file_read ( buffer, file_info.size, file );
     if ( read_size == fs_read_error_m ) {
         return std_null_buffer_m;

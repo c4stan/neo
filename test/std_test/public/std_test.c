@@ -9,13 +9,6 @@
 #include <std_sort.h>
 #include <std_file.h>
 
-// TODO
-#define FS_TEST 0
-
-#if FS_TEST
-    #include <fs.h>
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -216,7 +209,7 @@ static void bench_virtual_heap ( void ) {
                 std_virtual_heap_free ( ptrs[idx] );
                 ptrs[idx] = ptrs[--alloc_count];
             } else {
-                ptrs[alloc_count++] = std_virtual_heap_alloc ( random % 1023 + 1, 16 );
+                ptrs[alloc_count++] = std_virtual_heap_alloc_m ( random % 1023 + 1, 16 );
             }
         }
 
@@ -290,7 +283,7 @@ static void  test_allocator ( void ) {
     {
         uint32_t* a = std_virtual_heap_alloc_array_m ( uint32_t, 10 );
         uint32_t* b = std_virtual_heap_alloc_array_m ( uint32_t, 10 );
-        uint32_t* c = ( uint32_t* ) ( std_virtual_heap_alloc ( sizeof ( uint32_t ) * 10, std_alignof_m ( uint32_t ) ) );
+        uint32_t* c = ( uint32_t* ) ( std_virtual_heap_alloc_m ( sizeof ( uint32_t ) * 10, std_alignof_m ( uint32_t ) ) );
 
         for ( size_t i = 0; i < 10; ++i ) {
             a[i] = ( uint32_t ) i;
@@ -307,7 +300,7 @@ static void  test_allocator ( void ) {
         std_verify_m ( std_virtual_heap_free ( c ) );
     }
     {
-        void* buffer = std_virtual_heap_alloc ( 1024 * 32, 16 );
+        void* buffer = std_virtual_heap_alloc_m ( 1024 * 32, 16 );
         std_stack_t stack = std_stack ( buffer, 1024 * 32 );
         void* a = std_stack_alloc_align ( &stack, 1024 * 16, 16 );
         void* b = std_stack_alloc_align ( &stack, 1024 * 8, 16 );
@@ -328,8 +321,8 @@ static void  test_allocator ( void ) {
     }
     #endif
     for ( uint32_t i = 0; i < 100; ++i ) {
-        void* alloc = std_virtual_heap_alloc ( 256, 8 );
-        void* alloc2 = std_virtual_heap_alloc ( 2435, 8 );
+        void* alloc = std_virtual_heap_alloc_m ( 256, 8 );
+        void* alloc2 = std_virtual_heap_alloc_m ( 2435, 8 );
         std_virtual_heap_free ( alloc2 );
         std_virtual_heap_free ( alloc );
     }
@@ -495,26 +488,6 @@ static void test_thread ( void ) {
 
 static void test_module ( void ) {
     std_log_info_m ( "testing std_module..." );
-#if FS_TEST
-    // TODO std_test_module instead of fs
-    fs_i* fs = std_module_get_m ( FS_MODULE_NAME );
-    std_assert_m ( fs != NULL );
-    std_module_release ( fs );
-    // TODO test more
-
-#if 0
-    fs = std_module_get_m ( FS_MODULE_NAME );
-    std_assert_m ( fs != NULL );
-    std_module_reload_m ( std_module_name_m );
-#endif
-
-#if 0
-    fs = std_module_get_m ( FS_MODULE_NAME );
-    std_module_reload();
-#endif
-
-#endif
-
     std_log_info_m ( "std_module_test complete. [TODO: expand this test]" );
 }
 
@@ -768,7 +741,7 @@ static void test_queue ( void ) {
 #define THREAD_COUNT 8
         std_assert_m ( n % THREAD_COUNT == 0 );
         size_t per_thread_n = n / THREAD_COUNT;
-        void* threads_memory = std_virtual_heap_alloc ( n * sizeof ( test_queue_item_t ), 16 );
+        void* threads_memory = std_virtual_heap_alloc_m ( n * sizeof ( test_queue_item_t ), 16 );
 
         // SPMC
         {

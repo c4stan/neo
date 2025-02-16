@@ -7,8 +7,7 @@
 #include <std_list.h>
 #include <std_string.h>
 #include <std_log.h>
-
-#include <fs.h>
+#include <std_file.h>
 
 static xs_database_state_t* xs_database_state;
 
@@ -91,26 +90,25 @@ static char* xs_database_alloc_string ( xs_database_t* db, size_t size ) {
 }
 
 typedef struct {
-    fs_i* fs;
     xs_database_t* db;
     char* base;
 } xs_database_folder_iterator_params_t;
 
-static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flags, void* arg ) {
-    if ( ! ( flags & fs_path_is_file_m ) ) {
+static void xs_database_folder_iterator ( const char* name, std_path_flags_t flags, void* arg ) {
+    if ( ! ( flags & std_path_is_file_m ) ) {
         return;
     }
 
     xs_database_folder_iterator_params_t* params = ( xs_database_folder_iterator_params_t* ) arg;
 
-    size_t path_len = params->fs->append_path ( params->base, fs_path_size_m, name );
+    size_t path_len = std_path_append ( params->base, std_path_size_m, name );
     bool is_header = false;
     xg_pipeline_e type;
     {
         size_t extension_base = std_str_find_reverse ( params->base, path_len, "." );
 
         if ( extension_base == std_str_find_null_m ) {
-            params->fs->pop_path ( params->base );
+            std_path_pop ( params->base );
             return;
         }
 
@@ -126,7 +124,7 @@ static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flag
         } else if ( std_str_cmp ( params->base + extension_base, ".glsl" ) == 0 ) {
             is_header = true;
         } else {
-            params->fs->pop_path ( params->base );
+            std_path_pop ( params->base );
             return;
         }
     }
@@ -140,7 +138,7 @@ static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flag
     } else {
         xs_database_pipeline_state_t* pipeline_state = &params->db->pipeline_states[params->db->pipeline_states_count++];
         pipeline_state->path = dest;
-        pipeline_state->name = params->fs->get_path_name_ptr ( dest );
+        pipeline_state->name = std_path_name_ptr ( dest );
         pipeline_state->type = type;
         pipeline_state->pipeline_handle = xg_null_handle_m;
         pipeline_state->old_pipeline_handle = xg_null_handle_m;
@@ -159,16 +157,14 @@ static void xs_database_folder_iterator ( const char* name, fs_path_flags_t flag
         std_assert_m ( unique );
     }
 
-    params->fs->pop_path ( params->base );
+    std_path_pop ( params->base );
 }
 
 bool xs_database_add_folder ( xs_database_h db_handle, const char* input_path ) {
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
-
     xs_database_t* db = &xs_database_state->database_array[db_handle];
 
-    char path[fs_path_size_m] = { 0 };
-    size_t path_len = fs->get_absolute_path ( path, fs_path_size_m, input_path );
+    char path[std_path_size_m] = { 0 };
+    size_t path_len = std_path_absolute ( path, std_path_size_m, input_path );
 
     // TODO check that the path exists and is a folder
 
@@ -177,31 +173,28 @@ bool xs_database_add_folder ( xs_database_h db_handle, const char* input_path ) 
     db->folders[db->folders_count++] = dest;
 
     xs_database_folder_iterator_params_t args;
-    args.fs = fs;
     args.db = db;
     args.base = path;
-    fs->iterate_dir ( path, xs_database_folder_iterator, &args );
+    std_directory_iterate ( path, xs_database_folder_iterator, &args );
 
     return true;
 }
 
 bool xs_database_set_output_folder ( xs_database_h db_handle, const char* input_path ) {
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
-
     xs_database_t* db = &xs_database_state->database_array[db_handle];
 
-    fs_path_info_t info;
-    fs->get_path_info ( &info, input_path );
-    bool result = info.flags & fs_path_is_dir_m;
+    std_path_info_t info;
+    std_path_info ( &info, input_path );
+    bool result = info.flags & std_path_is_directory_m;
 
     if ( !result ) {
-        result = fs->create_dir ( input_path );
+        result = std_directory_create ( input_path );
     }
 
-    char path[fs_path_size_m] = { 0 };
-    fs->get_absolute_path ( path, fs_path_size_m, input_path );
+    char path[std_path_size_m] = { 0 };
+    std_path_absolute ( path, std_path_size_m, input_path );
 
-    std_str_copy ( db->output_path, fs_path_size_m, path );
+    std_str_copy ( db->output_path, std_path_size_m, path );
 
     return result;
 }
@@ -278,7 +271,6 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
     xs_database_build_result_t result = xs_database_build_result_m();
 
-    fs_i* fs = std_module_get_m ( fs_module_name_m );
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     // check headers, froce rebuild all shaders if one changed
@@ -290,8 +282,8 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
     for ( size_t header_it = 0; header_it < db->pipeline_state_headers_count && !dirty_headers; ++header_it ) {
         xs_database_pipeline_state_header_t* header = &db->pipeline_state_headers_array[header_it];
 
-        fs_file_info_t info;
-        std_verify_m ( fs->get_file_path_info ( &info, header->path ) );
+        std_file_info_t info;
+        std_verify_m ( std_file_path_info ( &info, header->path ) );
 
         dirty_headers |= db->pipeline_state_headers_last_build_timestamp.count < info.last_write_time.count;
     
@@ -308,13 +300,13 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
     for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
         xs_database_pipeline_state_t* pipeline_state = &db->pipeline_states[state_it];
 
-        fs_file_h pipeline_state_file = fs->open_file ( pipeline_state->path, fs_file_read_m );
-        std_assert_m ( pipeline_state_file != fs_null_handle_m );
+        std_file_h pipeline_state_file = std_file_open ( pipeline_state->path, std_file_read_m );
+        std_assert_m ( pipeline_state_file != std_file_null_handle_m );
 
-        fs_file_info_t pipeline_state_file_info;
-        std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
+        std_file_info_t pipeline_state_file_info;
+        std_verify_m ( std_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
 
-        fs->close_file ( pipeline_state_file );
+        std_file_close ( pipeline_state_file );
 
         bool state_parse_result = false;
 
@@ -377,23 +369,23 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             continue;
         }
 
-        char input_path[fs_path_size_m];
-        std_str_copy ( input_path, fs_path_size_m, pipeline_state->path );
-        fs->pop_path ( input_path );
+        char input_path[std_path_size_m];
+        std_str_copy ( input_path, std_path_size_m, pipeline_state->path );
+        std_path_pop ( input_path );
 
-        char output_path[fs_path_size_m];
+        char output_path[std_path_size_m];
 
         if ( db->output_path[0] ) {
-            std_str_copy ( output_path, fs_path_size_m, db->output_path );
+            std_str_copy ( output_path, std_path_size_m, db->output_path );
         } else {
-            std_str_copy ( output_path, fs_path_size_m, input_path );
+            std_str_copy ( output_path, std_path_size_m, input_path );
         }
 
-        fs->create_dir ( output_path );
+        std_directory_create ( output_path );
 
         shader_bytecode_t shader_bytecode[xs_shader_parser_max_shader_references_m];
-        char shader_path[fs_path_size_m];
-        char binary_path[fs_path_size_m];
+        char shader_path[std_path_size_m];
+        char binary_path[std_path_size_m];
 
         // check if the pipeline state needs to be (re)built
         bool needs_to_build = dirty_headers || pipeline_state->last_build_timestamp.count < pipeline_state_file_info.last_write_time.count || db->dirty_build_params;
@@ -418,12 +410,12 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             #else
             for ( uint32_t i = 0; i < shader_references->count; ++i ) {
                 xs_parser_shader_reference_t* shader = &shader_references->array[i];
-                std_str_copy ( shader_path, fs_path_size_m, input_path );
-                fs->append_path ( shader_path, fs_path_size_m, shader->name );
+                std_str_copy ( shader_path, std_path_size_m, input_path );
+                std_path_append ( shader_path, std_path_size_m, shader->name );
 
                 // check shader source edit time
-                fs_file_info_t shader_source_info;
-                std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
+                std_file_info_t shader_source_info;
+                std_verify_m ( std_file_path_info ( &shader_source_info, shader_path ) );
 
                 if ( pipeline_state->last_build_timestamp.count < shader_source_info.last_write_time.count ) {
                     needs_to_build = true;
@@ -456,12 +448,12 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 shader_bytecode_t* bytecode = &shader_bytecode[i];
 
                 // prepare shader code input path
-                std_str_copy ( shader_path, fs_path_size_m, input_path );
-                fs->append_path ( shader_path, fs_path_size_m, shader->name );
+                std_str_copy ( shader_path, std_path_size_m, input_path );
+                std_path_append ( shader_path, std_path_size_m, shader->name );
 
                 // prepare shader bytecode output path
-                std_str_copy ( binary_path, fs_path_size_m, output_path );
-                fs->append_path ( binary_path, fs_path_size_m, shader->name );
+                std_str_copy ( binary_path, std_path_size_m, output_path );
+                std_path_append ( binary_path, std_path_size_m, shader->name );
                 size_t len = std_str_len ( binary_path );
                 size_t len2 = std_str_find_reverse ( binary_path, len, "." );
 
@@ -499,10 +491,10 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                 // check if shader needs to be (re)compiled
                 bool skip_compile = false;
-                fs_file_info_t shader_source_info;
-                std_verify_m ( fs->get_file_path_info ( &shader_source_info, shader_path ) );
-                fs_file_info_t shader_output_info;
-                if ( fs->get_file_path_info ( &shader_output_info, binary_path ) ) {
+                std_file_info_t shader_source_info;
+                std_verify_m ( std_file_path_info ( &shader_source_info, shader_path ) );
+                std_file_info_t shader_output_info;
+                if ( std_file_path_info ( &shader_output_info, binary_path ) ) {
                     if ( shader_output_info.last_write_time.count > shader_source_info.last_write_time.count
                         && shader_output_info.last_write_time.count > most_recent_header_edit.count     // if any header got updated after the shader was compiled, need to recompile
                     ) {
@@ -552,7 +544,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 fs->close_file ( bytecode_file );
                 #else
                 bytecode->stage = stage;
-                bytecode->buffer = fs->read_file_path_to_heap ( binary_path );
+                bytecode->buffer = std_virtual_heap_read_file ( binary_path );
                 #endif
                 //}
             }

@@ -7,6 +7,7 @@
 #include <std_atomic.h>
 #include <std_byte.h>
 #include <std_file.h>
+#include <std_module.h>
 
 #include <malloc.h>
 
@@ -1288,9 +1289,24 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
     heap->stack = std_virtual_stack_create ( std_allocator_tlsf_max_segment_size_m );
     std_allocator_tlsf_heap_grow ( heap, size );
+
+#if std_build_debug_m
+    heap->debug_records_freelist = NULL;
+    std_mem_zero_static_array_m ( heap->debug_records_bitset );
+#endif
 }
 
-void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align ) {
+#if std_build_debug_m
+void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align, std_alloc_scope_t scope )
+#else
+void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align )
+#endif
+{
+#if std_build_debug_m
+    size += 8;
+    align = std_align ( align, 8 );
+#endif
+
     // check size
     std_static_assert_m ( std_allocator_tlsf_header_size_m == 8 );
     size = std_align ( size, 8 );
@@ -1373,6 +1389,17 @@ void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint
 
     //std_log_info_m ( "ALLOC " std_fmt_u64_m, segment_size );
 
+#if std_build_debug_m
+    std_allocator_debug_record_t* debug_record = std_list_pop_m ( &heap->debug_records_freelist );
+    if ( debug_record ) {
+        debug_record->scope = scope;
+        debug_record->user = user_data;
+        std_bitset_set ( heap->debug_records_bitset, debug_record - heap->debug_records_array );
+    }
+    std_mem_copy_m ( user_data, &debug_record );
+    user_data += 8;
+#endif
+
     return user_data;
 }
 
@@ -1380,6 +1407,15 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
     if ( !address ) {
         return;
     }
+
+#if std_build_debug_m
+    address -= 8;
+    std_auto_m debug_record = ( std_allocator_debug_record_t* ) * (void**) address;
+    if ( debug_record ) {
+        std_list_push ( &heap->debug_records_freelist, debug_record );
+        std_bitset_clear ( heap->debug_records_bitset, debug_record - heap->debug_records_array );
+    }
+#endif
 
     std_auto_m segment = ( char* ) address - std_allocator_tlsf_header_size_m;
 
@@ -1482,10 +1518,17 @@ void std_virtual_heap_allocator_info ( std_allocator_info_t* info ) {
 
 //==============================================================================
 
+#if std_build_debug_m
+void* std_tlsf_alloc ( uint64_t size, uint64_t align, std_alloc_scope_t scope ) {
+    std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
+    return std_tlsf_heap_alloc ( heap, size, align, scope );
+}
+#else
 void* std_tlsf_alloc ( uint64_t size, uint64_t align ) {
     std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
     return std_tlsf_heap_alloc ( heap, size, align );
 }
+#endif
 
 void std_tlsf_free ( void* address ) {
     std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
@@ -1494,15 +1537,19 @@ void std_tlsf_free ( void* address ) {
 
 //==============================================================================
 
+#if std_build_debug_m
+void* std_virtual_heap_alloc ( size_t size, size_t align, std_alloc_scope_t scope ) {
+    return std_tlsf_alloc ( size, align, scope );
+}
+#else
 void* std_virtual_heap_alloc ( size_t size, size_t align ) {
     return std_tlsf_alloc ( size, align );
-    //return std_allocator_virtual_heap_alloc ( size, align );
 }
+#endif
 
 bool std_virtual_heap_free ( void* address ) {
     std_tlsf_free ( address );
     return true; // TODO
-    //return std_allocator_virtual_heap_free ( handle );
 }
 
 //==============================================================================
@@ -1592,10 +1639,23 @@ void std_allocator_boot ( void ) {
 // Copy the local boot state into the external state
 void std_allocator_init ( std_allocator_state_t* state ) {
     std_mem_copy_m ( state, std_allocator_state );
+
+    std_allocator_tlsf_heap_t* heap = &state->tlsf_heap;
+    heap->debug_records_freelist = std_static_freelist_m ( heap->debug_records_array );
 }
 
 void std_allocator_attach ( std_allocator_state_t* state ) {
     std_allocator_state = state;
+}
+
+void std_allocator_shutdown ( void ) {
+    std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, heap->debug_records_bitset, idx, std_bitset_u64_count_m ( std_allocator_max_debug_records_m ) ) ) {
+        std_allocator_debug_record_t* record = &heap->debug_records_array[idx];
+        std_log_warn_m ( "MEMLEAK: " std_fmt_str_m " " std_fmt_str_m ":" std_fmt_size_m, record->scope.file, record->scope.function, record->scope.line );
+        ++idx;
+    }
 }
 
 /*
@@ -1664,7 +1724,7 @@ std_buffer_t std_virtual_heap_read_file ( const char* path ) {
         return std_null_buffer_m;
     }
     
-    void* buffer = std_virtual_heap_alloc ( file_info.size, 16 );
+    void* buffer = std_virtual_heap_alloc_m ( file_info.size, 16 );
     uint64_t read_size = std_file_read ( buffer, file_info.size, file );
     if ( read_size == std_file_read_error_m ) {
         return std_null_buffer_m;

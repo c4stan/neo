@@ -2,7 +2,6 @@
 #include <std_log.h>
 
 #include <se.h>
-#include <fs.h>
 
 std_warnings_ignore_m ( "-Wunused-function" )
 std_warnings_ignore_m ( "-Wunused-variable" )
@@ -208,7 +207,6 @@ static void run_se_test_2 ( void ) {
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     xf_i* xf = std_module_load_m ( xf_module_name_m );
     se_i* se = std_module_load_m ( se_module_name_m );
-    std_module_load_m ( fs_module_name_m );
 
     wm_window_params_t window_params = { .name = "se_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &window_params );

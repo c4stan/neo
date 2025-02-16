@@ -33,7 +33,7 @@ void std_init ( int argc, char** argv ) {
 
     std_allocator_boot();
 
-    std_runtime_state_t* state = std_virtual_heap_alloc_m ( std_runtime_state_t );
+    std_runtime_state_t* state = std_virtual_heap_alloc_struct_m ( std_runtime_state_t );
 
     std_allocator_init ( &state->allocator_state );
     std_log_init ( &state->log_state );
@@ -71,6 +71,7 @@ void std_runtime_bind ( void* std_runtime ) {
 }
 
 void std_shutdown ( void ) {
+    std_allocator_shutdown();
     std_module_shutdown();
     std_thread_shutdown();
     std_process_shutdown();

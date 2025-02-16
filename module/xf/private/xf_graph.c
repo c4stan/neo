@@ -70,7 +70,7 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     if ( node->params.type == xf_node_type_custom_pass_m) {
         xf_node_custom_pass_params_t* pass = &node->params.pass.custom;
         if ( pass->copy_args && pass->user_args.base ) {
-            void* alloc = std_virtual_heap_alloc ( pass->user_args.size, 16 ); // TODO some kind of linear allocator
+            void* alloc = std_virtual_heap_alloc_m ( pass->user_args.size, 16 ); // TODO some kind of linear allocator
             std_mem_copy ( alloc, pass->user_args.base, pass->user_args.size );
             node->user_alloc = alloc;
         } else {
@@ -79,7 +79,7 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     } else if ( node->params.type == xf_node_type_compute_pass_m ) {
         xf_node_compute_pass_params_t* pass = &node->params.pass.compute;
         if ( pass->copy_uniform_data && pass->uniform_data.base ) {
-            void* alloc = std_virtual_heap_alloc ( pass->uniform_data.size, 16 ); // TODO some kind of linear allocator
+            void* alloc = std_virtual_heap_alloc_m ( pass->uniform_data.size, 16 ); // TODO some kind of linear allocator
             std_mem_copy ( alloc, pass->uniform_data.base, pass->uniform_data.size );
             node->user_alloc = alloc;
         } else {

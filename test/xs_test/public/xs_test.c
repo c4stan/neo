@@ -5,7 +5,6 @@
 #include <wm.h>
 #include <xg.h>
 #include <xs.h>
-#include <fs.h>
 
 #include <math.h>
 
@@ -58,7 +57,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
     xg_queue_event_h event = xg_null_handle_m;
     if ( compute_clear ) {
-        event = xg->create_queue_event ( frame.device );
+        event = xg->create_queue_event ( &xg_queue_event_params_m ( .device = frame.device ) );
         xg->cmd_destroy_queue_event ( resource_cmd_buffer, event, xg_resource_cmd_buffer_time_workload_complete_m );
     }
 
@@ -377,8 +376,6 @@ static void xs_test ( void ) {
         std_assert_m ( swapchain != xg_null_handle_m );
     }
 
-    std_module_load_m ( fs_module_name_m );
-
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     xs_database_h sdb = xs->create_database ( &xs_database_params_m (
         .device = device,
@@ -481,6 +478,7 @@ static void xs_test ( void ) {
 
     std_module_unload_m ( xs_module_name_m );
     std_module_unload_m ( xg_module_name_m );
+    std_module_unload_m ( wm_module_name_m );
 }
 
 void std_main ( void ) {

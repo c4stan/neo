@@ -772,7 +772,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
             uint32_t group_size = device->raytrace_properties.shaderGroupHandleSize;
             //uint32_t sbt_stride = std_align ( group_size, device->raytrace_properties.shaderGroupBaseAlignment );
             //std_assert_m ( sbt_stride <= device->raytrace_properties.maxShaderGroupStride );
-            groups_buffer = std_virtual_heap_alloc ( group_count * group_size, 16 );
+            groups_buffer = std_virtual_heap_alloc_m ( group_count * group_size, 16 );
             VkResult result = xg_vk_device_ext_api ( device_handle )->get_shader_group_handles ( device->vk_handle, pipeline, 0, group_count, group_count * group_size, groups_buffer );
             std_verify_m ( result == VK_SUCCESS );
 
@@ -915,6 +915,8 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
     //    xg_resource_bindings_layout_h layout_handle = pipeline->common.resource_layouts[i];
     //    xg_vk_pipeline_resource_bindings_layout_destroy ( layout_handle );
     //}
+
+    std_virtual_heap_free ( pipeline->sbt_handle_buffer );
 
     std_list_push ( &xg_vk_pipeline_state->raytrace_pipelines_freelist, pipeline );
     std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->raytrace_pipelines_map, pipeline->common.hash ) );

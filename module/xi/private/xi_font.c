@@ -28,6 +28,7 @@ void xi_font_load ( xi_font_state_t* state ) {
 
     xi_font_state->fonts_array = std_virtual_heap_alloc_array_m ( xi_font_t, xi_font_max_fonts_m );
     xi_font_state->fonts_freelist = std_freelist_m ( xi_font_state->fonts_array, xi_font_max_fonts_m );
+    xi_font_state->fonts_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xi_font_max_fonts_m ) );
     xi_font_state->uniform_data = NULL;
     xi_font_state->renderpass = xg_null_handle_m;
 }
@@ -43,7 +44,16 @@ void xi_font_reload ( xi_font_state_t* state ) {
 }
 
 void xi_font_unload ( void ) {
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xi_font_state->fonts_bitset, idx, std_bitset_u64_count_m ( xi_font_max_fonts_m ) ) ) {
+        xi_font_t* font = &xi_font_state->fonts_array[idx];
+        std_log_info_m ( "Destroying font " std_fmt_u64_m": " std_fmt_str_m, idx, font->params.debug_name );
+        xi_font_destroy ( idx );
+        ++idx;
+    }
+
     std_virtual_heap_free ( xi_font_state->fonts_array );
+    std_virtual_heap_free ( xi_font_state->fonts_bitset );
 }
 
 xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* params ) {
@@ -74,7 +84,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
 
     // Atlas
     size_t atlas_size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m;
-    void* atlas_alloc = std_virtual_heap_alloc ( atlas_size, 16 );
+    void* atlas_alloc = std_virtual_heap_alloc_m ( atlas_size, 16 );
 #if 0
     std_alloc_t char_info_alloc = std_virtual_heap_alloc ( sizeof ( stbtt_bakedchar ) * params->char_count, 16 );
 
@@ -89,12 +99,6 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     stbtt_PackSetOversampling ( &pack_context, 2, 2 );
     stbtt_PackFontRange ( &pack_context, ( unsigned char* ) ttf_data.base, 0, ( float ) params->pixel_height, ( int ) params->first_char_code, ( int ) params->char_count, font->char_info );
     stbtt_PackEnd ( &pack_context );
-#endif
-
-#if 0
-    font->char_info = ( stbtt_bakedchar* ) char_info_alloc.buffer.base;
-#else
-    //font->char_info = ( stbtt_packedchar* ) char_info_alloc.buffer.base;
 #endif
 
     xg_texture_h raster_texture;
@@ -366,12 +370,14 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     font->outline = params->outline;
 
     xi_font_h font_handle = ( xi_font_h ) ( font - xi_font_state->fonts_array );
+    std_bitset_set ( xi_font_state->fonts_bitset, font_handle );
     return font_handle;
 }
 
-void xi_font_destroy ( xi_font_h font ) {
-    // TODO
-    std_unused_m ( font );
+void xi_font_destroy ( xi_font_h font_handle ) {
+    xi_font_t* font = &xi_font_state->fonts_array[font_handle];
+    std_virtual_heap_free ( font->char_info );
+    std_bitset_clear ( xi_font_state->fonts_bitset, font_handle );
 }
 
 xi_font_char_box_t xi_font_char_box_get ( float* fx, float* fy, xi_font_h font_handle, uint32_t character ) {

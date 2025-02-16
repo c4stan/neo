@@ -29,6 +29,7 @@ typedef struct {
 typedef struct {
     xi_font_t* fonts_array;
     xi_font_t* fonts_freelist;
+    uint64_t* fonts_bitset;
 
     xs_database_pipeline_h font_atlas_pipeline;
     //xg_buffer_h uniform_buffer; // TODO have a per-device cache instead of creating a new one on font creation

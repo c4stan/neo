@@ -21,7 +21,7 @@ void se_entity_load ( se_entity_state_t* state ) {
 
     state->page_array = std_virtual_heap_alloc_array_m ( void*, se_entity_family_page_count_m );
     for ( uint64_t i = 0; i < se_entity_family_page_count_m; ++i ) {
-        state->page_array[i] = std_virtual_heap_alloc ( se_entity_family_page_size_m, 16 );
+        state->page_array[i] = std_virtual_heap_alloc_m ( se_entity_family_page_size_m, 16 );
     }
     state->page_count = se_entity_family_page_count_m;
 
@@ -33,8 +33,8 @@ void se_entity_load ( se_entity_state_t* state ) {
 
     std_mutex_init ( &se_entity_state->mutex );
 
-    state->entity_meta = std_virtual_heap_alloc_m ( se_entity_metadata_t );
-    state->component_meta = std_virtual_heap_alloc_m ( se_entity_component_metadata_t );
+    state->entity_meta = std_virtual_heap_alloc_struct_m ( se_entity_metadata_t );
+    state->component_meta = std_virtual_heap_alloc_struct_m ( se_entity_component_metadata_t );
     std_mem_zero_m ( state->entity_meta );
     std_mem_zero_m ( state->component_meta );
 }
@@ -44,7 +44,20 @@ void se_entity_reload ( se_entity_state_t* state ) {
 }
 
 void se_entity_unload ( void ) {
-    // TODO
+    std_virtual_heap_free ( se_entity_state->family_mask_array );
+    std_virtual_heap_free ( se_entity_state->family_array );
+    std_virtual_heap_free ( se_entity_state->family_map_hashes );
+    std_virtual_heap_free ( se_entity_state->family_map_values );
+    for ( uint64_t i = 0; i < se_entity_family_page_count_m; ++i ) {
+        std_virtual_heap_free ( se_entity_state->page_array[i] );
+    }
+    std_virtual_heap_free ( se_entity_state->page_array );
+    std_virtual_heap_free ( se_entity_state->entity_array );
+    std_virtual_heap_free ( se_entity_state->entity_destroy_array );
+    std_virtual_heap_free ( se_entity_state->entity_meta );
+    std_virtual_heap_free ( se_entity_state->component_meta );
+
+    std_mutex_deinit ( &se_entity_state->mutex );
 }
 
 #if 0

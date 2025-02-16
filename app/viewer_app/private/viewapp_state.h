@@ -3,7 +3,6 @@
 #include <std_time.h>
 #include <std_app.h>
 
-#include <fs.h>
 #include <xf.h>
 #include <xs.h>
 #include <se.h>
@@ -13,9 +12,10 @@
 #include <xi.h>
 #include <tk.h>
 
+#include <xg_geo_util.h>
+
 // Modules
 typedef struct {
-    fs_i* fs;
     wm_i* wm;
     xg_i* xg;
     xs_i* xs;
@@ -134,6 +134,8 @@ typedef struct {
 }
 
 typedef struct {
+    xg_geo_util_geometry_data_t geo_data;
+    xg_geo_util_geometry_gpu_data_t geo_gpu_data;
     xs_database_pipeline_h depth_pipeline;
     xs_database_pipeline_h geometry_pipeline;
     xs_database_pipeline_h shadow_pipeline;
@@ -153,6 +155,8 @@ typedef struct {
 } viewapp_mesh_component_t;
 
 #define viewapp_mesh_component_m( ... ) ( viewapp_mesh_component_t ) { \
+    .geo_data = { 0 }, \
+    .geo_gpu_data = { 0 }, \
     .depth_pipeline = xs_null_handle_m, \
     .geometry_pipeline = xs_null_handle_m, \
     .shadow_pipeline = xs_null_handle_m, \

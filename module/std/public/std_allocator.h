@@ -18,10 +18,35 @@ bool std_virtual_free ( void* begin, void* end ); // on Win32 this range must ma
     Virtual heap allocator
     TODO rename to global_heap? heap? ???
 */
+#if std_build_debug_m
+typedef struct {
+    char module[32];
+    char file[32];
+    char function[32];
+    size_t line;
+} std_alloc_scope_t;
+
+//#define std_alloc_scope_m() ( std_alloc_scope_t ) { .module = std_pp_eval_string_m(std_module_name_m), .file = std_pp_eval_string_m(std_file_name_m), .function = std_func_name_m, .line = std_line_num_m }
+#define std_alloc_scope_m() ( { \
+    std_alloc_scope_t s; \
+    std_str_copy_static_m ( s.module, std_pp_eval_string_m ( std_module_name_m ) ); \
+    std_str_copy_static_m ( s.file, std_pp_eval_string_m ( std_file_name_m ) ); \
+    std_str_copy_static_m ( s.function, std_func_name_m ); \
+    s.line = std_line_num_m; \
+    s; \
+ } )
+
+void*   std_virtual_heap_alloc ( size_t size, size_t align, std_alloc_scope_t scope );
+#define std_virtual_heap_alloc_m( size, align ) ( std_virtual_heap_alloc ( size, align, std_alloc_scope_m() ) )
+#define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc_m ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
+#define std_virtual_heap_alloc_struct_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
+#else
 void*   std_virtual_heap_alloc ( size_t size, size_t align );
-bool    std_virtual_heap_free ( void* ptr );
-#define std_virtual_heap_alloc_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
+#define std_virtual_heap_alloc_m( size, align ) ( std_virtual_heap_alloc ( size, align ) )
 #define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
+#define std_virtual_heap_alloc_struct_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
+#endif
+bool    std_virtual_heap_free ( void* ptr );
 
 typedef struct {
     uint64_t allocated_size;
@@ -29,6 +54,18 @@ typedef struct {
 } std_allocator_info_t;
 
 void std_virtual_heap_allocator_info ( std_allocator_info_t* info );
+
+typedef struct {
+    uint64_t allocated_size;
+    char name[std_module_name_max_len_m];
+} std_allocator_module_info_record_t;
+
+typedef struct {
+    std_allocator_module_info_record_t* modules;
+    uint32_t count;
+} std_allocator_module_info_t;
+
+void std_virtual_heap_allocator_module_info ( std_allocator_module_info_t* info );
 
 /*
     Buffer utilities

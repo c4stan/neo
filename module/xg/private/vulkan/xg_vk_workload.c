@@ -255,8 +255,17 @@ void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
     std_assert_m ( device_context->is_active );
     const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
 
+    std_virtual_heap_free ( device_context->workload_contexts_array );
+    std_virtual_heap_free ( device_context->desc_allocators_array );
+
     for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
         xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[i];
+
+        std_virtual_heap_free ( workload_context->chunk.cmd_chunks_array );
+        std_virtual_heap_free ( workload_context->chunk.queue_chunks_array );
+        std_virtual_heap_free ( workload_context->translate.translated_chunks_array );
+        std_virtual_heap_free ( workload_context->sort.result );
+        std_virtual_heap_free ( workload_context->sort.temp );
 
         //if ( submit_context->is_submitted ) {
         //    const xg_vk_workload_t* workload = xg_vk_workload_get ( submit_context->workload );

@@ -7,13 +7,13 @@
 void* xg_vk_instance_cpu_alloc ( void* user, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
     std_unused_m ( user );
     std_unused_m ( scope );
-    return std_virtual_heap_alloc ( size, alignment );
+    return std_virtual_heap_alloc_m ( size, alignment );
 }
 
 void* xg_vk_instance_cpu_realloc ( void* user, void* original, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
     std_unused_m ( user );
     std_unused_m ( scope );
-    void* new = std_virtual_heap_alloc ( size, alignment );
+    void* new = std_virtual_heap_alloc_m ( size, alignment );
     std_mem_copy ( new, original, size );
     std_virtual_heap_free ( original );
     return new;

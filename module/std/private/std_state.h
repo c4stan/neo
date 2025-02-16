@@ -28,39 +28,29 @@ typedef struct {
     // Bss is uninitialized and its contribute to disk is almost zero.
     // Both have direct contribute on runtime memory consumption.
     // TODO
-    size_t data_size;
-    size_t bss_size;
+    //size_t data_size;
+    //size_t bss_size;
 } std_module_t;
 
 typedef struct {
+    // TODO use std_module_count_m and std_module_id_m?
+    // TODO auto load modules on startup and auto unload on shutdown
     std_module_t        modules_array[std_module_max_modules_m];
     std_module_t*       modules_freelist;
 
-    // std_module_name_t* -> std_module_t*
-    #if 0
-    std_module_name_t   modules_name_map_keys[std_module_map_slots_m];
-    std_module_t**      modules_name_map_payloads[std_module_map_slots_m];
-    std_map_t           modules_name_map;
-    #else
-    //uint64_t* modules_name_map_keys;
-    //uint64_t* modules_name_map_values;
+    // std_module_id_m -> std_module_t*
+    std_module_t*       modules_id_table[std_module_count_m];
+
+    // name hash -> std_module_t*
     uint64_t modules_name_map_keys[std_module_map_slots_m]; // name hash
     uint64_t modules_name_map_payloads[std_module_map_slots_m]; // std_module_t*
     std_hash_map_t modules_name_map;
-    #endif
 
     // void* api -> std_module_t*
-    #if 0
-    void*               modules_api_map_keys[std_module_map_slots_m];
-    std_module_t**      module_api_map_payloads[std_module_map_slots_m];
-    std_map_t           modules_api_map;
-    #else
     uint64_t modules_api_map_keys[std_module_map_slots_m]; // void*
     uint64_t module_api_map_payloads[std_module_map_slots_m]; // std_module_t*
     std_hash_map_t modules_api_map;
-    #endif
 
-    //std_mutex_t         modules_mutex;
     std_rwmutex_t       modules_mutex;
 } std_module_state_t;
 
@@ -112,6 +102,11 @@ typedef struct {
 #define std_allocator_tlsf_size_mask_m ( ( ~0ull ) << 3 )
 
 typedef struct {
+    std_alloc_scope_t scope;
+    void* user;
+} std_allocator_debug_record_t;
+
+typedef struct {
     std_mutex_t mutex;
     std_virtual_stack_t stack; // raw memory
     void* freelists[std_allocator_tlsf_x_size_m][std_allocator_tlsf_y_size_m]; // table of freelists
@@ -119,6 +114,9 @@ typedef struct {
     uint64_t available_rows; // one bit per table row (x dimension). 1 if at least one freelist on that row is available, 0 otherwise
     size_t allocated_size;
     size_t total_size;
+    std_allocator_debug_record_t debug_records_array[std_allocator_max_debug_records_m];
+    std_allocator_debug_record_t* debug_records_freelist;
+    uint64_t debug_records_bitset[std_bitset_u64_count_m ( std_allocator_max_debug_records_m )];
 } std_allocator_tlsf_heap_t;
 
 typedef struct {
@@ -317,6 +315,7 @@ void std_app_attach         ( std_app_state_t* );
 
 //==============================================================================
 
+void std_allocator_shutdown ( void );
 void std_process_shutdown ( void );
 void std_thread_shutdown ( void );
 void std_module_shutdown ( void );

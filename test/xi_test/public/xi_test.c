@@ -1,11 +1,11 @@
 #include <std_main.h>
 #include <std_time.h>
 #include <std_log.h>
+#include <std_file.h>
 
 #include <xs.h>
 #include <xf.h>
 #include <xi.h>
-#include <fs.h>
 #include <se.h>
 #include <rv.h>
 
@@ -78,7 +78,6 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
 
 static void xi_test ( void ) {
     wm_i* wm = std_module_load_m ( wm_module_name_m );
-    fs_i* fs = std_module_load_m ( fs_module_name_m );
 
     uint32_t resolution_x = 600;
     uint32_t resolution_y = 400;
@@ -135,19 +134,22 @@ static void xi_test ( void ) {
     // create test font
     xi_font_h font;
     {
-        fs_file_h font_file = fs->open_file ( "assets/ProggyVector-Regular.ttf", fs_file_read_m );
-        fs_file_info_t font_file_info;
-        fs->get_file_info ( &font_file_info, font_file );
-        void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
-        fs->read_file ( font_data_alloc, font_file_info.size, font_file );
+        std_file_h font_file = std_file_open ( "assets/ProggyVector-Regular.ttf", std_file_read_m );
+        std_file_info_t font_file_info;
+        std_file_info ( &font_file_info, font_file );
+        void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );
+        std_file_read ( font_data_alloc, font_file_info.size, font_file );
 
-        xi_font_params_t font_params;
-        font_params.xg_device = device;
-        font_params.pixel_height = 16;
-        font_params.first_char_code = xi_font_char_ascii_base_m;
-        font_params.char_count = xi_font_char_ascii_count_m;
-        font_params.outline = false;
+        xi_font_params_t font_params = xi_font_params_m (
+            .xg_device = device,
+            .pixel_height = 16,
+            .first_char_code = xi_font_char_ascii_base_m,
+            .char_count = xi_font_char_ascii_count_m,
+            .outline = false,
+            .debug_name = "proggy_clean"
+        );
         font = xi->create_font ( std_buffer ( font_data_alloc, font_file_info.size ), &font_params );
+        std_virtual_heap_free ( font_data_alloc );
     }
 
     // create ui entities
@@ -330,7 +332,7 @@ static void xi_test ( void ) {
 #endif
 
     //const char* ui_select_items[] = {"qwe", "asd", "zxc"};
-    void* select_alloc = std_virtual_heap_alloc ( 128, 8 );
+    void* select_alloc = std_virtual_heap_alloc_m ( 128, 8 );
     {
         std_stack_t stack = std_stack ( select_alloc, 128 );
         char** p1 = std_stack_alloc_m ( &stack, char* );
@@ -531,12 +533,14 @@ static void xi_test ( void ) {
         xs->update_pipeline_states ( workload );
     }
 
-    std_module_unload_m ( xi_module_name_m );
-    std_module_unload_m ( fs_module_name_m );
+    std_virtual_heap_free ( select_alloc );
+
     std_module_unload_m ( xf_module_name_m );
+    std_module_unload_m ( xi_module_name_m );
     std_module_unload_m ( xs_module_name_m );
     std_module_unload_m ( xg_module_name_m );
     std_module_unload_m ( wm_module_name_m );
+    std_module_unload_m ( rv_module_name_m );
 }
 
 void std_main ( void ) {

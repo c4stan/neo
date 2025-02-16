@@ -55,46 +55,6 @@ static std_module_state_t* std_module_state;
 
 // ----------------------------------------------------------------------------
 
-void std_module_init ( std_module_state_t* state ) {
-    //state->modules_buffer = std_buffer ( state->modules_array, std_module_max_modules_m * sizeof ( std_module_t ) );
-    //state->modules_freelist = std_freelist ( state->modules_buffer, sizeof ( std_module_t ) );
-    state->modules_freelist = std_static_freelist_m ( state->modules_array );
-    #if 0
-    state->modules_name_map =
-    std_map (
-        std_buffer ( state->modules_name_map_keys, std_module_map_slots_m * sizeof ( std_module_name_t ) ),
-        std_buffer ( state->modules_name_map_payloads, std_module_map_slots_m * sizeof ( std_module_t* ) ),
-        sizeof ( std_module_name_t ),
-        sizeof ( std_module_t* ),
-        std_module_hash_name, NULL,
-        std_module_cmp_name, NULL
-        );
-    state->modules_api_map =
-    std_map (
-        std_buffer ( state->modules_api_map_keys, std_module_map_slots_m * sizeof ( void* ) ),
-        std_buffer ( state->module_api_map_payloads, std_module_map_slots_m * sizeof ( std_module_t* ) ),
-        sizeof ( void* ),
-        sizeof ( std_module_t* ),
-        std_module_hash_api, NULL,
-        std_module_cmp_api, NULL
-        );
-    #else
-    state->modules_name_map = std_hash_map ( state->modules_name_map_keys, state->modules_name_map_payloads, std_module_map_slots_m );
-state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
-    #endif
-    std_rwmutex_init ( &state->modules_mutex );
-}
-
-void std_module_attach ( std_module_state_t* state ) {
-    std_module_state = state;
-}
-
-void std_module_shutdown ( void ) {
-    std_rwmutex_deinit ( &std_module_state->modules_mutex );
-}
-
-// ----------------------------------------------------------------------------
-
 // TODO what to do with this?
 #ifdef std_module_enable_fake_loading_m
 void std_module_fakeload_api ( const char* name, void* api ) {
@@ -565,4 +525,52 @@ void std_module_reload ( const char* solution_name ) {
     }
 
     return;
+}
+
+const char* std_module_name_from_id ( uint32_t id ) {
+    std_module_t* module = std_module_state->modules_id_table[id];
+    if ( !module ) return NULL;
+    return module->name.string;
+}
+
+// ----------------------------------------------------------------------------
+
+void std_module_init ( std_module_state_t* state ) {
+    //state->modules_buffer = std_buffer ( state->modules_array, std_module_max_modules_m * sizeof ( std_module_t ) );
+    //state->modules_freelist = std_freelist ( state->modules_buffer, sizeof ( std_module_t ) );
+    state->modules_freelist = std_static_freelist_m ( state->modules_array );
+    #if 0
+    state->modules_name_map =
+    std_map (
+        std_buffer ( state->modules_name_map_keys, std_module_map_slots_m * sizeof ( std_module_name_t ) ),
+        std_buffer ( state->modules_name_map_payloads, std_module_map_slots_m * sizeof ( std_module_t* ) ),
+        sizeof ( std_module_name_t ),
+        sizeof ( std_module_t* ),
+        std_module_hash_name, NULL,
+        std_module_cmp_name, NULL
+        );
+    state->modules_api_map =
+    std_map (
+        std_buffer ( state->modules_api_map_keys, std_module_map_slots_m * sizeof ( void* ) ),
+        std_buffer ( state->module_api_map_payloads, std_module_map_slots_m * sizeof ( std_module_t* ) ),
+        sizeof ( void* ),
+        sizeof ( std_module_t* ),
+        std_module_hash_api, NULL,
+        std_module_cmp_api, NULL
+        );
+    #else
+    state->modules_name_map = std_hash_map ( state->modules_name_map_keys, state->modules_name_map_payloads, std_module_map_slots_m );
+state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
+    #endif
+    std_rwmutex_init ( &state->modules_mutex );
+}
+
+void std_module_attach ( std_module_state_t* state ) {
+    std_module_state = state;
+    std_module_t* module = std_module_lookup ( std_pp_eval_string_m ( std_module_name_m ) );
+    std_module_state->modules_id_table[std_module_id_m] = module;
+}
+
+void std_module_shutdown ( void ) {
+    std_rwmutex_deinit ( &std_module_state->modules_mutex );
 }

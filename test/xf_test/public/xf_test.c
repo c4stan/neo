@@ -4,7 +4,6 @@
 
 #include <xs.h>
 #include <xf.h>
-#include <fs.h>
 
 #include <math.h>
 
@@ -66,8 +65,6 @@ static void xf_test ( void ) {
         swapchain = xg->create_window_swapchain ( &swapchain_params );
         std_assert_m ( swapchain != xg_null_handle_m );
     }
-
-    std_module_load_m ( fs_module_name_m );
 
     xs_i* xs = std_module_load_m ( xs_module_name_m );
     xs_database_h sdb = xs->create_database ( &xs_database_params_m (

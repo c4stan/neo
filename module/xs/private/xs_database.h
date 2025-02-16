@@ -58,7 +58,7 @@ typedef struct {
     size_t pipeline_state_headers_count;
     std_timestamp_t pipeline_state_headers_last_build_timestamp;
 
-    char output_path[fs_path_size_m];
+    char output_path[std_path_size_m];
     char debug_name[32];
 } xs_database_t;
 

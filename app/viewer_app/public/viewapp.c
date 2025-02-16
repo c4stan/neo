@@ -3,6 +3,7 @@
 #include <std_time.h>
 #include <std_app.h>
 #include <std_list.h>
+#include <std_file.h>
 
 #include <viewapp.h>
 
@@ -938,6 +939,8 @@ static void viewapp_build_raytrace_world ( void ) {
         .debug_name = "rt_world"
     ) );
 
+    std_virtual_heap_free ( rt_instances );
+
     m_state->render.raytrace_world = rt_world;
 #endif
 }
@@ -946,8 +949,8 @@ static void viewapp_boot_scene_raytrace ( void ) {
     xg_device_h device = m_state->render.device;
     xg_i* xg = m_state->modules.xg;
 
-    geometry_data_t geo = generate_plane ( 1 );
-    geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+    xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 1 );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
     xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
         .vertex_buffer = gpu_data.pos_buffer,
@@ -978,7 +981,8 @@ static void viewapp_boot_scene_raytrace ( void ) {
         .debug_name = "rt_world",
     ) );
 
-    free_gpu_data ( &gpu_data );
+    xg_geo_util_free_data ( &geo );
+    xg_geo_util_free_gpu_data ( &gpu_data );
 
     m_state->render.raytrace_world = world;
 }
@@ -997,10 +1001,12 @@ static void viewapp_boot_scene_cornell_box ( void ) {
 
     // sphere
     {
-        geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1067,10 +1073,12 @@ static void viewapp_boot_scene_cornell_box ( void ) {
     };
 
     for ( uint32_t i = 0; i < 5; ++i ) {
-        geometry_data_t geo = generate_plane ( 5.f );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 5.f );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1123,10 +1131,12 @@ static void viewapp_boot_scene_cornell_box ( void ) {
 
     // light
     {
-        geometry_data_t geo = generate_sphere ( 1.f, 100, 100 );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 100, 100 );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1208,10 +1218,12 @@ static void viewapp_boot_scene_field ( void ) {
 
     // plane
     {
-        geometry_data_t geo = generate_plane ( 100.f );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 100.f );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1246,10 +1258,12 @@ static void viewapp_boot_scene_field ( void ) {
 
     // quads
     for ( uint32_t i = 0; i < 10; ++i ) {
-        geometry_data_t geo = generate_plane ( 10.f );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 10.f );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1287,10 +1301,12 @@ static void viewapp_boot_scene_field ( void ) {
 
     // lights
     {
-        geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1357,10 +1373,12 @@ static void viewapp_boot_scene_field ( void ) {
     }
 
     {
-        geometry_data_t geo = generate_sphere ( 1.f, 300, 300 );
-        geometry_gpu_data_t gpu_data = upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
@@ -1560,20 +1578,22 @@ static void viewapp_boot ( void ) {
     xi->init_geos ( device );
 
     {
-        fs_i* fs = m_state->modules.fs;
-        fs_file_h font_file = fs->open_file ( "assets/ProggyVector-Regular.ttf", fs_file_read_m );
-        fs_file_info_t font_file_info;
-        fs->get_file_info ( &font_file_info, font_file );
-        void* font_data_alloc = std_virtual_heap_alloc ( font_file_info.size, 16 );
-        fs->read_file ( font_data_alloc, font_file_info.size, font_file );
+        std_file_h font_file = std_file_open ( "assets/ProggyVector-Regular.ttf", std_file_read_m );
+        std_file_info_t font_file_info;
+        std_file_info ( &font_file_info, font_file );
+        void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );
+        std_file_read ( font_data_alloc, font_file_info.size, font_file );
 
         m_state->ui.font = xi->create_font ( 
             std_buffer ( font_data_alloc, font_file_info.size ),
             &xi_font_params_m (
                 .xg_device = device,
                 .pixel_height = 16,
+                .debug_name = "proggy_clean"
             )
         );
+
+        std_virtual_heap_free ( font_data_alloc );
 
         m_state->ui.window_state = xi_window_state_m (
             .title = "debug",
@@ -2388,7 +2408,6 @@ void* viewer_app_load ( void* runtime ) {
 
     state->modules = ( viewapp_modules_state_t ) {
         .tk = std_module_load_m ( tk_module_name_m ),
-        .fs = std_module_load_m ( fs_module_name_m ),
         .wm = std_module_load_m ( wm_module_name_m ),
         .xg = std_module_load_m ( xg_module_name_m ),
         .xs = std_module_load_m ( xs_module_name_m ),
@@ -2405,6 +2424,19 @@ void* viewer_app_load ( void* runtime ) {
 }
 
 void viewer_app_unload ( void ) {
+    se_i* se = m_state->modules.se;
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    uint64_t mesh_count = mesh_query_result.entity_count;
+
+    for ( uint64_t i = 0; i < mesh_count; ++i ) {
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
+        xg_geo_util_free_data ( &mesh_component->geo_data );
+        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data );
+    }
+
     std_module_unload_m ( xi_module_name_m );
     std_module_unload_m ( rv_module_name_m );
     std_module_unload_m ( se_module_name_m );
@@ -2412,7 +2444,6 @@ void viewer_app_unload ( void ) {
     std_module_unload_m ( xs_module_name_m );
     std_module_unload_m ( xg_module_name_m );
     std_module_unload_m ( wm_module_name_m );
-    std_module_unload_m ( fs_module_name_m );
     std_module_unload_m ( tk_module_name_m );
 
     viewapp_state_free();

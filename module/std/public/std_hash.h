@@ -26,8 +26,9 @@ typedef struct {
 
 std_hash_map_t      std_hash_map ( uint64_t* keys, uint64_t* values, size_t capacity ); // Clears keys, doesn't touch values
 bool                std_hash_map_insert ( std_hash_map_t* map, uint64_t hash, uint64_t payload ); // Returns false if hash is already present
-bool                std_hash_map_try_insert ( uint64_t* out_payload, std_hash_map_t* map, uint64_t hash, uint64_t payload ); // Returns false and writes out payload if already present
+bool                std_hash_map_try_insert ( uint64_t* out_payload, std_hash_map_t* map, uint64_t hash, uint64_t payload ); // Returns false and writes out ptr to payload if already present
 uint64_t*           std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ); // Returns NULL if hash is not present
+uint64_t*           std_hash_map_lookup_insert ( std_hash_map_t* map, uint64_t hash, bool* insert ); // Inserts a new key and returns ptr to value if not present
 bool                std_hash_map_remove_hash ( std_hash_map_t* map, uint64_t hash );
 bool                std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t* payload );
 std_hash_map_t      std_hash_map_create ( uint64_t capacity ); // Heap allocated

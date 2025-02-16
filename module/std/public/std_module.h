@@ -123,7 +123,7 @@ void NAME##_state_bind ( NAME##_state_t* state );
 \
 NAME##_state_t* NAME##_state_alloc ( void ) { \
     std_assert_m ( ! NAME##_state ); \
-    NAME##_state = std_virtual_heap_alloc_m ( NAME##_state_t ); \
+    NAME##_state = std_virtual_heap_alloc_struct_m ( NAME##_state_t ); \
     return NAME##_state; \
 } \
 \
@@ -136,3 +136,5 @@ void NAME##_state_free ( void ) { \
 void NAME##_state_bind ( NAME##_state_t* state ) { \
     NAME##_state = state; \
 }
+
+const char* std_module_name_from_id ( uint32_t id );

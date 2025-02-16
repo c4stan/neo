@@ -434,6 +434,8 @@ class Project:
 
         self.config = None # TODO remove and only reference parent Solution config
 
+        self.id = 0
+
     # Search for and map header and source files
     # Looks in project_paths and external_paths and respects project_ignores (applies to both project and external)
     def map_files(self):
@@ -580,7 +582,7 @@ class Project:
         return True
 
     # Builds the make targets
-    def build(self, rootpath, build_path, solution_name):
+    def build(self, rootpath, build_path, solution):
         # call prepare (normalize paths and map files) first
         if (not self.prepare(self.path)):
             return
@@ -664,7 +666,7 @@ class Project:
 
         def_cmd = '-Dstd_module_name_m=' + self.name
         def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
-        def_cmd += ' -Dstd_solution_module_name_m=' + solution_name
+        def_cmd += ' -Dstd_solution_module_name_m=' + solution.name
         def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/cli.py\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_build_debug_m=1'
@@ -781,7 +783,7 @@ class Project:
 
         # Generate the DLLs only target, used when live-reloading modules
         # Group all dll module dependencies
-        if self.name == solution_name:
+        if self.name == solution.name:
             dlls_macro = Macro()
             dlls_macro.name = self.name.upper() + '_DLLS'
             for dep in self.external_depencencies:
@@ -1019,6 +1021,7 @@ class Solution:
         self.targets = MAKE_TARGETS
         self.defines = []
         self.main_project = None
+        self.next_project_id = 0
 
         if BUILD_FLAGS & BUILD_FLAG_OPTIMIZATION_OFF:
             self.config = CONFIG_DEBUG
@@ -1029,6 +1032,11 @@ class Solution:
         self.projects[project.name] = project
         project.solution = self
         project.config = self.config
+        project.id = self.next_project_id
+        self.next_project_id += 1
+
+    def set_main_project(self, project):
+        assert(project.name in self.projects)
         self.main_project = project
 
     def get_project(self, name):
@@ -1072,7 +1080,7 @@ class Solution:
             #project.build(path)
             log.verbose('Building project ' + project.name + ' (' + project.path + ')')
             log.push_verbose()
-            project.build(self.main_project.path, 'build/' + config_path, self.name)
+            project.build(self.main_project.path, 'build/' + config_path, self)
             log.pop_verbose()
             targets_map[project] = project.targets
             #if project.output == OUTPUT_EXE:
@@ -1237,6 +1245,7 @@ class Generator:
             log.verbose(project.name)
             self.solution.add_project(project)
         log.pop_verbose()
+        self.solution.set_main_project(self.projects[-1])
 
         log.pop_verbose()
 

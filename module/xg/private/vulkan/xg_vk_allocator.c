@@ -243,16 +243,6 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
     heap->memory_type = type;
     heap->device_idx = xg_vk_device_get_idx ( device );
 
-#if 0
-    uint64_t s = xg_vk_allocator_tlsf_min_segment_size_m;
-    while ( s < xg_vk_allocator_tlsf_max_segment_size_m ) {
-        xg_vk_allocator_tlsf_freelist_idx_t idx = xg_vk_allocator_tlsf_freelist_idx ( s );
-        std_log_info_m ( std_fmt_u64_m " " std_fmt_u64_m " " std_fmt_u64_m, s, idx.x, idx.y );
-        s = xg_vk_allocator_tlsf_heap_size_roundup ( s + 1 );
-    }
-#endif
-
-
     xg_vk_allocator_tlsf_segment_t* segment = xg_vk_allocator_tlsf_acquire_new_segment ( heap );
     segment->offset = 0;
     segment->size = size;
@@ -260,12 +250,11 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
     xg_vk_allocator_tlsf_add_to_freelist ( heap, segment );
 }
 
-void xg_vk_allocator_tlsf_heap_deinit ( xg_vk_allocator_tlsf_heap_t* heap, xg_device_h device ) {
-    // TODO
-    std_unused_m ( device );
+static void xg_vk_allocator_tlsf_heap_deinit ( xg_vk_allocator_tlsf_heap_t* heap ) {
     xg_vk_allocator_simple_free ( heap->gpu_alloc.handle );
     std_mutex_deinit ( &heap->mutex );
     heap->gpu_alloc = xg_null_alloc_m;
+    std_virtual_heap_free ( heap->segments );
 }
 
 #define xg_vk_allocator_tlsf_debug_print 0
@@ -522,7 +511,7 @@ void xg_vk_allocator_deactivate_device ( xg_device_h device_handle ) {
 
     for ( uint32_t i = 0; i < xg_memory_type_count_m; ++i ) {
         if ( !xg_memory_handle_is_null_m ( context->heaps[i].gpu_alloc.handle ) ) {
-            xg_vk_allocator_tlsf_heap_deinit ( &context->heaps[i], device_handle );
+            xg_vk_allocator_tlsf_heap_deinit ( &context->heaps[i] );
         }
     }
 }

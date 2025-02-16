@@ -277,3 +277,10 @@ void xg_geo_util_free_gpu_data ( xg_geo_util_geometry_gpu_data_t* gpu_data ) {
     
     xg->submit_workload ( workload );
 }
+
+void xg_geo_util_free_data ( xg_geo_util_geometry_data_t* data ) {
+    std_virtual_heap_free ( data->pos );
+    std_virtual_heap_free ( data->nor );
+    std_virtual_heap_free ( data->uv );
+    std_virtual_heap_free ( data->idx );
+}

@@ -394,6 +394,7 @@ typedef struct {
     uint32_t first_char_code;
     uint32_t char_count;
     bool outline;
+    char debug_name[xi_debug_name_size_m];
 } xi_font_params_t;
 
 #define xi_font_char_ascii_base_m 32
@@ -405,6 +406,7 @@ typedef struct {
     .first_char_code = xi_font_char_ascii_base_m, \
     .char_count = xi_font_char_ascii_count_m, \
     .outline = false, \
+    .debug_name = "", \
     ##__VA_ARGS__ \
 }
 

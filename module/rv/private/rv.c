@@ -28,6 +28,7 @@ void* rv_load ( void* std_runtime ) {
 
 void rv_unload ( void ) {
     rv_view_unload();
+    rv_state_free();
 }
 
 void rv_reload ( void* std_runtime, void* api ) {

@@ -101,7 +101,8 @@ def print_help():
     print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + Color.ENDC + ' to git pull remote changes')
     print('\t' + Color.OKGREEN + 'gitstatus' + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
-    print('\t' + Color.OKGREEN + 'recover' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to open the last submitted version of the file')
+    print('\t' + Color.OKGREEN + 'showremote' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the remote version of the file')
+    print('\t' + Color.OKGREEN + 'showstash' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the latest stash version of the file')
     print('\t' + Color.OKGREEN + 'killeditor' + Color.ENDC + ' to kill the text editor process')
     print('')
 
@@ -577,8 +578,17 @@ def show_committed_version(workspace, filename):
     if platform.system() == 'Windows':
         path += '/' + filename
         path = path.replace('\\', '/')
-    #print('git show HEAD:' + path)
     os.system('git show HEAD:' + path + ' | subl.exe -')
+
+def show_stash_version(workspace, filename):
+    path = get_workspace_path(workspace)
+    base = '\\neo\\'
+    offset = path.find(base) + len(base)
+    path = path[offset:]
+    if platform.system() == 'Windows':
+        path += '/' + filename
+        path = path.replace('\\', '/')
+    os.system('git show stash@{0}:' + path + ' | subl.exe -')
 
 def make_title(words):
     title = format_title_string(words)
@@ -641,8 +651,10 @@ def parse(string):
         makegen_workspace(tokens[1], tokens[2:])
     elif cmd == 'debug-fixup':
         fixup_debug_app(tokens[1], tokens[2:])
-    elif cmd == 'recover':
+    elif cmd == 'showremote':
         show_committed_version(tokens[1], tokens[2])
+    elif cmd == 'showstash':
+        show_stash_version(tokens[1], tokens[2])
     elif cmd == 'killeditor':
         kill_editor()
     elif cmd == '':
