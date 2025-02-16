@@ -487,6 +487,16 @@ xg_texture_h xg_vk_texture_register_swapchain_texture ( const xg_texture_params_
     texture->state = xg_vk_texture_state_created_m; // TODO
     xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
 
+    VkDebugUtilsObjectNameInfoEXT debug_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_IMAGE,
+        .objectHandle = ( uint64_t ) vk_image,
+        .pObjectName = params->debug_name,
+    };
+    const xg_vk_device_t* device = xg_vk_device_get ( texture->params.device );
+    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+
     return texture_handle;
 }
 

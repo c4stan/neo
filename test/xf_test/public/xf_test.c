@@ -128,9 +128,9 @@ static void xf_test ( void ) {
         ),
     ) );
 
-    xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
+    //xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
 
-    xf->add_node ( graph2, &xf_node_params_m (
+    xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
         .resources = xf_node_resource_params_m (
@@ -170,8 +170,9 @@ static void xf_test ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        uint64_t id = xf->execute_graph ( graph, workload, 0 );
-        xf->execute_graph ( graph2, workload, id );
+        uint64_t id = 0;
+        id = xf->execute_graph ( graph, workload, id );
+        //id = xf->execute_graph ( graph2, workload, id );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 

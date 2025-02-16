@@ -2101,7 +2101,6 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         xf_graph_h active_graph = graph_select.item_idx == 0 ? m_state->render.raster_graph : m_state->render.raytrace_graph;
         if ( m_state->render.active_graph != active_graph ) {
-            xf->debug_print_graph ( active_graph );
             m_state->render.active_graph = active_graph;
         }
 
@@ -2424,6 +2423,9 @@ void* viewer_app_load ( void* runtime ) {
 }
 
 void viewer_app_unload ( void ) {
+    xg_i* xg = m_state->modules.xg;
+    xg->wait_all_workload_complete();
+    
     se_i* se = m_state->modules.se;
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );

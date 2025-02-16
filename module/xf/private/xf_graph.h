@@ -65,24 +65,9 @@
 typedef uint32_t xf_graph_texture_h;
 typedef uint32_t xf_graph_buffer_h;
 
-typedef struct {
-    xf_graph_texture_h sampled_textures[xf_node_max_sampled_textures_m];
-    xf_graph_texture_h storage_texture_reads[xf_node_max_storage_texture_reads_m];
-    xf_graph_texture_h storage_texture_writes[xf_node_max_storage_texture_writes_m];
+typedef uint64_t xf_node_texture_h;
+typedef uint64_t xf_node_buffer_h;
 
-    xf_graph_buffer_h uniform_buffers[xf_node_max_uniform_buffers_m];
-    xf_graph_buffer_h storage_buffer_reads[xf_node_max_storage_buffer_reads_m];
-    xf_graph_buffer_h storage_buffer_writes[xf_node_max_storage_buffer_writes_m];
-
-    xf_graph_texture_h copy_texture_reads[xf_node_max_copy_texture_reads_m];
-    xf_graph_texture_h copy_texture_writes[xf_node_max_copy_texture_writes_m];
-
-    xf_graph_buffer_h copy_buffer_reads[xf_node_max_copy_buffer_reads_m];
-    xf_graph_buffer_h copy_buffer_writes[xf_node_max_copy_buffer_writes_m];
-
-    xf_graph_texture_h render_targets[xf_node_max_render_targets_m];
-    xf_graph_texture_h depth_stencil_target;
-} xf_graph_node_resource_refs_t;
 
 typedef struct {
     xf_texture_execution_state_t state;
@@ -94,28 +79,6 @@ typedef struct {
     .handle = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
-
-typedef struct xf_node_t {
-    xf_node_params_t params;
-    xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
-    uint32_t edge_count;
-    void* user_alloc;
-    bool enabled;
-    //tk_workload_h cpu_workload;
-    xg_renderpass_h renderpass;
-    struct {
-        xg_render_textures_layout_t render_textures;
-        uint32_t resolution_x;
-        uint32_t resolution_y;
-    } renderpass_params;
-    xf_graph_node_resource_refs_t resource_refs;
-    xf_node_h next_nodes[xf_graph_max_nodes_m]; // nodes that receive an arc starting from this node. must be executed after this node
-    uint32_t next_nodes_count;
-    xf_node_h prev_nodes[xf_graph_max_nodes_m]; // nodes that have an arc ending on this node. must be executed before this node
-    uint32_t prev_nodes_count;
-    uint32_t execution_order; // indexes graph nodes_execution_order
-    uint32_t segment; // indexes graph segments_array
-} xf_node_t;
 
 // TODO move out
 #define xf_graph_max_swapchain_multi_textures_per_graph_m 4
@@ -139,12 +102,12 @@ typedef enum {
 
 typedef struct {
     xf_node_h node;
-    xf_graph_resource_access_e access;
+    uint32_t resource_idx; // indexes node resources_array
 } xf_graph_resource_access_t;
 
 #define xf_graph_resource_access_m( ... ) ( xf_graph_resource_access_t ) { \
     .node = xf_null_handle_m, \
-    .access = xf_graph_resource_access_invalid_m, \
+    .resource_idx = -1, \
     ##__VA_ARGS__ \
 }
 
@@ -291,6 +254,78 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+//typedef enum {
+//    xf_graph_resource_access_sampled_m,
+//    xf_graph_resource_access_uniform_m,
+//    xf_graph_resource_access_storage_read_m,
+//    xf_graph_resource_access_copy_read_m,
+//    xf_graph_resource_access_render_target_m,
+//    xf_graph_resource_access_depth_target_m,
+//    xf_graph_resource_access_storage_write_m,
+//    xf_graph_resource_access_copy_write_m,
+//    xf_graph_resource_access_invalid_m,
+//} xf_graph_resource_access_e;
+//
+//#define xf_graph_resource_access_is_read( a ) ( a <= xf_graph_resource_access_copy_read_m )
+//#define xf_graph_resource_access_is_write( a ) ( a > xf_graph_resource_access_copy_read_m && a <= xf_graph_resource_access_copy_write_m )
+
+typedef enum {
+    xf_node_resource_texture_m,
+    xf_node_resource_buffer_m,
+    xf_node_resource_invalid_m,
+} xf_node_resource_e;
+
+typedef struct {
+    xf_node_resource_e type;
+    xg_pipeline_stage_bit_e stage;
+    xf_graph_resource_access_e access;
+    union {
+        struct {
+            xf_graph_texture_h graph_handle;
+            xg_texture_view_t view;
+            xg_texture_layout_e layout;
+        } texture;
+        struct {
+            xf_graph_buffer_h graph_handle;
+        } buffer;
+    };
+} xf_node_resource_t;
+
+#define xf_node_resource_m( ... ) ( xf_node_resource_t ) { \
+    .type = xf_node_resource_invalid_m, \
+    .stage = xg_pipeline_stage_bit_none_m, \
+    .access = xf_graph_resource_access_invalid_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct xf_node_t {
+    xf_node_params_t params;
+    xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
+    uint32_t edge_count;
+    void* user_alloc;
+    bool enabled;
+    //tk_workload_h cpu_workload;
+    xg_renderpass_h renderpass;
+    struct {
+        xg_render_textures_layout_t render_textures;
+        uint32_t resolution_x;
+        uint32_t resolution_y;
+    } renderpass_params;
+    xf_node_h next_nodes[xf_graph_max_nodes_m]; // nodes that receive an arc starting from this node. must be executed after this node
+    uint32_t next_nodes_count;
+    xf_node_h prev_nodes[xf_graph_max_nodes_m]; // nodes that have an arc ending on this node. must be executed before this node
+    uint32_t prev_nodes_count;
+    uint32_t execution_order; // indexes graph nodes_execution_order
+    uint32_t segment; // indexes graph segments_array
+
+    xf_node_resource_t resources_array[xf_node_max_textures_m + xf_node_max_buffers_m];
+    uint32_t resources_count;
+    uint32_t textures_array[xf_node_max_textures_m];
+    uint32_t textures_count;
+    uint32_t buffers_array[xf_node_max_buffers_m];
+    uint32_t buffers_count;
+} xf_node_t;
+
 typedef struct {
     xf_graph_params_t params;
 
@@ -321,7 +356,7 @@ typedef struct {
     std_hash_map_t buffers_map;
 
     xf_graph_memory_heap_t heap; // TODO one per mem type?
-    uint32_t owned_textures_array[32];
+    uint32_t owned_textures_array[32]; // indexes textures_array - TODO size
     uint32_t owned_textures_count;
 
     xf_graph_segment_t segments_array[xf_graph_max_nodes_m];

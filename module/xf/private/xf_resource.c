@@ -176,7 +176,7 @@ xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture_handle 
 }
 
 xf_device_texture_t* xf_resource_texture_get_device_texture ( xf_texture_h handle ) {
-    xf_texture_t* texture = &xf_resource_state->textures_array[handle];
+    xf_texture_t* texture = xf_resource_texture_get ( handle );
     if ( texture->device_texture_handle != xf_null_handle_m ) {
         return xf_resource_device_texture_get ( texture->device_texture_handle );
     } else {

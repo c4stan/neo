@@ -314,8 +314,6 @@ static void run_se_test_2 ( void ) {
         ) );
     }    
 
-    xf->debug_print_graph ( graph );
-
     std_tick_t begin = std_tick_now();
 
     while ( true ) {

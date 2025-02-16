@@ -206,8 +206,6 @@ static void xi_test ( void ) {
         )
     ) );
 
-    xf->debug_print_graph ( graph );
-
     wm_window_info_t window_info;
     wm->get_window_info ( window, &window_info );
 
