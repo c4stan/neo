@@ -101,6 +101,7 @@ void*       std_stack_write_align ( std_stack_t* buffer, const void* data, size_
 void        std_stack_clear ( std_stack_t* buffer );
 char*       std_stack_string_copy ( std_stack_t* buffer, const char* str );
 char*       std_stack_string_append ( std_stack_t* buffer, const char* str );
+char*       std_stack_string_append_format ( std_stack_t* buffer, const char* str, ... );
 char*       std_stack_string_append_char ( std_stack_t* stack, char c );
 void        std_stack_string_pop ( std_stack_t* stack );
 void        std_stack_free ( std_stack_t* stack, size_t size );

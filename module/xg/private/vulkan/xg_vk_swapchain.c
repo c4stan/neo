@@ -554,7 +554,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
         std_assert_msg_m ( result == VK_SUCCESS, "Present fail: " std_fmt_int_m, result );
 
 #if xg_debug_enable_flush_gpu_submissions_m || xg_debug_enable_disable_semaphore_frame_sync_m
-        result = vkQueueWaitIdle ( device->graphics_queue.vk_handle );
+        result = vkQueueWaitIdle ( device->queues[xg_cmd_queue_graphics_m].vk_handle );
         std_assert_m ( result == VK_SUCCESS );
 #endif
 

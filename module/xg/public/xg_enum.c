@@ -955,6 +955,99 @@ const char* xg_texture_layout_str ( xg_texture_layout_e layout ) {
     return "Malformed texture layout enum";
 }
 
+const char* xg_cmd_queue_str ( xg_cmd_queue_e queue ) {
+    switch ( queue ) {
+    case xg_cmd_queue_graphics_m:
+        return "graphics";
+    case xg_cmd_queue_compute_m:
+        return "compute";
+    case xg_cmd_queue_copy_m:
+        return "copy";
+    case xg_cmd_queue_invalid_m:
+        return "null_queue";
+    default:
+        return "Unknown cmd queue";
+    }
+}
+
+const char* xg_pipeline_stage_str ( xg_pipeline_stage_bit_e stage ) {
+    if ( stage == xg_pipeline_stage_bit_none_m ) {
+        return "none";
+    } else if ( stage == xg_pipeline_stage_bit_top_of_pipe_m ) {
+        return "top_of_pipe";
+    } else if ( stage == xg_pipeline_stage_bit_draw_m ) {
+        return "draw";
+    } else if ( stage == xg_pipeline_stage_bit_vertex_input_m ) {
+        return "vertex_input";
+    } else if ( stage == xg_pipeline_stage_bit_vertex_shader_m ) {
+        return "vertex_shader";
+    } else if ( stage == xg_pipeline_stage_bit_fragment_shader_m ) {
+        return "fragment_shader";
+    } else if ( stage == xg_pipeline_stage_bit_early_fragment_test_m ) {
+        return "early_fragment_test";
+    } else if ( stage == xg_pipeline_stage_bit_late_fragment_test_m ) {
+        return "late_fragment_test";
+    } else if ( stage == xg_pipeline_stage_bit_color_output_m ) {
+        return "color_output";
+    } else if ( stage == xg_pipeline_stage_bit_compute_shader_m ) {
+        return "compute_shader";
+    } else if ( stage == xg_pipeline_stage_bit_transfer_m ) {
+        return "transfer";
+    } else if ( stage == xg_pipeline_stage_bit_bottom_of_pipe_m ) {
+        return "bottom_of_pipe";
+    } else if ( stage == xg_pipeline_stage_bit_host_m ) {
+        return "host";
+    } else if ( stage == xg_pipeline_stage_bit_raytrace_shader_m ) {
+        return "raytrace_shader";
+    } else if ( stage == xg_pipeline_stage_bit_ray_acceleration_structure_build_m ) {
+        return "ray_acceleration_structure_build";
+    } else {
+        return "Unknown or composite pipeline stage bits";
+    }
+}
+
+const char* xg_memory_access_str ( xg_memory_access_bit_e access ) {
+    if ( access == xg_memory_access_bit_none_m ) {
+        return "none";
+    } else if ( access == xg_memory_access_bit_command_read_m ) {
+        return "command_read";
+    } else if ( access == xg_memory_access_bit_index_read_m ) {
+        return "index_read";
+    } else if ( access == xg_memory_access_bit_vertex_attribute_read_m ) {
+        return "vertex_attribute_read";
+    } else if ( access == xg_memory_access_bit_uniform_read_m ) {
+        return "uniform_read";
+    } else if ( access == xg_memory_access_bit_input_render_texture_read_m ) {
+        return "input_render_texture_read";
+    } else if ( access == xg_memory_access_bit_shader_read_m ) {
+        return "shader_read";
+    } else if ( access == xg_memory_access_bit_shader_write_m ) {
+        return "shader_write";
+    } else if ( access == xg_memory_access_bit_color_read_m ) {
+        return "render_target_read";
+    } else if ( access == xg_memory_access_bit_color_write_m ) {
+        return "render_target_write";
+    } else if ( access == xg_memory_access_bit_depth_stencil_read_m ) {
+        return "depth_stencil_read";
+    } else if ( access == xg_memory_access_bit_depth_stencil_write_m ) {
+        return "depth_stencil_write";
+    } else if ( access == xg_memory_access_bit_transfer_read_m ) {
+        return "transfer_read";
+    } else if ( access == xg_memory_access_bit_transfer_write_m ) {
+        return "transfter_write";
+    } else if ( access == xg_memory_access_bit_host_read_m ) {
+        return "host_read";
+    } else if ( access == xg_memory_access_bit_host_write_m ) {
+        return "host_write";
+    } else if ( access == xg_memory_access_bit_memory_read_m ) {
+        return "memory_read";
+    } else if ( access == xg_memory_access_bit_memory_write_m ) {
+        return "memory_write";
+     } else {
+        return "Unknown or composite memory access bits";
+     }
+ }
+
 xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
     switch ( stage ) {
         case xg_shading_stage_vertex_m:

@@ -264,8 +264,8 @@ void std_log_print ( std_log_msg_t msg, ... ) {
     va_start ( args, msg );
     int len = vsprintf ( buffer, msg.payload, args );
     va_end ( args );
-    buffer[len] = '\n';
-    buffer[len + 1] = '\0';
+    if ( buffer[len-1] != '\n' ) buffer[len++] = '\n';
+    buffer[len++] = '\0';
 
     std_log_msg_t formatted_msg = msg;
     formatted_msg.payload = buffer;
@@ -320,4 +320,10 @@ void std_log_os_error ( std_log_scope_t scope ) {
     msg.level = std_log_level_error_m;
     std_log_print ( msg );
 #endif
+}
+
+void std_debug_break ( void ) {
+    if ( std_log_state->is_debugger_attached ) {
+        std_debug_break_m();
+    }
 }

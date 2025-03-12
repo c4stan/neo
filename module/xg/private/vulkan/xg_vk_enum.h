@@ -34,5 +34,6 @@ xg_format_e                 xg_format_from_vk ( VkFormat format );
 xg_color_space_e            xg_color_space_from_vk ( VkColorSpaceKHR colorspace );
 xg_present_mode_e           xg_present_mode_from_vk ( VkPresentModeKHR mode );
 xg_memory_flag_bit_e        xg_memory_flags_from_vk ( VkMemoryPropertyFlags flags );
+xg_pipeline_stage_bit_e     xg_pipeline_stage_from_vk ( VkPipelineStageFlags flags );
 
-
+const char*                 xg_vk_image_aspect_str ( VkImageAspectFlags aspect );

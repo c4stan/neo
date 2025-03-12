@@ -198,11 +198,34 @@ void xf_resource_texture_update_info ( xf_texture_h texture_handle, const xg_tex
     //texture->allowed_usage = info->allowed_usage;
 }
 
-static void xf_resource_device_texture_set_execution_state ( xf_device_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* state ) {
+static void xf_resource_device_texture_set_execution_state ( xf_device_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
     xf_device_texture_t* texture = xf_resource_device_texture_get ( texture_handle );
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->state.shared = *state;
+        //if ( texture->state.shared.execution.queue == xg_cmd_queue_invalid_m ) {
+        //    // First acquire
+        //    std_assert_m ( !state->release );
+        //} else if ( texture->state.shared.execution.queue != state->queue ) {
+        //    // Release or Acquire
+        //    std_assert_m ( texture->state.shared.execution.release != state->release );
+        //    std_assert_m ( state->queue != xg_cmd_queue_invalid_m );
+        //} else if ( texture->state.shared.execution.release ) {
+        //    // Regular transition
+        //    std_assert_m ( state->queue != xg_cmd_queue_invalid_m );
+        //}
+        xf_texture_state_t* state = &texture->state.shared;
+        if ( state->execution.queue == xg_cmd_queue_invalid_m ) {
+            state->prev_queue = new_state->queue;
+            state->queue_transition = false;
+        } else if ( state->queue_transition ) {
+            std_assert_m ( new_state->queue == state->execution.queue );
+            state->queue_transition = false;
+            state->prev_queue = new_state->queue;
+        } else if ( state->execution.queue != new_state->queue ) {
+            state->queue_transition = true;
+            state->prev_queue = state->execution.queue;
+        }
+        texture->state.shared.execution = *new_state;
     } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count;
 
@@ -213,7 +236,7 @@ static void xf_resource_device_texture_set_execution_state ( xf_device_texture_h
         }
 
         for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i] = *state;
+            texture->state.mips[view.mip_base + i].execution = *new_state;
         }
     } else {
         std_not_implemented_m();
@@ -224,7 +247,7 @@ static void xf_resource_device_texture_set_execution_layout ( xf_device_texture_
     xf_device_texture_t* texture = xf_resource_device_texture_get ( texture_handle );
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->state.shared.layout = layout;
+        texture->state.shared.execution.layout = layout;
     } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count;
 
@@ -235,7 +258,7 @@ static void xf_resource_device_texture_set_execution_layout ( xf_device_texture_
         }
 
         for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].layout = layout;
+            texture->state.mips[view.mip_base + i].execution.layout = layout;
         }
     } else {
         std_not_implemented_m();
@@ -246,7 +269,7 @@ static void xf_resource_device_texture_add_execution_stage ( xf_device_texture_h
     xf_device_texture_t* texture = xf_resource_device_texture_get ( texture_handle );
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->state.shared.stage |= stage;
+        texture->state.shared.execution.stage |= stage;
     } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count;
 
@@ -257,7 +280,7 @@ static void xf_resource_device_texture_add_execution_stage ( xf_device_texture_h
         }
 
         for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].stage |= stage;
+            texture->state.mips[view.mip_base + i].execution.stage |= stage;
         }
     } else {
         std_not_implemented_m();
@@ -311,7 +334,7 @@ xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture 
 }
 
 // TODO try using VkEvents instead of barriers?
-static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_h device_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
+static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_h device_texture_handle, xg_texture_view_t view, const xf_texture_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
     xf_device_texture_t* device_texture = xf_resource_device_texture_get ( device_texture_handle );
 
     /*
@@ -319,10 +342,10 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
         if different layout as previous and both are reads, do layout update only barrier, and accumulate stage
         if prev or current access is write, do barrier with layout change and proper access and stage dependency, and replace resource state current values (no access and proper shader stage)
     */
-    if ( !xg_memory_access_is_write ( prev_state->access ) && !xg_memory_access_is_write ( new_state->access ) ) {
+    if ( !xg_memory_access_is_write ( prev_state->execution.access ) && !xg_memory_access_is_write ( new_state->access ) && prev_state->execution.queue == new_state->queue && !prev_state->queue_transition ) {
         // read after a previous read
         // just accumulate the stage and do layout transition if necessary
-        if ( prev_state->layout != new_state->layout ) {
+        if ( prev_state->execution.layout != new_state->layout ) {
             std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
             *barrier = xg_texture_memory_barrier_m (
                 .texture = device_texture->handle,
@@ -330,12 +353,14 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
                 .mip_count = view.mip_count,
                 .array_base = view.array_base,
                 .array_count = view.array_count,
-                .layout.old = prev_state->layout,
+                .layout.old = prev_state->execution.layout,
                 .layout.new = new_state->layout,
                 .memory.flushes = xg_memory_access_bit_none_m,
                 .memory.invalidations = new_state->access,
                 .execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m,
                 .execution.blocked = new_state->stage,
+                .queue.old = prev_state->execution.queue,
+                .queue.new = new_state->queue,
             );
 
             xf_resource_device_texture_set_execution_layout ( device_texture_handle, view, new_state->layout );
@@ -343,6 +368,11 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
 
         xf_resource_device_texture_add_execution_stage ( device_texture_handle, view, new_state->stage );
     } else {
+        xg_cmd_queue_e prev_queue = prev_state->execution.queue;
+        if ( prev_state->queue_transition ) {
+            prev_queue = prev_state->prev_queue;
+        }
+
         // wait on previous access and update the resource state
         std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
         *barrier = xg_texture_memory_barrier_m (
@@ -351,12 +381,14 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
             .mip_count = view.mip_count,
             .array_base = view.array_base,
             .array_count = view.array_count,
-            .layout.old = prev_state->layout,
+            .layout.old = prev_state->execution.layout,
             .layout.new = new_state->layout,
-            .memory.flushes = prev_state->access,
+            .memory.flushes = prev_state->execution.access,
             .memory.invalidations = new_state->access,
-            .execution.blocker = prev_state->stage,
+            .execution.blocker = prev_state->execution.stage,
             .execution.blocked = new_state->stage,
+            .queue.old = prev_queue,
+            .queue.new = new_state->queue,
         );
 
         xf_resource_device_texture_set_execution_state ( device_texture_handle, view, new_state );
@@ -365,17 +397,24 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
 
 void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    if ( std_str_cmp ( texture->params.debug_name, "depth_stencil_texture(1)" ) == 0 ) {
+        //std_debug_break();
+    }
     xf_device_texture_h device_texture_handle = texture->device_texture_handle;
+    xf_resource_device_texture_state_barrier ( stack, device_texture_handle, view, new_state );
+}
+
+void xf_resource_device_texture_state_barrier ( std_stack_t* stack, xf_device_texture_h device_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
     xf_device_texture_t* device_texture = xf_resource_device_texture_get ( device_texture_handle );
 
     if ( device_texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        xf_texture_execution_state_t* old_state = &device_texture->state.shared;
+        xf_texture_state_t* old_state = &device_texture->state.shared;
         xf_resource_texture_barrier ( stack, device_texture_handle, view, old_state, new_state );
     } else if ( device_texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
         uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? device_texture->info.mip_levels : view.mip_count;
 
         for ( uint32_t i = 0; i < mip_count; ++i ) {
-            xf_texture_execution_state_t* old_state = &device_texture->state.mips[view.mip_base + i];
+            xf_texture_state_t* old_state = &device_texture->state.mips[view.mip_base + i];
             xg_texture_view_t mip_view = view;
             mip_view.mip_base = view.mip_base + i;
             mip_view.mip_count = 1;
@@ -518,18 +557,22 @@ void xf_resource_buffer_map_to_new ( xf_buffer_h buffer_handle, xg_buffer_h xg_h
 }
 
 void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usage_bit_e usage ) {
-    // TODO should this take aliasing into account?
+#if 1
     if ( xf_resource_handle_is_multi_m ( texture_handle ) ) {
         xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( texture_handle )];
 
         for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
             xf_texture_t* texture = &xf_resource_state->textures_array[multi_texture->textures[i]];
-            texture->required_usage |= usage;
+        texture->required_usage |= usage;
         }
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
         texture->required_usage |= usage;
     }
+#else
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    texture->required_usage |= usage;
+#endif
 }
 
 void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_bit_e usage ) {
@@ -734,8 +777,10 @@ xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture_
     std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
     xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
 
-    int32_t rem = ( ( int32_t ) multi_texture->index + offset ) % ( int32_t ) multi_texture->params.multi_texture_count;
-    uint32_t index = rem < 0 ? ( uint32_t ) ( rem + ( int32_t ) multi_texture->params.multi_texture_count ) : ( uint32_t ) rem;
+    uint32_t texture_count = multi_texture->params.multi_texture_count;
+    int32_t rem = ( ( int32_t ) multi_texture->index + offset ) % ( int32_t ) texture_count;
+    uint32_t index = rem < 0 ? ( uint32_t ) ( rem + ( int32_t ) texture_count ) : ( uint32_t ) rem;
+    std_assert_m ( index < texture_count );
 
     uint64_t handle = multi_texture_handle & 0xffff;
     handle |= index << 16;
@@ -763,7 +808,7 @@ void xf_resource_swapchain_resize ( xf_texture_h swapchain ) {
 
     for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
         xf_device_texture_t* device_texture = xf_resource_texture_get_device_texture ( multi_texture->textures[i] );
-        device_texture->state.shared.layout = xg_texture_layout_undefined_m;
+        device_texture->state.shared.execution.layout = xg_texture_layout_undefined_m;
     }
 }
 
@@ -814,7 +859,7 @@ void xf_resource_device_texture_map_to_new ( xf_device_texture_h device_texture_
     xf_device_texture_t* texture = xf_resource_device_texture_get ( device_texture_handle );
     texture->handle = xg_handle;
     texture->info = *info;
-    texture->state.shared = xf_texture_execution_state_m(); // TODO take as param, don't assume shared
+    texture->state.shared = xf_texture_state_m(); // TODO take as param, don't assume shared
 }
 
 // ======================================================================================= //
@@ -869,4 +914,12 @@ void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resou
         }
         ++idx;
     }
+}
+
+xf_texture_h xf_resource_multi_texture_get_base ( xf_texture_h multi_texture_handle ) {
+    xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
+    uint64_t subtexture_index = xf_resource_handle_sub_idx_m ( multi_texture_handle );
+    subtexture_index = ( subtexture_index + multi_texture->index ) % multi_texture->params.multi_texture_count;
+    xf_texture_h texture_handle = multi_texture->textures[subtexture_index];
+    return texture_handle;
 }

@@ -38,7 +38,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
     xg_texture_info_t swapchain_texture_info;
     xg->get_texture_info ( &swapchain_texture_info, swapchain_texture );
 
-    // Allocate temp texture
+    // create temp texture
     xg_texture_params_t params = xg_texture_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
         .device = frame.device,
@@ -53,170 +53,184 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, temp_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 
-    const bool compute_clear = true;
+    // create events
+    xg_queue_event_h events[2] = {
+        xg->create_queue_event ( &xg_queue_event_params_m ( .device = frame.device ) ),
+        xg->create_queue_event ( &xg_queue_event_params_m ( .device = frame.device ) )
+    };
+    xg->cmd_destroy_queue_event ( resource_cmd_buffer, events[0], xg_resource_cmd_buffer_time_workload_complete_m );
+    xg->cmd_destroy_queue_event ( resource_cmd_buffer, events[1], xg_resource_cmd_buffer_time_workload_complete_m );
 
-    xg_queue_event_h event = xg_null_handle_m;
-    if ( compute_clear ) {
-        event = xg->create_queue_event ( &xg_queue_event_params_m ( .device = frame.device ) );
-        xg->cmd_destroy_queue_event ( resource_cmd_buffer, event, xg_resource_cmd_buffer_time_workload_complete_m );
-    }
+    xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+        .queue = xg_cmd_queue_graphics_m,
+        .signal_event = events[0],
+    ) );
 
-    // Clear temp texture
-    if ( compute_clear ) {
-        xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
-            .queue = xg_cmd_queue_compute_m,
-            .signal_event = event,
-        ) );
-        
-        // transition to storage image
-        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
-            .texture = temp_texture,
-            .layout.old = xg_texture_layout_undefined_m,
-            .layout.new = xg_texture_layout_shader_write_m,
-            .memory.flushes = xg_memory_access_bit_none_m,
-            .memory.invalidations = xg_memory_access_bit_none_m,
-            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-            .execution.blocked = xg_pipeline_stage_bit_compute_shader_m,
-        );
+    // transition to copy_dest
+    xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
+        .texture = temp_texture,
+        .layout.old = xg_texture_layout_undefined_m,
+        .layout.new = xg_texture_layout_copy_dest_m,
+        .memory.flushes = xg_memory_access_bit_none_m,
+        .memory.invalidations = xg_memory_access_bit_none_m,
+        .execution.blocker = xg_pipeline_stage_bit_none_m,
+        .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+    );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m (
-            .texture_memory_barriers_count = 1,
-            .texture_memory_barriers = &texture_barrier,
-        );
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &texture_barrier,
+    ) );
 
-        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
-    } else {
-        // transition to copy_dest
-        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
-            .texture = temp_texture,
-            .layout.old = xg_texture_layout_undefined_m,
-            .layout.new = xg_texture_layout_copy_dest_m,
-            .memory.flushes = xg_memory_access_bit_none_m,
-            .memory.invalidations = xg_memory_access_bit_none_m,
-            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-        );
+    // copy clear
+    xg_color_clear_t color_clear;
+    uint64_t t = 500;
+    color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
+    color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    xg->cmd_clear_texture ( cmd_buffer, 0, temp_texture, color_clear );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m (
-            .memory_barriers_count = 0,
-            .texture_memory_barriers_count = 1,
-            .texture_memory_barriers = &texture_barrier,
-        );
+    // transition to storage
+    texture_barrier = xg_texture_memory_barrier_m (
+        .texture = temp_texture,
+        .layout.old = xg_texture_layout_copy_dest_m,
+        .layout.new = xg_texture_layout_shader_write_m,
+        .memory.flushes = xg_memory_access_bit_transfer_write_m,
+        .memory.invalidations = xg_memory_access_bit_none_m,
+        .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+        .execution.blocked = xg_pipeline_stage_bit_compute_shader_m,
+    );
 
-        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
-    }
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &texture_barrier,
+    ) );
 
-    {
-        xg_color_clear_t color_clear;
-        uint64_t t = 500;
-        color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
-        color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    // release
+    texture_barrier = xg_texture_memory_barrier_m (
+        .texture = temp_texture,
+        .layout.old = xg_texture_layout_shader_write_m,
+        .layout.new = xg_texture_layout_shader_write_m,
+        .memory.flushes = xg_memory_access_bit_none_m,
+        .memory.invalidations = xg_memory_access_bit_none_m,
+        .execution.blocker = xg_pipeline_stage_bit_none_m,
+        .execution.blocked = xg_pipeline_stage_bit_none_m,
+        .queue.old = xg_cmd_queue_graphics_m,
+        .queue.new = xg_cmd_queue_compute_m,
+    );
 
-        if ( compute_clear ) {
-            // TODO upload color_clear to compute cbuffer...
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &texture_barrier,
+    ) );
 
-            xg_resource_bindings_layout_h compute_layouts[xg_shader_binding_set_count_m];
-            xg->get_pipeline_resource_layouts ( compute_layouts, frame.compute_pipeline );
+    xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+        .queue = xg_cmd_queue_compute_m,
+        .signal_event = events[1],
+        .wait_count = 1,
+        .wait_events = { events[0] },
+        .wait_stages = { xg_pipeline_stage_bit_top_of_pipe_m }
+    ) );
 
-            xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
-                .layout = compute_layouts[xg_shader_binding_set_dispatch_m],
-                .bindings = xg_pipeline_resource_bindings_m (
-                    .texture_count = 1,
-                    .textures = {
-                        xg_texture_resource_binding_m (
-                            .texture = temp_texture,
-                            .layout = xg_texture_layout_shader_write_m,
-                            .shader_register = 0,
-                        )
-                    }
-                )
-            ) );
+    // acquire
+    texture_barrier = xg_texture_memory_barrier_m (
+        .texture = temp_texture,
+        .layout.old = xg_texture_layout_shader_write_m,
+        .layout.new = xg_texture_layout_shader_write_m,
+        .memory.flushes = xg_memory_access_bit_none_m,
+        .memory.invalidations = xg_memory_access_bit_none_m,
+        .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+        .execution.blocked = xg_pipeline_stage_bit_compute_shader_m,
+        .queue.old = xg_cmd_queue_graphics_m,
+        .queue.new = xg_cmd_queue_compute_m,
+    );
 
-            xg->cmd_compute ( cmd_buffer, 0, &xg_cmd_compute_params_m (
-                .workgroup_count_x = swapchain_texture_info.width,
-                .workgroup_count_y = swapchain_texture_info.height,
-                .pipeline = frame.compute_pipeline,
-                .bindings[xg_shader_binding_set_dispatch_m] = group,
-            ) );
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &texture_barrier,
+    ) );
 
-            // release
-            xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m (
-                .texture = temp_texture,
-                .layout.old = xg_texture_layout_shader_write_m,
-                .layout.new = xg_texture_layout_copy_source_m,
-                .memory.flushes = xg_memory_access_bit_shader_write_m,
-                .memory.invalidations = xg_memory_access_bit_transfer_read_m,
-                .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
-                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-                .queue.old = xg_cmd_queue_compute_m,
-                .queue.new = xg_cmd_queue_graphics_m
-            );
+    // compute clear
+    // TODO upload color_clear to compute cbuffer...
+    xg_resource_bindings_layout_h compute_layouts[xg_shader_binding_set_count_m];
+    xg->get_pipeline_resource_layouts ( compute_layouts, frame.compute_pipeline );
 
-            xg_barrier_set_t barrier_set = xg_barrier_set_m (
-                .texture_memory_barriers_count = 1,
-                .texture_memory_barriers = &texture_barrier,
-            );
-            xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
+    xg->cmd_compute ( cmd_buffer, 0, &xg_cmd_compute_params_m (
+        .workgroup_count_x = swapchain_texture_info.width,
+        .workgroup_count_y = swapchain_texture_info.height,
+        .pipeline = frame.compute_pipeline,
+        .bindings[xg_shader_binding_set_dispatch_m] = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+            .layout = compute_layouts[xg_shader_binding_set_dispatch_m],
+            .bindings = xg_pipeline_resource_bindings_m (
+                .texture_count = 1,
+                .textures = {
+                    xg_texture_resource_binding_m (
+                        .texture = temp_texture,
+                        .layout = xg_texture_layout_shader_write_m,
+                        .shader_register = 0,
+                    )
+                }
+            )
+        ) ),
+    ) );
 
-            xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
-                .queue = xg_cmd_queue_graphics_m,
-                .wait_count = 1,
-                .wait_events = { event },
-                .wait_stages = { xg_pipeline_stage_bit_compute_shader_m }
-            ) );
-        } else {
-            xg->cmd_clear_texture ( cmd_buffer, 0, temp_texture, color_clear );
-        }
-    }
+    // transition to copy source, release
+    texture_barrier = xg_texture_memory_barrier_m (
+        .texture = temp_texture,
+        .layout.old = xg_texture_layout_shader_write_m,
+        .layout.new = xg_texture_layout_copy_source_m,
+        .memory.flushes = xg_memory_access_bit_shader_write_m,
+        .memory.invalidations = xg_memory_access_bit_transfer_read_m,
+        .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
+        .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+        .queue.old = xg_cmd_queue_compute_m,
+        .queue.new = xg_cmd_queue_graphics_m
+    );
+
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &texture_barrier,
+    ) );
+
+    xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
+        .queue = xg_cmd_queue_graphics_m,
+        .wait_count = 1,
+        .wait_events = { events[1] },
+        .wait_stages = { xg_pipeline_stage_bit_top_of_pipe_m },
+    ) );
 
     // Copy temp texture on swapchain texture
-    {
-        // flush and make visible the clear
-        // transition to copy_source
-        xg_texture_memory_barrier_t texture_barrier[2];
+    xg_texture_memory_barrier_t texture_barriers[2];
 
-        if ( compute_clear ) {
-            // acquire
-            texture_barrier[0] = xg_texture_memory_barrier_m (
-                .texture = temp_texture,
-                .layout.old = xg_texture_layout_shader_write_m,
-                .layout.new = xg_texture_layout_copy_source_m,
-                .memory.flushes = xg_memory_access_bit_shader_write_m,
-                .memory.invalidations = xg_memory_access_bit_transfer_read_m,
-                .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
-                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-                .queue.old = xg_cmd_queue_compute_m,
-                .queue.new = xg_cmd_queue_graphics_m
-            );
-        } else {
-            texture_barrier[0] = xg_texture_memory_barrier_m (
-                .texture = temp_texture,
-                .layout.old = xg_texture_layout_copy_dest_m,
-                .layout.new = xg_texture_layout_copy_source_m,
-                .memory.flushes = xg_memory_access_bit_transfer_write_m,
-                .memory.invalidations = xg_memory_access_bit_transfer_read_m,
-                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-            );
-        }
-        // transition to to copy_dest
-        texture_barrier[1] = xg_texture_memory_barrier_m (
-            .texture = swapchain_texture,
-            .layout.old = xg_texture_layout_undefined_m, //xg_texture_layout_present_m;
-            .layout.new = xg_texture_layout_copy_dest_m,
-            .memory.flushes = xg_memory_access_bit_none_m,
-            .memory.invalidations = xg_memory_access_bit_none_m,
-            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-            .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-        );
+    // flush and make visible the clear
+    // transition to copy_source
+    texture_barriers[0] = xg_texture_memory_barrier_m (
+        .texture = temp_texture,
+        .layout.old = xg_texture_layout_shader_write_m,
+        .layout.new = xg_texture_layout_copy_source_m,
+        .memory.flushes = xg_memory_access_bit_shader_write_m,
+        .memory.invalidations = xg_memory_access_bit_transfer_read_m,
+        .execution.blocker = xg_pipeline_stage_bit_compute_shader_m,
+        .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+        .queue.old = xg_cmd_queue_compute_m,
+        .queue.new = xg_cmd_queue_graphics_m
+    );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m (
-            .texture_memory_barriers_count = 2,
-            .texture_memory_barriers = texture_barrier,
-        );
-        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
-    }
+    // transition swapchain to copy_dest
+    texture_barriers[1] = xg_texture_memory_barrier_m (
+        .texture = swapchain_texture,
+        .layout.old = xg_texture_layout_undefined_m, //xg_texture_layout_present_m;
+        .layout.new = xg_texture_layout_copy_dest_m,
+        .memory.flushes = xg_memory_access_bit_none_m,
+        .memory.invalidations = xg_memory_access_bit_none_m,
+        .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+        .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+    );
+
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 2,
+        .texture_memory_barriers = texture_barriers,
+    ) );
 
     xg_texture_copy_params_t copy_params = xg_texture_copy_params_m (
         .source.texture = temp_texture,
@@ -225,25 +239,21 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
     xg->cmd_copy_texture ( cmd_buffer, 0, &copy_params );
 
     // Transition swpachain texture to render target
-    {
-        // make copy on swapchain available and visible to
-        xg_texture_memory_barrier_t texture_barrier = xg_texture_memory_barrier_m ( 
-            .texture = swapchain_texture,
-            .layout.old = xg_texture_layout_copy_dest_m,
-            .layout.new = xg_texture_layout_render_target_m,
-            .memory.flushes = xg_memory_access_bit_transfer_write_m,
-            .memory.invalidations = xg_memory_access_bit_color_write_m,
-            .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-            .execution.blocked = xg_pipeline_stage_bit_color_output_m,
-        );
+    // make copy on swapchain available and visible to
+    texture_barrier = xg_texture_memory_barrier_m ( 
+        .texture = swapchain_texture,
+        .layout.old = xg_texture_layout_copy_dest_m,
+        .layout.new = xg_texture_layout_render_target_m,
+        .memory.flushes = xg_memory_access_bit_transfer_write_m,
+        .memory.invalidations = xg_memory_access_bit_color_write_m,
+        .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+        .execution.blocked = xg_pipeline_stage_bit_color_output_m,
+    );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m (
-            .texture_memory_barriers_count = 1,
-            .texture_memory_barriers = &texture_barrier,
-        );
-
-        xg->cmd_barrier_set ( cmd_buffer, 0, &barrier_set );
-    }
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &texture_barrier,
+    ) );
 
     // Bind swapchain texture as render target
     xg->cmd_begin_renderpass ( cmd_buffer, 0, &xg_cmd_renderpass_params_m (
@@ -254,15 +264,6 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .view = xg_texture_view_m(),
         ) },
     ) );
-
-    // Set pipeline
-    //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, frame.graphics_pipeline, 0 );
-
-    //xg_viewport_state_t viewport = xg_viewport_state_m (
-    //    .width = 600,
-    //    .height = 400,
-    //);
-    //xg->cmd_set_dynamic_viewport ( cmd_buffer, &viewport, 0 );
 
     xg_buffer_range_t cbuffer_range;
     {

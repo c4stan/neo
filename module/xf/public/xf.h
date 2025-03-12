@@ -448,7 +448,7 @@ typedef struct {
     .dimension = xg_texture_dimension_2d_m, \
     .format = xg_format_undefined_m, \
     .samples_per_pixel = xg_sample_count_1_m, \
-    .allow_aliasing = false, \
+    .allow_aliasing = true, \
     .debug_name = {0}, \
     .clear_on_create = false, \
     .view_access = xg_texture_view_access_default_only_m, \
@@ -549,9 +549,9 @@ typedef struct {
     void ( *destroy_texture ) ( xf_texture_h texture );
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
-    xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params );
+    xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params ); // TODO rename create_node
     void ( *finalize_graph ) ( xf_graph_h graph );
-    void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
+    //void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
@@ -574,4 +574,7 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_graph_h graph, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
+
+    // TODO remove this
+    xf_texture_h ( *get_base_texture ) ( xf_texture_h multi_texture );
 } xf_i;

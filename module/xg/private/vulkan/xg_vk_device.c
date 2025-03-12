@@ -63,6 +63,9 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 #endif
 #endif
 
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_checkpoints, "vkGetQueueCheckpointDataNV" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_set_checkpoint, "vkCmdSetCheckpointNV" );
+
 #undef xg_vk_instance_ext_init_pfn_m    
 }
 
@@ -110,8 +113,24 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     vkGetPhysicalDeviceMemoryProperties ( device->vk_physical_handle, &device->memory_properties );
 
     // Queues
-    vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queues_families_count, NULL );
-    vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queues_families_count, device->queues_families_properties );
+    vkGetPhysicalDeviceQueueFamilyProperties2 ( device->vk_physical_handle, &device->queue_family_count, NULL );
+    VkQueueFamilyProperties2* queue_faimily_queries = std_virtual_heap_alloc_array_m ( VkQueueFamilyProperties2, device->queue_family_count );
+    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+        device->queue_checkpoint_properties[i] = ( VkQueueFamilyCheckpointPropertiesNV ) {
+            .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_NV,
+            .pNext = NULL
+        };
+        queue_faimily_queries[i] = ( VkQueueFamilyProperties2 ) {
+            .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2,
+            .pNext = &device->queue_checkpoint_properties[i]
+        };
+        //vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queue_family_count, device->queue_family_properties );
+    }
+    vkGetPhysicalDeviceQueueFamilyProperties2 ( device->vk_physical_handle, &device->queue_family_count, queue_faimily_queries );
+    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+        device->queue_family_properties[i] = queue_faimily_queries[i].queueFamilyProperties;
+    }
+    std_virtual_heap_free ( queue_faimily_queries );
 
 #if xg_enable_raytracing_m
     std_assert_m ( device->supported_features.shaderInt64 );
@@ -181,6 +200,19 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         vkGetPhysicalDeviceFormatProperties ( device->vk_physical_handle, xg_format_to_vk ( ( xg_format_e ) i ), &props );
 
         if ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT ) {
+            std_assert_m ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT );
+            std_log_info_m ( std_fmt_tab_m std_fmt_str_m, xg_format_str ( ( xg_format_e ) i ) );
+        }
+    }
+
+    // Print list of formats that support depth stencil target
+    std_log_info_m ( "Supported depth stencil target formats:" );
+    for ( uint64_t i = 0; i < xg_format_count_m; ++i ) {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties ( device->vk_physical_handle, xg_format_to_vk ( ( xg_format_e ) i ), &props );
+
+        if ( ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT ) ) {
+            std_assert_m ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT );
             std_log_info_m ( std_fmt_tab_m std_fmt_str_m, xg_format_str ( ( xg_format_e ) i ) );
         }
     }
@@ -209,15 +241,17 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     }
 
     // Print queue family properties
-    for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
-        VkQueueFlags flags = device->queues_families_properties[i].queueFlags;
-        uint32_t count = device->queues_families_properties[i].queueCount;
-        uint32_t timestap_bits = device->queues_families_properties[i].timestampValidBits;
-        VkExtent3D copy_granularity = device->queues_families_properties[i].minImageTransferGranularity;
+    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+        VkQueueFlags flags = device->queue_family_properties[i].queueFlags;
+        uint32_t count = device->queue_family_properties[i].queueCount;
+        uint32_t timestap_bits = device->queue_family_properties[i].timestampValidBits;
+        VkExtent3D copy_granularity = device->queue_family_properties[i].minImageTransferGranularity;
+        char buffer[32];
+        std_u32_to_bin ( device->queue_checkpoint_properties[i].checkpointExecutionStageMask, buffer );
         const char* desc = xg_vk_device_queue_str ( flags );
         std_log_info_m ( "Queue family " std_fmt_u32_m ": " std_fmt_u32_m " queues - " std_fmt_str_m " - <" std_fmt_u32_m
-            "," std_fmt_u32_m "," std_fmt_u32_m "> copy granulatity - " std_fmt_u32_m " bits timestamps",
-            i, count, desc, copy_granularity.width, copy_granularity.height, copy_granularity.depth, timestap_bits );
+            "," std_fmt_u32_m "," std_fmt_u32_m "> copy granulatity - " std_fmt_u32_m " bits timestamps - " std_fmt_str_m " checkpoint stages",
+            i, count, desc, copy_granularity.width, copy_granularity.height, copy_granularity.depth, timestap_bits, buffer );
     }
 #endif
 
@@ -425,11 +459,11 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     bool graphics_queue_found = false;
     VkQueueFlags graphics_queue_flags = 0;
 
-    for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
-        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
+    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+        if ( device->queue_family_properties[i].queueCount > 0 && device->queue_family_properties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ) {
             graphics_queue_found = true;
             graphics_queue->vk_family_idx = i;
-            graphics_queue_flags = device->queues_families_properties[i].queueFlags;
+            graphics_queue_flags = device->queue_family_properties[i].queueFlags;
             break;
         }
     }
@@ -451,14 +485,14 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     bool compute_queue_found = false;
     VkQueueFlags compute_queue_flags = 0;
 
-    for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
-        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT ) {
+    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+        if ( device->queue_family_properties[i].queueCount > 0 && device->queue_family_properties[i].queueFlags & VK_QUEUE_COMPUTE_BIT ) {
             if ( i == graphics_queue->vk_family_idx ) {
                 continue;
             }
             compute_queue_found = true;
             compute_queue->vk_family_idx = i;
-            compute_queue_flags = device->queues_families_properties[i].queueFlags;
+            compute_queue_flags = device->queue_family_properties[i].queueFlags;
             break;
         }
     }
@@ -485,8 +519,8 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     xg_vk_device_cmd_queue_t* copy_queue = &device->queues[xg_cmd_queue_copy_m];
     bool copy_queue_found = false;
 
-    for ( uint32_t i = 0; i < device->queues_families_count; ++i ) {
-        if ( device->queues_families_properties[i].queueCount > 0 && device->queues_families_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT ) {
+    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+        if ( device->queue_family_properties[i].queueCount > 0 && device->queue_family_properties[i].queueFlags & VK_QUEUE_TRANSFER_BIT ) {
             if ( i == graphics_queue->vk_family_idx || i == compute_queue->vk_family_idx ) {
                 continue;
             }
@@ -815,6 +849,8 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 #endif
         // debugPrintfEXT - TODO enable in debug only?
         "VK_KHR_shader_non_semantic_info",
+        // vkGetQueueCheckpointDataNV
+        "VK_NV_device_diagnostic_checkpoints",
     };
     size_t required_extensions_count = std_static_array_capacity_m ( required_extensions );
 

@@ -271,7 +271,11 @@ VkDescriptorType xg_descriptor_type_to_vk ( xg_resource_binding_e type ) {
         //    return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 
         case xg_resource_binding_raytrace_world_m:
-            return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+#if xg_vk_enable_nv_raytracing_ext_m
+        return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+#else
+        return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+#endif
 
         default:
             std_log_error_m ( "Resource descriptor type not supported" );
@@ -706,5 +710,21 @@ VkImageTiling xg_texture_tiling_to_vk ( xg_texture_tiling_e tiling ) {
     default:
         std_log_error_m ( "Texture tiling not supported" );
         return 0;
+    }
+}
+
+xg_pipeline_stage_bit_e xg_pipeline_stage_from_vk ( VkPipelineStageFlags flags ) {
+    return flags;
+}
+
+const char* xg_vk_image_aspect_str ( VkImageAspectFlags aspect ) {
+    if ( aspect == VK_IMAGE_ASPECT_COLOR_BIT ) {
+        return "color";
+    } else if ( aspect == VK_IMAGE_ASPECT_DEPTH_BIT ) {
+        return "depth";
+    } else if ( aspect == VK_IMAGE_ASPECT_STENCIL_BIT ) {
+        return "stencil";
+    } else {
+        return "Unknown or composite vk image aspect flags";
     }
 }

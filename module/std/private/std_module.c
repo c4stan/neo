@@ -527,12 +527,6 @@ void std_module_reload ( const char* solution_name ) {
     return;
 }
 
-const char* std_module_name_from_id ( uint32_t id ) {
-    std_module_t* module = std_module_state->modules_id_table[id];
-    if ( !module ) return NULL;
-    return module->name.string;
-}
-
 // ----------------------------------------------------------------------------
 
 void std_module_init ( std_module_state_t* state ) {
@@ -567,8 +561,6 @@ state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->modu
 
 void std_module_attach ( std_module_state_t* state ) {
     std_module_state = state;
-    std_module_t* module = std_module_lookup ( std_pp_eval_string_m ( std_module_name_m ) );
-    std_module_state->modules_id_table[std_module_id_m] = module;
 }
 
 void std_module_shutdown ( void ) {

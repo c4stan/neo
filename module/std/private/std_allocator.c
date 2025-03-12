@@ -10,6 +10,7 @@
 #include <std_module.h>
 
 #include <malloc.h>
+#include <stdio.h> // TODO include in std_log only and expose vsnprintf from there?
 
 #include "std_state.h"
 
@@ -614,6 +615,18 @@ static void std_stack_string_pop_terminator ( std_stack_t* stack ) {
 char* std_stack_string_append ( std_stack_t* stack, const char* str ) {
     std_stack_string_pop_terminator ( stack );
     return std_stack_string_copy ( stack, str );
+}
+
+char* std_stack_string_append_format ( std_stack_t* stack, const char* str, ... ) {
+    char buffer[2048];
+
+    va_list args;
+    va_start ( args, str );
+    int len = vsprintf ( buffer, str, args );
+    va_end ( args );
+    buffer[len] = '\0';
+
+    return std_stack_string_append ( stack, buffer );
 }
 
 char* std_stack_string_append_char ( std_stack_t* stack, char c ) {

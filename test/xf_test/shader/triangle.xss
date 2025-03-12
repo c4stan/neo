@@ -5,6 +5,17 @@ begin render_target 0
     format R8G8B8A8_UNORM
 end
 
+begin depth_stencil
+    format D32_SFLOAT
+    min_depth_bound 0
+    max_depth_bound 1
+    depth_bound_test off
+    depth_test on
+    depth_write on
+    depth_test_op less
+    stencil_test off
+end
+
 begin viewport
     dynamic on
 end

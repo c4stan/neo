@@ -11,9 +11,7 @@ layout ( set = xs_shader_binding_set_dispatch_m, binding = 3 ) uniform texture2D
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 4 ) uniform texture2D tex_normal_roughness;
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 5 ) uniform utexture2D tex_id;
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 6 ) uniform utexture2D tex_prev_id;
-
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 7, r11f_g11f_b10f ) uniform writeonly image2D img_color;
-
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 8 ) uniform sampler sampler_point;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
@@ -45,6 +43,7 @@ void main ( void ) {
 
     // Sample
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
+#if 0
     float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
     vec4 normal_roughness = texture ( sampler2D ( tex_normal_roughness, sampler_point ) , screen_uv );
     float roughness = normal_roughness.w;
@@ -85,7 +84,8 @@ void main ( void ) {
 
     // history sample
 #if 1
-    vec3 history = texture ( sampler2D ( tex_history, sampler_point ), prev_screen.xy ).xyz;
+    //vec3 history = texture ( sampler2D ( tex_history, sampler_point ), prev_screen.xy ).xyz;
+    vec3 history = vec3(0,0,0);
     float prev_depth = texture ( sampler2D ( tex_prev_depth, sampler_point ), prev_screen.xy ).x;
 #else
     vec3 history = sample_catmull_rom ( tex_history, sampler_point, prev_screen.xy, frame_cbuffer.resolution_f32 ).xyz;
@@ -93,6 +93,8 @@ void main ( void ) {
 #endif
 
     // Object id rejection
+    // <----------- HERE
+#if 0
     uvec4 object_id_sample = texture ( usampler2D ( tex_id, sampler_point ), screen_uv.xy );
     uvec4 prev_object_id_sample = texture ( usampler2D ( tex_prev_id, sampler_point ), prev_screen.xy );
     uint object_id = object_id_sample.x;//floatBitsToUint ( object_id_sample.x );
@@ -102,6 +104,7 @@ void main ( void ) {
         imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( color, 1 ) );
         return;
     }
+#endif
 
 #if 0
     // depth disocclusion
@@ -230,6 +233,9 @@ void main ( void ) {
     
     float eps = 0.000001;
     new_color.r -= eps * 0;
+#else
+    vec3 new_color = color;
+#endif
 
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( new_color, 1 ) );
 }

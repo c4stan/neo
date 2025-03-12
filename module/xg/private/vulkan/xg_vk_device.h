@@ -112,6 +112,18 @@ typedef struct {
         VkAccelerationStructureKHR                  accelerationStructure,
         const VkAllocationCallbacks*                pAllocator );
 
+    // TODO non-nvda
+    // vkGetQueueCheckpointDataNV
+    void ( *get_checkpoints ) (
+        VkQueue                                     queue,
+        uint32_t*                                   pCheckpointDataCount,
+        VkCheckpointDataNV*                         pCheckpointData );
+
+    // vkCmdSetCheckpointNV
+    void ( *cmd_set_checkpoint ) (
+        VkCommandBuffer                             commandBuffer,
+        const void*                                 pCheckpointMarker);
+
 //#endif
 } xg_vk_device_ext_api_i;
 
@@ -124,14 +136,19 @@ typedef struct {
     // Properties
     VkPhysicalDeviceProperties          generic_properties;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceProperties.html
     VkPhysicalDeviceFeatures            supported_features;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR raytrace_properties; //
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties;
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR supported_raytrace_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRayTracingPipelineFeaturesKHR.html
-    VkPhysicalDeviceBufferDeviceAddressFeatures supported_device_address_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR supported_acceleration_structure_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
+    
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR     raytrace_properties; //
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR  acceleration_structure_properties;
+    
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR       supported_raytrace_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRayTracingPipelineFeaturesKHR.html
+    VkPhysicalDeviceBufferDeviceAddressFeatures         supported_device_address_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR    supported_acceleration_structure_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
+    
     VkPhysicalDeviceMemoryProperties    memory_properties;                // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
-    VkQueueFamilyProperties             queues_families_properties[16];   // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
-    uint32_t                            queues_families_count;
+    
+    VkQueueFamilyCheckpointPropertiesNV queue_checkpoint_properties[16];
+    VkQueueFamilyProperties             queue_family_properties[16];   // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
+    uint32_t                            queue_family_count;
     VkDeviceQueueCreateInfo             queue_create_info[16 * 3];  // We determine these when we cache vulkan properties, use them when we create the device (on activation)
     uint32_t                            queue_create_info_count;
     // Main queues

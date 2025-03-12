@@ -75,6 +75,7 @@ static void xf_test ( void ) {
     xs->set_output_folder ( sdb, "output/shader/" );
     xs->build_database ( sdb );
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle" ) );
+    xs_database_pipeline_h compute_pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "clear" ) );
 
     xf_i* xf = std_module_load_m ( xf_module_name_m );
 
@@ -85,30 +86,85 @@ static void xf_test ( void ) {
         .debug_name = "test_graph_1" 
     ) );
 
-    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
-        .width = 600,
-        .height = 400,
-        .format = xg_format_r8g8b8a8_unorm_m,
-        .debug_name = "color_texture",
+    xf_texture_h color_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = 600,
+            .height = 400,
+            .format = xg_format_r8g8b8a8_unorm_m,
+            .debug_name = "color_texture",
+        ),
+        .multi_texture_count = 1,
+        .auto_advance = false,
+    ) );
+
+    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = 600,
+            .height = 400,
+            .format = xg_format_d32_sfloat_m,
+            .debug_name = "depth_texture",
+        ),
+        .multi_texture_count = 1,
+        .auto_advance = false,
     ) );
     
-    float color[3] = { 0, 1, 0 };
-    //uint64_t t = 500;
-    //color[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-    //color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
-    //color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+    bool compute_clear = true;
 
-    xf->add_node ( graph, &xf_node_params_m ( 
-        .debug_name = "clear",
-        .type = xf_node_type_clear_pass_m,
-        .pass.clear = xf_node_clear_pass_params_m (
-            .textures = { xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { color[0], color[1], color[2], 1 } ) ) }
-        ),
-        .resources = xf_node_resource_params_m (
-            .copy_texture_writes_count = 1,
-            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
-        ),
-    ) );
+    if ( compute_clear ) {
+#if 1
+        float color[3] = { 1, 0, 0 };
+
+        xf->add_node ( graph, &xf_node_params_m ( 
+            .debug_name = "clear1",
+            .type = xf_node_type_clear_pass_m,
+            .pass.clear = xf_node_clear_pass_params_m (
+                .textures = { 
+                    xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { color[0], color[1], color[2], 1 } ) ),
+                    xf_texture_clear_m ( .type = xf_texture_clear_type_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                },
+            ),
+            .resources = xf_node_resource_params_m (
+                .copy_texture_writes_count = 2,
+                .copy_texture_writes = { 
+                    xf_copy_texture_dependency_m ( .texture = color_texture ), 
+                    xf_copy_texture_dependency_m ( .texture = depth_texture ), 
+                },
+            ),
+        ) );
+
+        xf->add_node ( graph, &xf_node_params_m ( 
+            .debug_name = "clear2",
+            .type = xf_node_type_compute_pass_m,
+            .queue = xg_cmd_queue_compute_m,
+            .pass.compute = xf_node_compute_pass_params_m (
+                .pipeline = xs->get_pipeline_state ( compute_pipeline_state ),
+                .workgroup_count = { resolution_x, resolution_y, 1 },
+            ),
+            .resources = xf_node_resource_params_m (
+                .storage_texture_writes_count = 1,
+                .storage_texture_writes = { xf_compute_texture_dependency_m ( .texture = color_texture ) },
+            ),
+        ) );
+#endif
+    } else {
+        float color[3] = { 0, 1, 0 };
+        //uint64_t t = 500;
+        //color[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+        //color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
+        //color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
+
+        xf->add_node ( graph, &xf_node_params_m ( 
+            .debug_name = "clear",
+            .type = xf_node_type_clear_pass_m,
+            .pass.clear = xf_node_clear_pass_params_m (
+                .textures = { xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { color[0], color[1], color[2], 1 } ) ) }
+            ),
+            .resources = xf_node_resource_params_m (
+                .copy_texture_writes_count = 1,
+                .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+            ),
+        ) );
+    }
 
     xf_triangle_pass_args_t triangle_pass_args = {
         .pipeline_state = pipeline_state,
@@ -124,11 +180,10 @@ static void xf_test ( void ) {
         ),
         .resources = xf_node_resource_params_m (
             .render_targets_count = 1,
-            .render_targets = { xf_render_target_dependency_m ( .texture = color_texture ) },            
+            .render_targets = { xf_render_target_dependency_m ( .texture = color_texture ) },
+            .depth_stencil_target = depth_texture,
         ),
     ) );
-
-    //xf_graph_h graph2 = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "test_graph_2" ) );
 
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",

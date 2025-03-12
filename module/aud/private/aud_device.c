@@ -288,7 +288,7 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
         for ( uint64_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
             aud_device_submit_context_t* context = &device->submit_contexts[i];
             std_mem_zero_m ( context );
-            context->data = std_virtual_heap_alloc ( submit_block_size, 16 );
+            context->data = std_virtual_heap_alloc_m ( submit_block_size, 16 );
             context->size = submit_block_size;
         }
 

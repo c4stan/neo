@@ -165,9 +165,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
     std_unused_m ( user_data );
 
     if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT ) {
-        std_log_info_m ( data->pMessage );
+        //std_log_info_m ( data->pMessage );
     } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) {
-        std_log_warn_m ( data->pMessage );
+        //std_log_warn_m ( data->pMessage );
     } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) {
 #if xg_instance_crash_on_validation_error_m
         std_log_crash_m ( data->pMessage );
@@ -177,7 +177,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
     }
 
     if ( std_log_debugger_attached() ) {
-        if ( severity != VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT ) {
+        if ( severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) {
             std_debug_break_m();
         }
     }

@@ -68,21 +68,6 @@ typedef uint32_t xf_graph_buffer_h;
 typedef uint64_t xf_node_texture_h;
 typedef uint64_t xf_node_buffer_h;
 
-
-typedef struct {
-    xf_texture_execution_state_t state;
-    xf_graph_texture_h handle;
-} xf_graph_texture_barrier_t;
-
-#define xf_graph_texture_barrier_m( ... ) ( xf_graph_texture_barrier_t ) { \
-    .state = xf_texture_execution_state_m(), \
-    .handle = xf_null_handle_m, \
-    ##__VA_ARGS__ \
-}
-
-// TODO move out
-#define xf_graph_max_swapchain_multi_textures_per_graph_m 4
-
 typedef enum {
     //xf_graph_resource_access_read_m,
     //xf_graph_resource_access_write_m,
@@ -116,10 +101,26 @@ typedef struct {
 typedef struct {
     xf_graph_resource_access_t array[xf_graph_max_nodes_m];
     uint32_t count;
-} xf_resource_dependencies_t;
+} xf_graph_resource_dependencies_t;
 
-#define xf_resource_dependencies_m( ... ) ( xf_resource_dependencies_t ) { \
+#define xf_graph_resource_dependencies_m( ... ) ( xf_graph_resource_dependencies_t ) { \
     .count = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef uint64_t xf_graph_device_texture_h;
+
+typedef struct {
+    xf_device_texture_h handle;
+    union {
+        xf_graph_resource_dependencies_t shared;
+        xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
+    } deps;
+} xf_graph_device_texture_t;
+
+#define xf_graph_device_texture_m( ... ) ( xf_graph_device_texture_t ) { \
+    .handle = xf_null_handle_m, \
+    .deps.mips = { [0 ... 15] = xf_graph_resource_dependencies_m() }, \
     ##__VA_ARGS__ \
 }
 
@@ -135,45 +136,14 @@ typedef struct {
 }
 
 typedef struct {
-    xf_texture_execution_state_t state;
-    // TODO node is unused?
-    //      texture is only used in the pre-execute queue release pass
-    xf_node_h node;
-    xf_texture_h texture; 
-} xf_graph_texture_transition_t;
-
-#define xf_graph_texture_transition_m( ... ) ( xf_graph_texture_transition_t ) { \
-    .state = xf_texture_execution_state_m(), \
-    .node = xf_null_handle_m, \
-    .texture = xf_null_handle_m, \
-    ##__VA_ARGS__ \
-}
-
-typedef struct {
-    xf_graph_texture_transition_t array[xf_graph_max_nodes_m];
-    uint32_t count;
-    uint32_t idx;
-} xf_graph_texture_transitions_t;
-
-#define xf_graph_texture_transitions_m( ... ) { \
-    .count = 0, \
-    .idx = 0 , \
-    ##__VA_ARGS__ \
-}
-
-typedef struct {
     xf_texture_h handle;
-    bool disable_aliasing;
+    xf_graph_device_texture_h device_texture_handle;
     xf_graph_resource_lifespan_t lifespan;
     union {
-        xf_resource_dependencies_t shared;
-        xf_resource_dependencies_t mips[16]; // TODO make storage external?
+        xf_graph_resource_dependencies_t shared;
+        xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
         // TODO external hash table to support dynamic view access
     } deps;
-    union {
-        xf_graph_texture_transitions_t shared;
-        xf_graph_texture_transitions_t mips[16]; // TODO make storage external?
-    } transitions;
     // cached from underlying texture
     xg_texture_view_access_e view_access;
     uint32_t mip_levels;
@@ -181,42 +151,22 @@ typedef struct {
 
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
     .handle = xf_null_handle_m, \
-    .disable_aliasing = false, \
     .lifespan = xf_graph_resource_lifespan_m(), \
-    .deps.mips = { [0 ... 15] = xf_resource_dependencies_m() }, \
-    .transitions.mips = { [0 ... 15] = xf_graph_texture_transitions_m() }, \
+    .deps.mips = { [0 ... 15] = xf_graph_resource_dependencies_m() }, \
     .view_access = xg_texture_view_access_invalid_m, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
-    xf_buffer_execution_state_t state;
-    xf_node_h node;
-} xf_graph_buffer_transition_t;
-
-#define xf_graph_buffer_transition_m( ... ) ( xf_graph_buffer_transition_t ) { \
-    .state = xf_buffer_execution_state_m(), \
-    .node = xf_null_handle_m, \
-    ##__VA_ARGS__ \
-}
-
-typedef struct {
-    xf_graph_buffer_transition_t array[xf_graph_max_nodes_m];
-    uint32_t count;
-    uint32_t idx;
-} xf_graph_buffer_transitions_t;
-
-typedef struct {
     xf_buffer_h handle;
     xf_graph_resource_lifespan_t lifespan;
-    xf_resource_dependencies_t deps;
-    xf_graph_buffer_transitions_t transitions;
+    xf_graph_resource_dependencies_t deps;
 } xf_graph_buffer_t;
 
 #define xf_graph_buffer_m( ... ) ( xf_graph_buffer_t ) { \
     .handle = xf_null_handle_m, \
     .lifespan = xf_graph_resource_lifespan_m(), \
-    .deps = xf_resource_dependencies_m(), \
+    .deps = xf_graph_resource_dependencies_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -298,6 +248,46 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef struct {
+    xf_texture_execution_state_t state;
+    xf_texture_h texture;
+    xg_texture_view_t view;
+} xf_graph_texture_transition_t;
+
+#define xf_graph_texture_transition_m( ... ) ( xf_graph_texture_transition_t ) { \
+    .state = xf_texture_execution_state_m(), \
+    .texture = xf_null_handle_m, \
+    .view = xg_texture_view_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_graph_texture_transition_t array[xf_graph_max_nodes_m];
+    uint32_t count;
+} xf_graph_texture_transitions_t;
+
+#define xf_graph_texture_transitions_m( ... ) { \
+    .count = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_buffer_execution_state_t state;
+    xf_buffer_h buffer; // TODO device buffer
+} xf_graph_buffer_transition_t;
+
+#define xf_graph_buffer_transition_m( ... ) ( xf_graph_buffer_transition_t ) { \
+    .state = xf_buffer_execution_state_m(), \
+    .buffer = xf_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_graph_buffer_transition_t array[xf_graph_max_nodes_m];
+    uint32_t count;
+    uint32_t idx;
+} xf_graph_buffer_transitions_t;
+
 typedef struct xf_node_t {
     xf_node_params_t params;
     xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
@@ -324,6 +314,12 @@ typedef struct xf_node_t {
     uint32_t textures_count;
     uint32_t buffers_array[xf_node_max_buffers_m];
     uint32_t buffers_count;
+
+    xf_graph_texture_transitions_t texture_transitions;
+    xf_graph_texture_transitions_t texture_acquires; // TODO change type, remove unused fields
+    xf_graph_texture_transitions_t texture_releases; // TODO change type, remove unused fields
+    xf_graph_buffer_transitions_t buffer_transitions;
+    xf_graph_buffer_transitions_t buffer_releases;
 } xf_node_t;
 
 typedef struct {
@@ -339,6 +335,9 @@ typedef struct {
     xf_graph_buffer_t buffers_array[xf_graph_max_buffers_m];
     uint32_t textures_count;
     uint32_t buffers_count;
+
+    xf_graph_device_texture_t device_textures_array[xf_graph_max_textures_m];
+    uint32_t device_textures_count;
 
     uint32_t multi_textures_array[xf_graph_max_multi_textures_m]; // indexes textures_array
     uint32_t multi_textures_count;
@@ -377,7 +376,7 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_clear ( xf_graph_h graph );
 void xf_graph_finalize ( xf_graph_h graph );
-void xf_graph_build ( xf_graph_h graph, xg_workload_h workload );
+uint64_t xf_graph_build ( xf_graph_h graph, xg_workload_h workload, uint64_t key );
 uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );
 void xf_graph_advance_multi_textures ( xf_graph_h graph );
 void xf_graph_destroy ( xf_graph_h graph, xg_workload_h workload );

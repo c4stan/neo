@@ -38,9 +38,6 @@ typedef struct {
     std_module_t        modules_array[std_module_max_modules_m];
     std_module_t*       modules_freelist;
 
-    // std_module_id_m -> std_module_t*
-    std_module_t*       modules_id_table[std_module_count_m];
-
     // name hash -> std_module_t*
     uint64_t modules_name_map_keys[std_module_map_slots_m]; // name hash
     uint64_t modules_name_map_payloads[std_module_map_slots_m]; // std_module_t*

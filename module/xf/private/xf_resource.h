@@ -25,12 +25,6 @@ typedef struct {
     xg_cmd_queue_e queue;
 } xf_texture_execution_state_t;
 
-#define xf_texture_execution_state_cmp_m( a, b ) ( \
-    a.layout == b.layout && \
-    a.state == b.stage && \
-    a.access == b.access && \
-    a.queue == b.queue )
-
 #define xf_texture_execution_state_m( ... ) ( xf_texture_execution_state_t ) { \
     .layout = xg_texture_layout_undefined_m, \
     .stage = xg_pipeline_stage_bit_none_m, \
@@ -49,6 +43,19 @@ typedef struct {
     .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
     .queue = xg_cmd_queue_invalid_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xf_texture_execution_state_t execution;
+    xg_cmd_queue_e prev_queue;
+    bool queue_transition;
+} xf_texture_state_t; // TODO rename this to execution_state_t, the previous to transition_state_t or something
+
+#define xf_texture_state_m( ... ) ( xf_texture_state_t ) { \
+    .execution = xf_texture_execution_state_m(), \
+    .prev_queue = xg_cmd_queue_invalid_m, \
+    .queue_transition = false, \
     ##__VA_ARGS__ \
 }
 
@@ -170,9 +177,10 @@ typedef struct {
     xg_texture_info_t info;
     char debug_name[xf_debug_name_size_m];
     union {
-        xf_texture_execution_state_t shared;
-        xf_texture_execution_state_t mips[16]; // TODO make storage external?
+        xf_texture_state_t shared;
+        xf_texture_state_t mips[16]; // TODO make storage external?
         // TODO external hash table to support dynamic view access
+        // OR   dyn alloc from shared big T buffer as many as you need, no waste
     } state;
 } xf_device_texture_t;
 
@@ -182,7 +190,7 @@ typedef struct {
     .info = { 0 }, \
     .debug_name = "", \
     .ref_count = 0, \
-    .state.shared = xf_texture_execution_state_m(), \
+    .state.mips = { [0 ... 15] = xf_texture_state_m() }, \
     ##__VA_ARGS__ \
 }
 
@@ -240,6 +248,7 @@ void xf_resource_buffer_add_usage ( xf_buffer_h buffer, xg_buffer_usage_bit_e us
 
 void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
 void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
+void xf_resource_device_texture_state_barrier ( std_stack_t* stack, xf_device_texture_h device_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
 
 void xf_resource_texture_alias ( xf_texture_h texture, xf_texture_h alias );
 void xf_resource_texture_update_external ( xf_texture_h texture );
@@ -294,3 +303,5 @@ xf_device_texture_h xf_resource_device_texture_create ( const xf_device_texture_
 void xf_resource_device_texture_destroy ( xf_device_texture_h texture );
 void xf_resource_device_texture_add_ref ( xf_device_texture_h texture );
 void xf_resource_device_texture_remove_ref ( xf_device_texture_h texture );
+
+xf_texture_h xf_resource_multi_texture_get_base ( xf_texture_h multi_texture );

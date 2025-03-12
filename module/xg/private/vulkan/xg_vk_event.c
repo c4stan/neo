@@ -22,6 +22,10 @@ void xg_vk_event_load ( xg_vk_event_state_t* state ) {
     std_mutex_init ( &state->gpu_events_mutex );
     std_mutex_init ( &state->gpu_queue_events_mutex );
     std_mutex_init ( &state->cpu_queue_events_mutex );
+
+#if xg_debug_enable_events_log_m
+    state->uid = 0;
+#endif
 }
 
 void xg_vk_event_reload ( xg_vk_event_state_t* state ) {
@@ -90,26 +94,32 @@ xg_queue_event_h xg_gpu_queue_event_create ( const xg_queue_event_params_t* para
     VkResult result = vkCreateSemaphore ( device->vk_handle, &semaphore_create_info, xg_vk_cpu_allocator(), &event->vk_semaphore );
     std_verify_m ( result == VK_SUCCESS );
 
+    xg_queue_event_h handle = event - xg_vk_event_state->gpu_queue_events_array;
+    char debug_name[xg_debug_name_size_m];
+    if ( params->debug_name[0] == 0 ) {
+        std_u64_to_str ( debug_name, xg_debug_name_size_m, handle );
+    }
     {
         VkDebugUtilsObjectNameInfoEXT debug_name_info = {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_SEMAPHORE,
             .objectHandle = ( uint64_t ) event->vk_semaphore,
-            .pObjectName = params->debug_name,
+            .pObjectName = debug_name,
         };
         xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
     }
 
 #if xg_debug_enable_events_log_m
-    std_log_info_m ( "[XG-VK-EVENT] Create " std_fmt_u64_m, event->vk_semaphore );
+    event->uid = xg_vk_event_state->uid++;
+    std_log_info_m ( "[XG-VK-EVENT] Create " std_fmt_u64_m "-" std_fmt_u64_m, event->vk_semaphore, event->uid );
 #endif
 
     event->params = *params;
 
     std_mutex_unlock ( &xg_vk_event_state->gpu_queue_events_mutex );
 
-    return ( xg_queue_event_h ) ( event - xg_vk_event_state->gpu_queue_events_array );
+    return handle;
 }
 
 void xg_gpu_queue_event_destroy ( xg_queue_event_h event_handle ) {
@@ -119,7 +129,7 @@ void xg_gpu_queue_event_destroy ( xg_queue_event_h event_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( event->params.device );
 
 #if xg_debug_enable_events_log_m
-    std_log_info_m ( "[XG-VK-EVENT] Destroy " std_fmt_u64_m, event->vk_semaphore );
+    std_log_info_m ( "[XG-VK-EVENT] Destroy " std_fmt_u64_m "-" std_fmt_u64_m, event->vk_semaphore, event->uid );
 #endif
 
     vkDestroySemaphore ( device->vk_handle, event->vk_semaphore, xg_vk_cpu_allocator() );
@@ -136,7 +146,7 @@ const xg_vk_gpu_queue_event_t* xg_vk_gpu_queue_event_get ( xg_queue_event_h even
 void xg_gpu_queue_event_log_wait ( xg_queue_event_h event_handle ) {
 #if xg_debug_enable_events_log_m
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
-    std_log_info_m ( "[XG-VK-EVENT] Wait " std_fmt_u64_m, event->vk_semaphore );
+    std_log_info_m ( "[XG-VK-EVENT] Wait " std_fmt_u64_m "-" std_fmt_u64_m, event->vk_semaphore, event->uid );
 #else
     std_unused_m ( event_handle );
 #endif
@@ -145,7 +155,7 @@ void xg_gpu_queue_event_log_wait ( xg_queue_event_h event_handle ) {
 void xg_gpu_queue_event_log_signal ( xg_queue_event_h event_handle ) {
 #if xg_debug_enable_events_log_m
     xg_vk_gpu_queue_event_t* event = &xg_vk_event_state->gpu_queue_events_array[event_handle];
-    std_log_info_m ( "[XG-VK-EVENT] Signal " std_fmt_u64_m, event->vk_semaphore );
+    std_log_info_m ( "[XG-VK-EVENT] Signal " std_fmt_u64_m "-" std_fmt_u64_m, event->vk_semaphore, event->uid );
 #else
     std_unused_m ( event_handle );
 #endif

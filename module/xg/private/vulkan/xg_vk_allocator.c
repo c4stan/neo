@@ -444,17 +444,25 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
 // --------------------------
 
 xg_alloc_t xg_alloc ( const xg_alloc_params_t* params ) {
+#if 1
     uint64_t device_idx = xg_vk_device_get_idx ( params->device );
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
     xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[params->type];
     return xg_vk_tlsf_heap_alloc ( heap, params->size, params->align );
+#else
+    return xg_vk_allocator_simple_alloc ( params->device, params->size, params->type );
+#endif
 }
 
 void xg_free ( xg_memory_h handle ) {
+#if 1
     uint64_t device_idx = handle.device;
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
     xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[handle.type];
     xg_vk_tlsf_heap_free ( heap, handle );
+#else
+    xg_vk_allocator_simple_free ( handle );
+#endif
 }
 
 #if 0

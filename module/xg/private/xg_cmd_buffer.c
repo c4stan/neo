@@ -528,6 +528,7 @@ void xg_cmd_buffer_barrier_set ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key
 void xg_cmd_bind_queue ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_bind_queue_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_tag_cmd_m ( cmd_buffer, xg_cmd_bind_queue_m, params->queue, key, xg_cmd_bind_queue_params_t );
+    std_assert_m ( params->wait_count <= xg_cmd_bind_queue_max_wait_events_m );
 
     *cmd_args = *params;
 }

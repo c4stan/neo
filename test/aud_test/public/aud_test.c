@@ -64,7 +64,7 @@ static void run_aud_test ( void ) {
 
     aud_source_h source0;
     {
-        std_log_info_m ( "Creating audio source..." );
+        std_log_info_m ( "Creating audio source 1..." );
         aud_source_params_t params;
         params.sample_frequency = 8000;
         params.bits_per_sample = 8;
@@ -80,7 +80,7 @@ static void run_aud_test ( void ) {
 
     aud_source_h source1;
     {
-        std_log_info_m ( "Creating audio source..." );
+        std_log_info_m ( "Creating audio source 2..." );
         aud_source_params_t params;
         params.sample_frequency = 8000;
         params.bits_per_sample = 8;
@@ -94,17 +94,13 @@ static void run_aud_test ( void ) {
     write_source_wave ( buffer1, sizeof ( buffer1 ), 1 );
     aud->feed_source ( source1, buffer1, sizeof ( buffer1 ) );
 
+    std_log_info_m ( "Playing sources..." );
     aud->play_source ( source0 );
     aud->set_source_volume ( source0, 0.2f );
 
     aud->play_source ( source1 );
     aud->set_source_volume ( source1, 0.2f );
 
-    std_log_info_m ( "Playing source..." );
-#if 0
-    aud->play ( device, std_static_buffer_m ( buffer ) );
-    std_thread_this_sleep ( 60000 );
-#else
     const std_ring_t* device_ring = aud->get_device_ring ( device );
     uint64_t ring_capacity = std_ring_capacity ( device_ring );
 
@@ -160,8 +156,6 @@ static void run_aud_test ( void ) {
 
         std_thread_this_sleep ( step_ms / 2 );
     }
-
-#endif
 }
 
 void std_main ( void ) {

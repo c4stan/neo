@@ -146,17 +146,21 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
     std_assert_m ( texture );
 
+    if ( std_str_cmp ( params->debug_name, "depth_stencil_texture(1)" ) == 0 ) {
+        //std_debug_break();
+    }
+
     xg_texture_flag_bit_e flags = 0;
 
-    if ( params->allowed_usage & xg_texture_usage_bit_depth_stencil_m ) {
-        if ( xg_format_has_depth ( params->format ) ) {
-            flags |= xg_texture_flag_bit_depth_texture_m;
-        }
+    // These are required by validation at creation time for appropriate formats, even if usage as depth/stencil target is not selected
+    if ( xg_format_has_depth ( params->format ) ) {
+        flags |= xg_texture_flag_bit_depth_texture_m;
+    }
+    if ( xg_format_has_stencil ( params->format ) ) {
+        flags |= xg_texture_flag_bit_stencil_texture_m;
+    }
 
-        if ( xg_format_has_stencil ( params->format ) ) {
-            flags |= xg_texture_flag_bit_stencil_texture_m;
-        }
-    } else if ( params->allowed_usage & xg_texture_usage_bit_render_target_m ) {
+    if ( params->allowed_usage & xg_texture_usage_bit_render_target_m ) {
         flags = xg_texture_flag_bit_render_target_texture_m;
     }
 
@@ -230,9 +234,16 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
     vk_image_info.samples = xg_sample_count_to_vk ( params->samples_per_pixel );
     vk_image_info.tiling = xg_texture_tiling_to_vk ( params->tiling );
     vk_image_info.usage = xg_image_usage_to_vk ( params->allowed_usage );
-    vk_image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // TODO
+#if 1
+    vk_image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vk_image_info.queueFamilyIndexCount = 0;
     vk_image_info.pQueueFamilyIndices = NULL;
+#else
+    vk_image_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    vk_image_info.queueFamilyIndexCount = 2;
+    uint32_t idx[2] = { device->queues[0].vk_family_idx, device->queues[1].vk_family_idx };
+    vk_image_info.pQueueFamilyIndices = idx;
+#endif
     vk_image_info.initialLayout = xg_image_layout_to_vk ( params->initial_layout );
 
     // Query for memory requiremens
@@ -275,6 +286,10 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
 bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 
+    if ( std_str_cmp ( texture->params.debug_name, "depth_stencil_texture(1)" ) == 0 ) {
+        //std_debug_break();
+    }
+
     std_assert_m ( texture->state == xg_vk_texture_state_reserved_m );
 
     const xg_texture_params_t* params = &texture->params;
@@ -302,9 +317,16 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     vk_image_info.samples = xg_sample_count_to_vk ( params->samples_per_pixel );
     vk_image_info.tiling = xg_texture_tiling_to_vk ( params->tiling );
     vk_image_info.usage = xg_image_usage_to_vk ( params->allowed_usage );
-    vk_image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // TODO
+#if 1
+    vk_image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vk_image_info.queueFamilyIndexCount = 0;
     vk_image_info.pQueueFamilyIndices = NULL;
+#else
+    vk_image_info.sharingMode = VK_SHARING_MODE_CONCURRENT;
+    vk_image_info.queueFamilyIndexCount = 2;
+    uint32_t idx[2] = { device->queues[0].vk_family_idx, device->queues[1].vk_family_idx };
+    vk_image_info.pQueueFamilyIndices = idx;
+#endif
     vk_image_info.initialLayout = xg_image_layout_to_vk ( params->initial_layout );
 
     // Query for memory requiremens, allocate and bind

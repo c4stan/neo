@@ -1,0 +1,5 @@
+compute_shader clear.comp
+
+begin bindings
+    texture storage
+end

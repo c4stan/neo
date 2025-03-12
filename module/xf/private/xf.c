@@ -8,7 +8,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->create_graph = xf_graph_create;
     xf->add_node = xf_graph_node_create;
     xf->finalize_graph = xf_graph_finalize;
-    xf->build_graph = xf_graph_build;
+    //xf->build_graph = xf_graph_build;
     xf->execute_graph = xf_graph_execute;
     xf->advance_graph_multi_textures = xf_graph_advance_multi_textures;
     xf->destroy_graph = xf_graph_destroy;
@@ -38,6 +38,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->get_node_info = xf_graph_get_node_info;
 
     xf->debug_print_graph = xf_graph_debug_print;
+    xf->get_base_texture = xf_resource_multi_texture_get_base;
 }
 
 void* xf_load ( void* std_runtime ) {

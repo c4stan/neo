@@ -298,15 +298,11 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h shadow_node = add_shadow_pass ( graph, shadow_texture );
 
     // gbuffer laydown
-    // TODO remove multi?
-    xf_texture_h color_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
-        .texture = xf_texture_params_m (
-            .width = resolution_x,
-            .height = resolution_y,
-            .format = xg_format_r8g8b8a8_unorm_m,
-            .debug_name = "color_texture",
-        ),
-        .multi_texture_count = 1,
+    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "color_texture",
     ) );
 
     xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
@@ -322,18 +318,22 @@ static void viewapp_boot_raster_graph ( void ) {
             .height = resolution_y,
             .format = xg_format_r8g8b8a8_uint_m,
             .debug_name = "gbuffer_object_id",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m()
         ),
         .auto_advance = false,
     ) );
     xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
     m_state->render.object_id_texture = object_id_texture;
 
-    xf_texture_h depth_stencil_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
             .format = xg_format_d32_sfloat_m,//xg_format_d24_unorm_s8_uint_m,
-            .debug_name = "depth_stencil_texture",
+            .debug_name = "depth_texture",
+            .clear_on_create = true,
+            .clear.depth_stencil = xg_depth_stencil_clear_m ()
         ),
     ) );
 
@@ -345,7 +345,7 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .type = xf_texture_clear_type_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() )
+                xf_texture_clear_m ( .type = xf_texture_clear_type_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
             }
         ),
         .resources = xf_node_resource_params_m (
@@ -354,12 +354,12 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_copy_texture_dependency_m ( .texture = color_texture ),
                 xf_copy_texture_dependency_m ( .texture = normal_texture ),
                 xf_copy_texture_dependency_m ( .texture = object_id_texture ),
-                xf_copy_texture_dependency_m ( .texture = depth_stencil_texture ),
+                xf_copy_texture_dependency_m ( .texture = depth_texture ),
             }
         ),
     ) );
 
-    xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_stencil_texture );
+    xf_node_h geometry_pass = add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_texture );
 
     // lighting
     uint32_t light_grid_size[3] = { 16, 8, 24 };
@@ -404,7 +404,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h light_clusters_build_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "light_cluster_build",
         .type = xf_node_type_compute_pass_m,
-        .queue = xg_cmd_queue_compute_m,
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cluster_build" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
@@ -458,6 +458,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_node_h lighting_node = xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
+        .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
@@ -476,7 +477,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .sampled_textures = {
                 xf_compute_texture_dependency_m ( .texture = color_texture ),
                 xf_compute_texture_dependency_m ( .texture = normal_texture ),
-                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ),
+                xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
             },
             .storage_texture_writes_count = 1,
@@ -503,7 +504,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "hiz_texture",
     ) );
 
-    xf_node_h hiz_mip0_gen_node = add_hiz_mip0_gen_pass ( graph, hiz_texture, depth_stencil_texture );
+    xf_node_h hiz_mip0_gen_node = add_hiz_mip0_gen_pass ( graph, hiz_texture, depth_texture );
 
     for ( uint32_t i = 1; i < hiz_mip_count; ++i ) {
         add_hiz_submip_gen_pass ( graph, hiz_texture, i );
@@ -535,7 +536,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_blur_x_texture",
     ) );
-    xf_node_h ssgi_blur_x_node = add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
+    xf_node_h ssgi_blur_x_node = add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
 
     xf_texture_h ssgi_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
@@ -543,7 +544,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_blur_y_texture",
     ) );
-    xf_node_h ssgi_blur_y_node = add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_blur_y" );
+    xf_node_h ssgi_blur_y_node = add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_blur_y" );
 
     // ssgi temporal accumulation
     xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -552,13 +553,16 @@ static void viewapp_boot_raster_graph ( void ) {
             .height = resolution_y,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
             .debug_name = "ssgi_accumulation_texture",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m(),
         ),
     ) );
-    xf_texture_h prev_depth_stencil_texture = xf->get_multi_texture ( depth_stencil_texture, -1 );
+    xf_texture_h prev_depth_texture = xf->get_multi_texture ( depth_texture, -1 );
     xg_texture_h ssgi_history_texture = xf->get_multi_texture ( ssgi_accumulation_texture, -1 );
     xf_node_h ssgi_temporal_accumulation_node = xf->add_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssgi_ta",
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
@@ -572,8 +576,8 @@ static void viewapp_boot_raster_graph ( void ) {
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssgi_blur_y_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_history_texture ), 
-                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
-                xf_compute_texture_dependency_m ( .texture = prev_depth_stencil_texture )
+                xf_compute_texture_dependency_m ( .texture = depth_texture ), 
+                xf_compute_texture_dependency_m ( .texture = hiz_texture )
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
@@ -598,7 +602,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_2_blur_x_texture",
     ) );
-    xf_node_h ssgi_2_blur_x_node = add_bilateral_blur_pass ( graph, ssgi_2_blur_x_texture, ssgi_2_raymarch_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_2_blur_x" );
+    xf_node_h ssgi_2_blur_x_node = add_bilateral_blur_pass ( graph, ssgi_2_blur_x_texture, ssgi_2_raymarch_texture, normal_texture, depth_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_2_blur_x" );
 
     xf_texture_h ssgi_2_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
@@ -606,7 +610,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_2_blur_y_texture",
     ) );
-    xf_node_h ssgi_2_blur_y_node = add_bilateral_blur_pass ( graph, ssgi_2_blur_y_texture, ssgi_2_blur_x_texture, normal_texture, depth_stencil_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_2_blur_y" );
+    xf_node_h ssgi_2_blur_y_node = add_bilateral_blur_pass ( graph, ssgi_2_blur_y_texture, ssgi_2_blur_x_texture, normal_texture, depth_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_2_blur_y" );
 
     // ssgi2 temporal accumulation
     xf_texture_h ssgi_2_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -615,12 +619,15 @@ static void viewapp_boot_raster_graph ( void ) {
             .height = resolution_y,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
             .debug_name = "ssgi_2_accumulation_texture",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m(),
         ),
     ) );
     xg_texture_h ssgi_2_history_texture = xf->get_multi_texture ( ssgi_2_accumulation_texture, -1 );
     xf_node_h ssgi_2_temporal_accumulation_node = xf->add_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssgi_2_ta",
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
             .samplers_count = 1,
@@ -634,8 +641,8 @@ static void viewapp_boot_raster_graph ( void ) {
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssgi_2_blur_y_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_2_history_texture ), 
-                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
-                xf_compute_texture_dependency_m ( .texture = prev_depth_stencil_texture ) 
+                xf_compute_texture_dependency_m ( .texture = depth_texture ), 
+                xf_compute_texture_dependency_m ( .texture = hiz_texture ) 
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
@@ -660,7 +667,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_blur_x_texture",
     ) );
-    xf_node_h ssr_blur_x_node = add_bilateral_blur_pass ( graph, ssr_blur_x_texture, ssr_raymarch_texture, normal_texture, depth_stencil_texture, 1, 5, blur_pass_direction_horizontal_m, "ssr_blur_x" );
+    xf_node_h ssr_blur_x_node = add_bilateral_blur_pass ( graph, ssr_blur_x_texture, ssr_raymarch_texture, normal_texture, depth_texture, 1, 5, blur_pass_direction_horizontal_m, "ssr_blur_x" );
 
     xf_texture_h ssr_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
@@ -668,7 +675,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format  = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_blur_y_texture",
     ) );
-    xf_node_h ssr_blur_y_node = add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_stencil_texture, 1, 5, blur_pass_direction_vertical_m, "ssr_blur_y" );
+    xf_node_h ssr_blur_y_node = add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_texture, 1, 5, blur_pass_direction_vertical_m, "ssr_blur_y" );
 
     // ssr ta
     xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -677,12 +684,15 @@ static void viewapp_boot_raster_graph ( void ) {
             .height = resolution_y,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
             .debug_name = "ssr_accumulation_texture",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m(),
         ),
     ) );
     xf_texture_h ssr_history_texture = xf->get_multi_texture ( ssr_accumulation_texture, -1 );
     xf_node_h ssr_ta_node = xf->add_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssr_ta",
+        .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
@@ -696,11 +706,12 @@ static void viewapp_boot_raster_graph ( void ) {
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssr_blur_y_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssr_history_texture ), 
-                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
-                xf_compute_texture_dependency_m ( .texture = prev_depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_texture ), 
+                xf_compute_texture_dependency_m ( .texture = prev_depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = normal_texture ), 
                 xf_compute_texture_dependency_m ( .texture = object_id_texture ), 
-                xf_compute_texture_dependency_m ( .texture = prev_object_id_texture ) },
+                xf_compute_texture_dependency_m ( .texture = prev_object_id_texture )
+            },
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
@@ -744,6 +755,8 @@ static void viewapp_boot_raster_graph ( void ) {
             .height = resolution_y,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
             .debug_name = "taa_accumulation_texture",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m()
         ),
     ) );
     xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
@@ -762,7 +775,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .sampled_textures_count = 4,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = combine_texture ), 
-                xf_compute_texture_dependency_m ( .texture = depth_stencil_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = taa_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = object_id_texture ) 
             },
@@ -2377,8 +2390,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     viewapp_update_workload_uniforms ( workload );
 
-    uint64_t key = 0;
-    key = xf->execute_graph ( m_state->render.active_graph, workload, key );
+    xf->execute_graph ( m_state->render.active_graph, workload, 0 );
     xf->advance_multi_texture ( m_state->render.object_id_texture );
     xg->submit_workload ( workload );
     xg->present_swapchain ( m_state->render.swapchain, workload );

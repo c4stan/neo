@@ -36,6 +36,9 @@ const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h handle );
 typedef struct {
     xg_queue_event_params_t params;
     VkSemaphore vk_semaphore;
+#if xg_debug_enable_events_log_m
+    uint64_t uid;
+#endif
 } xg_vk_gpu_queue_event_t;
 
 xg_queue_event_h xg_gpu_queue_event_create ( const xg_queue_event_params_t* params );
@@ -85,6 +88,10 @@ typedef struct {
     xg_vk_cpu_queue_event_t* cpu_queue_events_array;
     xg_vk_cpu_queue_event_t* cpu_queue_events_freelist;
     std_mutex_t cpu_queue_events_mutex;
+
+#if xg_debug_enable_events_log_m
+    uint64_t uid;
+#endif
 } xg_vk_event_state_t;
 
 void xg_vk_event_load ( xg_vk_event_state_t* state );

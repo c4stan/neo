@@ -125,9 +125,7 @@ void    std_log_print              ( std_log_msg_t msg, ... ); // msg, format
     #define std_log_crash_m(...)
 #endif
 
-
-// Verify is the same as assert when asserts are enabled, and different in the fact that
-// it still executes the condition expression when asserts are disabled
+// verify logs are asserts, but their condition expression is also executed when asserts are disabled
 #if std_log_assert_enabled_m
     #define std_assert_info_m(cond, ...)  if (!(cond)) { std_log_info_m(__VA_ARGS__);  }
     #define std_assert_warn_m(cond, ...)  if (!(cond)) { std_log_warn_m(__VA_ARGS__);  }
@@ -177,3 +175,5 @@ void std_log_os_error ( std_log_scope_t scope );
 #endif
 
 void std_log_print_callstack ( void );
+
+void std_debug_break ( void );

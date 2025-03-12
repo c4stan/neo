@@ -752,7 +752,6 @@ typedef struct {
     uint32_t queue_chunks_count;
 } xg_vk_workload_cmd_chunk_result_t;
 
-std_unused_static_m()
 static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_vk_workload_chunk_context_t* context, const xg_cmd_header_t* cmd_headers, uint32_t cmd_count ) {
     xg_vk_workload_cmd_chunk_t* cmd_chunks_array = context->cmd_chunks_array;
     xg_vk_workload_queue_chunk_t* queue_chunks_array = context->queue_chunks_array;
@@ -837,10 +836,10 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
         case xg_cmd_copy_texture_m:
         case xg_cmd_copy_buffer_to_texture_m:
         case xg_cmd_copy_texture_to_buffer_m:
-            std_assert_m ( !in_renderpass );
         case xg_cmd_begin_debug_region_m:
         case xg_cmd_end_debug_region_m:
         case xg_cmd_barrier_set_m:
+            std_assert_m ( !in_renderpass );
             if ( cmd_chunk.begin == -1 ) cmd_chunk.begin = cmd_it;
             break;
         case xg_cmd_start_debug_capture_m:
@@ -864,6 +863,145 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
         .queue_chunks_count = queue_chunks_count,
     };
     return result;
+}
+
+// TODO
+std_unused_static_m()
+static void xg_vk_workload_debug_print_cmd_headers ( const xg_cmd_header_t* cmd_headers, uint32_t cmd_count ) {
+    for ( uint32_t cmd_it = 0; cmd_it < cmd_count; ++cmd_it ) {
+        const xg_cmd_header_t* header = &cmd_headers[cmd_it];
+        xg_cmd_type_e cmd_type = header->type;
+
+        switch ( cmd_type ) {
+        case xg_cmd_graphics_renderpass_begin_m: {
+            std_auto_m args = ( xg_cmd_renderpass_params_t* ) header->args;
+            const xg_vk_renderpass_t* renderpass = xg_vk_renderpass_get(args->renderpass);
+            std_log_info_m ( "renderpass_begin " std_fmt_str_m, renderpass->params.debug_name );
+            for ( uint32_t i = 0; i < args->render_targets_count; ++i ) {
+                xg_render_target_binding_t* binding = &args->render_targets[i];
+                const xg_vk_texture_t* texture = xg_vk_texture_get ( binding->texture );
+                std_log_info_m ( "RT" std_fmt_u32_m ": " std_fmt_str_m " " std_fmt_u64_m " " std_fmt_u64_m, i, texture->params.debug_name, texture->vk_handle, binding->view );
+            }
+            if ( args->depth_stencil.texture != xg_null_handle_m ) {
+                const xg_vk_texture_t* texture = xg_vk_texture_get ( args->depth_stencil.texture );
+                std_log_info_m ( "DS: " std_fmt_str_m " " std_fmt_u64_m, texture->params.debug_name, texture->vk_handle, texture->params.debug_name, texture->vk_handle );
+            }
+            break;
+        }
+        case xg_cmd_graphics_renderpass_end_m:  {
+            std_log_info_m ( "renderpass_end" );
+            break;
+        }
+        case xg_cmd_bind_queue_m:{
+            std_auto_m args = ( xg_cmd_bind_queue_params_t* ) header->args;
+            std_log_info_m ( "bind_queue " std_fmt_str_m, xg_cmd_queue_str ( args->queue ) );
+
+            if ( args->signal_event != xg_null_handle_m ) {
+                const xg_vk_gpu_queue_event_t* signal = xg_vk_gpu_queue_event_get ( args->signal_event );
+                std_log_info_m ( "SIGNAL:" std_fmt_str_m " " std_fmt_u64_m, signal->params.debug_name, signal->vk_semaphore );
+            } else {
+                std_log_info_m ( "SIGNAL:-" );
+            }
+
+            if ( !args->wait_count ) {
+                std_log_info_m ( "WAIT:-" );
+            } else {
+                for ( uint32_t i = 0; i < args->wait_count; ++i ) {
+                const xg_vk_gpu_queue_event_t* wait = xg_vk_gpu_queue_event_get ( args->wait_events[i] );
+                    std_log_info_m ( "WAIT:" std_fmt_str_m " " std_fmt_u64_m " " std_fmt_str_m, wait->params.debug_name, wait->vk_semaphore, xg_pipeline_stage_str ( args->wait_stages[i] ) );
+                }
+            }
+        }
+        break;
+        case xg_cmd_draw_m: {
+            std_log_info_m ( "draw" );
+            break;
+        }
+        case xg_cmd_compute_m: {
+            std_log_info_m ( "compute" );
+        }
+        break;
+        case xg_cmd_raytrace_m: {
+            std_log_info_m ( "raytrace" );
+        }
+        break;
+        case xg_cmd_texture_clear_m: {
+            std_auto_m args = ( xg_cmd_texture_clear_t* ) header->args;
+            const xg_vk_texture_t* texture = xg_vk_texture_get ( args->texture );
+            std_log_info_m ( "texture_clear " std_fmt_str_m " " std_fmt_u64_m, texture->params.debug_name, texture->vk_handle );
+        }
+        break;
+        case xg_cmd_texture_depth_stencil_clear_m: {
+            std_auto_m args = ( xg_cmd_texture_clear_t* ) header->args;
+            const xg_vk_texture_t* texture = xg_vk_texture_get ( args->texture );
+            std_log_info_m ( "depth_stencil_clear " std_fmt_str_m " " std_fmt_u64_m, texture->params.debug_name, texture->vk_handle );
+        }
+        break;
+        case xg_cmd_copy_buffer_m: {
+            std_log_info_m ( "copy_buffer" );
+        }
+        break;
+        case xg_cmd_copy_texture_m: {
+            std_log_info_m ( "copy_texture" );
+        }
+        break;
+        case xg_cmd_copy_buffer_to_texture_m: {
+            std_log_info_m ( "copy_buffer_to_texture" );
+        }
+        break;
+        case xg_cmd_copy_texture_to_buffer_m: {
+            std_log_info_m ( "copy_texture_to_buffer" );
+        }
+        break;
+        case xg_cmd_begin_debug_region_m: {
+            std_auto_m args = ( xg_cmd_begin_debug_region_t* ) header->args;
+            std_log_info_m ( "debug_region_begin " std_fmt_str_m, args->name );
+        }
+        break;
+        case xg_cmd_end_debug_region_m: {
+            std_log_info_m ( "debug_region_end" );
+        }
+        break;
+        case xg_cmd_barrier_set_m: {
+            std_log_info_m ( "barrier_set:" );
+            std_auto_m args = ( xg_cmd_barrier_set_t* ) header->args;
+            char* base = ( char* ) ( args + 1 );
+            if ( args->texture_memory_barriers > 0 ) {
+                base = ( char* ) std_align_ptr ( base, std_alignof_m ( xg_texture_memory_barrier_t ) );
+
+                for ( uint32_t i = 0; i < args->texture_memory_barriers; ++i ) {
+                    xg_texture_memory_barrier_t* barrier = ( xg_texture_memory_barrier_t* ) base;
+                    const xg_vk_texture_t* texture = xg_vk_texture_get ( barrier->texture );
+
+                    VkImageAspectFlags aspect = xg_texture_flags_to_vk_aspect ( texture->flags );
+                    if ( aspect == VK_IMAGE_ASPECT_NONE ) {
+                        aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+                    }
+
+                    std_log_info_m ( "texture barrier: " std_fmt_str_m " " std_fmt_u64_m " MIP:" std_fmt_u32_m "->" std_fmt_u32_m " ARRAY:" std_fmt_u32_m "->" std_fmt_u32_m " " std_fmt_str_m
+                        std_fmt_newline_m std_fmt_tab_m "FROM:" std_fmt_str_m " " std_fmt_str_m " WAIT:" std_fmt_str_m " FLUSH:" std_fmt_str_m
+                        std_fmt_newline_m std_fmt_tab_m "TO:" std_fmt_str_m " " std_fmt_str_m " STALL:" std_fmt_str_m " INVALIDATE:" std_fmt_str_m, 
+                        texture->params.debug_name, texture->vk_handle, barrier->mip_base, barrier->mip_count, barrier->array_base, barrier->array_count, xg_vk_image_aspect_str ( aspect ),
+                        xg_cmd_queue_str ( barrier->queue.old ), xg_texture_layout_str ( barrier->layout.old ), xg_pipeline_stage_str ( barrier->execution.blocker ), xg_memory_access_str ( barrier->memory.flushes ),
+                        xg_cmd_queue_str ( barrier->queue.new ), xg_texture_layout_str ( barrier->layout.new ), xg_pipeline_stage_str ( barrier->execution.blocked ), xg_memory_access_str ( barrier->memory.invalidations ) );
+
+                    base += sizeof ( xg_texture_memory_barrier_t );
+                }
+            }
+        }
+        break;
+        case xg_cmd_start_debug_capture_m: {
+            std_log_info_m ( "debug_capture_start" );
+        }
+        break;
+        case xg_cmd_stop_debug_capture_m: {
+            std_log_info_m ( "debug_capture_end" );
+        }
+        break;
+        default:
+            std_log_warn_m ( "Missing cmd print" );
+        }        
+    }
 }
 
 typedef struct {
@@ -910,9 +1048,11 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
             .pInheritanceInfo = NULL,
         };
         vkBeginCommandBuffer ( vk_cmd_buffer, &begin_info );
+        //device->ext_api.cmd_set_checkpoint ( vk_cmd_buffer, (void*) -1 );
 
         for ( uint32_t cmd_it = chunk.begin; cmd_it < chunk.end; ++cmd_it ) {
             const xg_cmd_header_t* header = &cmd_headers_array[cmd_it];
+            //device->ext_api.cmd_set_checkpoint ( vk_cmd_buffer, (void*) header->key );
             xg_cmd_type_e cmd_type = header->type;
             
             switch ( cmd_type ) {
@@ -1067,6 +1207,8 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 } else {
                     vkCmdDraw ( vk_cmd_buffer, primitive_count * 3, instance_count, vertex_offset, instance_offset );
                 }
+
+                std_noop_m;
             }
             break;
             case xg_cmd_compute_m: {
@@ -1478,6 +1620,12 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                         uint32_t dst_queue_idx = VK_QUEUE_FAMILY_IGNORED;
 
                         if ( barrier->queue.old != barrier->queue.new ) {
+                            xg_queue_ownership_transfer_t queue = barrier->queue;
+                            if ( queue.new == xg_cmd_queue_invalid_m ) queue.new = queue.old;
+                            if ( queue.old == xg_cmd_queue_invalid_m ) queue.old = queue.new;
+                            src_queue_idx = device->queues[queue.old].vk_family_idx;
+                            dst_queue_idx = device->queues[queue.new].vk_family_idx;
+                        } else if ( barrier->queue.old < xg_cmd_queue_count_m && barrier->queue.new < xg_cmd_queue_count_m ) {
                             src_queue_idx = device->queues[barrier->queue.old].vk_family_idx;
                             dst_queue_idx = device->queues[barrier->queue.new].vk_family_idx;
                         }
@@ -1502,6 +1650,11 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                         std_assert_m ( texture->vk_handle );
                         vk_barrier->image = texture->vk_handle;
                         vk_barrier->subresourceRange = range;
+
+                        //vk_barrier->srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+                        //vk_barrier->dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+                        //vk_barrier->srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                        //vk_barrier->dstStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 
                         base += sizeof ( xg_texture_memory_barrier_t );
                     }
@@ -1560,11 +1713,50 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
     return result;
 }
 
+static void xg_vk_workload_log_device_lost ( xg_device_h device_handle ) {
+    const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
+
+    uint32_t data_count[xg_cmd_queue_count_m] = {0};
+    device->ext_api.get_checkpoints ( device->queues[xg_cmd_queue_graphics_m].vk_handle, &data_count[xg_cmd_queue_graphics_m], NULL );
+    device->ext_api.get_checkpoints ( device->queues[xg_cmd_queue_compute_m].vk_handle, &data_count[xg_cmd_queue_compute_m], NULL );
+    device->ext_api.get_checkpoints ( device->queues[xg_cmd_queue_copy_m].vk_handle, &data_count[xg_cmd_queue_copy_m], NULL );
+    char stack_buffer[1024];
+    std_stack_t stack = std_static_stack_m ( stack_buffer );
+    std_stack_string_append_format ( &stack, "Device " std_fmt_str_m " lost.\n", device->generic_properties.deviceName );
+
+    for ( xg_cmd_queue_e queue_it = 0; queue_it < xg_cmd_queue_count_m; ++queue_it ) {
+        uint32_t count = data_count[queue_it];
+        std_stack_string_append_format ( &stack, std_fmt_str_m " checkpoints: " std_fmt_u32_m "\n", xg_cmd_queue_str ( queue_it ), data_count[queue_it] );
+        if ( count ) {
+            VkCheckpointDataNV* data = std_virtual_heap_alloc_array_m ( VkCheckpointDataNV, count );
+            for ( uint32_t i = 0; i < count; ++i ) {
+                data[i] = ( VkCheckpointDataNV ) {
+                    .sType = VK_STRUCTURE_TYPE_CHECKPOINT_DATA_NV,
+                };
+            }
+            device->ext_api.get_checkpoints ( device->queues[queue_it].vk_handle, &data_count[queue_it], data );
+            for ( uint32_t i = 0; i < count; ++i ) {
+                uint64_t key = ( uint64_t ) data[i].pCheckpointMarker;
+                const char* stage = xg_pipeline_stage_str ( xg_pipeline_stage_from_vk ( data[i].stage ) );
+                char buffer[64] = "-";
+                if ( key != -1 ) std_u64_to_str ( buffer, 64, key );
+                std_stack_string_append_format ( &stack, std_fmt_tab_m std_fmt_str_m ": " std_fmt_str_m "\n", stage, buffer );
+            }
+            std_virtual_heap_free ( data );
+        }
+    }
+
+    std_log_error_m ( stack_buffer );
+
+    std_process_this_exit ( std_process_exit_code_error_m );
+}
+
 void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context, xg_workload_h workload_handle, VkCommandBuffer* cmd_buffers_array, uint32_t cmd_buffers_count, xg_vk_workload_cmd_chunk_t* cmd_chunks_array, uint32_t cmd_chunks_count, xg_vk_workload_queue_chunk_t* queue_chunks_array, uint32_t queue_chunks_count ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
 
     std_assert_m ( xg_vk_workload_max_queue_chunks_m >= queue_chunks_count );
     VkSemaphore chunk_semaphores_array[xg_vk_workload_max_queue_chunks_m];
+    xg_queue_event_h chunk_semaphores_handles_array[xg_vk_workload_max_queue_chunks_m];
     VkPipelineStageFlags chunk_semaphores_stages[xg_vk_workload_max_queue_chunks_m];
 
     bool first_graphics_chunk = true;
@@ -1591,6 +1783,7 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
         context->events_array[context->events_count++] = chunk_complete_event_handle;
         const xg_vk_gpu_queue_event_t* chunk_complete_event = xg_vk_gpu_queue_event_get ( chunk_complete_event_handle );
         chunk_semaphores_array[queue_chunk_it] = chunk_complete_event->vk_semaphore;
+        chunk_semaphores_handles_array[queue_chunk_it] = chunk_complete_event_handle;
         chunk_semaphores_stages[queue_chunk_it] = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
         //}
 
@@ -1602,6 +1795,7 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
             const xg_vk_gpu_queue_event_t* event = xg_vk_gpu_queue_event_get ( queue_chunk.wait_events[i] );
             wait_semaphores[i] = event->vk_semaphore;
             wait_stages[i] = xg_pipeline_stage_to_vk ( queue_chunk.wait_stages[i] );
+            xg_gpu_queue_event_log_wait ( queue_chunk.wait_events[i] );
         }
 
 #if !xg_debug_enable_disable_semaphore_frame_sync_m
@@ -1620,9 +1814,11 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
         VkSemaphore signal_semaphores[2];
         uint32_t signal_count = 0;
         signal_semaphores[signal_count++] = chunk_complete_event->vk_semaphore;
+        xg_gpu_queue_event_log_signal ( chunk_complete_event_handle );
         if ( queue_chunk.signal_event != xg_null_handle_m ) {
             const xg_vk_gpu_queue_event_t* event = xg_vk_gpu_queue_event_get ( queue_chunk.signal_event );
             signal_semaphores[signal_count++] = event->vk_semaphore;
+            xg_gpu_queue_event_log_signal ( queue_chunk.signal_event );
         }
 
         VkSubmitInfo submit_info = {
@@ -1641,11 +1837,25 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
 
         const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
         VkResult result = vkQueueSubmit ( device->queues[queue_chunk.queue].vk_handle, 1, &submit_info, submit_fence );
-        std_verify_m ( result == VK_SUCCESS );
+
+        if ( result == VK_ERROR_DEVICE_LOST ) {
+            xg_vk_workload_log_device_lost ( workload->device );
+        } else {
+            std_verify_m ( result == VK_SUCCESS );
+        }
 
 #if xg_debug_enable_flush_gpu_submissions_m || xg_debug_enable_disable_semaphore_frame_sync_m
         result = vkQueueWaitIdle ( device->queues[queue_chunk.queue].vk_handle );
+        if ( result == VK_ERROR_DEVICE_LOST ) {
+            xg_vk_workload_log_device_lost ( workload->device );
+        } else {
+            std_verify_m ( result == VK_SUCCESS );
+        }
 #endif
+    }
+
+    for ( uint32_t i = 0; i < queue_chunks_count; ++i ) {
+        xg_gpu_queue_event_log_wait ( chunk_semaphores_handles_array[i] );
     }
 
     {
@@ -3776,9 +3986,9 @@ static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_c
 
         if ( fence_status == VK_TIMEOUT ) {
             break;
-        }
-
-        if ( fence_status == VK_ERROR_OUT_OF_HOST_MEMORY || fence_status == VK_ERROR_OUT_OF_DEVICE_MEMORY || fence_status == VK_ERROR_DEVICE_LOST ) {
+        } else if ( fence_status == VK_ERROR_DEVICE_LOST ) {
+            xg_vk_workload_log_device_lost ( device_handle );
+        } else if ( fence_status == VK_ERROR_OUT_OF_HOST_MEMORY || fence_status == VK_ERROR_OUT_OF_DEVICE_MEMORY  ) {
             std_log_error_m ( "Workload fence returned an error" );
         }
 
@@ -3912,6 +4122,9 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
 
     // merge & sort
     xg_vk_workload_cmd_sort_result_t sort_result = xg_vk_workload_sort_cmd_buffers ( &workload_context->sort, workload_handle );
+
+    // debug print
+    //xg_vk_workload_debug_print_cmd_headers ( sort_result.cmd_headers, sort_result.count );
 
     // chunk
     xg_vk_workload_cmd_chunk_result_t chunk_result = xg_vk_workload_chunk_cmd_headers ( &workload_context->chunk, sort_result.cmd_headers, sort_result.count );
