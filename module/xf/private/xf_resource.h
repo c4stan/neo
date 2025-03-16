@@ -175,10 +175,9 @@ typedef struct {
     xg_texture_h handle;
     uint32_t ref_count;
     xg_texture_info_t info;
-    char debug_name[xf_debug_name_size_m];
     union {
         xf_texture_state_t shared;
-        xf_texture_state_t mips[16]; // TODO make storage external?
+        xf_texture_state_t mips[xf_resource_max_mip_levels_m]; // TODO make storage external?
         // TODO external hash table to support dynamic view access
         // OR   dyn alloc from shared big T buffer as many as you need, no waste
     } state;
@@ -188,7 +187,6 @@ typedef struct {
     .is_external = false, \
     .handle = xg_null_handle_m, \
     .info = { 0 }, \
-    .debug_name = "", \
     .ref_count = 0, \
     .state.mips = { [0 ... 15] = xf_texture_state_m() }, \
     ##__VA_ARGS__ \

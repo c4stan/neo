@@ -26,6 +26,7 @@ xf_resource_max_multi_buffers_m         32
 xf_resource_multi_texture_max_textures_m    4
 xf_resource_multi_buffer_max_buffers_m      4
 xf_resource_max_device_textures_m       64
+xf_resource_max_mip_levels_m            16
 
 xf_graph_max_graphs_m                   8
 xf_graph_max_nodes_m                    128

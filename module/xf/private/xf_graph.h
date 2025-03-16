@@ -88,6 +88,7 @@ typedef enum {
 typedef struct {
     xf_node_h node;
     uint32_t resource_idx; // indexes node resources_array
+    // TODO specify subresource too here?
 } xf_graph_resource_access_t;
 
 #define xf_graph_resource_access_m( ... ) ( xf_graph_resource_access_t ) { \
@@ -96,15 +97,21 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
-// Stores what kind of access the graph nodes do on a (sub) resource
-// Filled when adding nodes to a graph and never updated after
 typedef struct {
     xf_graph_resource_access_t array[xf_graph_max_nodes_m];
     uint32_t count;
+} xf_graph_subresource_dependencies_t;
+
+// Stores what kind of access the graph nodes do on a (sub) resource
+// Filled when adding nodes to a graph and never updated after
+typedef struct {
+    xf_graph_subresource_dependencies_t* subresources;
+    uint32_t subresource_count;
 } xf_graph_resource_dependencies_t;
 
 #define xf_graph_resource_dependencies_m( ... ) ( xf_graph_resource_dependencies_t ) { \
-    .count = 0, \
+    .subresources = NULL, \
+    .subresource_count = 0, \
     ##__VA_ARGS__ \
 }
 
@@ -112,15 +119,12 @@ typedef uint64_t xf_graph_device_texture_h;
 
 typedef struct {
     xf_device_texture_h handle;
-    union {
-        xf_graph_resource_dependencies_t shared;
-        xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
-    } deps;
+    xf_graph_resource_dependencies_t dependencies;
 } xf_graph_device_texture_t;
 
 #define xf_graph_device_texture_m( ... ) ( xf_graph_device_texture_t ) { \
     .handle = xf_null_handle_m, \
-    .deps.mips = { [0 ... 15] = xf_graph_resource_dependencies_m() }, \
+    .dependencies = xf_graph_resource_dependencies_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -139,11 +143,12 @@ typedef struct {
     xf_texture_h handle;
     xf_graph_device_texture_h device_texture_handle;
     xf_graph_resource_lifespan_t lifespan;
-    union {
-        xf_graph_resource_dependencies_t shared;
-        xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
-        // TODO external hash table to support dynamic view access
-    } deps;
+    //union {
+    //    xf_graph_resource_dependencies_t shared;
+    //    xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
+    //    // TODO external hash table to support dynamic view access
+    //} deps;
+    xf_graph_resource_dependencies_t dependencies;
     // cached from underlying texture
     xg_texture_view_access_e view_access;
     uint32_t mip_levels;
@@ -152,7 +157,7 @@ typedef struct {
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
     .handle = xf_null_handle_m, \
     .lifespan = xf_graph_resource_lifespan_m(), \
-    .deps.mips = { [0 ... 15] = xf_graph_resource_dependencies_m() }, \
+    .dependencies = xf_graph_resource_dependencies_m(), \
     .view_access = xg_texture_view_access_invalid_m, \
     ##__VA_ARGS__ \
 }
@@ -160,13 +165,13 @@ typedef struct {
 typedef struct {
     xf_buffer_h handle;
     xf_graph_resource_lifespan_t lifespan;
-    xf_graph_resource_dependencies_t deps;
+    xf_graph_resource_dependencies_t dependencies;
 } xf_graph_buffer_t;
 
 #define xf_graph_buffer_m( ... ) ( xf_graph_buffer_t ) { \
     .handle = xf_null_handle_m, \
     .lifespan = xf_graph_resource_lifespan_m(), \
-    .deps = xf_graph_resource_dependencies_m(), \
+    .dependencies = xf_graph_resource_dependencies_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -360,6 +365,9 @@ typedef struct {
 
     xf_graph_segment_t segments_array[xf_graph_max_nodes_m];
     uint32_t segments_count;
+
+    std_virtual_stack_t resource_dependencies_allocator;
+    std_virtual_stack_t device_resource_dependencies_allocator;
 } xf_graph_t;
 
 typedef struct {
