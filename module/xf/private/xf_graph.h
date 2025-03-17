@@ -115,14 +115,14 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
-typedef uint64_t xf_graph_device_texture_h;
+typedef uint64_t xf_graph_physical_texture_h;
 
 typedef struct {
-    xf_device_texture_h handle;
+    xf_physical_texture_h handle;
     xf_graph_resource_dependencies_t dependencies;
-} xf_graph_device_texture_t;
+} xf_graph_physical_texture_t;
 
-#define xf_graph_device_texture_m( ... ) ( xf_graph_device_texture_t ) { \
+#define xf_graph_physical_texture_m( ... ) ( xf_graph_physical_texture_t ) { \
     .handle = xf_null_handle_m, \
     .dependencies = xf_graph_resource_dependencies_m(), \
     ##__VA_ARGS__ \
@@ -141,7 +141,7 @@ typedef struct {
 
 typedef struct {
     xf_texture_h handle;
-    xf_graph_device_texture_h device_texture_handle;
+    xf_graph_physical_texture_h physical_texture_handle;
     xf_graph_resource_lifespan_t lifespan;
     //union {
     //    xf_graph_resource_dependencies_t shared;
@@ -150,15 +150,12 @@ typedef struct {
     //} deps;
     xf_graph_resource_dependencies_t dependencies;
     // cached from underlying texture
-    xg_texture_view_access_e view_access;
-    uint32_t mip_levels;
 } xf_graph_texture_t;
 
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
     .handle = xf_null_handle_m, \
     .lifespan = xf_graph_resource_lifespan_m(), \
     .dependencies = xf_graph_resource_dependencies_m(), \
-    .view_access = xg_texture_view_access_invalid_m, \
     ##__VA_ARGS__ \
 }
 
@@ -177,7 +174,7 @@ typedef struct {
 
 typedef struct {
     xg_memory_h memory_handle;
-    xf_device_texture_h textures_array[xf_graph_max_textures_m];
+    xf_physical_texture_h textures_array[xf_graph_max_textures_m];
     uint32_t textures_count;
 } xf_graph_memory_heap_t;
 
@@ -278,7 +275,7 @@ typedef struct {
 
 typedef struct {
     xf_buffer_execution_state_t state;
-    xf_buffer_h buffer; // TODO device buffer
+    xf_buffer_h buffer; // TODO physical buffer
 } xf_graph_buffer_transition_t;
 
 #define xf_graph_buffer_transition_m( ... ) ( xf_graph_buffer_transition_t ) { \
@@ -341,8 +338,8 @@ typedef struct {
     uint32_t textures_count;
     uint32_t buffers_count;
 
-    xf_graph_device_texture_t device_textures_array[xf_graph_max_textures_m];
-    uint32_t device_textures_count;
+    xf_graph_physical_texture_t physical_textures_array[xf_graph_max_textures_m];
+    uint32_t physical_textures_count;
 
     uint32_t multi_textures_array[xf_graph_max_multi_textures_m]; // indexes textures_array
     uint32_t multi_textures_count;
@@ -367,7 +364,7 @@ typedef struct {
     uint32_t segments_count;
 
     std_virtual_stack_t resource_dependencies_allocator;
-    std_virtual_stack_t device_resource_dependencies_allocator;
+    std_virtual_stack_t physical_resource_dependencies_allocator;
 } xf_graph_t;
 
 typedef struct {

@@ -33,10 +33,10 @@ void xf_resource_load ( xf_resource_state_t* state ) {
     state->multi_textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_multi_textures_m ) );
     std_mem_zero_array_m ( state->multi_textures_bitset, std_bitset_u64_count_m ( xf_resource_max_multi_textures_m ) );
 
-    state->device_textures_array = std_virtual_heap_alloc_array_m ( xf_device_texture_t, xf_resource_max_device_textures_m );
-    state->device_textures_freelist = std_freelist_m ( state->device_textures_array, xf_resource_max_device_textures_m );
-    state->device_textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_device_textures_m ) );
-    std_mem_zero_array_m ( state->device_textures_bitset, std_bitset_u64_count_m ( xf_resource_max_device_textures_m ) );
+    state->physical_textures_array = std_virtual_heap_alloc_array_m ( xf_physical_texture_t, xf_resource_max_physical_textures_m );
+    state->physical_textures_freelist = std_freelist_m ( state->physical_textures_array, xf_resource_max_physical_textures_m );
+    state->physical_textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xf_resource_max_physical_textures_m ) );
+    std_mem_zero_array_m ( state->physical_textures_bitset, std_bitset_u64_count_m ( xf_resource_max_physical_textures_m ) );
 
     xf_resource_state = state;
 }
@@ -49,10 +49,10 @@ void xf_resource_unload ( void ) {
     uint64_t idx;
 
     idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->device_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_device_textures_m ) ) ) {
-        xf_device_texture_t* texture = &xf_resource_state->device_textures_array[idx];
-        std_log_info_m ( "Destroying device texture " std_fmt_u64_m ": " std_fmt_str_m, texture->info.debug_name );
-        xf_resource_device_texture_destroy ( idx );
+    while ( std_bitset_scan ( &idx, xf_resource_state->physical_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_physical_textures_m ) ) ) {
+        xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[idx];
+        std_log_info_m ( "Destroying physical texture " std_fmt_u64_m ": " std_fmt_str_m, texture->info.debug_name );
+        xf_resource_physical_texture_destroy ( idx );
         ++idx;
     }
 
@@ -92,12 +92,12 @@ void xf_resource_unload ( void ) {
     std_virtual_heap_free ( xf_resource_state->textures_array );
     std_virtual_heap_free ( xf_resource_state->multi_textures_array );
     std_virtual_heap_free ( xf_resource_state->multi_buffers_array );
-    std_virtual_heap_free ( xf_resource_state->device_textures_array );
+    std_virtual_heap_free ( xf_resource_state->physical_textures_array );
     std_virtual_heap_free ( xf_resource_state->buffers_bitset );
     std_virtual_heap_free ( xf_resource_state->textures_bitset );
     std_virtual_heap_free ( xf_resource_state->multi_textures_bitset );
     std_virtual_heap_free ( xf_resource_state->multi_buffers_bitset );
-    std_virtual_heap_free ( xf_resource_state->device_textures_bitset );
+    std_virtual_heap_free ( xf_resource_state->physical_textures_bitset );
 }
 
 // ======================================================================================= //
@@ -175,10 +175,10 @@ xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture_handle 
     }
 }
 
-xf_device_texture_t* xf_resource_texture_get_device_texture ( xf_texture_h handle ) {
+xf_physical_texture_t* xf_resource_texture_get_physical_texture ( xf_texture_h handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( handle );
-    if ( texture->device_texture_handle != xf_null_handle_m ) {
-        return xf_resource_device_texture_get ( texture->device_texture_handle );
+    if ( texture->physical_texture_handle != xf_null_handle_m ) {
+        return xf_resource_physical_texture_get ( texture->physical_texture_handle );
     } else {
         return NULL;
     }
@@ -198,8 +198,8 @@ void xf_resource_texture_update_info ( xf_texture_h texture_handle, const xg_tex
     //texture->allowed_usage = info->allowed_usage;
 }
 
-static void xf_resource_device_texture_set_execution_state ( xf_device_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
-    xf_device_texture_t* texture = xf_resource_device_texture_get ( texture_handle );
+static void xf_resource_physical_texture_set_execution_state ( xf_physical_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
         //if ( texture->state.shared.execution.queue == xg_cmd_queue_invalid_m ) {
@@ -243,8 +243,8 @@ static void xf_resource_device_texture_set_execution_state ( xf_device_texture_h
     }
 }
 
-static void xf_resource_device_texture_set_execution_layout ( xf_device_texture_h texture_handle, xg_texture_view_t view, xg_texture_layout_e layout ) {
-    xf_device_texture_t* texture = xf_resource_device_texture_get ( texture_handle );
+static void xf_resource_physical_texture_set_execution_layout ( xf_physical_texture_h texture_handle, xg_texture_view_t view, xg_texture_layout_e layout ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
         texture->state.shared.execution.layout = layout;
@@ -265,8 +265,8 @@ static void xf_resource_device_texture_set_execution_layout ( xf_device_texture_
     }
 }
 
-static void xf_resource_device_texture_add_execution_stage ( xf_device_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
-    xf_device_texture_t* texture = xf_resource_device_texture_get ( texture_handle );
+static void xf_resource_physical_texture_add_execution_stage ( xf_physical_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
         texture->state.shared.execution.stage |= stage;
@@ -319,23 +319,23 @@ xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture 
     std_str_copy_static_m ( texture_params.debug_name, info.debug_name );
     xf_texture_h texture_handle = xf_resource_texture_create ( &texture_params );
 
-    xf_device_texture_params_t device_texture_params = xf_device_texture_params_m (
+    xf_physical_texture_params_t physical_texture_params = xf_physical_texture_params_m (
         .is_external = true,
         .handle = xg_texture,
         .info = info,
     );
-    xf_device_texture_h device_texture_handle = xf_resource_device_texture_create ( &device_texture_params );
+    xf_physical_texture_h physical_texture_handle = xf_resource_physical_texture_create ( &physical_texture_params );
 
-    // TODO remove, keep info in device texture only
+    // TODO remove, keep info in physical texture only
     xf_resource_texture_update_info ( texture_handle, &info );
-    xf_resource_texture_bind ( texture_handle, device_texture_handle );
+    xf_resource_texture_bind ( texture_handle, physical_texture_handle );
 
     return texture_handle;
 }
 
 // TODO try using VkEvents instead of barriers?
-static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_h device_texture_handle, xg_texture_view_t view, const xf_texture_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
-    xf_device_texture_t* device_texture = xf_resource_device_texture_get ( device_texture_handle );
+static void xf_resource_texture_barrier ( std_stack_t* stack, xf_physical_texture_h physical_texture_handle, xg_texture_view_t view, const xf_texture_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
+    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
 
     /*
         if same layout as previous and both are reads, no barrier needed, just accumulate the stage in the resource state
@@ -348,7 +348,7 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
         if ( prev_state->execution.layout != new_state->layout ) {
             std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
             *barrier = xg_texture_memory_barrier_m (
-                .texture = device_texture->handle,
+                .texture = physical_texture->handle,
                 .mip_base = view.mip_base,
                 .mip_count = view.mip_count,
                 .array_base = view.array_base,
@@ -363,10 +363,10 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
                 .queue.new = new_state->queue,
             );
 
-            xf_resource_device_texture_set_execution_layout ( device_texture_handle, view, new_state->layout );
+            xf_resource_physical_texture_set_execution_layout ( physical_texture_handle, view, new_state->layout );
         }
 
-        xf_resource_device_texture_add_execution_stage ( device_texture_handle, view, new_state->stage );
+        xf_resource_physical_texture_add_execution_stage ( physical_texture_handle, view, new_state->stage );
     } else {
         xg_cmd_queue_e prev_queue = prev_state->execution.queue;
         if ( prev_state->queue_transition ) {
@@ -376,7 +376,7 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
         // wait on previous access and update the resource state
         std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
         *barrier = xg_texture_memory_barrier_m (
-            .texture = device_texture->handle,
+            .texture = physical_texture->handle,
             .mip_base = view.mip_base,
             .mip_count = view.mip_count,
             .array_base = view.array_base,
@@ -391,7 +391,7 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_device_texture_
             .queue.new = new_state->queue,
         );
 
-        xf_resource_device_texture_set_execution_state ( device_texture_handle, view, new_state );
+        xf_resource_physical_texture_set_execution_state ( physical_texture_handle, view, new_state );
     }
 }
 
@@ -400,25 +400,25 @@ void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h textur
     if ( std_str_cmp ( texture->params.debug_name, "depth_stencil_texture(1)" ) == 0 ) {
         //std_debug_break();
     }
-    xf_device_texture_h device_texture_handle = texture->device_texture_handle;
-    xf_resource_device_texture_state_barrier ( stack, device_texture_handle, view, new_state );
+    xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
+    xf_resource_physical_texture_state_barrier ( stack, physical_texture_handle, view, new_state );
 }
 
-void xf_resource_device_texture_state_barrier ( std_stack_t* stack, xf_device_texture_h device_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
-    xf_device_texture_t* device_texture = xf_resource_device_texture_get ( device_texture_handle );
+void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physical_texture_h physical_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
+    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
 
-    if ( device_texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        xf_texture_state_t* old_state = &device_texture->state.shared;
-        xf_resource_texture_barrier ( stack, device_texture_handle, view, old_state, new_state );
-    } else if ( device_texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? device_texture->info.mip_levels : view.mip_count;
+    if ( physical_texture->info.view_access == xg_texture_view_access_default_only_m ) {
+        xf_texture_state_t* old_state = &physical_texture->state.shared;
+        xf_resource_texture_barrier ( stack, physical_texture_handle, view, old_state, new_state );
+    } else if ( physical_texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
+        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? physical_texture->info.mip_levels : view.mip_count;
 
         for ( uint32_t i = 0; i < mip_count; ++i ) {
-            xf_texture_state_t* old_state = &device_texture->state.mips[view.mip_base + i];
+            xf_texture_state_t* old_state = &physical_texture->state.mips[view.mip_base + i];
             xg_texture_view_t mip_view = view;
             mip_view.mip_base = view.mip_base + i;
             mip_view.mip_count = 1;
-            xf_resource_texture_barrier ( stack, device_texture_handle, mip_view, old_state, new_state );
+            xf_resource_texture_barrier ( stack, physical_texture_handle, mip_view, old_state, new_state );
         }
     } else {
         std_not_implemented_m();
@@ -464,17 +464,22 @@ void xf_resource_texture_remove_ref ( xf_texture_h handle ) {
     }
 }
 
-void xf_resource_texture_bind ( xf_texture_h texture_handle, xf_device_texture_h device_texture_handle ) {
+void xf_resource_texture_bind ( xf_texture_h texture_handle, xf_physical_texture_h physical_texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    texture->device_texture_handle = device_texture_handle;
-    xf_resource_device_texture_add_ref ( device_texture_handle );
+    texture->physical_texture_handle = physical_texture_handle;
+    xf_resource_physical_texture_add_ref ( physical_texture_handle );
 }
 
 void xf_resource_texture_unbind ( xf_texture_h texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    xf_device_texture_h device_texture_handle = texture->device_texture_handle;
-    xf_resource_device_texture_remove_ref ( device_texture_handle );
-    texture->device_texture_handle = xg_null_handle_m;
+    xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
+    xf_resource_physical_texture_remove_ref ( physical_texture_handle );
+    texture->physical_texture_handle = xg_null_handle_m;
+}
+
+bool xf_resource_texture_is_depth ( xf_texture_h texture_handle ) {
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    return xg_format_has_depth ( texture->params.format );
 }
 
 // ======================================================================================= //
@@ -727,14 +732,14 @@ xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h sw
         xg_texture_info_t texture_info;
         xg->get_texture_info ( &texture_info, info.textures[i] );
 
-        xf_device_texture_h device_texture_handle = xf_resource_device_texture_create ( &xf_device_texture_params_m ( 
+        xf_physical_texture_h physical_texture_handle = xf_resource_physical_texture_create ( &xf_physical_texture_params_m ( 
             .is_external = true, 
             .handle = info.textures[i],
             .info = texture_info
         ) );
 
         xf_texture_h texture_handle = xf_resource_texture_create ( &params.texture );
-        xf_resource_texture_bind ( texture_handle, device_texture_handle );
+        xf_resource_texture_bind ( texture_handle, physical_texture_handle );
         xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
         texture->is_multi = true;
         texture->ref_count = 1;
@@ -755,7 +760,6 @@ xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h sw
 }
 
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture_handle ) {
-    // TODO should this take aliasing into account?
     std_assert_m ( xf_resource_handle_is_multi_m ( multi_texture_handle ) );
     xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[xf_resource_handle_multi_idx_m ( multi_texture_handle )];
     multi_texture->index = ( multi_texture->index + 1 ) % multi_texture->params.multi_texture_count;
@@ -807,8 +811,8 @@ void xf_resource_swapchain_resize ( xf_texture_h swapchain ) {
     xf_multi_texture_t* multi_texture = xf_resource_multi_texture_get_multi ( swapchain );
 
     for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
-        xf_device_texture_t* device_texture = xf_resource_texture_get_device_texture ( multi_texture->textures[i] );
-        device_texture->state.shared.execution.layout = xg_texture_layout_undefined_m;
+        xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( multi_texture->textures[i] );
+        physical_texture->state.shared.execution.layout = xg_texture_layout_undefined_m;
     }
 }
 
@@ -816,47 +820,47 @@ void xf_resource_swapchain_resize ( xf_texture_h swapchain ) {
 //                               D E V I C E   T E X T U R E
 // ======================================================================================= //
 
-xf_device_texture_h xf_resource_device_texture_create ( const xf_device_texture_params_t* params ) {
-    xf_device_texture_t* texture = std_list_pop_m ( &xf_resource_state->device_textures_freelist );
-    *texture = xf_device_texture_m (
+xf_physical_texture_h xf_resource_physical_texture_create ( const xf_physical_texture_params_t* params ) {
+    xf_physical_texture_t* texture = std_list_pop_m ( &xf_resource_state->physical_textures_freelist );
+    *texture = xf_physical_texture_m (
         .is_external = params->is_external,
         .handle = params->handle,
         .info = params->info,
     );
-    xf_device_texture_h handle = texture - xf_resource_state->device_textures_array;
-    std_bitset_set ( xf_resource_state->device_textures_bitset, handle );
+    xf_physical_texture_h handle = texture - xf_resource_state->physical_textures_array;
+    std_bitset_set ( xf_resource_state->physical_textures_bitset, handle );
     return handle;
 }
 
-void xf_resource_device_texture_destroy ( xf_device_texture_h handle ) {
-    xf_device_texture_t* texture = &xf_resource_state->device_textures_array[handle];
-    std_list_push ( &xf_resource_state->device_textures_freelist, texture );
-    std_bitset_clear ( xf_resource_state->device_textures_bitset, handle );
+void xf_resource_physical_texture_destroy ( xf_physical_texture_h handle ) {
+    xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
+    std_list_push ( &xf_resource_state->physical_textures_freelist, texture );
+    std_bitset_clear ( xf_resource_state->physical_textures_bitset, handle );
 }
 
-void xf_resource_device_texture_add_ref ( xf_device_texture_h handle ) {
-    xf_device_texture_t* texture = &xf_resource_state->device_textures_array[handle];
+void xf_resource_physical_texture_add_ref ( xf_physical_texture_h handle ) {
+    xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
     texture->ref_count += 1;
 }
 
-void xf_resource_device_texture_remove_ref ( xf_device_texture_h handle ) {
-    xf_device_texture_t* texture = &xf_resource_state->device_textures_array[handle];
+void xf_resource_physical_texture_remove_ref ( xf_physical_texture_h handle ) {
+    xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
     uint32_t ref_count = texture->ref_count;
     if ( ref_count > 1 ) {
         texture->ref_count = ref_count - 1;
     } else {
         texture->ref_count = 0;
-        //xf_resource_device_texture_destroy ( handle );
+        //xf_resource_physical_texture_destroy ( handle );
     }
 }
 
-xf_device_texture_t* xf_resource_device_texture_get ( xf_device_texture_h handle ) {
-    xf_device_texture_t* texture = &xf_resource_state->device_textures_array[handle];
+xf_physical_texture_t* xf_resource_physical_texture_get ( xf_physical_texture_h handle ) {
+    xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
     return texture;
 }
 
-void xf_resource_device_texture_map_to_new ( xf_device_texture_h device_texture_handle, xg_texture_h xg_handle, const xg_texture_info_t* info ) {
-    xf_device_texture_t* texture = xf_resource_device_texture_get ( device_texture_handle );
+void xf_resource_physical_texture_map_to_new ( xf_physical_texture_h physical_texture_handle, xg_texture_h xg_handle, const xg_texture_info_t* info ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( physical_texture_handle );
     texture->handle = xg_handle;
     texture->info = *info;
     texture->state.shared = xf_texture_state_m(); // TODO take as param, don't assume shared
@@ -868,13 +872,13 @@ void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resou
     uint64_t idx;
 
     idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->device_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_device_textures_m ) ) ) {
-        xf_device_texture_t* texture = &xf_resource_state->device_textures_array[idx];
+    while ( std_bitset_scan ( &idx, xf_resource_state->physical_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_physical_textures_m ) ) ) {
+        xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[idx];
         if ( texture->ref_count == 0 ) {
             if ( texture->handle != xg_null_handle_m && !texture->is_external ) {
                 xg->cmd_destroy_texture ( resource_cmd_buffer, texture->handle, time );
             }
-            xf_resource_device_texture_destroy ( idx );
+            xf_resource_physical_texture_destroy ( idx );
         }
         ++idx;
     }
