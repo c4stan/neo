@@ -1,0 +1,23 @@
+vertex_shader geometry_simple.vert
+fragment_shader object_id.frag
+
+include common_graphics.xsi
+include depth_write_d32.xsi
+
+begin render_target 0 // x: object id
+    format R8_UINT
+end
+
+begin input 0
+    pos R32G32B32_FLOAT
+end
+
+begin buffer
+    stage vertex
+    register 0
+end
+
+begin buffer
+    stage fragment
+    register 1
+end
