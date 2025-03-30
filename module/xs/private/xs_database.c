@@ -544,7 +544,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 fs->close_file ( bytecode_file );
                 #else
                 bytecode->stage = stage;
-                bytecode->buffer = std_virtual_heap_read_file ( binary_path );
+                bytecode->buffer = std_file_read_to_virtual_heap ( binary_path );
                 #endif
                 //}
             }

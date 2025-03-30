@@ -51,7 +51,7 @@ void xf_resource_unload ( void ) {
     idx = 0;
     while ( std_bitset_scan ( &idx, xf_resource_state->physical_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_physical_textures_m ) ) ) {
         xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[idx];
-        std_log_info_m ( "Destroying physical texture " std_fmt_u64_m ": " std_fmt_str_m, texture->info.debug_name );
+        std_log_info_m ( "Destroying physical texture " std_fmt_u64_m ": " std_fmt_str_m, idx, texture->info.debug_name );
         xf_resource_physical_texture_destroy ( idx );
         ++idx;
     }
@@ -59,7 +59,7 @@ void xf_resource_unload ( void ) {
     idx = 0;
     while ( std_bitset_scan ( &idx, xf_resource_state->textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_textures_m ) ) ) {
         xf_texture_t* texture = &xf_resource_state->textures_array[idx];
-        std_log_info_m ( "Destroying texture " std_fmt_u64_m ": " std_fmt_str_m, texture->params.debug_name );
+        std_log_info_m ( "Destroying texture " std_fmt_u64_m ": " std_fmt_str_m, idx, texture->params.debug_name );
         xf_resource_texture_destroy ( idx );
         ++idx;
     }
@@ -67,7 +67,7 @@ void xf_resource_unload ( void ) {
     idx = 0;
     while ( std_bitset_scan ( &idx, xf_resource_state->buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_buffers_m ) ) ) {
         xf_buffer_t* buffer = &xf_resource_state->buffers_array[idx];
-        std_log_info_m ( "Destroying buffer " std_fmt_u64_m ": " std_fmt_str_m, buffer->params.debug_name );
+        std_log_info_m ( "Destroying buffer " std_fmt_u64_m ": " std_fmt_str_m, idx, buffer->params.debug_name );
         xf_resource_buffer_destroy ( idx );
         ++idx;
     }
@@ -75,7 +75,7 @@ void xf_resource_unload ( void ) {
     idx = 0;
     while ( std_bitset_scan ( &idx, xf_resource_state->multi_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_textures_m ) ) ) {
         xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[idx];
-        std_log_info_m ( "Destroying multi texture " std_fmt_u64_m ": " std_fmt_str_m, multi_texture->params.texture.debug_name );
+        std_log_info_m ( "Destroying multi texture " std_fmt_u64_m ": " std_fmt_str_m, idx, multi_texture->params.texture.debug_name );
         xf_resource_texture_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
         ++idx;
     }
@@ -83,7 +83,7 @@ void xf_resource_unload ( void ) {
     idx = 0;
     while ( std_bitset_scan ( &idx, xf_resource_state->multi_buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_buffers_m ) ) ) {
         xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[idx];
-        std_log_info_m ( "Destroying multi buffer " std_fmt_u64_m ": " std_fmt_str_m, multi_buffer->params.buffer.debug_name );
+        std_log_info_m ( "Destroying multi buffer " std_fmt_u64_m ": " std_fmt_str_m, idx, multi_buffer->params.buffer.debug_name );
         xf_resource_buffer_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
         ++idx;
     }
@@ -473,8 +473,11 @@ void xf_resource_texture_bind ( xf_texture_h texture_handle, xf_physical_texture
 void xf_resource_texture_unbind ( xf_texture_h texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
+    //xf_physical_texture_t* physical_texture = &xf_resource_state->physical_textures_array[physical_texture_handle];
+    //if ( !physical_texture->is_external ) {
     xf_resource_physical_texture_remove_ref ( physical_texture_handle );
-    texture->physical_texture_handle = xg_null_handle_m;
+    texture->physical_texture_handle = xf_null_handle_m;
+    //}
 }
 
 bool xf_resource_texture_is_depth ( xf_texture_h texture_handle ) {

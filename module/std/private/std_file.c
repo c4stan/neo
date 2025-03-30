@@ -416,16 +416,18 @@ bool std_path_info ( std_path_info_t* info, const char* path ) {
         return false;
     }
 
-    uint64_t creation_time = ( uint64_t ) data.ftCreationTime.dwHighDateTime << 32 | data.ftCreationTime.dwLowDateTime;
-    std_filetime_to_timestamp ( creation_time, &info->creation_time );
-    info->flags = 0;
+    if ( info ) {
+        uint64_t creation_time = ( uint64_t ) data.ftCreationTime.dwHighDateTime << 32 | data.ftCreationTime.dwLowDateTime;
+        std_filetime_to_timestamp ( creation_time, &info->creation_time );
+        info->flags = 0;
 
-    if ( data.dwFileAttributes & INVALID_FILE_ATTRIBUTES ) {
-        info->flags |= std_path_non_existent_m;
-    } else if ( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
-        info->flags |= std_path_is_directory_m;
-    } else {
-        info->flags |= std_path_is_file_m;
+        if ( data.dwFileAttributes & INVALID_FILE_ATTRIBUTES ) {
+            info->flags |= std_path_non_existent_m;
+        } else if ( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
+            info->flags |= std_path_is_directory_m;
+        } else {
+            info->flags |= std_path_is_file_m;
+        }
     }
 
     return true;
@@ -437,15 +439,17 @@ bool std_path_info ( std_path_info_t* info, const char* path ) {
         return false;
     }
 
-    info->creation_time.count = 0;
-    info->flags = 0;
+    if ( info ) {
+        info->creation_time.count = 0;
+        info->flags = 0;
 
-    if ( stat_result == -1 && errno == ENOENT ) {
-        info->flags |= std_path_non_existent_m;
-    } else if ( S_ISREG ( stat_info.st_mode ) ) {
-        info->flags |= std_path_is_file_m;
-    } else if ( S_ISDIR ( stat_info.st_mode ) ) {
-        info->flags |= std_path_is_directory_m;
+        if ( stat_result == -1 && errno == ENOENT ) {
+            info->flags |= std_path_non_existent_m;
+        } else if ( S_ISREG ( stat_info.st_mode ) ) {
+            info->flags |= std_path_is_file_m;
+        } else if ( S_ISDIR ( stat_info.st_mode ) ) {
+            info->flags |= std_path_is_directory_m;
+        }
     }
 
     return true;
@@ -1100,6 +1104,7 @@ std_file_h std_file_open ( const char* path, std_file_access_t access ) {
     HANDLE h = CreateFile ( path, os_access, os_sharemode, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
     if ( h == INVALID_HANDLE_VALUE ) {
+        std_log_os_error_m();
         return std_file_null_handle_m;
     }
 
@@ -1414,6 +1419,10 @@ bool std_file_info ( std_file_info_t* info, std_file_h file ) {
 }
 
 bool std_file_path_info ( std_file_info_t* info, const char* path ) {
+    if ( !std_path_info ( NULL, path ) ) {
+        return false;
+    }
+
     std_file_h file = std_file_open ( path, std_file_read_m );
 
     if ( file == std_file_null_handle_m ) {
@@ -1456,8 +1465,7 @@ size_t std_file_path ( char* path, size_t cap, std_file_h file ) {
 #endif
 }
 
-#if 0
-std_buffer_t std_file_path_read_alloc ( const char* path ) {
+std_buffer_t std_file_read_to_virtual_heap ( const char* path ) {
     std_file_h file = std_file_open ( path, std_file_read_m );
     std_file_info_t file_info;
     bool valid_info = std_file_info ( &file_info, file );
@@ -1465,7 +1473,7 @@ std_buffer_t std_file_path_read_alloc ( const char* path ) {
         return std_null_buffer_m;
     }
 
-    void* buffer = std_virtual_heap_alloc ( file_info.size, 16 );
+    void* buffer = std_virtual_heap_alloc_m ( file_info.size, 16 );
     uint64_t read_size = std_file_read ( buffer, file_info.size, file );
     if ( read_size == std_file_read_error_m ) {
         return std_null_buffer_m;
@@ -1475,4 +1483,3 @@ std_buffer_t std_file_path_read_alloc ( const char* path ) {
     std_file_close ( file );
     return std_buffer ( buffer, file_info.size );
 }
-#endif

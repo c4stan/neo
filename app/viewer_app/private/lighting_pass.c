@@ -89,7 +89,7 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     }
 
     // Null light (radius == 0) at the end needed by the light cull pass
-    light_data->lights[light_count] = ( uniform_light_data_t ) {};
+    light_data->lights[light_count] = ( uniform_light_data_t ) { 0 };
 
     xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( .source = upload_buffer, .destination = light_buffer ) );
 }

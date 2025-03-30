@@ -16,7 +16,6 @@ void xi_workload_load ( xi_workload_state_t* state ) {
     xi_workload_state->workloads_array = std_virtual_heap_alloc_array_m ( xi_workload_t, xi_workload_max_workloads_m );
     xi_workload_state->workloads_freelist = std_freelist_m ( xi_workload_state->workloads_array, xi_workload_max_workloads_m );
     xi_workload_state->workloads_count = 0;
-    xi_workload_state->scissor_count = 0;
 
     // TODO have xg provide some default null textures, similar to default samplers
     xi_workload_state->null_texture = xg_null_handle_m;
@@ -64,22 +63,24 @@ xi_workload_h xi_workload_create ( void ) {
     workload->mesh_count = 0;
     workload->vertex_buffer = xg_null_handle_m;
     workload->xg_workload = xg_null_handle_m;
+    workload->scissor_count = 0;
 
     xi_workload_h handle = ( xi_workload_h ) ( workload - xi_workload_state->workloads_array );
     return handle;
 }
 
-xi_scissor_h xi_workload_add_scissor ( xi_workload_h workload, uint32_t x, uint32_t y, uint32_t width, uint32_t height ) {
-    if ( xi_workload_state->scissor_count == xi_workload_max_scissors_m ) {
+xi_scissor_h xi_workload_scissor ( xi_workload_h workload_handle, uint32_t x, uint32_t y, uint32_t width, uint32_t height ) {
+    xi_workload_t* workload = &xi_workload_state->workloads_array[workload_handle];
+    if ( workload->scissor_count == xi_workload_max_scissors_m ) {
         return xi_null_scissor_m;
     }
 
-    xi_scissor_t* scissor = &xi_workload_state->scissor_array[xi_workload_state->scissor_count++];
+    xi_scissor_t* scissor = &workload->scissor_array[workload->scissor_count++];
     scissor->x = x;
     scissor->y = y;
     scissor->width = width;
     scissor->height = height;
-    return xi_workload_state->scissor_array - scissor;
+    return workload->scissor_array - scissor;
 }
 
 void xi_workload_cmd_draw ( xi_workload_h workload_handle, const xi_draw_rect_t* rects, uint64_t rect_count ) {
@@ -300,9 +301,9 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             dir = sm_vec_3f_norm ( dir );
             sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
             sm_mat_4x4f_t trans = {
-                .r0[0] = 1,
-                .r1[1] = 1,
-                .r2[2] = 1,
+                .r0[0] = mesh->scale,
+                .r1[1] = mesh->scale,
+                .r2[2] = mesh->scale,
                 .r3[3] = 1,
                 .r0[3] = mesh->traslation[0],
                 .r1[3] = mesh->traslation[1],
@@ -395,6 +396,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
     }
 
     // draw ui
+    xi_scissor_h active_scissor = xi_null_scissor_m;
     uint32_t max_ui_sort_order = 0;
     {
         key += max_mesh_sort_order;
@@ -547,40 +549,23 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
         for ( uint32_t i = 0; i < workload->rect_count; ++i ) {
             const xi_draw_rect_t* rect = &workload->rect_array[i];
 
-#if 0
-            xg->cmd_set_pipeline_resources (
-                flush_params->cmd_buffer,
-                &xg_pipeline_resource_bindings_m (
-                    .set = xg_shader_binding_set_dispatch_m,
-                    .texture_count = 1,
-                    .textures = {
-                        xg_texture_resource_binding_m (
-                            .shader_register = 0,
-                            .layout = xg_texture_layout_shader_read_m,
-                            .texture = rect->texture != xg_null_handle_m ? rect->texture : xi_workload_state->null_texture,
-                        ),
-                    },
-                    .sampler_count = 1,
-                    .samplers = {
-                        xg_sampler_resource_binding_m (
-                            .shader_register = 1,
-                            .sampler = rect->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
-                        )
-                    },
-                ),
-                key + rect->sort_order );
+            xi_scissor_h scissor_handle = rect->scissor;
+            //if ( scissor_handle != active_scissor ) 
+            {
+                xg_scissor_state_t scissor_state = xg_scissor_state_m();
+    
+                if ( scissor_handle != xi_null_scissor_m ) {
+                    xi_scissor_t* scissor = &workload->scissor_array[scissor_handle];
+                    scissor_state.x = scissor->x;
+                    scissor_state.y = scissor->y;
+                    scissor_state.width = scissor->width;
+                    scissor_state.height = scissor->height;
+                }
 
-            xg_scissor_state_t scissor = xg_scissor_state_m();
-
-            if ( rect->scissor != xi_null_scissor_m ) {
-                scissor.x = xi_workload_state->scissor_array[rect->scissor].x;
-                scissor.y = xi_workload_state->scissor_array[rect->scissor].y;
-                scissor.width = xi_workload_state->scissor_array[rect->scissor].width;
-                scissor.height = xi_workload_state->scissor_array[rect->scissor].height;
+                xg->cmd_set_dynamic_scissor ( flush_params->cmd_buffer, key + rect->sort_order, &scissor_state );
+                active_scissor = scissor_handle;
             }
 
-            xg->cmd_set_dynamic_scissor ( flush_params->cmd_buffer, &scissor, flush_params->key + rect->sort_order );
-#endif
             xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m );
 
             xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( flush_params->resource_cmd_buffer, &xg_resource_bindings_params_m (
@@ -612,39 +597,31 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
                 .vertex_buffers = { workload->vertex_buffer },
                 .vertex_offset = i * 6,
             ) );
-
-            //xg->cmd_draw ( flush_params->cmd_buffer, 6, i * 6, key + rect->sort_order );
         }
 
         // draw tris
         for ( uint32_t i = 0; i < workload->tri_count; ++i ) {
             const xi_draw_tri_t* tri = &workload->tri_array[i];
 
-#if 0
-            xg->cmd_set_pipeline_resources (
-                flush_params->cmd_buffer,
-                &xg_pipeline_resource_bindings_m (
-                    .set = xg_shader_binding_set_dispatch_m,
-                    .texture_count = 1,
-                    .textures = { 
-                        xg_texture_resource_binding_m (
-                            .shader_register = 0,
-                            .layout = xg_texture_layout_shader_read_m,
-                            .texture = tri->texture != xg_null_handle_m ? tri->texture : xi_workload_state->null_texture,
-                        ),
-                    },
-                    .sampler_count = 1,
-                    .samplers = {
-                        xg_sampler_resource_binding_m (
-                            .shader_register = 1,
-                            .sampler = tri->linear_sampler_filter ? xi_workload_state->linear_sampler : xi_workload_state->point_sampler,
-                        ),
-                    },
-                ),
-                key + tri->sort_order );
+            // TODO
+            //xi_scissor_h scissor_handle = rect->scissor;
+            xi_scissor_h scissor_handle = xi_null_scissor_m;
+            //if ( scissor_handle != active_scissor ) 
+            {
+                xg_scissor_state_t scissor = xg_scissor_state_m();
 
-            xg->cmd_draw ( flush_params->cmd_buffer, 3, tri_base + i * 3, key + tri->sort_order );
-#endif
+                if ( scissor_handle != xi_null_scissor_m ) {
+                    xi_scissor_t* xi_scissor = &workload->scissor_array[scissor_handle];
+                    scissor.x = xi_scissor->x;
+                    scissor.y = xi_scissor->y;
+                    scissor.width = xi_scissor->width;
+                    scissor.height = xi_scissor->height;
+                }
+
+                xg->cmd_set_dynamic_scissor ( flush_params->cmd_buffer, key + tri->sort_order, &scissor );
+                active_scissor = scissor_handle;
+            }
+
             xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m );
 
             xg_resource_bindings_h group = xg->cmd_create_workload_bindings ( flush_params->resource_cmd_buffer, &xg_resource_bindings_params_m (

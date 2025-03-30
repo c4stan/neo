@@ -12,9 +12,6 @@ typedef struct {
     uint32_t height;
 } xi_scissor_t;
 
-typedef uint32_t xi_scissor_h;
-#define xi_null_scissor_m ( ( xi_scissor_h ) 0xffffffff )
-
 typedef struct {
     float x;
     float y;
@@ -86,6 +83,7 @@ typedef struct {
     uint64_t sort_order;
     float traslation[3]; // x y z
     float rotation[4];    // x y z w
+    float scale;
     float color[4];
 } xi_draw_mesh_t;
 
@@ -100,6 +98,7 @@ typedef struct {
     .sort_order = 0, \
     .traslation = { 0, 0, 0 }, \
     .rotation = { 0, 0, 0, 1 }, \
+    .scale = 1, \
     .color = { 1, 1, 1, 1 }, \
     ##__VA_ARGS__ \
 }
@@ -119,6 +118,9 @@ typedef struct {
 
     float proj_from_world[16];
 
+    xi_scissor_t scissor_array[xi_workload_max_scissors_m];
+    uint32_t scissor_count;
+
     xg_workload_h xg_workload;
 } xi_workload_t;
 
@@ -137,9 +139,6 @@ typedef struct {
     xi_workload_t* workloads_array;
     xi_workload_t* workloads_freelist;
     uint64_t workloads_count;
-
-    xi_scissor_t scissor_array[xi_workload_max_scissors_m];
-    uint32_t scissor_count;
 
     //xi_workload_submit_context_t* submit_contexts;
     //std_ring_t submit_ring;
@@ -174,7 +173,7 @@ void xi_workload_cmd_draw_tri ( xi_workload_h workload, const xi_draw_tri_t* tri
 void xi_workload_cmd_draw_mesh ( xi_workload_h workload, const xi_draw_mesh_t* mesh );
 uint64_t xi_workload_flush ( xi_workload_h workload, const xi_flush_params_t* params );
 
-xi_scissor_h xi_workload_add_viewport ( xi_workload_h workload, uint32_t x, uint32_t y, uint32_t width, uint32_t height );
+xi_scissor_h xi_workload_scissor ( xi_workload_h workload, uint32_t x, uint32_t y, uint32_t width, uint32_t height );
 
 void xi_workload_activate_device ( xg_i* xg, xg_device_h device );
 void xi_workload_deactivate_device ( xg_i* xg, xg_device_h device );

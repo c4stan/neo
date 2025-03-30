@@ -310,7 +310,7 @@ typedef struct {
     void ( *destroy_entities ) ( const se_entity_h* entities, uint64_t count );
 
     se_entity_h ( *create_entity ) ( const se_entity_params_t* params );
-    //void ( *destroy_entity ) ( se_entity_h entity );
+    void ( *destroy_entity ) ( se_entity_h entity );
 
     // TODO is this a good idea?
     //se_entity_group_h ( *create_entity_group ) ( void );

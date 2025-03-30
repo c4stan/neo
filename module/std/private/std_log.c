@@ -122,12 +122,13 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
             std_terminal_color_reset_m );
     } else {
         printf ( std_fmt_str_m
-            "" std_fmt_u32_m "|" std_fmt_f32_dec_m(3) "|"
+            "" std_fmt_u32_m "|" std_fmt_f32_dec_m(3) "|" std_fmt_str_m "|"
             std_fmt_str_m
             std_fmt_str_m,
             color_prefix,
             std_thread_uid ( std_thread_this() ),
             delta_millis / 1000.f,
+            msg->scope.module,
             msg->payload,
             std_terminal_color_reset_m );
     }

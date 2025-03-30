@@ -10,6 +10,7 @@
 #include <math.h>
 
 #include <std_log.h>
+#include <std_platform.h>
 
 std_warnings_ignore_m ( "-Wunused-function" )
 
@@ -21,6 +22,8 @@ void xi_ui_load ( xi_ui_state_t* state ) {
     std_mem_zero_m ( xi_ui_state );
     xi_ui_state->focus_stack_idx = -1;
     xi_ui_state->device = xg_null_handle_m;
+
+    xi_ui_state->windows_map = std_static_hash_map_m ( xi_ui_state->windows_map_ids, xi_ui_state->windows_map_values );
 }
 
 void xi_ui_reload ( xi_ui_state_t* state ) {
@@ -97,6 +100,7 @@ static xi_ui_layer_t* xi_ui_layer_add ( int64_t x, int64_t y, uint32_t width, ui
     layer->line_padding_x = padding_x;
     layer->line_padding_y = padding_y;
     layer->style = *style;
+    layer->total_content_height = 0;
 
     if ( xi_ui_cursor_test ( x, y, width, height ) ) {
         xi_ui_state->hovered_layer = id;
@@ -117,13 +121,21 @@ static void xi_ui_layer_pop_all ( void ) {
     xi_ui_state->layer_count = 0;
 }
 
+static void xi_ui_layer_add_content ( uint32_t height ) {
+    for ( uint32_t i = 0; i < xi_ui_state->layer_count; ++i ) {
+        xi_ui_layer_t* layer = &xi_ui_state->layers[i];
+        layer->total_content_height += height;
+    }
+}
+
 void xi_ui_newline ( void ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
     if ( layer->line_y + layer->line_height > layer->height ) {
-        return;
+        //return;
     }
 
+    xi_ui_layer_add_content ( layer->line_height );
     layer->line_y += layer->line_height;
     layer->line_offset = 0;
     layer->line_height = 0;
@@ -133,22 +145,26 @@ void xi_ui_newline ( void ) {
 static bool xi_ui_layer_add_section ( uint32_t width, uint32_t height ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
+    bool result = true;
+
     if ( xi_ui_state->minimized_window ) {
-        return false;
+        result = false;
+        return result;
     }
 
     if ( xi_ui_state->in_section && xi_ui_state->minimized_section ) {
-        return false;
+        result = false;
+        return result;
     }
 
     // check for enough horizontal space
-    if ( width + layer->line_offset + layer->line_offset_rev > layer->width ) {
-        return false;
+    if ( /*width +*/ layer->line_offset + layer->line_offset_rev > layer->width ) {
+        result = false;
     }
 
     // check for enough vertical space
-    if ( height + layer->line_y > layer->height ) {
-        return false;
+    if ( /*height +*/ layer->line_y > layer->height ) {
+        result = false;
     }
 
     // update line height
@@ -158,7 +174,7 @@ static bool xi_ui_layer_add_section ( uint32_t width, uint32_t height ) {
 
     xi_ui_newline();
 
-    return true;
+    return result;
 }
 
 static void xi_ui_layer_align ( uint32_t* x, uint32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
@@ -193,16 +209,19 @@ static void xi_ui_layer_align ( uint32_t* x, uint32_t* y, uint32_t width, uint32
 static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
+    bool result = true;
+
     if ( xi_ui_state->minimized_window ) {
-        return false;
+        result = false;
     }
 
     if ( xi_ui_state->culled_section ) {
-        return false;
+        result = false;
     }
 
     if ( xi_ui_state->in_section && xi_ui_state->minimized_section ) {
-        return false;
+        result = false;
+        return result;
     }
 
     // apply padding to element size
@@ -211,13 +230,13 @@ static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, 
     //height += layer->line_padding_y * 2;
 
     // check for enough horizontal space
-    if ( width + layer->line_offset + layer->line_offset_rev > layer->width ) {
-        return false;
+    if ( /*width +*/ layer->line_offset + layer->line_offset_rev > layer->width ) {
+        result = false;
     }
 
     // check for enough vertical space
-    if ( height + layer->line_y > layer->height ) {
-        return false;
+    if ( /*height +*/ layer->line_y > layer->height ) {
+        result = false;
     }
 
     xi_ui_layer_align ( x, y, width, height, style );
@@ -235,10 +254,10 @@ static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, 
     }
 
     if ( layer->line_y < 0 ) {
-        return false;
+        result = false;
     }
 
-    return true;
+    return result;
 }
 
 static bool xi_ui_acquire_keyboard ( uint64_t id ) {
@@ -344,6 +363,7 @@ static void xi_ui_draw_rect ( xi_workload_h workload, xi_color_t color, uint32_t
     rect.height = height;
     rect.color = color;
     rect.sort_order = sort_order;
+    rect.scissor = xi_ui_state->active_scissor;
     xi_workload_cmd_draw ( workload, &rect, 1 );
 }
 
@@ -392,6 +412,7 @@ static uint32_t xi_ui_draw_string ( xi_workload_h workload, xi_font_h font, cons
         rect.uv1[0] = box.uv1[0];
         rect.uv1[1] = box.uv1[1];
         rect.sort_order = sort_order;
+        rect.scissor = xi_ui_state->active_scissor;
 
         x_offset += box.width * scale;
 
@@ -437,6 +458,7 @@ void xi_ui_update_begin ( const wm_window_info_t* window_info, const wm_input_st
 
     xi_ui_state->update.os_window_width = window_info->width;
     xi_ui_state->update.os_window_height = window_info->height;
+    xi_ui_state->update.os_window_handle = window_info->os_handle;
 
     xi_ui_state->update.current_tick = now;
 
@@ -484,6 +506,8 @@ void xi_ui_update_begin ( const wm_window_info_t* window_info, const wm_input_st
     //xi_ui_state->focus_stack_idx = -1;
     xi_ui_state->focus_stack_change = false;
     xi_ui_state->focus_stack_count = 0;
+
+    xi_ui_state->active_scissor = xi_null_scissor_m;
 }
 
 void xi_ui_update_end ( void ) {
@@ -541,26 +565,44 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     uint32_t triangle_height = header_height * 0.8;
 
     uint32_t window_height = state->minimized ? header_height : state->height;
+    uint32_t window_width = state->width;
+    uint32_t scrollbar_width = state->scrollable ? 10 : 0;
 
-    xi_ui_layer_t* layer = xi_ui_layer_add ( state->x, state->y, state->width, window_height, state->padding_x, state->padding_y, &style, state->id );
+    xi_ui_layer_t* layer = xi_ui_layer_add ( state->x, state->y, window_width, window_height, 0, 0, &style, state->id );
+    layer = xi_ui_layer_add ( 0, 0, window_width - scrollbar_width, window_height, state->padding_x, state->padding_y, &style, state->id );
     layer->line_y = header_height;
 
+    // corner and scrollbar sizes
+    uint32_t corner_size = 15;
+    uint32_t scrollbar_height = layer->height - header_height - corner_size;
+    uint32_t scroll_handle_height = 30;
+    float scroll = state->scroll;
+    uint32_t title_size = xi_ui_string_width ( state->title, style.font ) + title_pad_x * 2 + triangle_width;
+
     // acquire active
+    // 0: header
+    // 1: resize triangle
+    // 2: minimize triangle
+    // 3: scrollbar
     if ( xi_ui_layer_cursor_test ( x + title_pad_x, y + title_pad_y, triangle_width, triangle_height ) ) {
         xi_ui_acquire_hovered ( state->id, 2 );
 
         if ( xi_ui_cursor_click() ) {
             xi_ui_acquire_active ( state->id, 2 );
         }
-    } else if ( xi_ui_layer_cursor_test ( x, y, layer->width, header_height ) ) {
+    } else if ( xi_ui_layer_cursor_test ( x, y, window_width, header_height ) ) {
         xi_ui_acquire_hovered ( state->id, 0 );
 
         if ( xi_ui_cursor_click() ) {
             xi_ui_acquire_active ( state->id, 0 );
         }
-    } else if ( xi_ui_layer_cursor_test ( layer->width - 20, layer->height - 20, 20, 20 ) ) {
+    } else if ( xi_ui_layer_cursor_test ( window_width - 20, layer->height - 20, 20, 20 ) ) {
         if ( xi_ui_cursor_click() ) {
             xi_ui_acquire_active ( state->id, 1 );
+        }
+    } else if ( state->scrollable && xi_ui_layer_cursor_test ( window_width - scrollbar_width, header_height + ( scrollbar_height - scroll_handle_height ) * scroll , scrollbar_width, scroll_handle_height ) ) {
+        if ( xi_ui_cursor_click() ) {
+            xi_ui_acquire_active ( state->id, 3 );
         }
     } else {
         xi_ui_release_hovered ( state->id );
@@ -593,10 +635,14 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     }
 
     // scroll
+    if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 3 ) {
+        int32_t handle_y = ( scrollbar_height - scroll_handle_height ) * scroll;
+        handle_y += xi_ui_state->update.mouse_delta_y;
+        handle_y = std_max_i32 ( handle_y, 0 );
+        scroll = ( float ) handle_y / ( scrollbar_height - scroll_handle_height );
+    }
     if ( state->scrollable ) {
-        float scroll = state->scroll;
-
-        if ( xi_ui_layer_cursor_test ( 0, 0, layer->width, layer->height ) ) {
+        if ( xi_ui_layer_cursor_test ( 0, 0, window_width, layer->height ) ) {
             if ( xi_ui_state->update.wheel_up ) {
                 scroll -= 0.05;
             }
@@ -605,15 +651,24 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
                 scroll += 0.05;
             }
         }
-
         scroll = std_min_f32 ( std_max_f32 ( scroll, 0 ), 1 );
-        state->scroll = scroll;
-        layer->line_y -= layer->height * scroll;
+
+        uint64_t* lookup = std_hash_map_lookup ( &xi_ui_state->windows_map, state->id );
+        if ( lookup ) {
+            uint64_t prev_height = *lookup;
+
+            //if ( prev_height <= layer->height ) { 
+            //    scroll = 0;
+            //} else {
+            //    prev_height -= layer->height;
+            //}
+
+            state->scroll = scroll;
+            layer->line_y -= prev_height * scroll;
+        }
     }
 
     // resize
-    uint32_t corner_size = 15;
-
     if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 1 ) {
         //float delta = std_tick_to_milli_f32 ( xi_ui_state.current_tick - xi_ui_state.mouse_down_tick );
 
@@ -622,8 +677,8 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         int32_t width = state->width;
         int32_t height = state->height;
 
-        int32_t min_width = title_pad_x + 10;
-        int32_t min_height = header_height + corner_size;
+        int32_t min_width = title_size;
+        int32_t min_height = header_height + corner_size + scroll_handle_height;
 
         if ( width > min_width ) {
             width += xi_ui_state->update.mouse_delta_x;
@@ -659,6 +714,9 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
             width = title_pad_x + 10;
         }
 
+        width = std_max_i32 ( width, min_width );
+        height = std_max_i32 ( height, min_height );
+
         state->width = width;
         state->height = height;
 
@@ -690,11 +748,11 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     // draw
     //  base background
     if ( !state->minimized ) {
-        xi_ui_draw_rect ( workload, style.color, layer->x, layer->y, layer->width, layer->height, state->sort_order );
+        xi_ui_draw_rect ( workload, style.color, layer->x, layer->y, window_width, window_height, state->sort_order );
     }
 
     //  title bar
-    xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.3 ), layer->x, layer->y, layer->width, header_height, state->sort_order );
+    xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.3 ), layer->x, layer->y, window_width, header_height, state->sort_order );
 
     // title triangle
     if ( !state->minimized ) {
@@ -713,6 +771,20 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
 
     //  title text
     xi_ui_draw_string ( workload, style.font, state->title, layer->x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
+
+    // scroll bar
+    if ( state->scrollable && !state->minimized ) {
+        xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ), 
+            layer->x + window_width - scrollbar_width, 
+            layer->y + header_height, 
+            scrollbar_width, scrollbar_height, 
+            state->sort_order );
+        xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.2 ), 
+            layer->x + window_width - scrollbar_width, 
+            layer->y + header_height + ( scrollbar_height - scroll_handle_height ) * scroll, 
+            scrollbar_width, scroll_handle_height, 
+            state->sort_order );
+    }
 
 #if 0
 
@@ -756,16 +828,27 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     //  resize corner
     if ( !state->minimized ) {
         xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
-            layer->x + layer->width, layer->y + layer->height - corner_size,
-            layer->x + layer->width, layer->y + layer->height,
-            layer->x + layer->width - corner_size, layer->y + layer->height,
+            layer->x + window_width, layer->y + layer->height - corner_size,
+            layer->x + window_width, layer->y + layer->height,
+            layer->x + window_width - corner_size, layer->y + layer->height,
             state->sort_order  );
     }
+
+    xi_ui_state->window_id = state->id;
+
+    xi_scissor_h scissor = xi_workload_scissor ( workload, state->x, state->y + header_height, state->width, state->height - header_height );
+    xi_ui_state->active_scissor = scissor;
 }
 
 void xi_ui_window_end ( xi_workload_h workload ) {
     std_unused_m ( workload );
+
+    uint64_t* lookup = std_hash_map_lookup_insert ( &xi_ui_state->windows_map, xi_ui_state->window_id, NULL );
+    xi_ui_layer_t* layer = &xi_ui_state->layers[0];
+    *lookup = layer->total_content_height;
+
     xi_ui_layer_pop_all();
+    xi_ui_state->active_scissor = xi_null_scissor_m;
 }
 
 void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
@@ -870,6 +953,7 @@ void xi_ui_section_end ( xi_workload_h workload ) {
         xi_ui_newline();
         xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
         layer->line_y += layer->line_padding_y * 2;
+        xi_ui_layer_add_content ( layer->line_padding_y * 2 );
     }
 
     xi_ui_state->in_section = false;
@@ -1163,7 +1247,7 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     return pressed;
 }
 
-void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
+bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
     xi_font_info_t font_info;
@@ -1176,9 +1260,10 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
     uint32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
-        return;
+        return false;
     }
 
+    bool selected = false;
     if ( xi_ui_state->active_id == state->id ) {
         if ( xi_ui_cursor_test ( x, y, width, height * ( state->item_count + 1 ) ) ) {
             xi_ui_acquire_hovered ( state->id, 0 );
@@ -1188,6 +1273,7 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
 
                 if ( y_offset > height ) {
                     state->item_idx = y_offset / height - 1;
+                    selected = true;
                 }
 
                 xi_ui_release_active ( state->id );
@@ -1227,10 +1313,12 @@ void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
                 //xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style->color, 0.75f ), layer->x + x, layer->y + y + height * ( i + 1 ), width, height, state->sort_order );
             }
 
-            uint32_t text_width = xi_ui_string_width ( state->items[state->item_idx], style.font );
+            uint32_t text_width = xi_ui_string_width ( state->items[i], style.font );
             xi_ui_draw_string ( workload, style.font, state->items[i], x + ( width - text_width ) / 2, y + height * ( i + 1 ), state->sort_order );
         }
     }
+
+    return selected;
 }
 
 uint64_t xi_ui_get_active_id ( void ) {
@@ -1514,18 +1602,27 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
         return false;
     }
 
+    sm_vec_3f_t p = sm_vec_3f ( state->position );
+    sm_vec_3f_t cam_p = sm_vec_3f ( xi_ui_state->update.view_info.transform.position );
+    float d = sm_vec_3f_len ( sm_vec_3f_sub ( p, cam_p ) );
+    float fov_y = xi_ui_state->update.view_info.proj_params.fov_y;
+    float pixel_size = 15;
+    float scale = ( 2 * pixel_size * d ) / ( xi_ui_state->update.os_window_height * tan ( fov_y / 2 ) );
+
     sm_mat_4x4f_t trans = {
-        .r0[0] = 1,
-        .r1[1] = 1,
-        .r2[2] = 1,
+        .r0[0] = scale,
+        .r1[1] = scale,
+        .r2[2] = scale,
         .r3[3] = 1,
         .r0[3] = state->position[0],
         .r1[3] = state->position[1],
         .r2[3] = state->position[2],
     };
 
+    bool hovered = false;
     if ( xi_ui_transform_mouse_pick_test ( &ray, trans ) ) {
         xi_ui_acquire_hovered ( state->id, 0 );
+        hovered = true;
 
         if ( xi_ui_cursor_click() ) {
             xi_ui_acquire_active ( state->id, 0 );
@@ -1542,17 +1639,15 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
 
     if ( xi_ui_state->active_id == state->id ) {
         const rv_view_info_t* view = &xi_ui_state->update.view_info;
-        sm_vec_3f_t p = { state->position[0], state->position[1], state->position[2] };
         // TODO negate v
         sm_vec_3f_t n = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( view->transform.focus_point ), sm_vec_3f ( view->transform.position ) ) );
         float d = sm_vec_3f_dot ( sm_vec_3f_neg ( n ), p );
         sm_vec_4f_t plane = { n.x, n.y, n.z, d };
-        sm_vec_3f_t new_p;
         float depth;
-        xi_ui_ray_plane_intersect ( &new_p, &depth, sm_vec_3f ( ray.origin ), sm_vec_3f ( ray.direction ), plane );
-        state->position[0] = new_p.x;
-        state->position[1] = new_p.y;
-        state->position[2] = new_p.z;
+        xi_ui_ray_plane_intersect ( &p, &depth, sm_vec_3f ( ray.origin ), sm_vec_3f ( ray.direction ), plane );
+        state->position[0] = p.x;
+        state->position[1] = p.y;
+        state->position[2] = p.z;
         down = true;
     } else {
         down = false;
@@ -1567,11 +1662,17 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
         .sort_order = state->sort_order,
         .traslation = { state->position[0], state->position[1], state->position[2] },
         .rotation = { state->rotation[0], state->rotation[1], state->rotation[2], state->rotation[3] },
+        .scale = scale,
     );
 
     if ( down ) {
         draw.color[0] = 1;
         draw.color[1] = 0;
+        draw.color[2] = 0;
+        draw.color[3] = 1;
+    } else if ( hovered ) {
+        draw.color[0] = 1;
+        draw.color[1] = 0.5;
         draw.color[2] = 0;
         draw.color[3] = 1;
     } else {
@@ -1584,4 +1685,38 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     xi_workload_cmd_draw_mesh ( workload_handle, &draw );
 
     return down;
+}
+
+#include <Commdlg.h>
+
+bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir ) {
+    if ( !initial_dir ) {
+        initial_dir = ".";
+    }
+#if defined(std_platform_win32_m)
+    std_log_info_m ( initial_dir );
+    char* filename = path_buffer.base;
+    OPENFILENAMEA ofn;
+    ZeroMemory ( &ofn, sizeof ( ofn ) );
+    filename[0] = '\0';
+    ofn.lStructSize = sizeof ( OPENFILENAME );
+    ofn.hwndOwner = ( HWND ) xi_ui_state->update.os_window_handle.win32.hwnd;
+    ofn.lpstrFilter = NULL;
+    ofn.lpstrCustomFilter = NULL;
+    ofn.nMaxCustFilter = 0;
+    ofn.nFilterIndex = 0;
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = path_buffer.size;
+    ofn.lpstrInitialDir = initial_dir;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrTitle = "";
+    ofn.lpstrDefExt = NULL;
+    ofn.Flags = OFN_NOCHANGEDIR | OFN_FILEMUSTEXIST;
+    
+    int result = GetOpenFileName ( &ofn );
+    return result != 0;
+#else
+    std_not_implemented_m();
+#endif
 }

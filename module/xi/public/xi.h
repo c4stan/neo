@@ -17,6 +17,10 @@ typedef uint64_t xi_id_t;
 typedef uint64_t xi_font_h;
 typedef uint64_t xi_workload_h;
 
+// TODO move out of here
+typedef uint32_t xi_scissor_h;
+#define xi_null_scissor_m ( ( xi_scissor_h ) 0xffffffff )
+
 // Color
 
 typedef struct {
@@ -488,7 +492,7 @@ typedef struct {
     void ( *add_slider )    ( xi_workload_h workload, xi_slider_state_t* state );
     //void ( *add_text )     ( xi_workload_h workload, xi_text_state_t*   state );
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );
-    void ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
+    bool ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
     bool ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
     bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
     bool ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
@@ -496,4 +500,6 @@ typedef struct {
     void ( *init_geos )     ( xg_device_h device );
     void ( *draw_line )     ( xi_workload_h workload, xi_line_state_t* state );
     bool ( *draw_transform )( xi_workload_h workload, xi_transform_state_t* state );    
+
+    bool ( *file_pick)      ( std_buffer_t path_buffer, const char* initial_dir );
 } xi_i;

@@ -386,9 +386,9 @@ static VkRenderPass xg_vk_renderpass_create_vk ( xg_device_h device_handle, cons
 }
 
 static void xg_vk_pipeline_hash_resource_binding_layout ( std_stack_t* stack, const xg_resource_binding_layout_t* layout ) {
-    std_stack_write_noalign_m ( stack, &layout->shader_register );
-    std_stack_write_noalign_m ( stack, &layout->stages );
-    std_stack_write_noalign_m ( stack, &layout->type );
+    std_stack_write_m ( stack, &layout->shader_register );
+    std_stack_write_m ( stack, &layout->stages );
+    std_stack_write_m ( stack, &layout->type );
 }
 
 static VkDescriptorSetLayoutBinding xg_vk_pipeline_vk_descriptor_set_layout_binding ( const xg_resource_binding_layout_t* layout ) {
@@ -405,7 +405,7 @@ xg_resource_bindings_layout_h xg_vk_pipeline_resource_bindings_layout_create ( c
     char state_buffer[sizeof ( *params )];
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
     uint32_t resource_count = params->resource_count;
-    std_stack_write_noalign_m ( &hash_allocator, &resource_count );
+    std_stack_write_m ( &hash_allocator, &resource_count );
     for ( size_t i = 0; i < resource_count; ++i ) {
         xg_vk_pipeline_hash_resource_binding_layout ( &hash_allocator, &params->resources[i] );
     }
@@ -557,32 +557,32 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
     char state_buffer[sizeof ( params->state ) + sizeof ( uint64_t ) * xg_shader_binding_set_count_m];
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.shader_count );
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.gen_shader_count );
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.miss_shader_count );
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.hit_group_count );
+    std_stack_write_m ( &hash_allocator, &params->state.shader_state.shader_count );
+    std_stack_write_m ( &hash_allocator, &params->state.shader_state.gen_shader_count );
+    std_stack_write_m ( &hash_allocator, &params->state.shader_state.miss_shader_count );
+    std_stack_write_m ( &hash_allocator, &params->state.shader_state.hit_group_count );
 
     // Shaders
     for ( uint32_t i = 0; i < params->state.shader_state.shader_count; ++i ) {
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.shaders[i].hash );
+        std_stack_write_m ( &hash_allocator, &params->state.shader_state.shaders[i].hash );
     }
 
     for ( uint32_t i = 0; i < params->state.shader_state.gen_shader_count; ++i ) {
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.gen_shaders[i] );
+        std_stack_write_m ( &hash_allocator, &params->state.shader_state.gen_shaders[i] );
     }
 
     for ( uint32_t i = 0; i < params->state.shader_state.miss_shader_count; ++i ) {
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.miss_shaders[i] );
+        std_stack_write_m ( &hash_allocator, &params->state.shader_state.miss_shaders[i] );
     }
 
     for ( uint32_t i = 0; i < params->state.shader_state.hit_group_count; ++i ) {
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.shader_state.hit_groups[i] );
+        std_stack_write_m ( &hash_allocator, &params->state.shader_state.hit_groups[i] );
     }
 
     // Resources layout
     for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_resource_bindings_layout_t* layout = xg_vk_pipeline_resource_bindings_layout_get ( params->resource_layouts[i] );
-        std_stack_write_noalign_m ( &hash_allocator, &layout->hash );
+        std_stack_write_m ( &hash_allocator, &layout->hash );
     }
 
     // Pipeline
@@ -931,12 +931,12 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
     char state_buffer[sizeof ( params->state ) + sizeof ( uint64_t ) * xg_shader_binding_set_count_m];
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.compute_shader.hash );
+    std_stack_write_m ( &hash_allocator, &params->state.compute_shader.hash );
 
     // Resources layout
     for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_resource_bindings_layout_t* layout = xg_vk_pipeline_resource_bindings_layout_get ( params->resource_layouts[i] );
-        std_stack_write_noalign_m ( &hash_allocator, &layout->hash );
+        std_stack_write_m ( &hash_allocator, &layout->hash );
     }
 
     // Pipeline
@@ -1077,14 +1077,14 @@ static uint64_t xg_vk_renderpass_params_hash ( const xg_render_textures_layout_t
     // Every pipeline will have a pointer to its shared renderpass. This way at render time on every pso change
     // it's enough to get the pso's renderpass, and begin a new renderpass if it's different from the previous.
     // Memset to zero and copy each field to guarantee padding value
-    std_stack_write_noalign_m ( &hash_allocator, &use_depth_stencil );
+    std_stack_write_m ( &hash_allocator, &use_depth_stencil );
 
     if ( use_depth_stencil ) {
-        std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.format );
-        std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->depth_stencil.samples_per_pixel );
+        std_stack_write_m ( &hash_allocator, &render_textures_layout->depth_stencil.format );
+        std_stack_write_m ( &hash_allocator, &render_textures_layout->depth_stencil.samples_per_pixel );
     }
 
-    std_stack_write_noalign_m ( &hash_allocator, &render_textures_layout->render_targets_count );
+    std_stack_write_m ( &hash_allocator, &render_textures_layout->render_targets_count );
 
     if ( render_textures_layout->render_targets_count ) {
         std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_render_target_layout_t ) );
@@ -1093,8 +1093,8 @@ static uint64_t xg_vk_renderpass_params_hash ( const xg_render_textures_layout_t
         std_sort_insertion_copy ( sorted_render_targets, render_textures_layout->render_targets, sizeof ( xg_render_target_layout_t ), render_textures_layout->render_targets_count, xg_vk_pipeline_render_target_layout_cmp, NULL );
 
         for ( size_t i = 0; i < render_textures_layout->render_targets_count; ++i ) {
-            std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].format );
-            std_stack_write_noalign_m ( &hash_allocator, &sorted_render_targets[i].samples_per_pixel );
+            std_stack_write_m ( &hash_allocator, &sorted_render_targets[i].format );
+            std_stack_write_m ( &hash_allocator, &sorted_render_targets[i].samples_per_pixel );
         }
     }
 
@@ -1109,8 +1109,8 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
     // Shaders
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.vertex_shader.hash );
-    std_stack_write_noalign_m ( &hash_allocator, &params->state.fragment_shader.hash );
+    std_stack_write_m ( &hash_allocator, &params->state.vertex_shader.hash );
+    std_stack_write_m ( &hash_allocator, &params->state.fragment_shader.hash );
 
     // Input layout
     VkPipelineVertexInputStateCreateInfo vertex_layout;
@@ -1151,7 +1151,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         // Compute hash
         //xg_vertex_stream_t sorted_input_streams[xg_input_layout_max_streams_m];
         //std_mem_zero_m ( &sorted_input_streams );
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.input_layout.stream_count );
+        std_stack_write_m ( &hash_allocator, &params->state.input_layout.stream_count );
 
         if ( params->state.input_layout.stream_count ) {
             std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_vertex_stream_t ) );
@@ -1181,6 +1181,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
     VkPipelineViewportStateCreateInfo viewport;
     VkViewport v;
     VkRect2D s;
+    bool force_dynamic_scissor = false;
     {
         viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
         viewport.pNext = NULL;
@@ -1194,15 +1195,14 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             uint32_t u32_0 = 0;
             float f32_0 = 0;
 
-            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_write_noalign_m ( &hash_allocator, &u32_0 );
-            std_stack_write_noalign_m ( &hash_allocator, &f32_0 );
-            std_stack_write_noalign_m ( &hash_allocator, &f32_0 );
+            std_stack_write_m ( &hash_allocator, &u32_0 );
+            std_stack_write_m ( &hash_allocator, &u32_0 );
+            std_stack_write_m ( &hash_allocator, &u32_0 );
+            std_stack_write_m ( &hash_allocator, &u32_0 );
+            std_stack_write_m ( &hash_allocator, &f32_0 );
+            std_stack_write_m ( &hash_allocator, &f32_0 );
         } else {
             std_mem_zero_m ( &v );
-            std_mem_zero_m ( &s );
 
             // Flip viewport y axis to point up, same as OpenGL/DX
             // https://www.saschawillems.de/blog/2019/03/29/flipping-the-vulkan-viewport
@@ -1215,19 +1215,49 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             v.height = - ( float ) params->state.viewport_state.height;
             v.minDepth = params->state.viewport_state.min_depth;
             v.maxDepth = params->state.viewport_state.max_depth;
+            viewport.pViewports = &v;
+
+            std_stack_write_m ( &hash_allocator, &params->state.viewport_state.x );
+            std_stack_write_m ( &hash_allocator, &params->state.viewport_state.y );
+            std_stack_write_m ( &hash_allocator, &params->state.viewport_state.width );
+            std_stack_write_m ( &hash_allocator, &params->state.viewport_state.height );
+            std_stack_write_m ( &hash_allocator, &params->state.viewport_state.min_depth );
+            std_stack_write_m ( &hash_allocator, &params->state.viewport_state.max_depth );
+        }
+
+        force_dynamic_scissor = params->state.scissor_state.width == xi_scissor_width_full_m && params->state.scissor_state.height == xi_scissor_height_full_m;
+        if ( params->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_scissor_m || force_dynamic_scissor ) {
+            int32_t i32_0 = 0;
+            uint32_t u32_0 = 0;
+
+            std_stack_write_m ( &hash_allocator, &i32_0 );
+            std_stack_write_m ( &hash_allocator, &i32_0 );
+            std_stack_write_m ( &hash_allocator, &u32_0 );
+            std_stack_write_m ( &hash_allocator, &u32_0 );
+        } else {
+            std_mem_zero_m ( &s );
+
+            uint32_t width = params->state.scissor_state.width;
+            uint32_t height = params->state.scissor_state.height;
+
+            if ( width == xi_scissor_width_full_m ) {
+                width = params->state.viewport_state.width;
+            }
+
+            if ( height == xi_scissor_height_full_m ) {
+                height = params->state.viewport_state.height;
+            }
+
             s.offset.x = 0;
             s.offset.y = 0;
-            s.extent.width = params->state.viewport_state.width;
-            s.extent.height = params->state.viewport_state.height;
-            viewport.pViewports = &v;
+            s.extent.width = width;
+            s.extent.height = height;
             viewport.pScissors = &s;
 
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.x );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.y );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.width );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.height );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.min_depth );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.viewport_state.max_depth );
+            std_stack_write_m ( &hash_allocator, &params->state.scissor_state.x );
+            std_stack_write_m ( &hash_allocator, &params->state.scissor_state.y );
+            std_stack_write_m ( &hash_allocator, &width );
+            std_stack_write_m ( &hash_allocator, &height );
         }
     }
     // Rasterizer
@@ -1251,21 +1281,21 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         rasterizer.depthBiasConstantFactor = params->state.rasterizer_state.depth_bias_state.const_factor;
         rasterizer.depthBiasSlopeFactor = params->state.rasterizer_state.depth_bias_state.slope_factor;
 
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.disable_rasterization );
+        std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.disable_rasterization );
 
         if ( params->state.rasterizer_state.disable_rasterization ) {
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.cull_mode );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.frontface_winding_mode );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.polygon_mode );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.line_width );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.enable_depth_clamp );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.cull_mode );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.frontface_winding_mode );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.polygon_mode );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.line_width );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.enable_depth_clamp );
 
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.enable );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.enable );
 
             if ( params->state.rasterizer_state.depth_bias_state.enable ) {
-                std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.clamp );
-                std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.const_factor );
-                std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.slope_factor );
+                std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.clamp );
+                std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.const_factor );
+                std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.depth_bias_state.slope_factor );
             }
         }
     }
@@ -1289,8 +1319,8 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         msaa.alphaToOneEnable = VK_FALSE;
 
         if ( params->state.rasterizer_state.disable_rasterization ) {
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.sample_count );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.mode );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.sample_count );
+            std_stack_write_m ( &hash_allocator, &params->state.rasterizer_state.antialiasing_state.mode );
         }
     }
     // Depth stencil
@@ -1326,35 +1356,35 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         ds.back.writeMask = params->state.depth_stencil_state.stencil.back_face_op.write_mask;
         ds.back.reference = params->state.depth_stencil_state.stencil.back_face_op.reference;
 
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_test );
+        std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_test );
 
         if ( params->state.depth_stencil_state.depth.enable_test ) {
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_write );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.compare_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_bound_test );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.min_bound );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.depth.max_bound );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_write );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.depth.compare_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.depth.enable_bound_test );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.depth.min_bound );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.depth.max_bound );
         }
 
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.enable_test );
+        std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.enable_test );
 
         if ( params->state.depth_stencil_state.stencil.enable_test ) {
             // TODO
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_pass_depth_fail_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_fail_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_depth_pass_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_mask );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.write_mask );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.reference );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_pass_depth_fail_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_fail_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.stencil_depth_pass_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.compare_mask );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.write_mask );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.front_face_op.reference );
 
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_pass_depth_fail_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_fail_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_depth_pass_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_op );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_mask );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.write_mask );
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.reference );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_pass_depth_fail_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_fail_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.stencil_depth_pass_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_op );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.compare_mask );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.write_mask );
+            std_stack_write_m ( &hash_allocator, &params->state.depth_stencil_state.stencil.back_face_op.reference );
         }
     }
     // Color blend
@@ -1389,7 +1419,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         bs.blendConstants[3] = 0;
 
         //xg_render_target_blend_state_t sorted_render_targets[xg_pipeline_output_max_color_targets_m];
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.blend_state.render_targets_count );
+        std_stack_write_m ( &hash_allocator, &params->state.blend_state.render_targets_count );
 
         if ( params->state.blend_state.render_targets_count ) {
             std_stack_align_zero ( &hash_allocator, std_alignof_m ( xg_render_target_blend_state_t ) );
@@ -1410,10 +1440,10 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             }
         }
 
-        std_stack_write_noalign_m ( &hash_allocator, &params->state.blend_state.enable_blend_logic_op );
+        std_stack_write_m ( &hash_allocator, &params->state.blend_state.enable_blend_logic_op );
 
         if ( params->state.blend_state.enable_blend_logic_op ) {
-            std_stack_write_noalign_m ( &hash_allocator, &params->state.blend_state.blend_logic_op );
+            std_stack_write_m ( &hash_allocator, &params->state.blend_state.blend_logic_op );
         }
     }
     // Dynamic state
@@ -1429,7 +1459,10 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
         if ( params->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_viewport_m ) {
             states[states_count++] = VK_DYNAMIC_STATE_VIEWPORT;
-            states[states_count++] = VK_DYNAMIC_STATE_SCISSOR; // TODO separate scissor control
+        }
+
+        if ( params->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_scissor_m || force_dynamic_scissor ) {
+            states[states_count++] = VK_DYNAMIC_STATE_SCISSOR;
         }
 
         dynamic_state.dynamicStateCount = states_count;
@@ -1438,12 +1471,12 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
     // Renderpass
     uint64_t renderpass_hash = xg_vk_renderpass_params_hash ( &params->render_textures_layout );
-    std_stack_write_noalign_m ( &hash_allocator, &renderpass_hash );
+    std_stack_write_m ( &hash_allocator, &renderpass_hash );
 
     // Resources layout
     for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
         xg_vk_resource_bindings_layout_t* layout = xg_vk_pipeline_resource_bindings_layout_get ( params->resource_layouts[i] );
-        std_stack_write_noalign_m ( &hash_allocator, &layout->hash );
+        std_stack_write_m ( &hash_allocator, &layout->hash );
     }
 
     // Pipeline
@@ -1580,6 +1613,10 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         xg_vk_pipeline->state = params->state;
         xg_vk_pipeline->vk_renderpass = vk_renderpass;
 
+        if ( force_dynamic_scissor ) {
+            xg_vk_pipeline->state.dynamic_state |= xg_graphics_pipeline_dynamic_state_bit_scissor_m;
+        }
+
         // store common pipeline state
         for ( size_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
             xg_vk_pipeline->common.resource_layouts[i] = params->resource_layouts[i];
@@ -1708,7 +1745,7 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         vkCreatePipelineCache ( device->vk_handle, &info, NULL, &context->vk_pipeline_cache );
     }
 #endif
-    
+
     {
         VkDescriptorPoolCreateInfo info;
         info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;

@@ -186,7 +186,7 @@ typedef void ( xf_node_execute_f ) ( const xf_node_execute_args_t* node_args, vo
 typedef enum {
     xf_passthrough_mode_ignore_m,
     xf_passthrough_mode_clear_m,
-    xf_passthrough_mode_alias_m,
+    //xf_passthrough_mode_alias_m,
     xf_passthrough_mode_copy_m,
     // xf_passthrough_mode_execute_flag_m, // todo: call execute anyway and pass a flag in node_args indicating that it's a passthrough
 } xf_passthrough_mode_e;
@@ -195,7 +195,7 @@ typedef struct {
     xf_passthrough_mode_e mode;
     union {
         xg_color_clear_t clear;
-        xf_texture_h alias;
+        //xf_texture_h alias;
         xf_copy_texture_dependency_t copy_source;
     };
 } xf_texture_passthrough_t;
@@ -346,8 +346,8 @@ typedef struct {
 }
 
 typedef enum {
-    xf_texture_clear_type_color_m,
-    xf_texture_clear_type_depth_stencil_m,
+    xf_texture_clear_color_m,
+    xf_texture_clear_depth_stencil_m,
 } xf_texture_clear_type_e;
 
 typedef struct {
@@ -359,7 +359,7 @@ typedef struct {
 } xf_texture_clear_t;
 
 #define xf_texture_clear_m( ... ) ( xf_texture_clear_t ) { \
-    .type = xf_texture_clear_type_color_m, \
+    .type = xf_texture_clear_color_m, \
     .color = xg_color_clear_m(), \
     ##__VA_ARGS__ \
 }
@@ -574,6 +574,8 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_graph_h graph, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
+
+    void ( *invalidate_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
     // TODO remove this
     xf_texture_h ( *get_base_texture ) ( xf_texture_h multi_texture );

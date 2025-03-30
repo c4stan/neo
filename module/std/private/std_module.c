@@ -126,7 +126,7 @@ static bool std_module_entrypoint_name ( const char* name, const char* entrypoin
 
     return true;
 }
-
+#include <std_file.h>
 static std_module_t* std_module_load_internal ( const char* name ) {
     std_log_info_m ( "Requested module " std_fmt_str_m " is not currently loaded. Looking up the modules library...", name );
     // Build file and entrypoint name
@@ -165,6 +165,10 @@ static std_module_t* std_module_load_internal ( const char* name ) {
     UnmapViewOfFile ( map );
     */
     //
+
+    std_file_info_t file_info;
+    std_file_path_info ( &file_info, module_file_name );
+    std_unused_m ( file_info );
 
     // Load
 #if defined(std_platform_win32_m)

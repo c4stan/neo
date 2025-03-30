@@ -301,6 +301,19 @@ static void run_se_test_2 ( void ) {
         component_data.vertex_cbuffer_data.scale = 0.05f;
         component_data.pipeline_state = pipeline_state;
 
+        se_entity_h t = se->create_entity ( &se_entity_params_m (
+            .debug_name = "entity",
+            .update = se_entity_update_m (
+                .components = { se_component_update_m ( 
+                    .id = se_test_pass_component_m, 
+                    .streams = { se_stream_update_m ( 
+                        .data = &component_data 
+                    ) } 
+                ) }
+            )
+        ) );
+        se->destroy_entity ( t );
+
         se->create_entity ( &se_entity_params_m (
             .debug_name = "entity",
             .update = se_entity_update_m (

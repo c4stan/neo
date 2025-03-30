@@ -5,6 +5,7 @@ xg_pipeline_resource_max_bindings_per_set_m   (xg_pipeline_resource_max_buffers_
 xg_workload_max_queued_workloads_m                      4
 xg_workload_max_allocated_workloads_m                   8
 xg_workload_uniform_buffer_size_m                       2 * 1024 * 1024
+xg_workload_staging_buffer_size_m                       64 * 1024 * 1024
 # TODO use these
 xg_workload_max_timestamp_query_pools_per_workload_m    8
 xg_workload_timing_name_size_m                          32

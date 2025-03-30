@@ -60,172 +60,6 @@ void se_entity_unload ( void ) {
     std_mutex_deinit ( &se_entity_state->mutex );
 }
 
-#if 0
-void se_entity_init ( void ) {
-    static uint64_t entity_bitset_array[se_max_entities_m / 64];
-    std_assert_m ( std_align_test ( se_max_entities_m, 64 ) );
-
-    static se_component_flags_t component_flags_array[se_max_entities_m];
-    static se_entity_component_table_t component_tables_array[se_max_entities_m];
-
-    se_entity_state->component_flags_array = component_flags_array;
-    se_entity_state->component_flags_freelist = std_static_freelist_m ( component_flags_array );
-    se_entity_state->component_tables = component_tables_array;
-
-    std_mem_zero_m ( &entity_bitset_array );
-    se_entity_state->entity_bitset = entity_bitset_array;
-
-    std_mutex_init ( &se_entity_state->mutex );
-}
-#endif
-
-#if 0
-se_entity_h se_entity_create ( const se_entity_params_t* params ) {
-    // TODO
-    std_unused_m ( params );
-
-    std_mutex_lock ( &se_entity_state->mutex );
-    se_component_mask_t* mask = std_list_pop_m ( &se_entity_state->component_mask_freelist );
-    size_t entity_idx = ( size_t ) ( mask - se_entity_state->component_mask_array );
-    std_bitset_set ( se_entity_state->entity_bitset, entity_idx );
-    std_mutex_unlock ( &se_entity_state->mutex );
-
-    se_entity_component_table_t* component_table = &se_entity_state->component_tables[entity_idx];
-    std_mem_zero_m ( &mask );
-    std_mem_zero_m ( component_table );
-    std_mem_set ( component_table->keys, sizeof ( component_table->keys ), 0xff );
-    component_table->mask = 32 - 1;
-
-    return ( se_entity_h ) entity_idx;
-}
-
-bool se_entity_destroy ( se_entity_h entity_handle ) {
-    uint64_t entity_idx = ( uint64_t ) entity_handle;
-
-    std_mutex_lock ( &se_entity_state->mutex );
-    se_component_mask_t* mask = &se_entity_state->component_mask_array[entity_idx];
-    std_list_push ( &se_entity_state->component_mask_freelist, &mask );
-    std_bitset_clear ( se_entity_state->entity_bitset, entity_idx );
-    std_mutex_unlock ( &se_entity_state->mutex );
-
-    // TODO
-    return true;
-}
-
-bool se_entity_component_add ( se_entity_h entity_handle, se_component_e component_type, se_component_h component_handle ) {
-    uint64_t entity_idx = ( uint64_t ) entity_handle;
-    se_entity_component_table_t* component_table = &se_entity_state->component_tables[entity_idx];
-
-    std_assert_m ( std_bitset_test ( se_entity_state->entity_bitset, entity_idx ) );
-
-    // TODO
-    uint64_t hash = std_hash_murmur_64 ( component_type );
-    //std_assert_m ( hash != 0 );
-
-    std_hash_map_t map;
-    map.hashes = component_table->keys;
-    map.payloads = component_table->payloads;
-    map.count = component_table->count;
-    map.mask = component_table->mask;
-
-    bool result = std_hash_map_insert ( &map, hash, component_handle );
-
-    if ( result ) {
-        component_table->count = map.count;
-        se_component_mask_t* mask = &se_entity_state->component_mask_array[entity_idx];
-        std_bitset_set ( mask->u64, component_type );
-    }
-
-    return result;
-}
-
-bool se_entity_component_remove ( se_entity_h entity_handle, se_component_e component_type ) {
-    uint64_t entity_idx = ( uint64_t ) entity_handle;
-    se_entity_component_table_t* component_table = &se_entity_state->component_tables[entity_idx];
-
-    std_assert_m ( std_bitset_test ( se_entity_state->entity_bitset, entity_idx ) );
-
-    // TODO
-    uint64_t hash = std_hash_murmur_64 ( component_type );
-    //std_assert_m ( hash != 0 );
-
-    std_hash_map_t map;
-    map.hashes = component_table->keys;
-    map.payloads = component_table->payloads;
-    map.count = component_table->count;
-    map.mask = component_table->mask;
-
-    bool result = std_hash_map_remove_hash ( &map, hash );
-
-    if ( result ) {
-        component_table->count = map.count;
-        se_component_mask_t* mask = &se_entity_state->component_mask_array[entity_idx];
-        std_bitset_clear ( mask->u64, component_type );
-    }
-
-    return result;
-}
-
-se_component_h se_entity_component_get ( se_entity_h entity_handle, se_component_e component_type ) {
-    uint64_t entity_idx = ( uint64_t ) entity_handle;
-    se_entity_component_table_t* component_table = &se_entity_state->component_tables[entity_idx];
-
-    std_assert_m ( std_bitset_test ( se_entity_state->entity_bitset, entity_idx ) );
-
-    // TODO
-    uint64_t hash = std_hash_murmur_64 ( component_type );
-    //std_assert_m ( hash != 0 );
-
-    std_hash_map_t map;
-    map.hashes = component_table->keys;
-    map.payloads = component_table->payloads;
-    map.count = component_table->count;
-    map.mask = component_table->mask;
-
-    uint64_t* result = std_hash_map_lookup ( &map, hash );
-
-    if ( result == NULL ) {
-        return se_null_handle_m;
-    }
-
-    return ( se_component_h ) ( *result );
-}
-
-void se_entity_component_get_array ( se_component_h* out_component_handles, size_t count, const se_entity_h* entities, se_component_e component_type ) {
-    for ( size_t i = 0; i < count; ++i ) {
-        out_component_handles[i] = se_entity_component_get ( entities[i], component_type );
-    }
-}
-
-size_t se_entity_extract ( se_component_mask_t* out_component_masks, se_entity_h* out_entity_handles ) {
-    size_t block_count = se_max_entities_m / 64;
-    uint64_t entity_idx = 0;
-    size_t count = 0;
-
-    std_mutex_lock ( &se_entity_state->mutex );
-
-    while ( std_bitset_scan ( &entity_idx, se_entity_state->entity_bitset, entity_idx, block_count ) ) {
-        se_component_mask_t* component_mask = &se_entity_state->component_mask_array[entity_idx];
-        se_entity_h entity_handle = ( se_entity_h ) entity_idx;
-
-        //std_mem_copy ( out_component_flags[count], *component_flags, sizeof ( se_component_flags_t ) );
-        out_component_masks[count] = *component_mask;
-        //out_component_flags[count] = *component_flags;
-        out_entity_handles[count] = entity_handle;
-
-        ++count;
-        ++entity_idx;
-    }
-
-    std_mutex_unlock ( &se_entity_state->mutex );
-
-    return count;
-}
-#endif
-
-//--
-
-
 static uint64_t se_entity_component_mask_hash ( se_component_mask_t mask ) {
     uint64_t hash = std_hash_block_64_m ( mask.u64, se_component_mask_block_count_m * sizeof ( uint64_t ) );
     return hash;
@@ -325,24 +159,12 @@ void se_entity_family_destroy ( se_component_mask_t mask ) {
     std_bitset_clear ( se_entity_state->family_bitset, family_idx );
 }
 
-#if 0
-static se_entity_h* se_entity_family_get_entity ( se_entity_family_t* family, uint32_t idx ) {
-    se_entity_family_stream_t* stream = &family->entity_stream;
-    
-    uint32_t entities_per_page = stream->stride / se_entity_family_page_size_m;
-    uint32_t page_idx = idx / entities_per_page;
-    uint32_t page_sub_idx = idx % entities_per_page;
-
-    std_assert_m ( page_idx < stream->page_count );
-
-    se_entity_h* page = stream->pages[page_idx];
-    return &page[page_sub_idx];
-}
-#endif
-
 static void* se_entity_family_get_component ( se_entity_family_t* family, uint32_t entity_idx, uint32_t component_id, uint8_t stream_id ) {
     std_assert_m ( component_id < se_max_component_types_m );
     uint8_t component_family_slot = family->component_slots[component_id];
+    if ( component_family_slot == 0xff ) {
+        return NULL;
+    }
     std_assert_m ( component_family_slot < se_max_components_per_entity_m );
     se_entity_family_component_t* family_component = &family->components[component_family_slot];
     se_entity_family_stream_t* family_stream = &family_component->streams[stream_id];
@@ -356,9 +178,8 @@ static void* se_entity_family_get_component ( se_entity_family_t* family, uint32
     return data;
 }
 
-static void* se_entity_family_get_component_stream_data ( se_entity_t* entity, se_entity_family_stream_t* stream ) {
-    uint32_t idx = entity->idx;
-
+// idx is entity->idx field
+static void* se_entity_family_get_component_stream_data ( se_entity_family_stream_t* stream, uint64_t idx  ) {
     uint32_t stride = stream->stride;
     uint32_t items_per_page = stream->items_per_page;
     uint32_t page_idx = idx / items_per_page;
@@ -425,97 +246,9 @@ se_entity_h se_entity_reserve ( void ) {
     }
 
     uint64_t entity_idx = entity - se_entity_state->entity_array;
-    
     std_bitset_set ( se_entity_state->entity_meta->used_entities, entity_idx );
-
-    return  ( se_entity_h ) entity_idx;
+    return ( se_entity_h ) entity_idx;
 }
-
-#if 0
-se_entity_h se_entity_alloc ( se_component_mask_t mask ) {
-    // make sure entity faimly exists
-    //se_entity_family_t* family = se_entity_family_get ( mask );
-    se_entity_family_t* family = se_entity_family_get ( mask );
-    if ( !family ) {
-        std_log_error_m ( "Trying to add entity to non-existing entity family" );
-        return se_null_handle_m;
-    }
-
-    // allocate entity
-#if 0
-    se_entity_t* entity = std_list_pop_m ( &se_entity_state->entity_freelist );
-    uint64_t entity_idx = entity - se_entity_state->entity_array;
-    se_entity_h entity_handle = entity_idx;
-#else
-    se_entity_h entity_handle = se_entity_reserve();
-#endif
-    se_entity_alloc_components ( entity_handle, mask );
-
-    return entity_handle;
-}
-
-static const void* se_entity_update ( const se_entity_update_t* update ) {
-    //for ( uint64_t update_it = 0; update_it < update_count; ++update_it ) {
-    //se_entity_update_t* update = &updates[update_it];
-    se_entity_t* entity = &se_entity_state->entity_array[update->entity];
-    //se_entity_family_t* family = se_entity_family_get ( entity->mask );
-    se_entity_family_t* family = &se_entity_state->family_array[entity->family];
-
-    const se_component_update_t* component = update->components;
-    const void* ptr = component;
-
-    for ( uint32_t i = 0; i < update->component_count; ++i ) {
-        //const se_component_update_t* component = &update->components[i];
-        
-        uint32_t id = component->id;
-        std_assert_m ( id < se_max_component_types_m );
-
-        uint8_t family_slot = family->component_slots[id];
-        std_assert_m ( family_slot < se_max_components_per_entity_m );
-        se_entity_family_component_t* family_component = &family->components[family_slot];
-
-        ptr += sizeof ( se_component_update_t );
-
-        for ( uint32_t j = 0; j < component->stream_count; ++j ) {
-            const se_component_stream_update_t* stream = &component->streams[j];
-            bool has_inline_data = stream->has_inline_data;
-            void* src_data_ptr = stream->data;
-
-            se_entity_family_stream_t* family_stream = &family_component->streams[stream->id];
-            void* dst_data = se_entity_family_get_component_stream_data ( entity, family_stream );
-            uint32_t stride = family_stream->stride;
-
-            if ( !has_inline_data ) {
-                if ( src_data_ptr ) {
-                    std_mem_copy ( dst_data, src_data_ptr, stride );
-                }
-                ptr += sizeof ( se_component_stream_update_t );
-            } else {
-                std_mem_copy ( dst_data, stream->inline_data, stride );
-                ptr += 8 + stride;
-            }
-        }
-
-        //ptr += sizeof ( se_component_update_t ) + component->stream_count * sizeof ( se_component_stream_update_t );
-        component = ( const se_component_update_t* ) ptr;
-    }
-
-    return ptr;
-    //}
-}
-
-void se_entity_create ( const se_entity_params_t* params ) {
-    uint64_t count = params->entity_count;
-    const se_entity_update_t* entity_update = params->entities;
-
-    for ( uint64_t entity_it = 0; entity_it < count; ++entity_it ) {
-        //se_entity_h entity_handle = se_entity_alloc ( entity_update->mask );
-        se_entity_alloc_components ( entity_update->entity, entity_update->mask );
-        entity_update = ( se_entity_update_t* ) se_entity_update ( entity_update );
-    }
-}
-
-#else
 
 void se_entity_update ( se_entity_h entity_handle,  const se_entity_update_t* update ) {
     se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
@@ -561,20 +294,36 @@ se_entity_h se_entity_create_init ( const se_entity_params_t* params ) {
     return entity;
 }
 
-#endif
+void se_entity_destroy ( const se_entity_h entity_handle ) {
+    se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
+    se_entity_family_t* family = &se_entity_state->family_array[entity->family];
+    uint32_t entity_idx = entity->idx;
+    se_entity_h* family_entity = se_entity_family_get_component_stream_data ( &family->entity_stream, entity_idx );
+    uint32_t swap_idx = family->entity_count - 1;
+    if ( swap_idx != entity_idx ) {
+        se_entity_h* swap_entity = se_entity_family_get_component_stream_data ( &family->entity_stream, swap_idx );
+        *family_entity = *swap_entity;
+
+        for ( uint32_t i = 0; i < family->component_count; ++i ) {
+            se_entity_family_component_t* family_component = &family->components[i];
+            for ( uint32_t j = 0; j < family_component->stream_count; ++j ) {
+                se_entity_family_stream_t* component_stream = &family_component->streams[j];
+                void* entity_component = se_entity_family_get_component_stream_data ( component_stream, entity_idx );
+                void* swap_component = se_entity_family_get_component_stream_data ( component_stream, swap_idx );
+                std_mem_copy ( entity_component, swap_component, component_stream->stride );
+            }
+        }
+    }
+    family->entity_count -= 1;
+    std_bitset_clear ( se_entity_state->entity_meta->used_entities, entity_handle );
+}
 
 const char* se_entity_name ( se_entity_h entity_handle ) {
     se_entity_name_t* name = &se_entity_state->entity_meta->names[entity_handle];
     return name->string;
 }
 
-void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count ) {
-    std_not_implemented_m();
-    std_unused_m ( entity_handles );
-    std_unused_m ( count );
-}
-
-static void se_entity_extract_stream ( se_data_stream_t* result,  const se_entity_family_stream_t* stream, uint32_t entity_count ) {
+static void se_entity_extract_stream ( se_data_stream_t* result, const se_entity_family_stream_t* stream, uint32_t entity_count ) {
     uint32_t capacity = stream->items_per_page;
     
     result->page_capacity = capacity;
@@ -797,7 +546,7 @@ void se_entity_property_set ( se_property_h property_handle, void* data ) {
     uint8_t slot = family->component_slots[property_handle.component];
     se_entity_family_stream_t* stream = &family->components[slot].streams[property->stream];
 
-    void* dst_data = se_entity_family_get_component_stream_data ( entity, stream );
+    void* dst_data = se_entity_family_get_component_stream_data ( stream, entity->idx );
     dst_data += property->offset;
     uint32_t stride = se_entity_property_stride ( property->type );
 
@@ -807,39 +556,3 @@ void se_entity_property_set ( se_property_h property_handle, void* data ) {
         std_str_copy ( dst_data, se_property_string_max_size_m, data );
     }
 }
-
-#if 0
-// TODO remove
-void se_entity_update ( const se_entity_update_t* updates, uint64_t update_count ) {
-    for ( uint64_t update_it = 0; update_it < update_count; ++update_it ) {
-        se_entity_update_t* update = &updates[update_it];
-        se_entity_t* entity = &se_entity_state->entity_array[update->entity];
-        se_entity_family_t* family = se_entity_family_get ( entity->mask );
-        uint32_t family_idx = entity->family_idx;
-
-        for ( uint32_t i = 0; i < update->component_count; ++i ) {
-            se_component_data_t* component = &update->components[i];
-            
-            uint32_t id = component->id;
-            std_assert_m ( id < se_max_component_types_m );
-
-            uint8_t family_slot = family->component_slots[id];
-            std_assert_m ( family_slot < se_entity_max_components_m );
-            se_entity_family_component_t* family_component = family->components[family_slot];
-
-            for ( uint32_t j = 0; j < component->stream_count; ++j ) {
-                se_data_stream_t* stream = &component->streams[j];
-
-                se_entity_family_stream_t* family_stream = family_component->streams[stream->id];
-
-                uint32_t stride = family_stream->stride;
-                uint32_t items_per_page = family_stream->items_per_page;
-                uint32_t page_idx = family_idx / items_per_page;
-                uint32_t page_sub_idx = family_idx % items_per_page;
-
-                std_mem_copy ( family_stream->pages[page_idx] + page_sub_idx * stride, stream->data, stride );
-            }
-        }
-    }
-}
-#endif

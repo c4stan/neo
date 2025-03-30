@@ -58,7 +58,7 @@ void main ( void ) {
     cluster_3d_idx.x = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
 
     // TODO
-    uint light_count = 1;
+    uint light_count = light_buffer.light_count;
     uint thread_count = 64;
     uint light_batch_count = ( light_count + thread_count - 1 ) / thread_count;
 

@@ -120,7 +120,7 @@ static void xf_test ( void ) {
             .pass.clear = xf_node_clear_pass_params_m (
                 .textures = { 
                     xf_texture_clear_m ( .color = xg_color_clear_m ( .f32 = { color[0], color[1], color[2], 1 } ) ),
-                    xf_texture_clear_m ( .type = xf_texture_clear_type_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                    xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
                 },
             ),
             .resources = xf_node_resource_params_m (

@@ -3,8 +3,9 @@ code = public, private
 defs = public.def
 configs = debug, release
 output = exe
-deps = std, fs
+deps = std
 if win32
+    dlls = $assimp_dll
     libs = $assimp_lib
     includes = $assimp_include
     bindings = assimp_models

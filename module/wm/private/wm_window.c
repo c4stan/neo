@@ -965,7 +965,7 @@ void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_cons
     const char* prefix = "";
 
     if ( overwrite_console ) {
-        prefix = std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m;
+        prefix = std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_prevline_m;
     }
 
     std_log_m ( 0, std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n",

@@ -851,8 +851,8 @@ typedef struct {
 #define xg_scissor_state_m( ... ) ( xg_scissor_state_t ) { \
     .x = 0, \
     .y = 0, \
-    .width = 0xffffffff, \
-    .height = 0xffffffff, \
+    .width = xi_scissor_width_full_m, \
+    .height = xi_scissor_height_full_m, \
     ##__VA_ARGS__ \
 }
 
@@ -1127,6 +1127,7 @@ typedef enum {
 } xg_graphics_pipeline_dynamic_state_e;
 
 typedef enum {
+    xg_graphics_pipeline_dynamic_state_bit_none_m = 0,
     xg_graphics_pipeline_dynamic_state_bit_viewport_m = 1 << xg_graphics_pipeline_dynamic_state_viewport_m,
     xg_graphics_pipeline_dynamic_state_bit_scissor_m  = 1 << xg_graphics_pipeline_dynamic_state_scissor_m,
 } xg_graphics_pipeline_dynamic_state_bit_e;
@@ -1779,10 +1780,39 @@ typedef struct {
 }
 
 typedef struct {
+    uint32_t width;
+    uint32_t height;
+} xg_dynamic_viewport_state_t;
+
+#define xg_dynamic_viewport_state_m( ... ) ( xg_dynamic_viewport_state_t ) { \
+    .width = 0, \
+    .height = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+} xg_dynamic_scissor_state_t;
+
+#define xg_dynamic_scissor_state_m( ... ) ( xg_dynamic_scissor_state_t ) { \
+    .x = 0, \
+    .y = 0, \
+    .width = 0, \
+    .height = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xg_renderpass_h renderpass;
     xg_render_target_binding_t render_targets[xg_pipeline_output_max_color_targets_m];
     xg_depth_stencil_binding_t depth_stencil;
     uint32_t render_targets_count;
+    //xg_graphics_pipeline_dynamic_state_bit_e dynamic_state;
+    //xg_dynamic_viewport_state_t dynamic_viewport;
+    //xg_dynamic_scissor_state_t dynamic_scissor;
 } xg_cmd_renderpass_params_t;
 
 #define xg_cmd_renderpass_params_m( ... ) ( xg_cmd_renderpass_params_t ) { \
@@ -1791,6 +1821,10 @@ typedef struct {
     .depth_stencil = xg_depth_stencil_binding_m(), \
     ##__VA_ARGS__ \
 }
+//    .dynamic_state = xg_graphics_pipeline_dynamic_state_bit_none_m, \
+//    .dynamic_viewport = xg_dynamic_viewport_state_m(), \
+//    .dynamic_scissor = xg_dynamic_scissor_state_m(), \
+
 
 typedef struct {
     xg_raytrace_pipeline_state_h pipeline;
@@ -2342,6 +2376,7 @@ typedef struct {
     void                    ( *submit_workload )                    ( xg_workload_h workload );
     void                    ( *discard_workload )                   ( xg_workload_h workload );
     bool                    ( *is_workload_complete )               ( xg_workload_h workload );
+    void                    ( *debug_capture_workload )             ( xg_workload_h workload ); // TODO filename?
 
     double                  ( *get_timestamp_ticks_per_us )         ( void );
 
@@ -2417,8 +2452,8 @@ typedef struct {
 
     //xg_query_buffer_h       ( *cmd_create_query_buffer )            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_query_buffer_params_t* params );
 
-    //void                    ( *cmd_set_dynamic_viewport )           ( xg_cmd_buffer_h cmd_buffer, const xg_viewport_state_t* viewport, uint64_t key );
-    //void                    ( *cmd_set_dynamic_scissor )            ( xg_cmd_buffer_h cmd_buffer, const xg_scissor_state_t* scissor, uint64_t key );
+    void                    ( *cmd_set_dynamic_viewport )           ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_viewport_state_t* viewport );
+    void                    ( *cmd_set_dynamic_scissor )            ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_scissor_state_t* scissor );
 
     xg_buffer_h             ( *create_buffer )                      ( const xg_buffer_params_t* params );
     xg_texture_h            ( *create_texture )                     ( const xg_texture_params_t* params );
@@ -2464,6 +2499,8 @@ typedef struct {
 
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
     xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size ); // TODO take in a std_buffer_t ?
+
+    xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, void* data, size_t size );
 
     void                    ( *wait_all_workload_complete )         ( void );
 

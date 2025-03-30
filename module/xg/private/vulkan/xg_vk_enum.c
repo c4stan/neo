@@ -271,7 +271,7 @@ VkDescriptorType xg_descriptor_type_to_vk ( xg_resource_binding_e type ) {
         //    return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 
         case xg_resource_binding_raytrace_world_m:
-#if xg_vk_enable_nv_raytracing_ext_m
+#if 0//xg_vk_enable_nv_raytracing_ext_m
         return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
 #else
         return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;

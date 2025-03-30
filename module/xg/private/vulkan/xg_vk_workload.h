@@ -16,10 +16,9 @@ typedef uint64_t xg_cpu_queue_event_h;
 typedef struct {
     xg_buffer_h handle;
     xg_alloc_t alloc;
-    //char* base;
     uint64_t used_size;
     uint64_t total_size;
-} xg_vk_workload_uniform_buffer_t;
+} xg_vk_workload_buffer_t;
 
 #if 0
 typedef struct {
@@ -69,7 +68,9 @@ typedef struct {
     bool stop_debug_capture_on_present;
 
     //xg_vk_desc_allocator_t desc_allocator;
-    xg_vk_workload_uniform_buffer_t uniform_buffer;
+    xg_vk_workload_buffer_t uniform_buffer;
+    xg_vk_workload_buffer_t staging_buffer;
+    
     xg_vk_desc_allocator_t* desc_allocator;
 
     xg_vk_desc_allocator_t* desc_allocators_array[xg_vk_workload_max_desc_allocators_per_workload_m];
@@ -91,6 +92,8 @@ typedef struct {
     //uint32_t timestamp_query_pools_count;
 
     xg_resource_bindings_h global_bindings;
+
+    bool debug_capture;
 } xg_vk_workload_t;
 
 typedef struct {
@@ -203,6 +206,7 @@ xg_resource_cmd_buffer_h xg_workload_add_resource_cmd_buffer ( xg_workload_h wor
 void xg_workload_remove_resource_cmd_buffer ( xg_workload_h workload, xg_resource_cmd_buffer_h cmd_buffer );
 
 xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload, void* data, size_t size );
+xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload, void* data, size_t size );
 xg_resource_bindings_h xg_workload_create_resource_group ( xg_workload_h workload, xg_resource_bindings_layout_h layout_handle );
 void xg_workload_set_global_resource_group ( xg_workload_h workload, xg_resource_bindings_h group );
 
@@ -230,3 +234,5 @@ typedef struct {
 
 xg_vk_workload_context_inline_t xg_vk_workload_context_create_inline ( xg_device_h device_handle );
 void xg_vk_workload_context_submit_inline ( xg_vk_workload_context_inline_t* context );
+
+void xg_vk_workload_enable_debug_capture ( xg_workload_h workload );

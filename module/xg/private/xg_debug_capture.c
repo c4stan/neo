@@ -49,14 +49,26 @@ void xg_debug_capture_unload ( void ) {
     std_noop_m;
 }
 
-RENDERDOC_API_1_5_0* xg_debug_capture_get_api ( void ) {
+static RENDERDOC_API_1_5_0* xg_debug_capture_get_api ( void ) {
     return ( RENDERDOC_API_1_5_0* ) xg_debug_capture_state->renderdoc_api;
 }
 
+static bool xg_debug_capture_is_available ( void ) {
+    return xg_debug_capture_state->renderdoc_api != NULL;
+}
+
 void xg_debug_capture_start ( void ) {
+    if ( !xg_debug_capture_is_available() ) {
+        std_log_warn_m ( "Debug capture not available" );
+        return;
+    }
     xg_debug_capture_get_api()->StartFrameCapture ( NULL, NULL );
 }
 
 void xg_debug_capture_stop ( void ) {
+    if ( !xg_debug_capture_is_available() ) {
+        std_log_warn_m ( "Debug capture not available" );
+        return;
+    }
     xg_debug_capture_get_api()->EndFrameCapture ( NULL, NULL );
 }

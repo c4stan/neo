@@ -5,3 +5,6 @@ configs = debug, release
 output = dll
 deps = std, xg, xs, rv, sm
 ignores = xi_geo
+if win32
+    libs = comdlg32.lib
+endif

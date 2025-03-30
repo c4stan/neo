@@ -164,6 +164,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
     std_unused_m ( type );
     std_unused_m ( user_data );
 
+    // This is because the shader declares the raytrace AS as accelerationStructureNV but xg uses the KHR AS API.
+    // It's OK as long as it works fine. Avoids having to duplicate the entire creation code for the NV path.
+    if ( data->pMessageIdName && std_str_cmp ( data->pMessageIdName, "VUID-VkRayTracingPipelineCreateInfoNV-layout-07990" ) == 0 ) {
+        std_log_warn_m ( "Ignoring Validation error VUID-VkRayTracingPipelineCreateInfoNV-layout-07990" );
+        return VK_FALSE;
+    }
+
     if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT ) {
         //std_log_info_m ( data->pMessage );
     } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) {

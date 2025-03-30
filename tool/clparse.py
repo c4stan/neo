@@ -285,6 +285,7 @@ def build_workspace(name, flags):
     make_target = 'all'
     if '-r' in flags:
         make_target = 'reload'
+        generator.alias_target()
     if platform.system() == 'Windows':
         cmd = 'printf Building...\\n && mingw32-make ' + make_flags + ' ' + make_target
     elif platform.system() == 'Linux':
@@ -315,7 +316,7 @@ def clear_workspace(name):
     for workspace in workspaces:
         path = get_workspace_path(workspace)
         push_path(path)
-        deletes = ['output', 'modules', 'submodules', 'build']
+        deletes = ['output', 'modules', 'build']
         for delete in deletes:
             delete_path = delete
             if os.path.exists(delete_path):
@@ -400,14 +401,18 @@ def run_app(name, flags, params):
         env_vars["ENABLE_VULKAN_RENDERDOC_CAPTURE"] = "1"
 
     if makedef['output'] == ['app']:
-        cmd = './submodules/' + config + '/std_launcher.exe'
+        cmd = './build/' + config + '/output/std_launcher.exe'
         SUBPROCESS = subprocess.Popen([cmd, name], env = env_vars)
     else:
         cmd = './build/' + config + '/output/' + name + '.exe'
         SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars)
     pop_path()
 
-def debug_app(name, flags):
+def debug_process():
+    cmd = 'vsjitdebugger -p ' + str(SUBPROCESS.pid)
+    os.system(cmd)
+
+def debug_app(name, flags, params):
     if not validate_workspace(name):
         return
     path = get_workspace_path(name)
@@ -419,12 +424,14 @@ def debug_app(name, flags):
     config = 'debug'
     if ('-o' in flags):
         config = 'release'
+
+    params = ' '.join(params)
     if platform.system() == 'Windows':
         if makedef['output'] == ['app']:
-            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'submodules\\' + config + '\\' + "std_launcher" + '.exe' + ' ' + name
+            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\std_launcher.exe' + ' ' + name + ' ' + params
         else:
             #cmd = 'start ..\\remedybg.exe ' + 'output\\debug\\' + name + '.exe'
-            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\' + name + '.exe'
+            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\' + name + '.exe' + ' ' + params
     elif platform.system() == 'Linux':
         # TODD try https://github.com/nakst/gf
         cmd = 'code .'
@@ -446,7 +453,7 @@ def fixup_debug_app(name, flags):
         config = 'release'
     if platform.system() == 'Linux':
         if makedef['output'] == ['app']:
-            program_path = 'submodules/' + config + '/' + 'std_launcher.exe'
+            program_path = 'build/' + config + '/output/std_launcher.exe'
             args = name
         else:
             program_path = 'build/debug/output/' + name + '.exe'
@@ -636,7 +643,18 @@ def parse(string):
             params = []
         run_app(tokens[1], flags, params)
     elif cmd == 'debug':
-        debug_app(tokens[1], tokens[2:])
+        if len(tokens) == 1:
+            debug_process()
+        else:
+            args = tokens[2:]
+            if '--' in args:
+                split = args.index('--')
+                flags = args[0:split]
+                params = args[split + 1:]
+            else:
+                flags = args[0:]
+                params = []
+            debug_app(tokens[1], flags, params)
     elif cmd == 'create':
         create_local_workspace(tokens[1], tokens[2])
     elif cmd == 'gitpush':

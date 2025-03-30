@@ -5,6 +5,10 @@ begin viewport
     dynamic on
 end
 
+begin scissor
+    dynamic on
+end
+
 begin render_target 0
     blend on
     blend_color_op add

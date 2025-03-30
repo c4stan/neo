@@ -51,6 +51,9 @@ typedef enum {
     xg_cmd_graphics_renderpass_begin_m,
     xg_cmd_graphics_renderpass_end_m,
 
+    xg_cmd_dynamic_viewport_m,
+    xg_cmd_dynamic_scissor_m,
+
     xg_cmd_draw_m,
     xg_cmd_compute_m,
     xg_cmd_raytrace_m,
@@ -166,6 +169,9 @@ xg_cmd_buffer_t* xg_cmd_buffer_get ( xg_cmd_buffer_h cmd_buffer );
 // Begin/end renderpass
 void xg_cmd_buffer_cmd_renderpass_begin ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_renderpass_params_t* params );
 void xg_cmd_buffer_cmd_renderpass_end ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
+
+void xg_cmd_dynamic_viewport ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_viewport_state_t* viewport );
+void xg_cmd_dynamic_scissor ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_scissor_state_t* scissor );
 
 // Draw calls
 void xg_cmd_buffer_cmd_draw ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );

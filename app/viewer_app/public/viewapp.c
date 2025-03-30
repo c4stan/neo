@@ -23,6 +23,10 @@
 #include <geometry.h>
 #include <viewapp_state.h>
 
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 #include <se.inl>
 
 // ---
@@ -147,7 +151,6 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
 
 // ---
 
-// TODO avoid this, instead raycast into scene. maybe use a bvh or a grid to speed up if needed.
 static void viewapp_boot_mouse_pick_graph ( void ) {
     xg_device_h device = m_state->render.device;    
     uint32_t resolution_x = m_state->render.resolution_x;
@@ -176,17 +179,20 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
     ) );
 
     xf->add_node ( graph, &xf_node_params_m ( 
-        .debug_name = "mouse_pick_depth_clear",
+        .debug_name = "mouse_pick_clear",
         .type = xf_node_type_clear_pass_m,
         .pass.clear = {
-            .textures = { xf_texture_clear_m ( 
-                .type = xf_texture_clear_type_depth_stencil_m,
-                .depth_stencil = xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m )
-            ) }
+            .textures = { 
+                xf_texture_clear_m (),
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m ) ),
+            }
         },
         .resources = xf_node_resource_params_m (
-            .copy_texture_writes_count = 1,
-            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = depth_texture ) }
+            .copy_texture_writes_count = 2,
+            .copy_texture_writes = { 
+                xf_copy_texture_dependency_m ( .texture = object_id_texture ),
+                xf_copy_texture_dependency_m ( .texture = depth_texture ),
+            }
         )
     ) );
 
@@ -284,7 +290,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
         .device = device,
         .debug_name = "raster_graph",
-        .sort = true
+        .sort = false
     ) );
     m_state->render.raster_graph = graph;
 
@@ -300,7 +306,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .type = xf_node_type_clear_pass_m,
         .pass.clear = {
             .textures = { xf_texture_clear_m ( 
-                .type = xf_texture_clear_type_depth_stencil_m,
+                .type = xf_texture_clear_depth_stencil_m,
                 .depth_stencil = xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m )
             ) }
         },
@@ -360,7 +366,7 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .type = xf_texture_clear_type_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
             }
         ),
         .resources = xf_node_resource_params_m (
@@ -419,7 +425,6 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "light_cluster_build",
         .type = xf_node_type_compute_pass_m,
-        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cluster_build" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
@@ -502,7 +507,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = color_texture ) },
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) ) },
         ),
     ) );
 
@@ -577,7 +582,6 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->add_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssgi_ta",
-        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
@@ -597,7 +601,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = ssgi_blur_y_texture ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssgi_blur_y_texture ) ) }
         )
     ) );
 
@@ -642,7 +646,6 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->add_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssgi_2_ta",
-        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
             .samplers_count = 1,
@@ -662,7 +665,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = ssgi_2_blur_y_texture ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssgi_2_blur_y_texture ) ) }
         ),
     ) );
 
@@ -730,7 +733,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_alias_m, .alias = ssr_blur_y_texture, ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssr_blur_y_texture ) ) }
         )
     ) );
 
@@ -797,11 +800,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m (
-                    .mode = xf_passthrough_mode_alias_m,
-                    .alias = combine_texture
-                )
-            }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = combine_texture ) ) }
         )
     ) );
     m_state->render.taa_node = taa_node;
@@ -974,6 +973,7 @@ static void viewapp_build_raytrace_world ( void ) {
 
 // ---
 
+std_unused_static_m()
 static void viewapp_boot_scene_cornell_box ( void ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
@@ -1203,6 +1203,7 @@ static void viewapp_boot_scene_field ( void ) {
 
     xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
     xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
+    xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
 
     xg_device_h device = m_state->render.device;
 
@@ -1216,6 +1217,7 @@ static void viewapp_boot_scene_field ( void ) {
             .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
+            .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
             .idx_buffer = gpu_data.idx_buffer,
@@ -1256,6 +1258,7 @@ static void viewapp_boot_scene_field ( void ) {
             .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
+            .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
             .idx_buffer = gpu_data.idx_buffer,
@@ -1290,6 +1293,7 @@ static void viewapp_boot_scene_field ( void ) {
     }
 
     // lights
+    #if 1
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
@@ -1299,6 +1303,7 @@ static void viewapp_boot_scene_field ( void ) {
             .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
+            .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
             .idx_buffer = gpu_data.idx_buffer,
@@ -1361,6 +1366,7 @@ static void viewapp_boot_scene_field ( void ) {
             )
         ) );
     }
+    #endif
 
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
@@ -1371,6 +1377,7 @@ static void viewapp_boot_scene_field ( void ) {
             .geo_gpu_data = gpu_data,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
+            .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
             .idx_buffer = gpu_data.idx_buffer,
@@ -1436,7 +1443,260 @@ static void viewapp_boot_scene_field ( void ) {
 }
 #endif
 
-//#include <stdio.h>
+static void viewapp_create_cameras ( void ) {
+    se_i* se = m_state->modules.se;
+    rv_i* rv = m_state->modules.rv;
+    uint32_t resolution_x = m_state->render.resolution_x;
+    uint32_t resolution_y = m_state->render.resolution_y;
+
+    // view
+    rv_view_params_t view_params = rv_view_params_m (
+        .position = { 0, 0, -8 },
+        .proj_params = rv_projection_params_m (
+            .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
+            .near_z = 0.1,
+            .far_z = 1000,
+            .fov_y = 50.f * rv_deg_to_rad_m,
+            .jitter = { 1.f / resolution_x, 1.f / resolution_y },
+            .reverse_z = false,
+        ),
+    );
+
+    // cameras
+    viewapp_camera_component_t arcball_camera_component = viewapp_camera_component_m (
+        .view = rv->create_view ( &view_params ),
+        .enabled = true,
+        .type = viewapp_camera_type_arcball_m
+    );
+
+    viewapp_camera_component_t flycam_camera_component = viewapp_camera_component_m (
+        .view = rv->create_view ( &view_params ),
+        .enabled = false,
+        .type = viewapp_camera_type_flycam_m
+    );
+
+    se->create_entity ( &se_entity_params_m (
+        .debug_name = "arcball_camera",
+        .update = se_entity_update_m (
+            .components = { se_component_update_m (
+                .id = viewapp_camera_component_id_m,
+                .streams = { se_stream_update_m ( .data = &arcball_camera_component ) }
+            ) }
+        )
+    ) );
+
+    se->create_entity ( &se_entity_params_m (
+        .debug_name = "flycam_camera",
+        .update = se_entity_update_m (
+            .components = { se_component_update_m (
+                .id = viewapp_camera_component_id_m,
+                .streams = { se_stream_update_m ( .data = &flycam_camera_component ) }
+            ) }
+        )
+    ) );
+}
+
+static void viewapp_import_scene ( const char* input_path ) {
+    se_i* se = m_state->modules.se;
+    xs_i* xs = m_state->modules.xs;
+
+    unsigned int flags = 0;
+    flags |= aiProcess_JoinIdenticalVertices;
+    //flags |= aiProcess_MakeLeftHanded;
+    flags |= aiProcess_Triangulate;
+    flags |= aiProcess_ValidateDataStructure;
+    flags |= aiProcess_GenSmoothNormals;
+    flags |= aiProcess_FindInvalidData;
+    flags |= aiProcess_GenUVCoords;
+    flags |= aiProcess_GenBoundingBoxes;
+    //flags |= aiProcess_FlipWindingOrder;
+
+    std_log_info_m ( "Importing input scene " std_fmt_str_m, input_path );
+    const struct aiScene* scene = aiImportFile ( input_path, flags );
+
+    if ( scene == NULL ) {
+        const char* error = aiGetErrorString();
+        std_log_error_m ( "Error importing file: " std_fmt_str_m, error );
+    } else {
+        xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
+        xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
+        xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
+
+        for ( uint32_t mesh_it = 0; mesh_it < scene->mNumMeshes; ++mesh_it ) {
+            const struct aiMesh* mesh = scene->mMeshes[mesh_it];
+            xg_geo_util_geometry_data_t geo;
+            geo.vertex_count = mesh->mNumVertices;
+            geo.index_count = mesh->mNumFaces * 3;
+            geo.pos = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 3 );
+            geo.nor = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 3 );
+            geo.uv = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 2 );
+            geo.idx = std_virtual_heap_alloc_array_m ( uint32_t, geo.index_count );
+
+            for ( uint32_t i = 0; i < mesh->mNumVertices; i++ ) {
+                geo.pos[i * 3 + 0] = mesh->mVertices[i].x;
+                geo.pos[i * 3 + 1] = mesh->mVertices[i].y;
+                geo.pos[i * 3 + 2] = mesh->mVertices[i].z;
+            }
+
+            for ( uint32_t i = 0; i < mesh->mNumVertices; i++ ) {
+                geo.nor[i * 3 + 0] = mesh->mNormals[i].x;
+                geo.nor[i * 3 + 1] = mesh->mNormals[i].y;
+                geo.nor[i * 3 + 2] = mesh->mNormals[i].z;
+            }
+
+            if ( mesh->mTextureCoords[0] ) {
+                for ( uint32_t i = 0; i < mesh->mNumVertices; i++ ) {
+                    geo.uv[i * 2 + 0] = mesh->mTextureCoords[0][i].x;
+                    geo.uv[i * 2 + 1] = mesh->mTextureCoords[0][i].y;
+                }
+            } else {
+                for ( uint32_t i = 0; i < mesh->mNumVertices; i += 2 ) {
+                    geo.uv[i * 2 + 0] = 0;
+                    geo.uv[i * 2 + 1] = 0;
+                }
+            }
+
+            for ( uint32_t i = 0; i < mesh->mNumFaces; i++ ) {
+                struct aiFace face = mesh->mFaces[i];
+                geo.idx[i * 3 + 0] = face.mIndices[0];
+                geo.idx[i * 3 + 1] = face.mIndices[1];
+                geo.idx[i * 3 + 2] = face.mIndices[2];
+            }
+
+            xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
+
+            float base_color[3] = { 
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 250 / 255.f, 2.2 )
+            };
+            float roughness = 1;
+            float metalness = 0;
+
+            uint32_t mat_idx = mesh->mMaterialIndex;
+            if ( mat_idx < scene->mNumMaterials ) {
+                struct aiMaterial* material = scene->mMaterials[mat_idx];
+                struct aiColor4D diffuse;
+                if ( aiGetMaterialColor ( material, AI_MATKEY_BASE_COLOR, &diffuse ) == AI_SUCCESS ) {
+                    base_color[0] = diffuse.r;
+                    base_color[1] = diffuse.g;
+                    base_color[2] = diffuse.b;
+                }
+
+                aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &roughness );
+                aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &metalness );
+            }
+
+            viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+                .geo_data = geo,
+                .geo_gpu_data = gpu_data,
+                .object_id_pipeline = object_id_pipeline_state,
+                .geometry_pipeline = geometry_pipeline_state,
+                .shadow_pipeline = shadow_pipeline_state,
+                .pos_buffer = gpu_data.pos_buffer,
+                .nor_buffer = gpu_data.nor_buffer,
+                .idx_buffer = gpu_data.idx_buffer,
+                .vertex_count = geo.vertex_count,
+                .index_count = geo.index_count,
+                .position = { 0, 0, 0 },
+                .object_id = m_state->render.next_object_id++,
+                .material = viewapp_material_data_m (
+                    .base_color = { base_color[0], base_color[1], base_color[2] },
+                    .ssr = true,
+                    .roughness = roughness,
+                    .metalness = metalness,
+                )
+            );
+
+            se_entity_params_t entity_params = se_entity_params_m (
+                .update = se_entity_update_m (
+                    .components = { se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ) }
+                )
+            );
+            std_str_copy_static_m ( entity_params.debug_name, mesh->mName.data );
+            se->create_entity ( &entity_params );
+        }
+
+        for ( uint32_t light_it = 0; light_it < scene->mNumLights; ++light_it ) {
+            const struct aiLight* light = scene->mLights[light_it];
+            
+            viewapp_light_component_t light_component = viewapp_light_component_m (
+                .position = { light->mPosition.x, light->mPosition.y, light->mPosition.z },
+                .intensity = 5,
+                .color = { light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b },
+                .shadow_casting = false
+            );
+
+            se_entity_params_t entity_params = se_entity_params_m (
+                .update = se_entity_update_m (
+                    .components = { se_component_update_m (
+                        .id = viewapp_light_component_id_m,
+                        .streams = ( se_stream_update_m ( .data = &light_component ) )
+                    ) }
+                )
+            );
+            std_str_copy_static_m ( entity_params.debug_name, light->mName.data );
+            se->create_entity ( &entity_params );
+        }
+    }
+
+    aiReleaseImport ( scene );
+}
+
+#if 0
+// TODO
+static xg_texture_h viewapp_load_texture ( const char* path ) {
+    int width, height, channels;
+    void* data = stbi_load ( path, &width, &height, &channels, 0 );
+    if ( !data ) {
+        return xg_null_handle_m;
+    }
+
+    xg_i* xg = m_state->modules.xg;
+    xg_texture_params_t params = xg_texture_params_m ( 
+        .memory_type = xg_memory_type_gpu_only_m,
+        .device = m_state->render.device,
+        .width = width,
+        .height = height,
+        .format = , // TODO
+        .allowed_usage = xg_texture_usage_bit_sampled_m,
+    );
+}
+#endif
+
+static void viewapp_load_scene ( uint32_t id ) {
+    se_i* se = m_state->modules.se;
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m() );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    uint64_t entity_count = mesh_query_result.entity_count;
+
+    for ( uint64_t i = 0; i < entity_count; ++i ) {
+        se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
+        viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
+        if ( mesh_component ) {
+            xg_geo_util_free_data ( &mesh_component->geo_data );
+            xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data );
+        }
+        se->destroy_entity ( *entity );
+    }
+
+    viewapp_create_cameras();
+
+    if ( id == 0 ) {
+        viewapp_boot_scene_cornell_box();
+    } else if ( id == 1 ) {
+        viewapp_boot_scene_field();
+    } else {
+        viewapp_import_scene ( m_state->scene.custom_scene_path );
+    }
+
+    m_state->scene.active_scene = id;
+}
+
 static void viewapp_boot ( void ) {
     uint32_t resolution_x = 1024;//1920;
     uint32_t resolution_y = 768;//1024;
@@ -1509,11 +1769,15 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh component", &se_component_properties_params_m (
-        .count = 3,
+        .count = 7,
         .properties = {
             se_field_property_m ( 0, viewapp_mesh_component_t, position, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, orientation, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, up, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.base_color, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.roughness, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.metalness, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.ssr, se_property_bool_m ),
         }
     ) );
 
@@ -1594,63 +1858,16 @@ static void viewapp_boot ( void ) {
 
         m_state->ui.frame_section_state = xi_section_state_m ( .title = "frame" );
         m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
+        m_state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
         m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
         m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
     }
 
-    rv_i* rv = m_state->modules.rv;
-    {
-        // view
-        rv_view_params_t view_params = rv_view_params_m (
-            .position = { 0, 0, -8 },
-            .proj_params = rv_projection_params_m (
-                .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
-                .near_z = 0.1,
-                .far_z = 1000,
-                .fov_y = 50.f * rv_deg_to_rad_m,
-                .jitter = { 1.f / resolution_x, 1.f / resolution_y },
-                .reverse_z = false,
-            ),
-        );
-
-        // cameras
-        viewapp_camera_component_t arcball_camera_component = viewapp_camera_component_m (
-            .view = rv->create_view ( &view_params ),
-            .enabled = true,
-            .type = viewapp_camera_type_arcball_m
-        );
-
-        viewapp_camera_component_t flycam_camera_component = viewapp_camera_component_m (
-            .view = rv->create_view ( &view_params ),
-            .enabled = false,
-            .type = viewapp_camera_type_flycam_m
-        );
-
-        se->create_entity ( &se_entity_params_m (
-            .debug_name = "arcball_camera",
-            .update = se_entity_update_m (
-                .components = { se_component_update_m (
-                    .id = viewapp_camera_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &arcball_camera_component ) }
-                ) }
-            )
-        ) );
-
-        se->create_entity ( &se_entity_params_m (
-            .debug_name = "flycam_camera",
-            .update = se_entity_update_m (
-                .components = { se_component_update_m (
-                    .id = viewapp_camera_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &flycam_camera_component ) }
-                ) }
-            )
-        ) );
-    }
-
     viewapp_boot_workload_resources_layout();
 
-    viewapp_boot_scene_cornell_box();
+    //viewapp_boot_scene_cornell_box();
     //viewapp_boot_scene_field();
+    viewapp_load_scene ( m_state->scene.active_scene );
     viewapp_build_raytrace_geo();
     viewapp_build_raytrace_world();
 
@@ -2053,13 +2270,35 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         xi->newline();
     }
     xi->end_section ( xi_workload );
+
+    // scene
+    xi->begin_section ( xi_workload, &m_state->ui.scene_section_state );
+    {
+        xi_label_state_t scene_select_label = xi_label_state_m ( .text = "scene" );
+        xi->add_label ( xi_workload, &scene_select_label );
+
+        const char* scene_select_items[] = { "cornell box", "field", "..." };
+        xi_select_state_t scene_select = xi_select_state_m (
+            .items = scene_select_items,
+            .item_count = std_static_array_capacity_m ( scene_select_items ),
+            .item_idx = m_state->scene.active_scene,
+            .width = 100,
+            .sort_order = 2,
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+        );
+        if ( xi->add_select ( xi_workload, &scene_select ) ) {
+            if ( scene_select.item_idx == 2 ) {
+                xi->file_pick ( std_buffer_static_array_m ( m_state->scene.custom_scene_path ), std_binding_assimp_models_m );
+            }
+            viewapp_load_scene ( scene_select.item_idx );
+        }
+    }
+    xi->end_section ( xi_workload );
     
     // xf graph
     xi->begin_section ( xi_workload, &m_state->ui.xf_graph_section_state );
     {
-        xi_label_state_t graph_select_label = xi_label_state_m (
-            .text = "graph"
-        );
+        xi_label_state_t graph_select_label = xi_label_state_m ( .text = "graph" );
         xi->add_label ( xi_workload, &graph_select_label );
 
 #if xg_enable_raytracing_m
@@ -2115,6 +2354,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
                 if ( node_switch.value != node_enabled ) {
                     xf->node_set_enabled ( m_state->render.active_graph, graph_info.nodes[i], node_switch.value );
+                    xf->invalidate_graph ( m_state->render.active_graph, workload );
                 }
             }
         }
@@ -2133,6 +2373,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 for ( uint32_t i = 0; i < info.node_count; ++i ) {
                     xf->disable_node ( m_state->render.active_graph, info.nodes[i] );
                 }
+                xf->invalidate_graph ( m_state->render.active_graph, workload );
             }
             if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
                 .text = "Enable all", 
@@ -2145,6 +2386,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 for ( uint32_t i = 0; i < info.node_count; ++i ) {
                     xf->enable_node ( m_state->render.active_graph, info.nodes[i] );
                 }
+                xf->invalidate_graph ( m_state->render.active_graph, workload );
             }
         }
     }
@@ -2213,17 +2455,15 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
     xi->end_section ( xi_workload );
 
+    xi->end_window ( xi_workload );
+
+    // raytrace update
     if ( entity_edit ) {
         update_raytrace_world ( workload );
     }
 
-    xi->end_window ( xi_workload );
-
-    if ( !old_input_state->mouse[wm_mouse_state_left_m] && input_state->mouse[wm_mouse_state_left_m] ) {
-        mouse_pick ( input_state->cursor_x, input_state->cursor_y );
-    }
-
     // geos
+    bool transform_drag = false;
     if ( m_state->ui.mouse_pick_entity != se_null_handle_m ) {
         viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
         std_assert_m ( mesh );
@@ -2231,7 +2471,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         xi_transform_state_t xform = xi_transform_state_m (
             .position = { mesh->position[0], mesh->position[1], mesh->position[2] }
         );
-        xi->draw_transform ( xi_workload, &xform );
+        transform_drag = xi->draw_transform ( xi_workload, &xform );
 
         bool rtworld_needs_update = false;
         if ( ( mesh->position[0] != xform.position[0] 
@@ -2249,6 +2489,11 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         if ( rtworld_needs_update ) {
             update_raytrace_world ( workload );
         }
+    }
+
+    // mouse pick
+    if ( !transform_drag && !old_input_state->mouse[wm_mouse_state_left_m] && input_state->mouse[wm_mouse_state_left_m] ) {
+        mouse_pick ( input_state->cursor_x, input_state->cursor_y );
     }
 
     xi->end_update();
@@ -2381,7 +2626,6 @@ void* viewer_app_load ( void* runtime ) {
     state->reload = false;
 
     state->modules = ( viewapp_modules_state_t ) {
-        .tk = std_module_load_m ( tk_module_name_m ),
         .wm = std_module_load_m ( wm_module_name_m ),
         .xg = std_module_load_m ( xg_module_name_m ),
         .xs = std_module_load_m ( xs_module_name_m ),
@@ -2392,6 +2636,7 @@ void* viewer_app_load ( void* runtime ) {
     };
     state->render = viewapp_render_state_m();
     state->ui = viewapp_ui_state_m();
+    state->scene = viewapp_scene_state_m();
 
     m_state = state;
     return state;
@@ -2420,7 +2665,6 @@ void viewer_app_unload ( void ) {
     std_module_unload_m ( xs_module_name_m );
     std_module_unload_m ( xg_module_name_m );
     std_module_unload_m ( wm_module_name_m );
-    std_module_unload_m ( tk_module_name_m );
 
     viewapp_state_free();
 }

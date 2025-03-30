@@ -56,6 +56,8 @@ static void xi_api_init ( xi_i* xi ) {
 
     xi->get_active_element_id = xi_ui_get_active_id;
     xi->get_hovered_element_id = xi_ui_get_hovered_id;
+
+    xi->file_pick = xi_ui_file_pick;
 }
 
 void* xi_load ( void* std_runtime ) {

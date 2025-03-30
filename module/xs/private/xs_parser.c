@@ -244,7 +244,11 @@ static bool xs_parser_str_to_bool ( const char* token ) {
 
 static xg_format_e xs_parser_format_to_enum ( const char* format ) {
 
-    if ( std_str_cmp ( format, "R16_FLOAT" ) == 0 ) {
+    if ( std_str_cmp ( format, "R8_UINT" ) == 0 ) {
+        return xg_format_r8_uint_m;
+    }
+
+    else if ( std_str_cmp ( format, "R16_FLOAT" ) == 0 ) {
         return xg_format_r16_sfloat_m;
     } else if ( std_str_cmp ( format, "R16_UNORM" ) == 0 ) {
         return xg_format_r16_unorm_m;
@@ -1724,19 +1728,7 @@ static void xs_parser_parse_graphics_pipeline_state ( xs_parser_parsing_context_
 }
 
 bool xs_parser_parse_graphics_pipeline_state_from_path ( xs_parser_graphics_pipeline_state_t* state, const char* path ) {
-#if 0
-    fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
-    std_assert_m ( pipeline_state_file != fs_null_handle_m );
-    fs_file_info_t pipeline_state_file_info;
-    std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
-    void* file_buffer = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
-    std_verify_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
-    fs->close_file ( pipeline_state_file );
-#else
-    std_buffer_t file_buffer = std_virtual_heap_read_file ( path );
-#endif
-
-    //state_alloc.buffer.base[pipeline_state_file_info.size] = 0;
+    std_buffer_t file_buffer = std_file_read_to_virtual_heap ( path );
 
     xs_parser_parsing_context_t context;
     xs_parser_parsing_context_init ( &context, xg_pipeline_graphics_m, state, file_buffer, path );
@@ -1874,17 +1866,7 @@ static void xs_parser_parse_compute_pipeline_state ( xs_parser_parsing_context_t
 }
 
 bool xs_parser_parse_compute_pipeline_state_from_path ( xs_parser_compute_pipeline_state_t* state, const char* path ) {
-#if 0
-    fs_file_h pipeline_state_file = fs->open_file ( path, fs_file_read_m );
-    std_assert_m ( pipeline_state_file != fs_null_handle_m );
-    fs_file_info_t pipeline_state_file_info;
-    std_verify_m ( fs->get_file_info ( &pipeline_state_file_info, pipeline_state_file ) );
-    std_alloc_t state_alloc = std_virtual_heap_alloc ( pipeline_state_file_info.size, 16 );
-    std_verify_m ( fs->read_file ( NULL, state_alloc.buffer, pipeline_state_file ) );
-    fs->close_file ( pipeline_state_file );
-#else
-    std_buffer_t file_buffer = std_virtual_heap_read_file ( path );
-#endif
+    std_buffer_t file_buffer = std_file_read_to_virtual_heap ( path );
 
     xs_parser_parsing_context_t context;
     xs_parser_parsing_context_init ( &context, xg_pipeline_compute_m, state, file_buffer, path );
@@ -1895,7 +1877,7 @@ bool xs_parser_parse_compute_pipeline_state_from_path ( xs_parser_compute_pipeli
 }
 
 bool xs_parser_parse_raytrace_pipeline_state_from_path ( xs_parser_raytrace_pipeline_state_t* state, const char* path ) {
-    std_buffer_t file_buffer = std_virtual_heap_read_file ( path );
+    std_buffer_t file_buffer = std_file_read_to_virtual_heap ( path );
 
     xs_parser_parsing_context_t context;
     xs_parser_parsing_context_init ( &context, xg_pipeline_raytrace_m, state, file_buffer, path );

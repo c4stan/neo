@@ -54,8 +54,10 @@ static void xg_api_init ( xg_i* xg ) {
     xg->submit_workload = xg_workload_submit;
     xg->is_workload_complete = xg_workload_is_complete;
     xg->write_workload_uniform = xg_workload_write_uniform;
+    xg->write_workload_staging = xg_workload_write_staging;
     xg->wait_all_workload_complete = xg_workload_wait_all_workload_complete;
     xg->set_workload_global_bindings = xg_workload_set_global_resource_group;
+    xg->debug_capture_workload = xg_vk_workload_enable_debug_capture;
     // Raytrace
     xg->create_raytrace_geometry = xg_vk_raytrace_geometry_create;
     xg->create_raytrace_world = xg_vk_raytrace_world_create;
@@ -70,6 +72,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_copy_texture = xg_cmd_buffer_copy_texture;
     xg->cmd_copy_buffer = xg_cmd_buffer_copy_buffer;
     xg->cmd_copy_buffer_to_texture = xg_cmd_buffer_copy_buffer_to_texture;
+    xg->cmd_set_dynamic_viewport = xg_cmd_dynamic_viewport;
+    xg->cmd_set_dynamic_scissor = xg_cmd_dynamic_scissor;
     //#if defined(std_platform_win32_m)
     xg->cmd_start_debug_capture = xg_cmd_buffer_start_debug_capture;
     xg->cmd_stop_debug_capture = xg_cmd_buffer_stop_debug_capture;
@@ -88,7 +92,6 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_destroy_renderpass = xg_resource_cmd_buffer_graphics_renderpass_destroy;
     xg->cmd_create_workload_bindings = xg_resource_cmd_buffer_workload_resource_bindings_create;
     xg->cmd_destroy_queue_event = xg_resource_cmd_buffer_queue_event_destroy;
-
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;
     xg->get_buffer_info = xg_buffer_get_info;

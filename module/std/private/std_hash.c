@@ -560,13 +560,13 @@ uint64_t* std_hash_map_lookup_insert ( std_hash_map_t* map, uint64_t hash, bool*
         if ( map_hash == UINT64_MAX ) {
             hashes[idx] = hash;
             ++map->count;
-            *insert = true;
+            if ( insert ) *insert = true;
             return &payloads[idx];
         }
 
         if ( hash == map_hash ) {
             // Success
-            *insert = false;
+            if ( insert ) *insert = false;
             return &payloads[idx];
         }
 
@@ -575,7 +575,7 @@ uint64_t* std_hash_map_lookup_insert ( std_hash_map_t* map, uint64_t hash, bool*
     }
 
     std_log_error_m ( "hash map is full!" );
-    *insert = false;
+    if ( insert ) *insert = false;
     return NULL;
 }
 

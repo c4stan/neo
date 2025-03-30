@@ -27,4 +27,4 @@ std_path_size_m                         32767
 std_debug_string_size_m                 32
 
 #std_module
-std_module_name_max_len_m               32
+std_module_name_max_len_m               64

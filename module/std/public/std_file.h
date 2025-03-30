@@ -2,6 +2,7 @@
 
 #include <std_platform.h>
 #include <std_time.h>
+#include <std_allocator.h>
 
 typedef uint64_t std_file_h;
 #define std_file_null_handle_m UINT64_MAX
@@ -96,6 +97,7 @@ size_t      std_directory_files ( char** files, size_t files_cap, size_t file_ca
 size_t      std_directory_subdirs ( char** subdirs, size_t subdirs_cap, size_t subdir_cap, const char* path );
 bool        std_directory_info ( std_directory_info_t* info, const char* path );
 
+// TODO automatically create path if missing
 std_file_h  std_file_create ( const char* path, std_file_access_t access, std_path_already_existing_e already_existing );
 bool        std_file_destroy ( std_file_h file );
 bool        std_file_path_destroy ( const char* path );
@@ -114,3 +116,5 @@ bool        std_file_seek ( std_file_h file, std_file_point_t base, int64_t offs
 bool        std_file_info ( std_file_info_t* info, std_file_h file );
 bool        std_file_path_info ( std_file_info_t* info, const char* path );
 size_t      std_file_path ( char* path, size_t cap, std_file_h file );
+
+std_buffer_t std_file_read_to_virtual_heap ( const char* path );

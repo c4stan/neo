@@ -466,6 +466,8 @@ class Project:
         log.pop_verbose()
 
     # Resolve module dependencies by converting them to 'normal' dependencies
+    # TODO instead of adding them to external_, make new lists module_libs module_dlls module_execs,
+    #       and leave the external ones for actual non-module external dlls/...
     def gather_module_dependencies(self):
         log.verbose("Gathering module dependencies...")
         log.push_verbose()
@@ -556,7 +558,6 @@ class Project:
             log.verbose(dep)
         log.pop_verbose()
 
-        # TODO what are these 2 blocks for?
         log.verbose("External libs:")
         log.push_verbose()
         external_libs = []
@@ -576,7 +577,6 @@ class Project:
             external_dlls.append(dll)
         self.external_dlls = external_dlls
         log.pop_verbose()
-        # TODO see above
 
         self.map_files()
         return True
@@ -670,11 +670,11 @@ class Project:
         def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/cli.py\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_build_debug_m=1'
-            def_cmd += ' -Dstd_submodules_path_m=\\"submodules/debug/\\"'
         elif self.config == CONFIG_RELEASE:
             def_cmd += ' -Dstd_build_debug_m=0'
-            def_cmd += ' -Dstd_submodules_path_m=\\"submodules/release/\\"'
         def_cmd += ' -Dstd_rootpath_m=\\"' + normpath(self.index.root_path) + '/\\"'
+        submodule_path = 'build/' + config_path + '/output/'
+        def_cmd += ' -Dstd_submodules_path_m=\\"' + submodule_path + '\\"'
         stack_size = '1000000'
         # Parse all def files
         for path in self.defines:
@@ -938,27 +938,74 @@ class Project:
 
         create_dir(relpath(self.path + '/build/' + config_path, rootpath) + '/output/')
 
+    def alias_target(self):
+        copied_dlls = []
+
+        config = config_str(self.config)
+        modules_path = self.path + '/build/' + config + '/output/'
+
+        dlls_to_copy = []
+        if self.output == OUTPUT_APP:
+            output_path = self.path + '/build/' + config + '/output'
+            dll = output_path + '/' + self.name + '.dll'
+            dlls_to_copy.append((config, dll))
+
+        for item in dlls_to_copy:
+            config = ''
+            dll = ''
+            if type(item) in [list, tuple]:
+                config = item[0] + '/'
+                dll = item[1]
+            else:
+                dll = item
+            base, name, ext = parse_path(dll)
+
+            dest_dll_path = normpath(modules_path + '/' + name + ext)
+            source_dll_path = dll
+            copied_dlls.append(name)
+
+            alias_dll_path = normpath(modules_path + '/' + '___' + name + ext)
+
+            # print('\t' + source_dll_path)
+            # this will delete the .dll even if there's a process still running that's loaded it in the past
+            # needed for live reload
+            
+            #log.verbose('Deleting ' + normpath(modules_path + '/' + name + ext))
+            #os.system('rm -f ' + normpath(modules_path + '/' + name + ext))
+            
+            if (os.path.exists(alias_dll_path)):
+                log.verbose('Deleting ' + alias_dll_path)
+                os.system('rm -f ' + alias_dll_path)
+
+            if (os.path.exists(dest_dll_path)):
+                log.verbose('Renaming ' + dest_dll_path + ' to ' + alias_dll_path)
+                #log.verbose('mv ' + normpath(modules_path + '/' + name + ext) + ' ' + normpath(modules_path + '/' + '___' + name + ext))
+                # TODO make silent to avoid warning
+                os.system('mv ' + dest_dll_path + ' ' + alias_dll_path)
+
     # external_dlls are located and copied locally as part of the build process by this script
     def gather_dlls(self, path):
         copied_dlls = []
 
         config = config_str(self.config)
-        modules_path = normpath(path + '/' + config)
+        modules_path = path# normpath(path + '/' + config)
 
         # TODO remove this, use external_exes instead
-        if self.output == OUTPUT_APP and not (BUILD_FLAGS & BUILD_FLAG_RELOAD):            
-            create_dir(modules_path)
-            base, name, ext = parse_path(self.launcher_path)
+        if self.output == OUTPUT_APP and not (BUILD_FLAGS & BUILD_FLAG_RELOAD):
             shutil.copy(self.launcher_path, modules_path)
-            output_path = self.path + '/build/' + config + '/output'
-            dll = output_path + '/' + self.name + '.dll'
-            shutil.copy(dll, modules_path)
+            #create_dir(modules_path)
+            #base, name, ext = parse_path(self.launcher_path)
+            #shutil.copy(self.launcher_path, modules_path)
+            #output_path = self.path + '/build/' + config + '/output'
+            #dll = output_path + '/' + self.name + '.dll'
+            #shutil.copy(dll, modules_path)
 
         dlls_to_copy = self.external_dlls.copy()
         if self.output == OUTPUT_APP:
-            output_path = self.path + '/build/' + config + '/output'
-            dll = output_path + '/' + self.name + '.dll'
-            dlls_to_copy.append((config, dll))
+            copied_dlls.append(self.name)
+        #    output_path = self.path + '/build/' + config + '/output'
+        #    dll = output_path + '/' + self.name + '.dll'
+        #    dlls_to_copy.append((config, dll))
 
         if len(dlls_to_copy) > 0:
             create_dir(modules_path)
@@ -1008,8 +1055,10 @@ class Project:
                 if platform.system() == 'Windows':
                     log.verbose('Deleting ' + normpath(modules_path + '/' + name + '.pdb'))
                     os.system('rm -f ' + normpath(modules_path + '/' + name + '.pdb'))
-                    log.verbose('Copying ' + base + '/' + name + '.pdb' + ' to ' + normpath(modules_path + '/' + name + '.pdb'))
-                    shutil.copy(base + '/' + name + '.pdb', normpath(modules_path + '/' + name + '.pdb'))
+                    source_pdb_path = base + '/' + name + '.pdb'
+                    if (os.path.exists(source_pdb_path)):
+                        log.verbose('Copying ' + base + '/' + name + '.pdb' + ' to ' + normpath(modules_path + '/' + name + '.pdb'))
+                        shutil.copy(source_pdb_path, normpath(modules_path + '/' + name + '.pdb'))
         return copied_dlls
 
 # A solution contains the main module and all its dependencies as projects.
@@ -1045,7 +1094,13 @@ class Solution:
         return self.projects[name]
 
     def gather_dlls(self):
-        return self.main_project.gather_dlls(normpath(self.main_project.path + '/submodules'))
+        config_path = config_str(self.config)
+        gather_path = self.main_project.path + '/submodules'
+        gather_path = self.main_project.path + '/build/' + config_path + '/output/'
+        return self.main_project.gather_dlls(normpath(gather_path))
+
+    def alias_target(self):
+        self.main_project.alias_target()
 
     def output_build_changes(self, changelist):
         message = str(len(changelist)) + '\0'
@@ -1110,9 +1165,9 @@ class Solution:
             separator = ''
             path = relpath(self.main_project.path + '/build/' + config_path + '/output/*', self.root)
             makefile.write(separator + 'rm -rf ' + path)
-            separator = ' && '
-            path = relpath(self.main_project.path + '/submodules/' + config_path + '/*', self.root)
-            makefile.write(separator + 'rm -rf ' + path)
+            #separator = ' && '
+            #path = relpath(self.main_project.path + '/submodules/' + config_path + '/*', self.root)
+            #makefile.write(separator + 'rm -rf ' + path)
             makefile.write('\n\n')
             phony.append('clean')
         # --- Dump the projects ---
@@ -1273,6 +1328,12 @@ class Generator:
         log.info('Writing out build error...')
         log.push_verbose()
         self.solution.output_build_error()
+        log.pop_verbose()
+
+    def alias_target(self):
+        log.info('Aliasing target...')
+        log.push_verbose()
+        self.solution.alias_target()
         log.pop_verbose()
 
     def get_build_path(self):

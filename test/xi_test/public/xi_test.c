@@ -410,7 +410,7 @@ static void xi_test ( void ) {
     xi->init_geos ( device );
     xi_transform_state_t xform_state = xi_transform_state_m();
 
-    float target_fps = 30.f;
+    float target_fps = 24.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = std_tick_now();
 

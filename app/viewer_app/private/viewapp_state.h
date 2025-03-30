@@ -10,7 +10,6 @@
 #include <wm.h>
 #include <xg.h>
 #include <xi.h>
-#include <tk.h>
 
 #include <xg_geo_util.h>
 
@@ -23,8 +22,21 @@ typedef struct {
     se_i* se;
     rv_i* rv;
     xi_i* xi;
-    tk_i* tk;
 } viewapp_modules_state_t;
+
+// Scene
+typedef struct {
+    uint32_t active_scene;
+    char custom_scene_path[128];
+    //uint32_t entity_count;
+    //se_entity_h entities[128];
+} viewapp_scene_state_t;
+
+#define viewapp_scene_state_m( ... ) ( viewapp_scene_state_t ) { \
+    .active_scene = 0, \
+    .custom_scene_path[0] = '\0' \
+    ##__VA_ARGS__ \
+}
 
 // Render
 typedef struct {
@@ -92,6 +104,7 @@ typedef struct {
     xi_section_state_t frame_section_state;
     xi_section_state_t xg_alloc_section_state;
     xi_section_state_t xf_graph_section_state;
+    xi_section_state_t scene_section_state;
     xi_section_state_t entities_section_state;
 
     se_entity_h mouse_pick_entity;
@@ -121,6 +134,9 @@ typedef struct {
     float roughness;
     float metalness;
     float emissive;
+    xf_texture_h color_texture;
+    xf_texture_h normal_texture;
+    xf_texture_h metalness_roughness_texture;
 } viewapp_material_data_t;
 
 #define viewapp_material_data_m( ... ) ( viewapp_material_data_t ) { \
@@ -129,6 +145,9 @@ typedef struct {
     .ssr = false, \
     .roughness = 0.5, \
     .metalness = 0, \
+    .color_texture = xg_null_handle_m, \
+    .normal_texture = xg_null_handle_m, \
+    .metalness_roughness_texture = xg_null_handle_m, \
     ##__VA_ARGS__ \
 }
 
@@ -233,6 +252,7 @@ typedef struct {
     viewapp_modules_state_t modules;
     viewapp_render_state_t render;
     viewapp_ui_state_t ui;
+    viewapp_scene_state_t scene;
     bool reload;
 } viewapp_state_t;
 

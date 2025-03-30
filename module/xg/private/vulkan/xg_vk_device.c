@@ -848,7 +848,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         "VK_KHR_deferred_host_operations",
 #endif
         // debugPrintfEXT - TODO enable in debug only?
-        "VK_KHR_shader_non_semantic_info",
+        //"VK_KHR_shader_non_semantic_info",
         // vkGetQueueCheckpointDataNV
         "VK_NV_device_diagnostic_checkpoints",
     };

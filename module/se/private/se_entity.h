@@ -6,6 +6,10 @@
 #include <std_mutex.h>
 #include <std_hash.h>
 
+// TODO use virtual arrays instead of this paged chunk system?
+//      only downside seems to be losing the potential (not yet implemented) to free
+//      entire pages at once instead of having to always delete entities one by one.
+//      could be useful when it comes down to e.g. static entities in a level?
 typedef struct {
     uint32_t stride;
     uint32_t page_count;
@@ -131,7 +135,7 @@ void se_entity_update ( se_entity_h entity, const se_entity_update_t* update );
 se_entity_h se_entity_create_init ( const se_entity_params_t* params );
 
 //void se_entity_create ( const se_entity_params_t* params );
-void se_entity_destroy ( const se_entity_h* entity_handles, uint64_t count );
+void se_entity_destroy ( const se_entity_h entity_handle );
 
 void se_entity_query ( se_query_result_t* result, const se_query_params_t* params );
 

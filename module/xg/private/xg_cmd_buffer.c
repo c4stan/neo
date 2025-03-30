@@ -440,6 +440,18 @@ void xg_cmd_buffer_cmd_renderpass_end ( xg_cmd_buffer_h cmd_buffer_handle, uint6
     xg_cmd_buffer_record_cmd_noargs_m ( cmd_buffer, xg_cmd_graphics_renderpass_end_m, key );
 }
 
+void xg_cmd_dynamic_viewport ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_viewport_state_t* viewport ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_dynamic_viewport_m, key, xg_viewport_state_t );
+    *cmd_args = *viewport;
+}
+
+void xg_cmd_dynamic_scissor ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_scissor_state_t* scissor ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_dynamic_scissor_m, key, xg_scissor_state_t );
+    *cmd_args = *scissor;
+}
+
 void xg_cmd_buffer_cmd_draw ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_draw_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_draw_m, key, xg_cmd_draw_params_t );

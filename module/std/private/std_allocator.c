@@ -652,6 +652,12 @@ void std_stack_free ( std_stack_t* stack, size_t size ) {
     stack->top = top >= begin ? top : begin;
 }
 
+uint64_t std_stack_used_size ( std_stack_t* stack ) {
+    void* top = stack->top;
+    void* begin = stack->begin;
+    return top - begin;
+}
+
 //==============================================================================
 
 std_virtual_stack_t std_virtual_stack ( void* base, size_t mapped_size, size_t virtual_size ) {
@@ -675,6 +681,10 @@ std_virtual_stack_t std_virtual_stack_create ( size_t virtual_size ) {
 
 void std_virtual_stack_destroy ( std_virtual_stack_t* stack ) {
     std_virtual_free ( stack->mapped.begin, stack->virtual_end );
+}
+
+uint64_t std_virtual_stack_used_size ( std_virtual_stack_t* stack ) {
+    return std_stack_used_size ( &stack->mapped );
 }
 
 static bool std_virtual_stack_size_check ( std_virtual_stack_t* stack, size_t alloc_size ) {
@@ -1728,22 +1738,3 @@ typedef struct {
 
 #endif
 */
-
-std_buffer_t std_virtual_heap_read_file ( const char* path ) {
-    std_file_h file = std_file_open ( path, std_file_read_m );
-    std_file_info_t file_info;
-    bool valid_info = std_file_info ( &file_info, file );
-    if ( !valid_info ) {
-        return std_null_buffer_m;
-    }
-    
-    void* buffer = std_virtual_heap_alloc_m ( file_info.size, 16 );
-    uint64_t read_size = std_file_read ( buffer, file_info.size, file );
-    if ( read_size == std_file_read_error_m ) {
-        return std_null_buffer_m;
-        std_virtual_heap_free ( buffer );
-    }
-
-    std_file_close ( file );
-    return std_buffer ( buffer, file_info.size );
-}

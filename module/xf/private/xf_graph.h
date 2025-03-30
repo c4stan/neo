@@ -332,6 +332,7 @@ typedef struct {
     uint32_t nodes_count;
     bool is_finalized;
     bool is_built;
+    bool is_invalidated;
 
     xf_graph_texture_t textures_array[xf_graph_max_textures_m];
     xf_graph_buffer_t buffers_array[xf_graph_max_buffers_m];
@@ -346,7 +347,7 @@ typedef struct {
     //uint64_t multi_textures_hashes[xf_graph_max_multi_textures_m];
     //std_hash_set_t multi_textures_hash_set;
     
-    // queue[n][q] stores the idx of node n predecessor for queue type q. All indices are to nodes_execution_order
+    // queue[n][q] stores the idx of the predecessor of node n for queue type q. All indices are to nodes_execution_order. defaults to -1
     int32_t cross_queue_node_deps[xf_graph_max_nodes_m][xg_cmd_queue_count_m];
 
     uint64_t texture_hashes[xf_graph_max_textures_m * 2];
@@ -379,7 +380,7 @@ void xf_graph_unload ( void );
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
-void xf_graph_clear ( xf_graph_h graph );
+void xf_graph_invalidate ( xf_graph_h graph, xg_workload_h workload );
 void xf_graph_finalize ( xf_graph_h graph );
 uint64_t xf_graph_build ( xf_graph_h graph, xg_workload_h workload, uint64_t key );
 uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );

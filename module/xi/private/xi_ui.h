@@ -32,6 +32,8 @@ typedef struct {
 
     // copied from the element that creates the layer, gets inherited by the children unless they override it with their own style
     xi_style_t style;
+
+    uint32_t total_content_height;
 } xi_ui_layer_t;
 
 typedef struct {
@@ -50,6 +52,7 @@ typedef struct {
 
     uint32_t os_window_width;
     uint32_t os_window_height;
+    wm_window_os_h os_window_handle;
 
     rv_view_info_t view_info;
     bool valid_view_info;
@@ -98,17 +101,24 @@ typedef struct {
     xi_ui_layer_t layers[xi_ui_max_layers_m];
     uint32_t layer_count;
 
+    xi_scissor_h active_scissor;
+
     // state of the base os window
     //int64_t base_x;
     //int64_t base_y;
     //int64_t base_width;
     //int64_t base_height;
 
+    uint64_t windows_map_ids[xi_ui_max_layers_m * 2];
+    uint64_t windows_map_values[xi_ui_max_layers_m * 2];
+    std_hash_map_t windows_map;
+
     // TODO support stack of sections, not just one
     bool in_section;
     bool minimized_section;
     bool culled_section;
     bool minimized_window;
+    xi_id_t window_id;
 
     // geo
     xg_device_h device;
@@ -132,7 +142,7 @@ void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state );
 bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state );
 void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state );
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state );
-void xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
+bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
 bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state );
 bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state );
 
@@ -146,3 +156,5 @@ const xi_ui_update_state_t* xi_ui_get_update_state ( void );
 void xi_ui_geo_init ( xg_device_h device_handle );
 void xi_ui_draw_line ( xi_workload_h workload, xi_line_state_t* state );
 bool xi_ui_draw_transform ( xi_workload_h workload, xi_transform_state_t* state );
+
+bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir );
