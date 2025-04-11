@@ -2,10 +2,13 @@
 
 #include <xg_enum.h>
 
+#include "xg_resource_cmd_buffer.h"
+
 #include "xg_vk_device.h"
 #include "xg_vk_enum.h"
 #include "xg_vk_instance.h"
 #include "xg_vk_allocator.h"
+#include "xg_vk_workload.h"
 
 #include <std_list.h>
 
@@ -39,6 +42,50 @@ void xg_vk_texture_unload ( void ) {
     std_virtual_heap_free ( xg_vk_texture_state->textures_array );
     std_virtual_heap_free ( xg_vk_texture_state->textures_bitset );
     std_mutex_deinit ( &xg_vk_texture_state->textures_mutex );
+}
+
+void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h workload ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
+    xg_cmd_buffer_h cmd_buffer = xg_workload_add_cmd_buffer ( workload );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg_workload_add_resource_cmd_buffer ( workload );
+
+    char black[4] = { 0, 0, 0, 0 };
+    xg_vk_texture_state->default_textures[device_idx][xg_default_texture_r8g8b8a8_unorm_black_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+        .device = device_handle,
+        .memory_type = xg_memory_type_gpu_only_m,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m,
+        .debug_name = "default_r8g8b8a8_unorm_black",
+    ), &xg_texture_init_m (
+        .mode = xg_texture_init_mode_upload_m,
+        .upload_data = black,
+    ) );
+
+    char white[4] = { 0xff, 0xff, 0xff, 0xff };
+    xg_vk_texture_state->default_textures[device_idx][xg_default_texture_r8g8b8a8_unorm_white_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+        .device = device_handle,
+        .memory_type = xg_memory_type_gpu_only_m,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m,
+        .debug_name = "default_r8g8b8a8_unorm_white",
+    ), &xg_texture_init_m (
+        .mode = xg_texture_init_mode_upload_m,
+        .upload_data = white,
+    ) );
+
+    xg_texture_memory_barrier_t barriers[xg_default_texture_count_m];
+    for ( uint32_t i = 0; i < xg_default_texture_count_m; ++i ) {
+        barriers[i] = xg_texture_memory_barrier_m (
+            .texture = xg_vk_texture_state->default_textures[device_idx][i],
+            .memory.invalidations = xg_memory_access_bit_shader_read_m,
+            .layout.new = xg_texture_layout_shader_read_m,
+            .execution.blocked = xg_pipeline_stage_bit_all_commands_m,
+        );
+    }
+    xg_cmd_buffer_barrier_set ( cmd_buffer, 1, &xg_barrier_set_m (
+        .texture_memory_barriers = barriers,
+        .texture_memory_barriers_count = xg_default_texture_count_m
+    ) );
 }
 
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params ) {
@@ -145,10 +192,6 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     std_bitset_set ( xg_vk_texture_state->textures_bitset, texture_handle );
     std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
     std_assert_m ( texture );
-
-    if ( std_str_cmp ( params->debug_name, "depth_stencil_texture(1)" ) == 0 ) {
-        //std_debug_break();
-    }
 
     xg_texture_flag_bit_e flags = 0;
 
@@ -286,10 +329,6 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
 bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 
-    if ( std_str_cmp ( texture->params.debug_name, "depth_stencil_texture(1)" ) == 0 ) {
-        //std_debug_break();
-    }
-
     std_assert_m ( texture->state == xg_vk_texture_state_reserved_m );
 
     const xg_texture_params_t* params = &texture->params;
@@ -333,12 +372,15 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     vkCreateImage ( device->vk_handle, &vk_image_info, NULL, &vk_image );
 
     if ( params->debug_name[0] ) {
+        char buffer[32];
+        std_u64_to_str ( buffer, 32, texture_handle );
         VkDebugUtilsObjectNameInfoEXT debug_name;
         debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
         debug_name.pNext = NULL;
         debug_name.objectType = VK_OBJECT_TYPE_IMAGE;
         debug_name.objectHandle = ( uint64_t ) vk_image;
-        debug_name.pObjectName = params->debug_name;
+        //debug_name.pObjectName = params->debug_name;
+        debug_name.pObjectName = buffer;
         xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
     }
 
@@ -573,48 +615,9 @@ const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture_handle
     }
 }
 
-static xg_texture_h xg_texture_create_default ( xg_device_h device, xg_default_texture_e texture_enum ) {
-    xg_texture_params_t params;
-
-    // TODO fill content to white/black
-    switch ( texture_enum ) {
-        case xg_default_texture_r8g8b8a8_unorm_white_m:
-            params = xg_texture_params_m (
-                .device = device,
-                .memory_type = xg_memory_type_gpu_only_m,
-                .format = xg_format_r8g8b8a8_unorm_m,
-                .allowed_usage = xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m,
-            );
-            std_str_copy_static_m ( params.debug_name, "default r8g8b8a8_unorm" );
-            break;
-
-        case xg_default_texture_r8g8b8a8_unorm_black_m:
-            params = xg_texture_params_m (
-                .device = device,
-                .memory_type = xg_memory_type_gpu_only_m,
-                .format = xg_format_r8g8b8a8_unorm_m,
-                .allowed_usage = xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m,
-            );
-            std_str_copy_static_m ( params.debug_name, "default linear clamp" );
-            break;
-
-        default:
-            std_log_error_m ( "Unkown default sampler" );
-            break;
-    }
-
-    return xg_texture_create ( &params );
-}
-
-// TODO pre-create on device init?
 xg_texture_h xg_texture_get_default ( xg_device_h device, xg_default_texture_e texture_enum ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device );
     xg_texture_h texture = xg_vk_texture_state->default_textures[device_idx][texture_enum];
-
-    if ( texture == xg_null_handle_m ) {
-        texture = xg_texture_create_default ( device, texture_enum );
-        xg_vk_texture_state->default_textures[device_idx][texture_enum] = texture;
-    }
-
+    std_assert_m ( texture != xg_null_handle_m );
     return texture;
 }

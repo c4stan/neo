@@ -37,8 +37,8 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
     ) );
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m (
-        .component_count = 1,
-        .components = { viewapp_mesh_component_id_m }
+        .component_count = 2,
+        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m }
     ) );
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     uint64_t light_count = light_query_result.entity_count;
@@ -73,38 +73,33 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         //xg->cmd_set_dynamic_viewport ( node_args->cmd_buffer, &viewport, key );
 
         se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+        se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
         uint64_t mesh_count = mesh_query_result.entity_count;
         for ( uint64_t j = 0; j < mesh_count; ++j ) {
             viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
             xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->shadow_pipeline );
-            //xg->cmd_set_graphics_pipeline_state ( cmd_buffer, pipeline_state, key );
 
-            sm_vec_3f_t up = { 0, 1, 0 };
-            
-            sm_vec_3f_t dir = {
-                .x = mesh_component->orientation[0],
-                .y = mesh_component->orientation[1],
-                .z = mesh_component->orientation[2],
-            };
+            viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+
+            sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
+            sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
             dir = sm_vec_3f_norm ( dir );
-            
             sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
-
+            float scale = transform_component->scale;
             sm_mat_4x4f_t trans = {
-                .r0[0] = 1,
-                .r1[1] = 1,
-                .r2[2] = 1,
+                .r0[0] = scale,
+                .r1[1] = scale,
+                .r2[2] = scale,
                 .r3[3] = 1,
-                .r0[3] = mesh_component->position[0],
-                .r1[3] = mesh_component->position[1],
-                .r2[3] = mesh_component->position[2],
+                .r0[3] = transform_component->position[0],
+                .r1[3] = transform_component->position[1],
+                .r2[3] = transform_component->position[2],
             };
 
             draw_uniforms_t draw_uniforms = {
                 .world = sm_matrix_4x4f_mul ( trans, rot ),
             };
 
-            // Bind draw resources
             xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
                 .layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m ),
                 .bindings = xg_pipeline_resource_bindings_m (
@@ -115,26 +110,6 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
                     )
                 )
             ) );
-
-            //xg->cmd_set_pipeline_resources ( cmd_buffer, &draw_bindings, key );
-
-            // Set vertex streams
-            //xg_vertex_stream_binding_t vertex_bindings[2] = {
-            //    xg_vertex_stream_binding_m (
-            //        .buffer = mesh_component->pos_buffer,
-            //        .stream_id = 0,
-            //        .offset = 0,
-            //    ),
-            //    xg_vertex_stream_binding_m (
-            //        .buffer = mesh_component->nor_buffer,
-            //        .stream_id = 1,
-            //        .offset = 0,
-            //    )
-            //};
-            //xg->cmd_set_vertex_streams ( cmd_buffer, vertex_bindings, 2, key );
-
-            //// Draw
-            //xg->cmd_draw_indexed ( cmd_buffer, mesh_component->idx_buffer, mesh_component->index_count, 0, key );
 
             xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
                 .pipeline = pipeline_state,

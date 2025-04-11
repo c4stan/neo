@@ -62,6 +62,7 @@ void std_u64_to_bin ( uint64_t u64, char* str );
 size_t std_str_trim_left  ( char* str, const char** tokens, size_t n );
 size_t std_str_trim_right ( char* str, const char** tokens, size_t n );
 
+// TODO return ptr?
 size_t std_str_find         ( const char* str, const char* token );
 size_t std_str_find_reverse ( const char* str, size_t start, const char* token );   // offset in byte count
 

@@ -153,17 +153,18 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .execution.blocked = xg_pipeline_stage_bit_transfer_m,
         );
 
-        xg_barrier_set_t barrier_set = xg_barrier_set_m();
-        barrier_set.texture_memory_barriers_count = 1;
-        barrier_set.texture_memory_barriers = &barrier;
-
+        xg_barrier_set_t barrier_set = xg_barrier_set_m (
+            .texture_memory_barriers_count = 1,
+            .texture_memory_barriers = &barrier,
+        );
         xg->cmd_barrier_set ( cmd_buffer, key, &barrier_set );
     }
 
     {
-        xg_buffer_to_texture_copy_params_t copy_params = xg_default_buffer_to_texture_copy_params_m;
-        copy_params.source = staging_buffer;
-        copy_params.destination = raster_texture;
+        xg_buffer_to_texture_copy_params_t copy_params = xg_buffer_to_texture_copy_params_m (
+            .source = staging_buffer,
+            .destination = raster_texture,
+        );
         xg->cmd_copy_buffer_to_texture ( cmd_buffer, key, &copy_params );
     }
 

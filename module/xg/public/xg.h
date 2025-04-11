@@ -1007,6 +1007,7 @@ typedef enum {
 } xg_shading_stage_e;
 
 typedef enum {
+    xg_shading_stage_bit_none_m             = 0,
     // graphics
     xg_shading_stage_bit_vertex_m           = 1 << xg_shading_stage_vertex_m,
     xg_shading_stage_bit_fragment_m         = 1 << xg_shading_stage_fragment_m,
@@ -1490,6 +1491,7 @@ typedef struct {
 }
 
 typedef struct {
+    // TODO rename these to prev_access and next_access?
     xg_memory_access_bit_e flushes;         // prev access. make any cache that can possibly contain one of these memory accesses flush its content, making the changes visible from outside
     xg_memory_access_bit_e invalidations;   // next access. make any cache that can possibly contain one of these memory accesses invalidate its content, making it able to see outside changes
 } xg_memory_dependency_t;
@@ -1893,6 +1895,26 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    xg_buffer_init_mode_clear_m,
+    xg_buffer_init_mode_upload_m,
+    xg_buffer_init_mode_uninitialized_m,
+} xg_buffer_init_mode_e;
+
+typedef struct {
+    xg_buffer_init_mode_e mode;
+    union {
+        uint32_t clear;
+        void* upload_data;
+    };
+} xg_buffer_init_t;
+
+#define xg_buffer_init_m( ... ) ( xg_buffer_init_t ) { \
+    .mode = xg_texture_init_mode_uninitialized_m, \
+    .upload_data = NULL, \
+    ##__VA_ARGS__ \
+}
+
 typedef struct {
     xg_memory_type_e memory_type;
     xg_device_h device;
@@ -1932,6 +1954,30 @@ typedef struct {
 #define xg_memory_address_m( ... ) ( xg_memory_address_t ) { \
     .base = 0, \
     .offset = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef enum {
+    xg_texture_init_mode_clear_m,
+    xg_texture_init_mode_clear_depth_stencil_m,
+    xg_texture_init_mode_upload_m,
+    xg_texture_init_mode_uninitialized_m,
+} xg_texture_init_mode_e;
+
+typedef struct {
+    xg_texture_init_mode_e mode;
+    union {
+        xg_color_clear_t clear;
+        xg_depth_stencil_clear_t depth_stencil_clear;
+        void* upload_data;
+    };
+    xg_texture_layout_e final_layout;
+} xg_texture_init_t;
+
+#define xg_texture_init_m( ... ) ( xg_texture_init_t ) { \
+    .mode = xg_texture_init_mode_uninitialized_m, \
+    .upload_data = NULL, \
+    .final_layout = xg_texture_layout_undefined_m, \
     ##__VA_ARGS__ \
 }
 
@@ -2172,13 +2218,14 @@ typedef struct {
     //xg_texture_layout_e layout;
 } xg_buffer_to_texture_copy_params_t;
 
-#define xg_default_buffer_to_texture_copy_params_m ( xg_buffer_to_texture_copy_params_t ) { \
+#define xg_buffer_to_texture_copy_params_m( ... ) ( xg_buffer_to_texture_copy_params_t ) { \
     .source = xg_null_handle_m, \
     .source_offset = 0, \
     .destination = xg_null_handle_m, \
     .mip_base = 0, \
     .array_base = 0, \
     .array_count = 1, \
+    ##__VA_ARGS__ \
 }
 
 typedef struct {
@@ -2190,25 +2237,27 @@ typedef struct {
     uint64_t destination_offset;
 } xg_texture_to_buffer_copy_params_t;
 
-#define xg_default_texture_to_buffer_copy_params_m ( xg_texture_to_buffer_copy_params_t ) { \
+#define xg_texture_to_buffer_copy_params_m( ... ) ( xg_texture_to_buffer_copy_params_t ) { \
     .source = xg_null_handle_m, \
     .mip_base = 0, \
     .array_base = 0, \
     .array_count = 1, \
     .destination = xg_null_handle_m, \
     .destination_offset = 0, \
+    ##__VA_ARGS__ \
 }
 
 // TODO move out of xg
 typedef enum {
-    xg_default_texture_r8g8b8a8_unorm_white_m,
     xg_default_texture_r8g8b8a8_unorm_black_m,
+    xg_default_texture_r8g8b8a8_unorm_white_m,
     xg_default_texture_count_m,
 } xg_default_texture_e;
 
 typedef enum {
     xg_default_sampler_point_clamp_m,
     xg_default_sampler_linear_clamp_m,
+    xg_default_sampler_linear_wrap_m,
     xg_default_sampler_count_m,
 } xg_default_sampler_e;
 
@@ -2257,7 +2306,7 @@ typedef struct {
 } xg_raytrace_geometry_params_t;
 
 #define xg_raytrace_geometry_params_m( ... ) ( xg_raytrace_geometry_params_t ) { \
-    .device = device, \
+    .device = xg_null_handle_m, \
     .geometries = NULL, \
     .geometry_count = 0, \
     .debug_name = { 0 }, \
@@ -2445,8 +2494,8 @@ typedef struct {
     void                    ( *cmd_begin_debug_region )             ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const char* name, uint32_t color );
     void                    ( *cmd_end_debug_region )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
-    xg_buffer_h             ( *cmd_create_buffer )                  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params );
-    xg_texture_h            ( *cmd_create_texture )                 ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params );
+    xg_buffer_h             ( *cmd_create_buffer )                  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params, xg_buffer_init_t* init );
+    xg_texture_h            ( *cmd_create_texture )                 ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params, xg_texture_init_t* init );
     void                    ( *cmd_destroy_buffer )                 ( xg_resource_cmd_buffer_h cmd_buffer, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e time );
     void                    ( *cmd_destroy_texture )                ( xg_resource_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_resource_cmd_buffer_time_e time );
 
@@ -2479,10 +2528,13 @@ typedef struct {
     xg_sampler_h            ( *create_sampler )                     ( const xg_sampler_params_t* params );
     xg_sampler_h            ( *get_default_sampler )                ( xg_device_h device, xg_default_sampler_e sampler );
 
+    xg_texture_h            ( *get_default_texture )                ( xg_device_h device, xg_default_texture_e texture );
+
     // TODO separate creation and build
     xg_raytrace_geometry_h  ( *create_raytrace_geometry )           ( const xg_raytrace_geometry_params_t* params );
     xg_raytrace_world_h     ( *create_raytrace_world )              ( const xg_raytrace_world_params_t* params );
 
+    void                    ( *destroy_raytrace_geometry )          ( xg_raytrace_geometry_h geometry );
     void                    ( *destroy_raytrace_world )             ( xg_raytrace_world_h world );
 
     // Pipeline state

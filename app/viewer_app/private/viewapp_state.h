@@ -25,6 +25,19 @@ typedef struct {
 } viewapp_modules_state_t;
 
 // Scene
+#if 0
+typedef struct {
+    char name[32];
+    xg_geo_util_geometry_data_t data;
+    xg_geo_util_geometry_gpu_data_t gpu_data;
+} viewapp_scene_mesh_t;
+
+typedef struct {
+    viewapp_scene_mesh_t* mesh;
+    float local_transform[16];
+    float global_transform[16];
+} viewapp_scene_mesh_instance_t;
+#endif
 typedef struct {
     uint32_t active_scene;
     char custom_scene_path[128];
@@ -69,6 +82,8 @@ typedef struct {
     xf_node_h taa_node;
     xg_raytrace_world_h raytrace_world;
     xg_resource_bindings_layout_h workload_bindings_layout;
+
+    bool graph_reload;
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
@@ -127,6 +142,7 @@ typedef struct {
 #define viewapp_camera_component_id_m 1
 #define viewapp_light_component_id_m 2
 #define viewapp_raytrace_mesh_component_id 3
+#define viewapp_transform_component_id_m 4
 
 typedef struct {
     float base_color[3];
@@ -152,6 +168,21 @@ typedef struct {
 }
 
 typedef struct {
+    float position[3];
+    float orientation[3];
+    float up[3];
+    float scale;
+} viewapp_transform_component_t;
+
+#define viewapp_transform_component_m( ... ) { \
+    .position = { 0, 0, 0 }, \
+    .orientation = { 0, 0, 1 }, \
+    .up = { 0, 1, 0 }, \
+    .scale = 1, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     xg_geo_util_geometry_data_t geo_data;
     xg_geo_util_geometry_gpu_data_t geo_gpu_data;
     xs_database_pipeline_h object_id_pipeline;
@@ -159,12 +190,11 @@ typedef struct {
     xs_database_pipeline_h shadow_pipeline;
     xg_buffer_h pos_buffer;
     xg_buffer_h nor_buffer;
+    xg_buffer_h uv_buffer;
     xg_buffer_h idx_buffer;
     uint32_t vertex_count;
     uint32_t index_count;
-    float position[3];
-    float orientation[3];
-    float up[3];
+    viewapp_transform_component_t prev_transform;
     uint32_t object_id;
     viewapp_material_data_t material;
 
@@ -180,12 +210,11 @@ typedef struct {
     .shadow_pipeline = xs_null_handle_m, \
     .pos_buffer = xg_null_handle_m, \
     .nor_buffer = xg_null_handle_m, \
+    .uv_buffer = xg_null_handle_m, \
     .idx_buffer = xg_null_handle_m, \
     .vertex_count = 0, \
     .index_count = 0, \
-    .position = { 0, 0, 0 }, \
-    .orientation = { 0, 0, 1 }, \
-    .up = { 0, 1, 0 }, \
+    .prev_transform = viewapp_transform_component_m(), \
     .object_id = 0, \
     .material = viewapp_material_data_m(), \
     .rt_geo = xg_null_handle_m, \

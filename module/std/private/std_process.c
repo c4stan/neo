@@ -271,8 +271,10 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
         //BOOL retval = CreateProcess ( executable, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
         BOOL retval = CreateProcess ( NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
-        std_unused_m ( retval );
-        std_assert_m ( retval == TRUE );
+        if ( !retval ) {
+            std_log_os_error_m();
+            return std_process_null_handle_m;
+        }
 
         os_handle = ( uint64_t ) pi.hProcess;
         os_id = ( uint64_t ) pi.dwProcessId;

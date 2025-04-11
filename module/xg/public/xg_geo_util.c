@@ -218,7 +218,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
         .debug_name = "vbuffer pos stream",
-    ) );
+    ), NULL );
 
     xg_buffer_h nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
@@ -226,7 +226,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m,
         .debug_name = "vbuffer nor stream",
-    ) );
+    ), NULL );
 
     xg_buffer_h uv_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
@@ -234,7 +234,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .size = geo->vertex_count * sizeof ( float ) * 2,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m,
         .debug_name = "vbuffer uv stream",
-    ) );
+    ), NULL );
 
     xg_buffer_h idx_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
         .memory_type = xg_memory_type_gpu_only_m,
@@ -242,7 +242,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .size = geo->index_count * sizeof ( uint32_t ),
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_index_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
         .debug_name = "ibuffer",
-    ) );
+    ), NULL );
 
     xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = pos_staging, .destination = pos_buffer ) );
     xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = nor_staging, .destination = nor_buffer ) );
@@ -265,17 +265,12 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
     return result;
 }
 
-void xg_geo_util_free_gpu_data ( xg_geo_util_geometry_gpu_data_t* gpu_data ) {
+void xg_geo_util_free_gpu_data ( xg_geo_util_geometry_gpu_data_t* gpu_data, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    xg_workload_h workload = xg->create_workload ( gpu_data->device );
-    xg_resource_cmd_buffer_h xg_resource_cmd_buffer_h = xg->create_resource_cmd_buffer ( workload );
     
-    xg->cmd_destroy_buffer ( xg_resource_cmd_buffer_h, gpu_data->pos_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    xg->cmd_destroy_buffer ( xg_resource_cmd_buffer_h, gpu_data->nor_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    xg->cmd_destroy_buffer ( xg_resource_cmd_buffer_h, gpu_data->idx_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    
-    xg->submit_workload ( workload );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->pos_buffer, xg_resource_cmd_buffer_time_workload_start_m );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->nor_buffer, xg_resource_cmd_buffer_time_workload_start_m );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->idx_buffer, xg_resource_cmd_buffer_time_workload_start_m );
 }
 
 void xg_geo_util_free_data ( xg_geo_util_geometry_data_t* data ) {

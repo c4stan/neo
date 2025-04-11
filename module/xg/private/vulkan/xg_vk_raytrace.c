@@ -474,7 +474,19 @@ void xg_vk_raytrace_world_destroy ( xg_raytrace_world_h world_handle ) {
     xg_device_h device_handle = world->params.device;
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
     xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, world->vk_handle, NULL );
+    std_bitset_clear ( xg_vk_raytrace_state->worlds_bitset, world_handle );
     std_list_push ( &xg_vk_raytrace_state->worlds_freelist, world );
+#endif
+}
+
+void xg_vk_raytrace_geometry_destroy ( xg_raytrace_geometry_h geo_handle ) {
+#if xg_enable_raytracing_m
+    xg_vk_raytrace_geometry_t* geo = &xg_vk_raytrace_state->geometries_array[geo_handle];
+    xg_device_h device_handle = geo->params.device;
+    const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
+    xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, geo->vk_handle, NULL );
+    std_bitset_clear ( xg_vk_raytrace_state->geometries_bitset, geo_handle );
+    std_list_push ( &xg_vk_raytrace_state->geometries_freelist, geo );
 #endif
 }
 

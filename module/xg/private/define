@@ -4,8 +4,12 @@ xg_pipeline_resource_max_bindings_per_set_m   (xg_pipeline_resource_max_buffers_
 
 xg_workload_max_queued_workloads_m                      4
 xg_workload_max_allocated_workloads_m                   8
-xg_workload_uniform_buffer_size_m                       2 * 1024 * 1024
+xg_workload_uniform_buffer_size_m                       1 * 1024 * 1024
 xg_workload_staging_buffer_size_m                       64 * 1024 * 1024
+xg_workload_max_uniform_size_m                          16 * 1024 * 1024
+xg_workload_max_staging_size_m                          1 * 1024 * 1024 * 1024
+xg_vk_workload_max_uniform_buffers_per_workload_m       8
+xg_vk_workload_max_staging_buffers_per_workload_m       8
 # TODO use these
 xg_workload_max_timestamp_query_pools_per_workload_m    8
 xg_workload_timing_name_size_m                          32
@@ -18,12 +22,12 @@ xg_cmd_buffer_cmd_buffer_size_m                     1024 * 1024
 xg_cmd_buffer_max_cmd_buffers_m                     64
 xg_cmd_buffer_preallocated_cmd_buffers_m            64
 
-xg_cmd_buffer_resource_cmd_buffer_size_m            1024 * 1024
+xg_cmd_buffer_resource_cmd_buffer_size_m            1024 * 1024 * 32
 xg_cmd_buffer_max_resource_cmd_buffers_m            64
 xg_cmd_buffer_preallocated_resource_cmd_buffers_m   64
 
 xg_instance_enabled_runtime_layers_m        (xg_runtime_layer_bit_debug_m | xg_runtime_layer_bit_renderdoc_m)
-xg_instance_crash_on_validation_error_m     0
+xg_instance_crash_on_validation_error_m         1
 
 xg_debug_enable_events_log_m                    0
 xg_debug_enable_flush_gpu_submissions_m         0

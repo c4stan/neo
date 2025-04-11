@@ -144,7 +144,12 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
         }
     }
 
+#if std_log_crash_on_error_m
+    if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
+#else
     if ( msg->level == std_log_level_crash_m ) {
+#endif
+        fflush ( stdout );
         std_process_this_exit ( std_process_exit_code_error_m );
     }
 }

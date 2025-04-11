@@ -397,9 +397,6 @@ static void xf_resource_texture_barrier ( std_stack_t* stack, xf_physical_textur
 
 void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    if ( std_str_cmp ( texture->params.debug_name, "depth_stencil_texture(1)" ) == 0 ) {
-        //std_debug_break();
-    }
     xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
     xf_resource_physical_texture_state_barrier ( stack, physical_texture_handle, view, new_state );
 }
@@ -434,6 +431,9 @@ void xf_resource_texture_add_ref ( xf_texture_h handle ) {
     } else {
         xf_texture_t* texture = xf_resource_texture_get ( handle );
         texture->ref_count += 1;
+        if ( texture->ref_count == 2 ) {
+            std_log_warn_m ( texture->params.debug_name );
+        }
     }
 }
 
@@ -473,11 +473,10 @@ void xf_resource_texture_bind ( xf_texture_h texture_handle, xf_physical_texture
 void xf_resource_texture_unbind ( xf_texture_h texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
-    //xf_physical_texture_t* physical_texture = &xf_resource_state->physical_textures_array[physical_texture_handle];
-    //if ( !physical_texture->is_external ) {
-    xf_resource_physical_texture_remove_ref ( physical_texture_handle );
-    texture->physical_texture_handle = xf_null_handle_m;
-    //}
+    if ( physical_texture_handle != xf_null_handle_m ) {
+        xf_resource_physical_texture_remove_ref ( physical_texture_handle );
+        texture->physical_texture_handle = xf_null_handle_m;
+    }
 }
 
 bool xf_resource_texture_is_depth ( xf_texture_h texture_handle ) {

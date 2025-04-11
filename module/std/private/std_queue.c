@@ -11,7 +11,7 @@
 #if defined ( std_platform_win32_m )
 // https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples
-static void std_queue_virtual_alloc_aliased ( char** base, char** alias, size_t* size ) {
+static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t* size ) {
     size_t queue_size = std_pow2_round_up ( std_virtual_page_align ( *size ) );
     *base = NULL;
     *alias = NULL;
@@ -228,6 +228,50 @@ void std_ring_clear ( std_ring_t* ring ) {
     ring->top = 0;
     ring->bot = 0;
 }
+
+// --------------------------
+
+#if 0
+std_atomic_ring_t std_atomic_ring ( uint64_t capacity ) {
+    std_assert_m ( std_pow2_test ( capacity ) );
+    std_atomic_ring_t ring = {
+        .top = 0,
+        .bot = 0,
+        .mask = capacity - 1,
+    };
+    return ring;
+}
+
+uint64_t std_atomic_ring_count ( const std_atomic_ring_t* ring ) {
+    return ring->top - ring->bot;
+}
+
+uint64_t std_atomic_ring_capacity ( const std_atomic_ring_t* ring ) {
+    return ring->mask + 1;
+}
+
+uint64_t std_atomic_ring_top_idx ( const std_atomic_ring_t* ring ) {
+    return ring->top & ring->mask;
+}
+
+uint64_t std_atomic_ring_bot_idx ( const std_atomic_ring_t* ring ) {
+    return ring->bot & ring->mask;
+}
+
+uint64_t std_atomic_ring_idx ( const std_atomic_ring_t* ring, uint64_t virtual_idx ) {
+    return virtual_idx & ring->mask;
+}
+
+uint64_t std_atomic_ring_push_align_wrap ( std_atomic_ring_t* ring, uint64_t count, uint64_t align ) {
+    // Load
+    
+}
+
+void std_atomic_ring_clear ( std_atomic_ring_t* ring ) {
+    ring->top = 0;
+    ring->bot = 0;
+}
+#endif
 
 #if 0
 std_circular_pool_t std_circular_pool ( std_buffer_t buffer, size_t stride ) {

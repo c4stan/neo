@@ -180,6 +180,9 @@ static void xg_vk_workload_context_init ( xg_vk_workload_context_t* context ) {
     context->is_submitted = false;
 }
 
+#define xg_vk_workload_max_uniform_buffers_m std_div_ceil_m ( xg_workload_max_uniform_size_m, xg_workload_uniform_buffer_size_m )
+#define xg_vk_workload_max_staging_buffers_m std_div_ceil_m ( xg_workload_max_staging_size_m, xg_workload_staging_buffer_size_m )
+
 void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
     std_assert_m ( device_idx < xg_max_active_devices_m );
@@ -226,6 +229,49 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     for ( uint32_t i = 0; i < xg_vk_workload_max_desc_allocators_m; ++i ) {
         xg_vk_desc_allocator_init ( &device_context->desc_allocators_array[i], device_handle );
     }
+
+    device_context->uniform_buffers_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_buffer_t, xg_vk_workload_max_uniform_buffers_m );
+    device_context->uniform_buffers_freelist = std_freelist_m ( device_context->uniform_buffers_array, xg_vk_workload_max_uniform_buffers_m );
+    device_context->staging_buffers_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_buffer_t, xg_vk_workload_max_staging_buffers_m );
+    device_context->staging_buffers_freelist = std_freelist_m ( device_context->staging_buffers_array, xg_vk_workload_max_staging_buffers_m );
+
+    // TODO have all workload uniform buffers use a single permanently allocated buffer as backend,
+    //      and just offset into that, in order to support dynamic uniform buffers ( just need to 
+    //      rebind same descriptor with new offset instead of re-allocating a new descriptor 
+    //      and/or writing to it )
+    for ( uint32_t i = 0; i < xg_vk_workload_max_uniform_buffers_m; ++i ) {
+        xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
+            .memory_type = xg_memory_type_gpu_mapped_m,
+            .device = device_handle,
+            .size = xg_workload_uniform_buffer_size_m,
+            .allowed_usage = xg_buffer_usage_bit_uniform_m,
+            .debug_name = "workload_uniform_buffer"
+        ) );
+        xg_buffer_info_t uniform_buffer_info;
+        xg_buffer_get_info ( &uniform_buffer_info, uniform_buffer_handle );
+        xg_vk_workload_buffer_t* buffer = &device_context->uniform_buffers_array[i];
+        buffer->handle = uniform_buffer_handle;
+        buffer->alloc = uniform_buffer_info.allocation;
+        buffer->used_size = 0;
+        buffer->total_size = xg_workload_uniform_buffer_size_m;
+    }
+
+    for ( uint32_t i = 0; i < xg_vk_workload_max_staging_buffers_m; ++i ) {
+        xg_buffer_h staging_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
+            .memory_type = xg_memory_type_upload_m,
+            .device = device_handle,
+            .size = xg_workload_staging_buffer_size_m,
+            .allowed_usage = xg_buffer_usage_bit_copy_source_m,
+            .debug_name = "workload_staging_buffer",
+        ) );
+        xg_buffer_info_t staging_buffer_info;
+        xg_buffer_get_info ( &staging_buffer_info, staging_buffer_handle );
+        xg_vk_workload_buffer_t* buffer = &device_context->staging_buffers_array[i];
+        buffer->handle = staging_buffer_handle;
+        buffer->alloc = staging_buffer_info.allocation;
+        buffer->used_size = 0;
+        buffer->total_size = xg_workload_staging_buffer_size_m;
+    }
 }
 
 void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
@@ -236,6 +282,9 @@ void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
 
     std_virtual_heap_free ( device_context->workload_contexts_array );
     std_virtual_heap_free ( device_context->desc_allocators_array );
+
+    std_virtual_heap_free ( device_context->uniform_buffers_array );
+    std_virtual_heap_free ( device_context->staging_buffers_array );
 
     for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
         xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[i];
@@ -286,6 +335,26 @@ static xg_vk_cmd_allocator_t* xg_vk_cmd_allocator_pop ( xg_device_h device_handl
 }
 #endif
 
+static xg_vk_workload_buffer_t* xg_vk_uniform_buffer_pop ( xg_device_h device_handle, xg_workload_h workload_handle ) {
+    xg_vk_workload_device_context_t* device_context = xg_vk_workload_device_context_get ( device_handle );
+    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
+    xg_vk_workload_buffer_t* buffer = std_list_pop_m ( &device_context->uniform_buffers_freelist );
+    std_assert_m ( buffer );
+    workload->uniform_buffer = buffer;
+    workload->uniform_buffers_array[workload->uniform_buffers_count++] = buffer;
+    return buffer;
+}
+
+static xg_vk_workload_buffer_t* xg_vk_staging_buffer_pop ( xg_device_h device_handle, xg_workload_h workload_handle ) {
+    xg_vk_workload_device_context_t* device_context = xg_vk_workload_device_context_get ( device_handle );
+    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
+    xg_vk_workload_buffer_t* buffer = std_list_pop_m ( &device_context->staging_buffers_freelist );
+    std_assert_m ( buffer );
+    workload->staging_buffer = buffer;
+    workload->staging_buffers_array[workload->staging_buffers_count++] = buffer;
+    return buffer;
+}
+
 xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     xg_vk_workload_t* workload = std_list_pop_m ( &xg_vk_workload_state->workload_freelist );
     uint64_t workload_idx = ( uint64_t ) ( workload - xg_vk_workload_state->workload_array );
@@ -301,6 +370,11 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     workload->desc_layouts_count = 0;
     workload->desc_allocator = xg_vk_desc_allocator_pop ( device_handle, workload_handle );
 
+    workload->uniform_buffers_count = 0;
+    workload->uniform_buffer = xg_vk_uniform_buffer_pop ( device_handle, workload_handle );
+    workload->staging_buffers_count = 0;
+    workload->staging_buffer = xg_vk_staging_buffer_pop ( device_handle, workload_handle );
+
     // https://github.com/krOoze/Hello_Triangle/blob/master/doc/Schema.pdf
     //workload->execution_complete_gpu_event = xg_gpu_queue_event_create ( device_handle ); // TODO pre-create these?
     workload->execution_complete_gpu_event = xg_null_handle_m;
@@ -312,43 +386,6 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     workload->global_bindings = xg_null_handle_m;
 
     workload->debug_capture = false;
-
-    // TODO have all workload uniform buffers use a single permanently allocated buffer as backend,
-    //      and just offset into that, in order to support dynamic uniform buffers ( just need to 
-    //      rebind same descriptor with new offset instead of re-allocating a new descriptor 
-    //      and/or writing to it )
-    xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_mapped_m,
-        .device = device_handle,
-        .size = xg_workload_uniform_buffer_size_m,
-        .allowed_usage = xg_buffer_usage_bit_uniform_m,
-        .debug_name = "workload_uniform_buffer"
-    ) );
-    xg_buffer_info_t uniform_buffer_info;
-    xg_buffer_get_info ( &uniform_buffer_info, uniform_buffer_handle );
-    workload->uniform_buffer = ( xg_vk_workload_buffer_t ) {
-        .handle = uniform_buffer_handle,
-        .alloc = uniform_buffer_info.allocation,
-        .used_size = 0,
-        .total_size = xg_workload_uniform_buffer_size_m,
-    };
-
-    xg_buffer_h staging_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
-        .memory_type = xg_memory_type_upload_m,
-        .device = device_handle,
-        .size = xg_workload_staging_buffer_size_m,
-        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-        .debug_name = "workload_staging_buffer",
-    ) );
-    xg_buffer_info_t staging_buffer_info;
-    xg_buffer_get_info ( &staging_buffer_info, staging_buffer_handle );
-    workload->staging_buffer = ( xg_vk_workload_buffer_t ) {
-        .handle = staging_buffer_handle,
-        .alloc = staging_buffer_info.allocation,
-        .used_size = 0,
-        .total_size = xg_workload_staging_buffer_size_m,
-    };
-
 #if 0
     workload->timestamp_query_pools_count = 0;
 #endif
@@ -635,13 +672,6 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
     //xg_vk_workload_buffer_t* uniform_buffer = &xg_vk_workload_state->device_contexts[device_idx].uniform_buffers[workload_idx];
     //uniform_buffer->used_size = 0;
 
-    // TODO pool these
-    xg_buffer_destroy ( workload->uniform_buffer.handle );
-    workload->uniform_buffer.handle = xg_null_handle_m;
-
-    xg_buffer_destroy ( workload->staging_buffer.handle );
-    workload->staging_buffer.handle = xg_null_handle_m;
-
     const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
     xg_vk_workload_device_context_t* context = xg_vk_workload_device_context_get ( workload->device );
 
@@ -650,6 +680,13 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
         vkResetDescriptorPool ( device->vk_handle, allocator->vk_desc_pool, 0 );
         xg_vk_desc_allocator_reset_counters ( allocator );
         std_list_push ( &context->desc_allocators_freelist, allocator );
+    }
+
+    for ( uint32_t i = 0; i < workload->uniform_buffers_count; ++i  ) {
+        std_list_push ( &context->uniform_buffers_freelist, workload->uniform_buffers_array[i] );
+    }
+    for ( uint32_t i = 0; i < workload->staging_buffers_count; ++i ) {
+        std_list_push ( &context->staging_buffers_freelist, workload->staging_buffers_array[i] );
     }
 
 #if 0
@@ -748,7 +785,7 @@ static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_vk_
         context->capacity = total_header_count;
     }
 
-    xg_cmd_buffer_sort_n ( sort_result, sort_temp, total_header_count, cmd_buffers, workload->cmd_buffers_count );
+    xg_cmd_buffer_sort ( sort_result, sort_temp, total_header_count, cmd_buffers, workload->cmd_buffers_count );
 
     xg_vk_workload_cmd_sort_result_t result;
     result.cmd_headers = sort_result;
@@ -1946,33 +1983,95 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
     std_assert_m ( workload );
 
-    for ( size_t i = 0; i < workload->resource_cmd_buffers_count; ++i ) {
-        xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
-        std_assert_m ( cmd_buffer );
+    // TODO is this ok?
+    xg_cmd_buffer_h cmd_buffer = xg_workload_add_cmd_buffer ( workload_handle );
+    
+    // TODO transition staging buffer to copy source?
+    //
 
-        xg_resource_cmd_header_t* cmd_header = ( xg_resource_cmd_header_t* ) cmd_buffer->cmd_headers_allocator.base;
+    xg_cmd_buffer_begin_debug_region ( cmd_buffer, 0, "xg_resource_upload", xg_debug_region_color_teal_m );
+
+    for ( size_t i = 0; i < workload->resource_cmd_buffers_count; ++i ) {
+        xg_resource_cmd_buffer_t* resource_cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
+        std_assert_m ( resource_cmd_buffer );
+
+        xg_resource_cmd_header_t* cmd_header = resource_cmd_buffer->cmd_headers_allocator.base;
         std_assert_m ( std_align_test_ptr ( cmd_header, xg_resource_cmd_buffer_cmd_alignment_m ) );
-        size_t cmd_headers_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
-        const xg_resource_cmd_header_t* cmd_headers_end = ( xg_resource_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + cmd_headers_size );
+        size_t cmd_headers_size = std_queue_local_used_size ( &resource_cmd_buffer->cmd_headers_allocator );
+        const xg_resource_cmd_header_t* cmd_headers_end = resource_cmd_buffer->cmd_headers_allocator.base + cmd_headers_size;
 
         for ( const xg_resource_cmd_header_t* header = cmd_header; header < cmd_headers_end; ++header ) {
-            switch ( header->type ) {
+            xg_resource_cmd_type_e cmd_type = header->type;
+            switch ( cmd_type ) {
                 case xg_resource_cmd_texture_create_m: {
                     std_auto_m args = ( xg_resource_cmd_texture_create_t* ) header->args;
 
-                    std_verify_m ( xg_texture_alloc ( args->texture ) );
+                    xg_texture_h texture_handle = args->texture;
+                    std_verify_m ( xg_texture_alloc ( texture_handle ) );
+                    if ( args->init ) {
+                        switch ( args->init_mode ) {
+                        case xg_texture_init_mode_clear_m:
+                            xg_cmd_buffer_texture_clear ( cmd_buffer, 0, texture_handle, args->clear );
+                            break;
+                        case xg_texture_init_mode_clear_depth_stencil_m:
+                            xg_cmd_buffer_texture_depth_stencil_clear ( cmd_buffer, 0, texture_handle, args->depth_stencil_clear );
+                            break;
+                        case xg_texture_init_mode_upload_m:
+                            // TODO batch
+                            xg_cmd_buffer_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+                                .texture_memory_barriers_count = 1,
+                                .texture_memory_barriers = &xg_texture_memory_barrier_m (
+                                    .texture = texture_handle,
+                                    .layout.old = xg_texture_layout_undefined_m,
+                                    .layout.new = xg_texture_layout_copy_dest_m,
+                                    .memory.flushes = xg_memory_access_bit_none_m,
+                                    .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+                                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                                    .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+                                ),
+                            ) );
+                            // TODO handle mip/array
+                            xg_cmd_buffer_copy_buffer_to_texture ( cmd_buffer, 0, &xg_buffer_to_texture_copy_params_m (
+                                .source = args->staging.handle,
+                                .source_offset = args->staging.offset,
+                                .destination = texture_handle,
+                            ) );
+                            break;
+                        default:
+                            break;
+                        }
+
+                        if ( args->init_layout != xg_texture_layout_undefined_m ) {
+                            xg_cmd_buffer_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+                                .texture_memory_barriers_count = 1,
+                                .texture_memory_barriers = &xg_texture_memory_barrier_m (
+                                    .texture = texture_handle,
+                                    .layout.old = xg_texture_layout_copy_dest_m,
+                                    .layout.new = args->init_layout,
+                                    .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                                    .memory.invalidations = xg_memory_access_bit_shader_read_m | xg_memory_access_bit_shader_write_m,
+                                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                                    .execution.blocked = xg_pipeline_stage_bit_fragment_shader_m,
+                                ),
+                            ) );
+                        }
+                    }
                 }
                 break;
 
                 case xg_resource_cmd_buffer_create_m: {
                     std_auto_m args = ( xg_resource_cmd_buffer_create_t* ) header->args;
-
                     std_verify_m ( xg_buffer_alloc ( args->buffer ) );
                 }
                 break;
+                
+                default:
+                    break;
             }
         }
     }
+
+    xg_cmd_buffer_end_debug_region ( cmd_buffer, 0 );
 }
 
 static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg_resource_cmd_buffer_time_e destroy_time ) {
@@ -2197,6 +2296,11 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     // TODO offer some way to call this (and thus trigger end-of-workload resource destruction) without having to submit a new workload after this one is complete.
     xg_vk_workload_recycle_submission_contexts ( device_context, 0 );
 
+    xg_vk_workload_create_resources ( workload_handle );
+    xg_vk_workload_allocate_resource_groups ( workload_handle );
+    xg_vk_workload_update_resource_groups ( workload_handle );
+    xg_vk_workload_destroy_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_start_m );
+
     // test cmd buffers, if empty process resource cmd buffers and exit here
     {
         size_t total_header_size = 0;
@@ -2206,22 +2310,14 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
             total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
         }
 
+
         if ( total_header_size == 0 ) {
-            xg_vk_workload_create_resources ( workload_handle );
-            xg_vk_workload_allocate_resource_groups ( workload_handle );
-            xg_vk_workload_update_resource_groups ( workload_handle );
-            xg_vk_workload_destroy_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_start_m );
             xg_vk_workload_destroy_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_complete_m );
             xg_workload_destroy ( workload_handle );
 
             return;
         }
     }
-
-    xg_vk_workload_create_resources ( workload_handle );
-    xg_vk_workload_allocate_resource_groups ( workload_handle );
-    xg_vk_workload_update_resource_groups ( workload_handle );
-    xg_vk_workload_destroy_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_start_m );
 
     xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[std_ring_top_idx ( &device_context->workload_contexts_ring )];
     std_ring_push ( &device_context->workload_contexts_ring, 1 );
@@ -2240,10 +2336,6 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     // chunk
     xg_vk_workload_cmd_chunk_result_t chunk_result = xg_vk_workload_chunk_cmd_headers ( &workload_context->chunk, sort_result.cmd_headers, sort_result.count );
 
-    if ( workload->debug_capture ) {
-        xg_debug_capture_start();
-    }
-
     // translate
     xg_vk_workload_translate_cmd_chunks_result_t translate_result = xg_vk_workload_translate_cmd_chunks ( &workload_context->translate, device_context->device_handle, workload_handle, sort_result.cmd_headers, chunk_result.cmd_chunks_array, chunk_result.cmd_chunks_count );
 
@@ -2251,10 +2343,6 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     xg_vk_workload_submit_cmd_chunks ( &workload_context->submit, workload_handle, translate_result.translated_chunks_array, translate_result.translated_chunks_count, chunk_result.cmd_chunks_array, chunk_result.cmd_chunks_count, chunk_result.queue_chunks_array, chunk_result.queue_chunks_count );
 
     workload_context->is_submitted = true;
-
-    if ( workload->debug_capture ) {
-        xg_debug_capture_stop();
-    }
 
     // Close pending debug cpature
 #if 0
@@ -2288,7 +2376,9 @@ void xg_workload_wait_all_workload_complete ( void ) {
     }
 }
 
-static xg_buffer_range_t xg_vk_workload_buffer_write ( xg_vk_workload_buffer_t* buffer, uint32_t alignment, void* data, size_t data_size ) {
+#if 0
+static xg_buffer_range_t xg_vk_workload_buffer_write ( xg_vk_workload_buffer_t* buffer, uint32_t alignment, void* data, size_t size ) {
+#if 1
     char* base = buffer->alloc.mapped_address;
     std_assert_m ( base != NULL );
     uint64_t offset = 0; // this is relative to the start of the VkBuffer object, not to the underlying Vk memory allocation
@@ -2311,20 +2401,91 @@ static xg_buffer_range_t xg_vk_workload_buffer_write ( xg_vk_workload_buffer_t* 
     range.offset = top;
     range.size = data_size;
     return range;
+#else
+    for ( ;; ) {
+        uint64_t cap = buffer->total_size;
+        uint64_t top = buffer->top;
+        uint64_t bot = buffer->bot;
+        uint64_t mask = cap - 1;
+
+        uint64_t offset = top & mask;
+
+        top = std_align_u64 ( top, alignment );
+        
+        // force wrap around if remaining free segment is too small
+        if ( cap < offset + size ) {
+            top = std_align_u64 ( top, cap );
+        }
+
+        // check for enough free size
+        uint64_t new_top = top + size;
+        if ( new_top - bot > cap ) {
+            return xg_buffer_range_m();
+        }
+    
+        if ( std_compare_and_swap_u64 ( &buffer->top, &top, new_top ) ) {
+            xg_buffer_range_t range = {
+                .handle = buffer->vk_handle;
+                .offset = top & mask,
+                .size = size,
+            };
+            return range;
+        }
+    }
+#endif
 }
+#endif
 
 xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, void* data, size_t data_size ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
-    xg_vk_workload_buffer_t* uniform_buffer = &workload->uniform_buffer;
+    xg_vk_workload_buffer_t* uniform_buffer = workload->uniform_buffer;
+
     const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
     uint64_t alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
-    return xg_vk_workload_buffer_write ( uniform_buffer, alignment, data, data_size );
+
+    uint64_t offset = uniform_buffer->used_size;
+    offset = std_align_u64 ( offset, alignment );
+    if ( offset + data_size > uniform_buffer->total_size ) {
+        uniform_buffer = xg_vk_uniform_buffer_pop ( workload->device, workload_handle );
+        workload->uniform_buffer = uniform_buffer;
+        offset = 0;
+        std_assert_m ( uniform_buffer->total_size > data_size );
+    }
+
+    char* base = uniform_buffer->alloc.mapped_address;
+    std_mem_copy ( base + offset, data, data_size );
+    uniform_buffer->used_size = offset + data_size;
+
+    xg_buffer_range_t range = {
+        .handle = uniform_buffer->handle,
+        .offset = offset,
+        .size = data_size,
+    };
+    return range;
 }
 
 xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, void* data, size_t data_size ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
-    xg_vk_workload_buffer_t* staging_buffer = &workload->staging_buffer;
-    return xg_vk_workload_buffer_write ( staging_buffer, 1, data, data_size );
+    xg_vk_workload_buffer_t* staging_buffer = workload->staging_buffer;
+
+    uint64_t offset = staging_buffer->used_size;
+    if ( offset + data_size > staging_buffer->total_size ) {
+        staging_buffer = xg_vk_staging_buffer_pop ( workload->device, workload_handle );
+        workload->staging_buffer = staging_buffer;
+        offset = 0;
+        std_assert_m ( staging_buffer->total_size > data_size );
+    }
+
+    char* base = staging_buffer->alloc.mapped_address;
+    std_mem_copy ( base + offset, data, data_size );
+    staging_buffer->used_size = offset + data_size;
+
+    xg_buffer_range_t range = {
+        .handle = staging_buffer->handle,
+        .offset = offset,
+        .size = data_size,
+    };
+    return range;
 }
 
 xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload_handle ) {
@@ -2335,7 +2496,7 @@ xg_cmd_buffer_h xg_workload_add_cmd_buffer ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
     std_assert_m ( workload->gen == handle_gen );
 
-    xg_cmd_buffer_h cmd_buffer = xg_cmd_buffer_open ( workload_handle );
+    xg_cmd_buffer_h cmd_buffer = xg_cmd_buffer_create ( workload_handle );
 
     workload->cmd_buffers[workload->cmd_buffers_count++] = cmd_buffer;
 

@@ -405,8 +405,7 @@ static xg_shading_stage_bit_e xs_parser_shading_stage_to_bit ( const char* stage
         return xg_shading_stage_bit_ray_hit_closest_m;
     }
 
-    std_assert_m ( false );
-    return 0;
+    return xg_shading_stage_bit_none_m;
 }
 
 static void xs_parser_parse_input_desc ( xs_parser_parsing_context_t* context ) {
@@ -1435,9 +1434,10 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
             len = std_str_len ( token );
         }
 
+        // TODO instead of always defaulting to default_shading_stage try to parse an optional additional stage somewhere?
         if ( std_str_cmp ( token , "buffer" ) == 0 ) {
             xs_parser_buffer_t buffer = {
-                .stages = xs_parser_default_shading_stage ( context ),
+                .stages = xg_shading_stage_bit_none_m,
                 .set = binding_set,
                 .type = xs_parser_buffer_type_uniform_m,
                 .shader_register = binding_register,
@@ -1457,11 +1457,20 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                         buffer.type = xs_parser_buffer_type_uniform_m;
                     } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
                         buffer.type = xs_parser_buffer_type_storage_m;
+                    } else {
+                        xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                        if ( stage != xg_shading_stage_bit_none_m ) {
+                            buffer.stages |= stage;
+                        }
                     }
                 }
 
                 xs_parser_skip_spaces ( context );
                 len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            if ( buffer.stages == xg_shading_stage_bit_none_m ) {
+                buffer.stages = xs_parser_default_shading_stage ( context );
             }
 
             for ( uint32_t i = 0; i < array_size; ++i ) {
@@ -1470,7 +1479,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
             }
         } else if ( std_str_cmp ( token, "texture" ) == 0 ) {
             xs_parser_texture_t texture = {
-                .stages = xs_parser_default_shading_stage ( context ),
+                .stages = xg_shading_stage_bit_none_m,
                 .set = binding_set,
                 .type = xs_parser_texture_type_sampled_m,
                 .shader_register = binding_register,
@@ -1490,11 +1499,20 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                         texture.type = xs_parser_texture_type_sampled_m;
                     } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
                         texture.type = xs_parser_texture_type_storage_m;
+                    } else {
+                        xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                        if ( stage != xg_shading_stage_bit_none_m ) {
+                            texture.stages |= stage;
+                        }
                     }
                 }
 
                 xs_parser_skip_spaces ( context );
                 len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            if ( texture.stages == xg_shading_stage_bit_none_m ) {
+                texture.stages = xs_parser_default_shading_stage ( context );
             }
 
             for ( uint32_t i = 0; i < array_size; ++i ) {
@@ -1503,7 +1521,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
             }
         } else if (std_str_cmp ( token, "sampler" ) == 0 ) {
             xs_parser_sampler_t sampler = {
-                .stages = xs_parser_default_shading_stage ( context ),
+                .stages = xg_shading_stage_bit_none_m,
                 .set = binding_set,
                 .shader_register = binding_register,
             };
@@ -1512,10 +1530,19 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                 if ( token[len - 1] == ']' ) {
                     array_size = xs_parser_extract_token_array ( token, len );
                     len = std_str_len ( token );
+                } else {
+                    xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                    if ( stage != xg_shading_stage_bit_none_m ) {
+                        sampler.stages |= stage;
+                    }
                 }
 
                 xs_parser_skip_spaces ( context );
                 len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            if ( sampler.stages == xg_shading_stage_bit_none_m ) {
+                sampler.stages = xs_parser_default_shading_stage ( context );
             }
 
             for ( uint32_t i = 0; i < array_size; ++i ) {

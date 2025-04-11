@@ -126,41 +126,25 @@ typedef struct {
     uint64_t*           cmd_buffers_bitset;
     uint64_t            allocated_cmd_buffers_count;
     std_mutex_t         cmd_buffers_mutex;
-    //std_queue_shared_t  cmd_buffers_queue;  // mpmc xg_cmd_buffer_t idx queue - indexes into the pool buffer. TODO make this a mpsc when the API is there
 } xg_cmd_buffer_state_t;
 
 void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state );
 void xg_cmd_buffer_reload ( xg_cmd_buffer_state_t* state );
 void xg_cmd_buffer_unload ( void );
 
-// **
-//
 // ======================================================================================= //
 //                               C M D   B U F F E R   A P I
 // ======================================================================================= //
-//
-// **
-// Each command has a key value associated that works as a global sorting key. The backend will do the sorting before GPU submission.
-
-// Returns a number of ready to record command buffers to the user. Tries to grab them from the pool, allocates new ones if necessary.
-xg_cmd_buffer_h xg_cmd_buffer_open ( xg_workload_h workload );
-void xg_cmd_buffer_open_n ( xg_cmd_buffer_h* cmd_buffers, size_t count, xg_workload_h workload );
+xg_cmd_buffer_h xg_cmd_buffer_create ( xg_workload_h workload );
 
 // sorts all cmd headers from an array of cmd buffers into a single sorted array
 // cmd_header_cap should be big enough to contain all the cmd headers contained in the passed in cmd buffers
 // both cmd_headers and cmd_headers_temp need to respect cmd_header_cap
 // after calling cmd_headers will contain the sorted result. cmd_headers_temp will contain garbage and can be reused or destroyed 
-void xg_cmd_buffer_sort_n ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count );
+void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count );
 
-#if 0
-    // Queue a command buffer for later processing/submission.
-    void xg_cmd_buffer_close ( xg_cmd_buffer_h* cmd_buffers, size_t count );
-#endif
-
-// Put a command buffer back in the pool and discard its content.
 void xg_cmd_buffer_discard ( xg_cmd_buffer_h* cmd_buffers, size_t count );
 
-// For interaction with the HAL submodule.
 xg_cmd_buffer_t* xg_cmd_buffer_get ( xg_cmd_buffer_h cmd_buffer );
 
 // ======================================================================================= //

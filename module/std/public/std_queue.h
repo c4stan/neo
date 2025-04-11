@@ -23,10 +23,34 @@ void std_ring_push ( std_ring_t* ring, uint64_t count );
 void std_ring_pop ( std_ring_t* ring, uint64_t count );
 void std_ring_clear ( std_ring_t* ring );
 
+#if 0
+typedef struct {
+    uint64_t top;
+    char _p0[std_l1d_size_m - sizeof ( uint64_t )];
+    uint64_t bot;
+    char _p1[std_l1d_size_m - sizeof ( uint64_t )];
+    uint64_t mask;
+    char _p2[std_l1d_size_m - sizeof ( uint64_t )];
+} std_atomic_ring_t;
+
+std_atomic_ring_t std_atomic_ring ( uint64_t capacity );
+uint64_t std_atomic_ring_count ( const std_atomic_ring_t* ring );
+uint64_t std_atomic_ring_capacity ( const std_atomic_ring_t* ring );
+uint64_t std_atomic_ring_top_idx ( const std_atomic_ring_t* ring );
+uint64_t std_atomic_ring_bot_idx ( const std_atomic_ring_t* ring );
+uint64_t std_atomic_ring_idx ( const std_atomic_ring_t* ring, uint64_t virtual_idx );
+// try to force wrap if elements can't all be stored contiguously
+uint64_t std_atomic_ring_push_align_wrap ( std_atomic_ring_t* ring, uint64_t count, uint64_t align );
+// TODO
+//bool std_atomic_ring_push ( std_atomic_ring_t* ring, uint64_t count );
+//bool std_atomic_ring_pop ( std_atomic_ring_t* ring, uint64_t count );
+void std_atomic_ring_clear ( std_atomic_ring_t* ring );
+#endif
+
 // Single thread access queue
 typedef struct {
-    char* base;
-    char* alias;
+    void* base;
+    void* alias;
     std_ring_t ring;
 } std_queue_local_t;
 
@@ -52,8 +76,8 @@ void                std_queue_local_align_pop   ( std_queue_local_t* queue, size
 // Multi thread access queue
 // pad contents to avoid false sharing cache lines
 std_static_align_m ( std_l1d_size_m ) typedef struct {
-    char*    base;
-    char*   alias;
+    void*    base;
+    void*   alias;
     char    _p0[std_l1d_size_m - sizeof ( char* ) - sizeof ( char* )];
     size_t  top;
     char    _p1[std_l1d_size_m - sizeof ( size_t )];

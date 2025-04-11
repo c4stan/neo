@@ -1,5 +1,7 @@
 #include "xg_vk_device.h"
 
+#include <xg_debug_capture.h>
+
 #include "xg_vk.h"
 #include "xg_vk_enum.h"
 #include "xg_vk_instance.h"
@@ -15,6 +17,7 @@
     #include "vulkan/xg_vk_allocator.h"
     #include "vulkan/xg_vk_workload.h"
     #include "vulkan/xg_vk_pipeline.h"
+    #include "vulkan/xg_vk_texture.h"
 #endif
 
 /*
@@ -63,8 +66,14 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 #endif
 #endif
 
-    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_checkpoints, "vkGetQueueCheckpointDataNV" );
-    xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_set_checkpoint, "vkCmdSetCheckpointNV" );
+    // RenderDoc doesn't seem to support these...
+    if ( !xg_debug_capture_is_available() ) {
+        xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_checkpoints, "vkGetQueueCheckpointDataNV" );
+        xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_set_checkpoint, "vkCmdSetCheckpointNV" );
+    } else {
+        device->ext_api.get_checkpoints = NULL;
+        device->ext_api.cmd_set_checkpoint = NULL;
+    }
 
 #undef xg_vk_instance_ext_init_pfn_m    
 }
@@ -961,7 +970,13 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 
     xg_vk_allocator_activate_device ( device_handle );
     xg_vk_workload_activate_device ( device_handle );
+
+    xg_workload_h workload = xg_workload_create ( device_handle );
+
     xg_vk_pipeline_activate_device ( device_handle );
+    xg_vk_texture_activate_device ( device_handle, workload );
+
+    xg_workload_submit ( workload );
 
     return true;
 }

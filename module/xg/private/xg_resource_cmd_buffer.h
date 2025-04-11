@@ -7,6 +7,7 @@
 #include <std_mutex.h>
 
 // TODO allocate cmds on opposide sides of the buffer depending on time_e
+// TODO use virtual_stack instead of local_queue?
 typedef struct {
     xg_workload_h workload;
     std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
@@ -49,6 +50,14 @@ typedef struct {
 
 typedef struct {
     xg_texture_h texture;
+    bool init;
+    xg_texture_init_mode_e init_mode;
+    union {
+        xg_color_clear_t clear;
+        xg_depth_stencil_clear_t depth_stencil_clear;
+        xg_buffer_range_t staging;
+    };
+    xg_texture_layout_e init_layout;
 } xg_resource_cmd_texture_create_t;
 
 typedef struct {
@@ -58,6 +67,12 @@ typedef struct {
 
 typedef struct {
     xg_buffer_h buffer;
+    bool init;
+    xg_buffer_init_mode_e init_mode;
+    union {
+        uint32_t clear;
+        xg_buffer_range_t staging;
+    };
 } xg_resource_cmd_buffer_create_t;
 
 typedef struct {
@@ -126,10 +141,10 @@ xg_resource_cmd_buffer_t* xg_resource_cmd_buffer_get ( xg_resource_cmd_buffer_h 
 // ======================================================================================= //
 //                                     R E S O U R C E
 // ======================================================================================= //
-xg_texture_h    xg_resource_cmd_buffer_texture_create           ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params );
+xg_texture_h    xg_resource_cmd_buffer_texture_create           ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params, xg_texture_init_t* init );
 void            xg_resource_cmd_buffer_texture_destroy          ( xg_resource_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_resource_cmd_buffer_time_e destroy_time );
 
-xg_buffer_h     xg_resource_cmd_buffer_buffer_create            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params );
+xg_buffer_h     xg_resource_cmd_buffer_buffer_create            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params, xg_buffer_init_t* init );
 void            xg_resource_cmd_buffer_buffer_destroy           ( xg_resource_cmd_buffer_h cmd_buffer, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e destroy_time );
 
 xg_resource_bindings_h xg_resource_cmd_buffer_resource_bindings_create ( xg_resource_cmd_buffer_h cmd_buffer, const xg_resource_bindings_params_t* params );

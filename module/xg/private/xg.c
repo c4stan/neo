@@ -63,6 +63,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->create_raytrace_world = xg_vk_raytrace_world_create;
     xg->cmd_raytrace = xg_cmd_buffer_cmd_raytrace;
     xg->destroy_raytrace_world = xg_vk_raytrace_world_destroy;
+    xg->destroy_raytrace_geometry = xg_vk_raytrace_geometry_destroy;
     // Command Buffer
     xg->cmd_barrier_set = xg_cmd_buffer_barrier_set;
     xg->cmd_clear_texture = xg_cmd_buffer_texture_clear;
@@ -99,6 +100,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->create_sampler = xg_sampler_create;
     xg->get_default_sampler = xg_sampler_get_default;
     xg->create_queue_event = xg_gpu_queue_event_create;
+    xg->get_default_texture = xg_texture_get_default;
     // Allocator
     xg->get_allocator_info = xg_vk_allocator_get_info;
     xg->alloc_memory = xg_alloc;

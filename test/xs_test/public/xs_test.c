@@ -49,7 +49,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         .initial_layout = xg_texture_layout_undefined_m,
         .debug_name = "temp_texture",
     );
-    xg_texture_h temp_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params );
+    xg_texture_h temp_texture = xg->cmd_create_texture ( resource_cmd_buffer, &params, NULL );
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, temp_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 

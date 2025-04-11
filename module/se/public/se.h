@@ -32,7 +32,7 @@ typedef struct {
 
 #define se_component_layout_m( ... ) ( se_component_layout_t ) { \
     .id = 0, \
-    .stream_count = 0, \
+    .stream_count = 1, \
     .streams = { [0 ... se_component_max_streams_m - 1] = 0 }, \
     ##__VA_ARGS__ \
 }

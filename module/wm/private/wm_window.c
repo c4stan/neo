@@ -998,6 +998,7 @@ static void wm_update_input_state ( wm_window_h handle ) {
 
     uint8_t keyboard[256];
     GetKeyState ( 0 );
+    // TODO this seems to be laggy, replace with local persistent cache updated when reading the event queue?
     result = GetKeyboardState ( keyboard );
     std_assert_m ( result );
 

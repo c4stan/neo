@@ -63,6 +63,7 @@ typedef struct {
     rv_matrix_4x4_t prev_proj_from_view;
     float z_near;
     float z_far;
+    uint32_t reload;
 } workload_uniforms_t;
 
 static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
@@ -102,6 +103,7 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             .prev_proj_from_view = view_info.prev_frame_proj_matrix,
             .z_near = view_info.proj_params.near_z,
             .z_far = view_info.proj_params.far_z,
+            .reload = m_state->render.graph_reload,
         };
 
         // if TAA is off disable jittering
@@ -358,6 +360,13 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
+    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r16g16_sfloat_m,
+        .debug_name = "velocity_texture",
+    ) );
+
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "geometry_clear",
         .type = xf_node_type_clear_pass_m,
@@ -366,21 +375,23 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
             }
         ),
         .resources = xf_node_resource_params_m (
-            .copy_texture_writes_count = 4,
+            .copy_texture_writes_count = 5,
             .copy_texture_writes = {
                 xf_copy_texture_dependency_m ( .texture = color_texture ),
                 xf_copy_texture_dependency_m ( .texture = normal_texture ),
                 xf_copy_texture_dependency_m ( .texture = object_id_texture ),
+                xf_copy_texture_dependency_m ( .texture = velocity_texture ),
                 xf_copy_texture_dependency_m ( .texture = depth_texture ),
             }
         ),
     ) );
 
-    add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, depth_texture );
+    add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, velocity_texture, depth_texture );
 
     // lighting
     uint32_t light_grid_size[3] = { 16, 8, 24 };
@@ -586,17 +597,18 @@ static void viewapp_boot_raster_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ta" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
             .samplers_count = 1,
-            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 4,
+            .sampled_textures_count = 5,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssgi_blur_y_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
-                xf_compute_texture_dependency_m ( .texture = hiz_texture )
+                xf_compute_texture_dependency_m ( .texture = hiz_texture ),
+                xf_compute_texture_dependency_m ( .texture = velocity_texture )
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
@@ -655,12 +667,13 @@ static void viewapp_boot_raster_graph ( void ) {
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_2_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 4,
+            .sampled_textures_count = 5,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssgi_2_blur_y_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_2_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
-                xf_compute_texture_dependency_m ( .texture = hiz_texture ) 
+                xf_compute_texture_dependency_m ( .texture = hiz_texture ), 
+                xf_compute_texture_dependency_m ( .texture = velocity_texture )
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
@@ -790,17 +803,23 @@ static void viewapp_boot_raster_graph ( void ) {
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = taa_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 4,
+            .sampled_textures_count = 5,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = combine_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = taa_history_texture ), 
-                xf_compute_texture_dependency_m ( .texture = object_id_texture ) 
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ),
+                xf_compute_texture_dependency_m ( .texture = velocity_texture ) 
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = combine_texture ) ) }
+            .storage_texture_writes = { 
+                xf_texture_passthrough_m ( 
+                    .mode = xf_passthrough_mode_copy_m, 
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = combine_texture ) 
+                ) 
+            }
         )
     ) );
     m_state->render.taa_node = taa_node;
@@ -825,7 +844,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = tonemap_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
             .sampled_textures_count = 1,
-            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = taa_accumulation_texture ) }, // taa_accumulation_texture
+            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = taa_accumulation_texture ) },
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
@@ -854,12 +873,39 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
+    m_state->render.graph_reload = true;
+
     xf->finalize_graph ( graph );
 }
 
-static void viewapp_build_raytrace_geo ( void ) {
-    xg_device_h device = m_state->render.device;
+static void viewapp_build_mesh_raytrace_geo ( se_entity_h entity, viewapp_mesh_component_t* mesh ) {
     xg_i* xg = m_state->modules.xg;
+    se_i* se = m_state->modules.se;
+
+    se_entity_properties_t entity_properties;
+    se->get_entity_properties ( &entity_properties, entity );
+
+    xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
+        .vertex_buffer = mesh->pos_buffer,
+        .vertex_format = xg_format_r32g32b32_sfloat_m,
+        .vertex_count = mesh->vertex_count,
+        .vertex_stride = 12,
+        .index_buffer = mesh->idx_buffer,
+        .index_count = mesh->index_count,
+    );
+    std_str_copy_static_m ( rt_data.debug_name, entity_properties.name );
+
+    xg_raytrace_geometry_params_t rt_geo_params = xg_raytrace_geometry_params_m ( 
+        .device = m_state->render.device,
+        .geometries = &rt_data,
+        .geometry_count = 1,
+    );
+    std_str_copy_static_m ( rt_geo_params.debug_name, entity_properties.name );
+    xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &rt_geo_params );
+    mesh->rt_geo = rt_geo;
+}
+
+static void viewapp_build_raytrace_geo ( void ) {
     se_i* se = m_state->modules.se;
 
     se_query_result_t mesh_query_result;
@@ -872,27 +918,7 @@ static void viewapp_build_raytrace_geo ( void ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         
         se_entity_h* entity_handle = se_stream_iterator_next ( &entity_iterator );
-        se_entity_properties_t entity_properties;
-        se->get_entity_properties ( &entity_properties, *entity_handle );
-
-        xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
-            .vertex_buffer = mesh_component->pos_buffer,
-            .vertex_format = xg_format_r32g32b32_sfloat_m,
-            .vertex_count = mesh_component->vertex_count,
-            .vertex_stride = 12,
-            .index_buffer = mesh_component->idx_buffer,
-            .index_count = mesh_component->index_count,
-        );
-        std_str_copy_static_m ( rt_data.debug_name, entity_properties.name );
-
-        xg_raytrace_geometry_params_t rt_geo_params = xg_raytrace_geometry_params_m ( 
-            .device = device,
-            .geometries = &rt_data,
-            .geometry_count = 1,
-        );
-        std_str_copy_static_m ( rt_geo_params.debug_name, entity_properties.name );
-        xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &rt_geo_params );
-        mesh_component->rt_geo = rt_geo;
+        viewapp_build_mesh_raytrace_geo ( *entity_handle, mesh_component );
     }
 }
 
@@ -908,38 +934,33 @@ static void viewapp_build_raytrace_world ( void ) {
     }
 
     se_query_result_t mesh_query_result;
-    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( 
+        .component_count = 2, 
+        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
+    ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     xg_raytrace_geometry_instance_t* rt_instances = std_virtual_heap_alloc_array_m ( xg_raytrace_geometry_instance_t, mesh_count );
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
-        
-        sm_vec_3f_t up = {
-            .x = mesh_component->up[0],
-            .y = mesh_component->up[1],
-            .z = mesh_component->up[2],
-        };
+        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-        sm_vec_3f_t dir = {
-            .x = mesh_component->orientation[0],
-            .y = mesh_component->orientation[1],
-            .z = mesh_component->orientation[2],
-        };
+        sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
+        sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
         dir = sm_vec_3f_norm ( dir );
-        
         sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
-
+        float scale = transform_component->scale;
         sm_mat_4x4f_t trans = {
-            .r0[0] = 1,
-            .r1[1] = 1,
-            .r2[2] = 1,
+            .r0[0] = scale,
+            .r1[1] = scale,
+            .r2[2] = scale,
             .r3[3] = 1,
-            .r0[3] = mesh_component->position[0],
-            .r1[3] = mesh_component->position[1],
-            .r2[3] = mesh_component->position[2],
+            .r0[3] = transform_component->position[0],
+            .r1[3] = transform_component->position[1],
+            .r2[3] = transform_component->position[2],
         };
 
         sm_mat_4x4f_t world_matrix = sm_matrix_4x4f_mul ( trans, rot );
@@ -998,10 +1019,10 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { -1.1, -1.45, 1 },
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1015,13 +1036,24 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             )
         );
 
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            .position = { -1.1, -1.45, 1 },
+        );
+
         se->create_entity( &se_entity_params_m (
             .debug_name = "sphere",
             .update = se_entity_update_m (
-                .components = { se_component_update_m (
-                    .id = viewapp_mesh_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
-                ) }
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    )
+                }
             )
         ) );
     }
@@ -1071,9 +1103,24 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
+            .object_id = m_state->render.next_object_id++,
+            .material = viewapp_material_data_m (
+                .base_color = {
+                    plane_col[i][0],
+                    plane_col[i][1],
+                    plane_col[i][2],
+                },
+                .ssr = true,
+                .roughness = 0.1,
+                .metalness = 0,
+            ),
+        );
+
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
             .position = {
                 plane_pos[i][0],
                 plane_pos[i][1],
@@ -1089,17 +1136,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 plane_up[i][1],
                 plane_up[i][2],
             },
-            .object_id = m_state->render.next_object_id++,
-            .material = viewapp_material_data_m (
-                .base_color = {
-                    plane_col[i][0],
-                    plane_col[i][1],
-                    plane_col[i][2],
-                },
-                .ssr = true,
-                .roughness = 0.1,
-                .metalness = 0,
-            ),
         );
 
         if ( i == 3 ) { // top plane
@@ -1109,10 +1145,17 @@ static void viewapp_boot_scene_cornell_box ( void ) {
         se->create_entity ( &se_entity_params_m (
             .debug_name = "plane",
             .update = se_entity_update_m ( 
-                .components = { se_component_update_m (
-                    .id = viewapp_mesh_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
-                ) }
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    )
+                }
             )
         ) );
     }
@@ -1130,10 +1173,10 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .shadow_pipeline = shadow_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { 0, 1.5, 0 },
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1146,6 +1189,10 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 .metalness = 0,
                 .emissive = 1,
             )
+        );
+
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            .position = { 0, 1.5, 0 },
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
@@ -1178,7 +1225,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
         se->create_entity ( &se_entity_params_m (
             .debug_name = "light",
             .update = se_entity_update_m (
-                .component_count = 2,
+                .component_count = 3,
                 .components = { 
                     se_component_update_m (
                         .id = viewapp_light_component_id_m,
@@ -1187,6 +1234,10 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     se_component_update_m (
                         .id = viewapp_mesh_component_id_m,
                         .streams = ( se_stream_update_m ( .data = &mesh_component ) )
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = ( se_stream_update_m ( .data = &transform_component ) )
                     )
                 }
             )
@@ -1220,6 +1271,7 @@ static void viewapp_boot_scene_field ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
@@ -1235,13 +1287,22 @@ static void viewapp_boot_scene_field ( void ) {
             ),          
         );
 
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m ();
+
         se->create_entity ( &se_entity_params_m(
             .debug_name = "plane",
             .update = se_entity_update_m (
-                .components = { se_component_update_m (
-                    .id = viewapp_mesh_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
-                ) }
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    ) 
+                }
             )            
         ) );
     }
@@ -1261,12 +1322,10 @@ static void viewapp_boot_scene_field ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { x, 5, 0 },
-            .orientation = { 0, 1, 0 },
-            .up = { 0, 0, -1 },
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
@@ -1279,13 +1338,26 @@ static void viewapp_boot_scene_field ( void ) {
             )
         );
 
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            .position = { x, 5, 0 },
+            .orientation = { 0, 1, 0 },
+            .up = { 0, 0, -1 },
+        );
+
         se->create_entity ( &se_entity_params_m (
             .debug_name = "quad",
             .update = se_entity_update_m (
-                .components = { se_component_update_m (
-                    .id = viewapp_mesh_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
-                ) }
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    ) 
+                }
             )
         ) );
 
@@ -1293,7 +1365,7 @@ static void viewapp_boot_scene_field ( void ) {
     }
 
     // lights
-    #if 1
+    #if 0
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
@@ -1306,10 +1378,10 @@ static void viewapp_boot_scene_field ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { 10, 10, -10 },
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1322,6 +1394,10 @@ static void viewapp_boot_scene_field ( void ) {
                 .metalness = 0,
                 .emissive = 1,
             )
+        );
+
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            .position = { 10, 10, -10 },
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m(
@@ -1352,7 +1428,7 @@ static void viewapp_boot_scene_field ( void ) {
         se->create_entity ( &se_entity_params_m ( 
             .debug_name = "light",
             .update = se_entity_update_m (
-                .component_count = 2,
+                .component_count = 3,
                 .components = { 
                     se_component_update_m (
                         .id = viewapp_light_component_id_m,
@@ -1361,6 +1437,10 @@ static void viewapp_boot_scene_field ( void ) {
                     se_component_update_m (
                         .id = viewapp_mesh_component_id_m,
                         .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
                     )
                 }
             )
@@ -1380,10 +1460,10 @@ static void viewapp_boot_scene_field ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .pos_buffer = gpu_data.pos_buffer,
             .nor_buffer = gpu_data.nor_buffer,
+            .uv_buffer = gpu_data.uv_buffer,
             .idx_buffer = gpu_data.idx_buffer,
             .vertex_count = geo.vertex_count,
             .index_count = geo.index_count,
-            .position = { -10, 10, -10 },
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1396,6 +1476,10 @@ static void viewapp_boot_scene_field ( void ) {
                 .metalness = 0,
                 .emissive = 1,
             )
+        );
+
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            .position = { -10, 10, -10 },
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
@@ -1426,7 +1510,7 @@ static void viewapp_boot_scene_field ( void ) {
         se->create_entity ( &se_entity_params_m ( 
             .debug_name = "light",
             .update = se_entity_update_m (
-                .component_count = 2,
+                .component_count = 3,
                 .components = { 
                     se_component_update_m (
                         .id = viewapp_light_component_id_m,
@@ -1435,6 +1519,10 @@ static void viewapp_boot_scene_field ( void ) {
                     se_component_update_m (
                         .id = viewapp_mesh_component_id_m,
                         .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
                     )
                 }
             )
@@ -1455,7 +1543,7 @@ static void viewapp_create_cameras ( void ) {
         .proj_params = rv_projection_params_m (
             .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
             .near_z = 0.1,
-            .far_z = 1000,
+            .far_z = 10000,
             .fov_y = 50.f * rv_deg_to_rad_m,
             .jitter = { 1.f / resolution_x, 1.f / resolution_y },
             .reverse_z = false,
@@ -1465,13 +1553,13 @@ static void viewapp_create_cameras ( void ) {
     // cameras
     viewapp_camera_component_t arcball_camera_component = viewapp_camera_component_m (
         .view = rv->create_view ( &view_params ),
-        .enabled = true,
+        .enabled = false,
         .type = viewapp_camera_type_arcball_m
     );
 
     viewapp_camera_component_t flycam_camera_component = viewapp_camera_component_m (
         .view = rv->create_view ( &view_params ),
-        .enabled = false,
+        .enabled = true,
         .type = viewapp_camera_type_flycam_m
     );
 
@@ -1496,20 +1584,93 @@ static void viewapp_create_cameras ( void ) {
     ) );
 }
 
+#include <xg_enum.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+std_unused_static_m()
+static xg_texture_h viewapp_import_texture ( const struct aiScene* scene, const char* path, xg_resource_cmd_buffer_h cmd_buffer ) {
+    void* data;
+    xg_format_e format;
+    int width, height, channels;
+
+    uint64_t star_idx = std_str_find ( path, "*" );
+    if ( star_idx != std_str_find_null_m ) {
+        channels = 4; // TODO
+        uint32_t texture_idx = std_str_to_u32 ( path + star_idx );
+        std_assert_m ( texture_idx < scene->mNumTextures );
+        struct aiTexture* embedded_texture = scene->mTextures[texture_idx];
+        if ( embedded_texture->mHeight == 0 ) {
+            // Compressed texture (e.g., PNG/JPG embedded)
+            data = stbi_load_from_memory ( ( stbi_uc*) embedded_texture->pcData, embedded_texture->mWidth, &width, &height, NULL, channels);
+        } else {
+            // Raw uncompressed texture
+            data = embedded_texture->pcData;
+            width = embedded_texture->mWidth;
+            height = embedded_texture->mHeight;
+        }
+    } else {
+        if ( !stbi_info ( path, &width, &height, &channels ) ) {
+            std_log_error_m ( "failed to read texture " std_fmt_str_m, path );
+            return xg_null_handle_m;
+        }
+        if ( channels == 3 ) channels = 4;
+        data = stbi_load ( path, &width, &height, NULL, channels );
+        std_assert_m ( data );
+    }
+
+    if ( channels == 4 ) {
+        format = xg_format_r8g8b8a8_unorm_m;
+    } else if ( channels == 2 ) {
+        format = xg_format_r8g8_unorm_m;
+    } else if ( channels == 1 ) {
+        format = xg_format_r8_unorm_m;
+    } else {
+        format = xg_format_undefined_m;
+    }
+
+    xg_i* xg = m_state->modules.xg;
+    xg_texture_params_t params = xg_texture_params_m ( 
+        .memory_type = xg_memory_type_gpu_only_m,
+        .device = m_state->render.device,
+        .width = width,
+        .height = height,
+        .format = format,
+        .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_copy_dest_m,
+    );
+    std_path_name ( params.debug_name, sizeof ( params.debug_name ), path );
+
+    xg_texture_h texture_handle = xg->cmd_create_texture ( cmd_buffer, &params, &xg_texture_init_m (
+        .mode = xg_texture_init_mode_upload_m,
+        .upload_data = data,
+        .final_layout = xg_texture_layout_shader_read_m
+    ) );
+
+    return texture_handle;
+}
+
 static void viewapp_import_scene ( const char* input_path ) {
     se_i* se = m_state->modules.se;
+    xg_i* xg = m_state->modules.xg;
     xs_i* xs = m_state->modules.xs;
 
     unsigned int flags = 0;
+    flags |= aiProcess_ConvertToLeftHanded;
     flags |= aiProcess_JoinIdenticalVertices;
     //flags |= aiProcess_MakeLeftHanded;
     flags |= aiProcess_Triangulate;
     flags |= aiProcess_ValidateDataStructure;
-    flags |= aiProcess_GenSmoothNormals;
+    //flags |= aiProcess_GenSmoothNormals;
     flags |= aiProcess_FindInvalidData;
-    flags |= aiProcess_GenUVCoords;
-    flags |= aiProcess_GenBoundingBoxes;
+    //flags |= aiProcess_GenBoundingBoxes;
     //flags |= aiProcess_FlipWindingOrder;
+    flags |= aiProcess_PreTransformVertices;
+
+    std_tick_t start_tick = std_tick_now();
+
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xg->debug_capture_workload ( workload );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     std_log_info_m ( "Importing input scene " std_fmt_str_m, input_path );
     const struct aiScene* scene = aiImportFile ( input_path, flags );
@@ -1565,26 +1726,38 @@ static void viewapp_import_scene ( const char* input_path ) {
 
             xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
 
-            float base_color[3] = { 
-                powf ( 240 / 255.f, 2.2 ),
-                powf ( 240 / 255.f, 2.2 ),
-                powf ( 250 / 255.f, 2.2 )
-            };
-            float roughness = 1;
-            float metalness = 0;
+            viewapp_material_data_t mesh_material = viewapp_material_data_m (
+                .base_color = { 
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 250 / 255.f, 2.2 )
+                },
+                .roughness = 1,
+                .metalness = 0,
+                .ssr = true,
+            );
 
             uint32_t mat_idx = mesh->mMaterialIndex;
             if ( mat_idx < scene->mNumMaterials ) {
                 struct aiMaterial* material = scene->mMaterials[mat_idx];
                 struct aiColor4D diffuse;
                 if ( aiGetMaterialColor ( material, AI_MATKEY_BASE_COLOR, &diffuse ) == AI_SUCCESS ) {
-                    base_color[0] = diffuse.r;
-                    base_color[1] = diffuse.g;
-                    base_color[2] = diffuse.b;
+                    mesh_material.base_color[0] = diffuse.r;
+                    mesh_material.base_color[1] = diffuse.g;
+                    mesh_material.base_color[2] = diffuse.b;
                 }
 
-                aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &roughness );
-                aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &metalness );
+                struct aiString texture_name;
+                if ( aiGetMaterialTexture ( material, aiTextureType_DIFFUSE, 0, &texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
+                    char texture_path[128];
+                    std_path_normalize ( texture_path, 128, input_path );
+                    size_t len = std_path_pop ( texture_path );
+                    std_path_append ( texture_path, 128 - len, texture_name.data );
+                    mesh_material.color_texture = viewapp_import_texture ( scene, texture_path, resource_cmd_buffer );
+                }
+
+                aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );
+                aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &mesh_material.metalness );
             }
 
             viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
@@ -1595,25 +1768,31 @@ static void viewapp_import_scene ( const char* input_path ) {
                 .shadow_pipeline = shadow_pipeline_state,
                 .pos_buffer = gpu_data.pos_buffer,
                 .nor_buffer = gpu_data.nor_buffer,
+                .uv_buffer = gpu_data.uv_buffer,
                 .idx_buffer = gpu_data.idx_buffer,
                 .vertex_count = geo.vertex_count,
                 .index_count = geo.index_count,
-                .position = { 0, 0, 0 },
                 .object_id = m_state->render.next_object_id++,
-                .material = viewapp_material_data_m (
-                    .base_color = { base_color[0], base_color[1], base_color[2] },
-                    .ssr = true,
-                    .roughness = roughness,
-                    .metalness = metalness,
-                )
+                .material = mesh_material,
+            );
+
+            viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+                .position = { 0, 0, 0 },
             );
 
             se_entity_params_t entity_params = se_entity_params_m (
                 .update = se_entity_update_m (
-                    .components = { se_component_update_m (
-                        .id = viewapp_mesh_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
-                    ) }
+                    .component_count = 2,
+                    .components = { 
+                        se_component_update_m (
+                            .id = viewapp_mesh_component_id_m,
+                            .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                        ),
+                        se_component_update_m (
+                            .id = viewapp_transform_component_id_m,
+                            .streams = { se_stream_update_m ( .data = &transform_component ) }
+                        ) 
+                    }
                 )
             );
             std_str_copy_static_m ( entity_params.debug_name, mesh->mName.data );
@@ -1630,6 +1809,7 @@ static void viewapp_import_scene ( const char* input_path ) {
                 .shadow_casting = false
             );
 
+            // TOOD
             se_entity_params_t entity_params = se_entity_params_m (
                 .update = se_entity_update_m (
                     .components = { se_component_update_m (
@@ -1643,31 +1823,23 @@ static void viewapp_import_scene ( const char* input_path ) {
         }
     }
 
+    xg->submit_workload ( workload );
+
     aiReleaseImport ( scene );
-}
 
-#if 0
-// TODO
-static xg_texture_h viewapp_load_texture ( const char* path ) {
-    int width, height, channels;
-    void* data = stbi_load ( path, &width, &height, &channels, 0 );
-    if ( !data ) {
-        return xg_null_handle_m;
-    }
-
-    xg_i* xg = m_state->modules.xg;
-    xg_texture_params_t params = xg_texture_params_m ( 
-        .memory_type = xg_memory_type_gpu_only_m,
-        .device = m_state->render.device,
-        .width = width,
-        .height = height,
-        .format = , // TODO
-        .allowed_usage = xg_texture_usage_bit_sampled_m,
-    );
+    std_tick_t end_tick = std_tick_now();
+    float time_ms = std_tick_to_milli_f32 ( end_tick - start_tick );
+    std_log_info_m ( "Scene imported in " std_fmt_f32_dec_m(3) "s", time_ms / 1000.f );
 }
-#endif
 
 static void viewapp_load_scene ( uint32_t id ) {
+    xg_i* xg = m_state->modules.xg;
+
+    xg->wait_all_workload_complete();
+
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+
     se_i* se = m_state->modules.se;
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m() );
@@ -1679,10 +1851,27 @@ static void viewapp_load_scene ( uint32_t id ) {
         viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
         if ( mesh_component ) {
             xg_geo_util_free_data ( &mesh_component->geo_data );
-            xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data );
+            xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, resource_cmd_buffer );
+
+            viewapp_material_data_t* material = &mesh_component->material;
+            if ( material->color_texture != xg_null_handle_m ) {
+                xg->cmd_destroy_texture ( resource_cmd_buffer, material->color_texture, xg_resource_cmd_buffer_time_workload_start_m );
+            }
+            if ( material->normal_texture != xg_null_handle_m ) {
+                xg->cmd_destroy_texture ( resource_cmd_buffer, material->normal_texture, xg_resource_cmd_buffer_time_workload_start_m );
+            }
+            if ( material->metalness_roughness_texture != xg_null_handle_m ) {
+                xg->cmd_destroy_texture ( resource_cmd_buffer, material->metalness_roughness_texture, xg_resource_cmd_buffer_time_workload_start_m );
+            }
+
+            if ( mesh_component->rt_geo != xg_null_handle_m ) {
+                xg->destroy_raytrace_geometry ( mesh_component->rt_geo );
+            }
         }
         se->destroy_entity ( *entity );
     }
+
+    xg->submit_workload ( workload );
 
     viewapp_create_cameras();
 
@@ -1695,6 +1884,9 @@ static void viewapp_load_scene ( uint32_t id ) {
     }
 
     m_state->scene.active_scene = id;
+
+    viewapp_build_raytrace_geo();
+    viewapp_build_raytrace_world();
 }
 
 static void viewapp_boot ( void ) {
@@ -1760,20 +1952,32 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 1,
-        .components = { se_component_layout_m (
-            .id = viewapp_mesh_component_id_m,
-            .stream_count = 1,
-            .streams = { sizeof ( viewapp_mesh_component_t ) }
-        ) }
+        .component_count = 2,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_mesh_component_id_m,
+                .streams = { sizeof ( viewapp_mesh_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .streams = { sizeof ( viewapp_transform_component_t ) }
+            ),
+        }
     ) );
 
-    se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh component", &se_component_properties_params_m (
-        .count = 7,
+    se->set_component_properties ( viewapp_transform_component_id_m, "Transform", &se_component_properties_params_m (
+        .count = 4,
         .properties = {
-            se_field_property_m ( 0, viewapp_mesh_component_t, position, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, orientation, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, up, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, position, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, orientation, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, up, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, scale, se_property_f32_m ),
+        }
+    ) );
+
+    se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh", &se_component_properties_params_m (
+        .count = 4,
+        .properties = {
             se_field_property_m ( 0, viewapp_mesh_component_t, material.base_color, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, material.roughness, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, material.metalness, se_property_f32_m ),
@@ -1781,7 +1985,7 @@ static void viewapp_boot ( void ) {
         }
     ) );
 
-    se->set_component_properties ( viewapp_light_component_id_m, "Light component", &se_component_properties_params_m (
+    se->set_component_properties ( viewapp_light_component_id_m, "Light", &se_component_properties_params_m (
         .count = 3,
         .properties = {
             se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
@@ -1790,7 +1994,7 @@ static void viewapp_boot ( void ) {
         }
     ) );
 
-    se->set_component_properties ( viewapp_camera_component_id_m, "Camera component", &se_component_properties_params_m (
+    se->set_component_properties ( viewapp_camera_component_id_m, "Camera", &se_component_properties_params_m (
         .count = 1, // TODO
         .properties = {
             se_field_property_m ( 0, viewapp_camera_component_t, enabled, se_property_bool_m ),
@@ -1798,17 +2002,19 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 2,
+        .component_count = 3,
         .components = { 
             se_component_layout_m (
                 .id = viewapp_light_component_id_m,
-                .stream_count = 1,
                 .streams = { sizeof ( viewapp_light_component_t ) }
             ),
             se_component_layout_m (
                 .id = viewapp_mesh_component_id_m,
-                .stream_count = 1,
                 .streams = { sizeof ( viewapp_mesh_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .streams = { sizeof ( viewapp_transform_component_t ) }
             )
         }
     ) );
@@ -1865,11 +2071,7 @@ static void viewapp_boot ( void ) {
 
     viewapp_boot_workload_resources_layout();
 
-    //viewapp_boot_scene_cornell_box();
-    //viewapp_boot_scene_field();
     viewapp_load_scene ( m_state->scene.active_scene );
-    viewapp_build_raytrace_geo();
-    viewapp_build_raytrace_world();
 
     viewapp_boot_raster_graph();
     viewapp_boot_raytrace_graph();
@@ -1991,12 +2193,22 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                 }
             }
         } else if ( camera_component->type == viewapp_camera_type_flycam_m ) {
+            bool speed_up_press = new_input_state->keyboard[wm_keyboard_state_e_m];
+            bool speed_down_press = new_input_state->keyboard[wm_keyboard_state_q_m];
+            float speed = camera_component->move_speed;
+            if ( speed_up_press ) {
+                speed *= 1.1f;
+                camera_component->move_speed = speed;
+            }
+            if ( speed_down_press ) {
+                speed *= 0.9f;
+                camera_component->move_speed = speed;
+            }
+
             bool forward_press = new_input_state->keyboard[wm_keyboard_state_w_m];
             bool backward_press = new_input_state->keyboard[wm_keyboard_state_s_m];
             bool right_press = new_input_state->keyboard[wm_keyboard_state_d_m];
             bool left_press = new_input_state->keyboard[wm_keyboard_state_a_m];
-
-            float speed = camera_component->move_speed;
             if ( ( forward_press && !backward_press ) || ( backward_press && !forward_press ) 
                 || ( right_press && !left_press ) || ( left_press && !right_press ) ) {
                 sm_vec_3f_t z_axis = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( xform.focus_point ), sm_vec_3f ( xform.position ) ) );
@@ -2073,29 +2285,97 @@ static void duplicate_selection ( void ) {
 
     viewapp_mesh_component_t new_mesh = *mesh;
     new_mesh.object_id = m_state->render.next_object_id++;
-    new_mesh.position[0] = 0;
-    new_mesh.position[1] = 0;
-    new_mesh.position[2] = 0;
-    new_mesh.orientation[0] = 0;
-    new_mesh.orientation[1] = 0;
-    new_mesh.orientation[2] = 1;
-    new_mesh.up[0] = 0;
-    new_mesh.up[1] = 1;
-    new_mesh.up[2] = 0;
+    viewapp_transform_component_t new_transform = viewapp_transform_component_m();
 
     se->create_entity( &se_entity_params_m (
         .debug_name = "duplicate mesh", // TODO
         .update = se_entity_update_m (
-            .component_count = 1,
-            .components = se_component_update_m (
-                .id = viewapp_mesh_component_id_m,
-                .stream_count = 1,
-                .streams = {
-                    se_stream_update_m ( .id = 0, .data = &new_mesh )
-                }
-            )
+            .component_count = 2,
+            .components = { 
+                se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &new_mesh ) }
+                ),
+                se_component_update_m (
+                    .id = viewapp_transform_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &new_transform ) }
+                )
+            }
         )
     ) );
+}
+
+static void spawn_sphere ( void ) {
+    xs_i* xs = m_state->modules.xs;
+    se_i* se = m_state->modules.se;
+
+    xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
+    xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
+    xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
+
+    xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
+
+    viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+        .geo_data = geo,
+        .geo_gpu_data = gpu_data,
+        .object_id_pipeline = object_id_pipeline_state,
+        .geometry_pipeline = geometry_pipeline_state,
+        .shadow_pipeline = shadow_pipeline_state,
+        .pos_buffer = gpu_data.pos_buffer,
+        .nor_buffer = gpu_data.nor_buffer,
+        .uv_buffer = gpu_data.uv_buffer,
+        .idx_buffer = gpu_data.idx_buffer,
+        .vertex_count = geo.vertex_count,
+        .index_count = geo.index_count,
+        .object_id = m_state->render.next_object_id++,
+        .material = viewapp_material_data_m (
+            .base_color = { 
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 250 / 255.f, 2.2 )
+            },
+            .ssr = true,
+            .roughness = 0.1,
+            .metalness = 0,
+            .emissive = 1,
+        )
+    );
+
+    viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        .position = { 0, 0, 0 },
+    );
+
+    viewapp_light_component_t light_component = viewapp_light_component_m (
+        .position = { 0, 0, 0 },
+        .intensity = 5,
+        .color = { 1, 1, 1 },
+        .shadow_casting = true
+    );
+
+    se_entity_h entity = se->create_entity( &se_entity_params_m (
+        .debug_name = "sphere",
+        .update = se_entity_update_m (
+            .component_count = 3,
+            .components = { 
+                se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ),
+                se_component_update_m (
+                    .id = viewapp_transform_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &transform_component ) }
+                ),
+                se_component_update_m (
+                    .id = viewapp_light_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &light_component ) }
+                )
+            }
+        )
+    ) );
+
+    viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
+    viewapp_build_mesh_raytrace_geo ( entity, mesh );
 }
 
 static void mouse_pick ( uint32_t x, uint32_t y ) {
@@ -2135,7 +2415,9 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
 
         if ( mesh_component->object_id == id ) {
             m_state->ui.mouse_pick_entity = *entity;
-            std_log_info_m ( "Mouse pick entity handle " std_fmt_u64_m, m_state->ui.mouse_pick_entity );
+            se_entity_properties_t props;
+            se->get_entity_properties ( &props, *entity );
+            std_log_info_m ( "Mouse pick entity handle " std_fmt_u64_m " " std_fmt_str_m, m_state->ui.mouse_pick_entity, props.name );
             return;
         }
     }
@@ -2290,7 +2572,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             if ( scene_select.item_idx == 2 ) {
                 xi->file_pick ( std_buffer_static_array_m ( m_state->scene.custom_scene_path ), std_binding_assimp_models_m );
             }
-            viewapp_load_scene ( scene_select.item_idx );
+            if ( scene_select.item_idx != 2 || m_state->scene.custom_scene_path[0] != '\0' ) {
+                viewapp_load_scene ( scene_select.item_idx );
+            }
         }
     }
     xi->end_section ( xi_workload );
@@ -2355,6 +2639,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 if ( node_switch.value != node_enabled ) {
                     xf->node_set_enabled ( m_state->render.active_graph, graph_info.nodes[i], node_switch.value );
                     xf->invalidate_graph ( m_state->render.active_graph, workload );
+                    m_state->render.graph_reload = true;
                 }
             }
         }
@@ -2465,26 +2750,26 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     // geos
     bool transform_drag = false;
     if ( m_state->ui.mouse_pick_entity != se_null_handle_m ) {
-        viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
-        std_assert_m ( mesh );
+        viewapp_transform_component_t* transform = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_transform_component_id_m, 0 );
+        std_assert_m ( transform );
 
         xi_transform_state_t xform = xi_transform_state_m (
-            .position = { mesh->position[0], mesh->position[1], mesh->position[2] }
+            .position = { transform->position[0], transform->position[1], transform->position[2] }
         );
         transform_drag = xi->draw_transform ( xi_workload, &xform );
 
         bool rtworld_needs_update = false;
-        if ( ( mesh->position[0] != xform.position[0] 
-            || mesh->position[1] != xform.position[1] 
-            || mesh->position[2] != xform.position[2] )
+        if ( ( transform->position[0] != xform.position[0] 
+            || transform->position[1] != xform.position[1] 
+            || transform->position[2] != xform.position[2] )
             && m_state->render.active_graph == m_state->render.raytrace_graph )
         {
             rtworld_needs_update = true;
         }
 
-        mesh->position[0] = xform.position[0];
-        mesh->position[1] = xform.position[1];
-        mesh->position[2] = xform.position[2];
+        transform->position[0] = xform.position[0];
+        transform->position[1] = xform.position[1];
+        transform->position[2] = xform.position[2];
     
         if ( rtworld_needs_update ) {
             update_raytrace_world ( workload );
@@ -2497,6 +2782,56 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
 
     xi->end_update();
+}
+
+static void viewapp_update_lights ( void ) {
+    se_i* se = m_state->modules.se;
+    rv_i* rv = m_state->modules.rv;
+
+    se_query_result_t query_result;
+    se->query_entities ( &query_result, &se_query_params_m ( 
+        .component_count = 2,
+        .components = { viewapp_light_component_id_m, viewapp_transform_component_id_m }
+    ) );
+    se_stream_iterator_t light_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &query_result.components[1], 0 );
+
+    for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
+        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
+        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        rv_view_transform_t transform = {
+            .position = { 
+                transform_component->position[0],
+                transform_component->position[1],
+                transform_component->position[2],
+            },
+            .focus_point = {
+                transform_component->position[0],
+                transform_component->position[1] - 1.f, // TODO
+                transform_component->position[2],
+            },
+        };
+        rv->update_view_transform ( light_component->view, &transform );
+    }
+}
+
+static void viewapp_update_meshes ( void ) {
+    se_i* se = m_state->modules.se;
+
+    se_query_result_t mesh_query_result;
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( 
+        .component_count = 2,
+        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m }
+    ) );
+    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
+
+    for ( uint32_t i = 0; i < mesh_query_result.entity_count; ++i ) {
+        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
+        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        mesh_component->prev_transform = *transform_component;
+        // TODO update transform...
+    }
 }
 
 static std_app_state_e viewapp_update ( void ) {
@@ -2564,6 +2899,10 @@ static std_app_state_e viewapp_update ( void ) {
         duplicate_selection();
     }
 
+    if ( !input_state->keyboard[wm_keyboard_state_f6_m] && new_input_state.keyboard[wm_keyboard_state_f6_m] ) {
+        spawn_sphere();
+    }
+
     m_state->render.frame_id += 1;
 
     viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
@@ -2573,31 +2912,62 @@ static std_app_state_e viewapp_update ( void ) {
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
 
+    viewapp_update_meshes();
+    viewapp_update_lights();
     viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
 
     m_state->render.window_info = new_window_info;
     m_state->render.input_state = new_input_state;
 
     if ( m_state->reload ) {
+        bool enabled[xf_graph_max_nodes_m] = {};
+        xf_graph_info_t graph_info;
+        xf->get_graph_info ( &graph_info, m_state->render.active_graph );
+        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
+            xf_node_info_t node_info;
+            xf->get_node_info ( &node_info, m_state->render.active_graph, graph_info.nodes[i] );
+            enabled[i] = node_info.enabled;
+        }
+
+        bool active_graph[2] = {};
+        if ( m_state->render.active_graph == m_state->render.raster_graph ) active_graph[0] = 1;
+        if ( m_state->render.active_graph == m_state->render.raytrace_graph ) active_graph[1] = 1;
+
         xf->destroy_graph ( m_state->render.raster_graph, workload );
         xf->destroy_graph ( m_state->render.raytrace_graph, workload );
         xf->destroy_graph ( m_state->render.mouse_pick_graph, workload );
 
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg->cmd_destroy_texture ( resource_cmd_buffer, m_state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_complete_m );
-
-        //xf->destroy_unreferenced_resources();
+ 
+       //xf->destroy_unreferenced_resources ( xg, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 
         viewapp_boot_raster_graph();
         viewapp_boot_raytrace_graph();
         viewapp_boot_mouse_pick_graph();
 
-        m_state->render.active_graph = m_state->render.raster_graph;
+        if ( active_graph[0] ) m_state->render.active_graph = m_state->render.raster_graph;
+        if ( active_graph[1] ) m_state->render.active_graph = m_state->render.raytrace_graph;
+
+        bool any_passthrough = false;
+        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
+            if ( !enabled[i] ) {
+                xf->node_set_enabled ( m_state->render.active_graph, graph_info.nodes[i], false );
+                any_passthrough = true;
+            }
+        }
+
+        if ( any_passthrough ) {
+            xf->invalidate_graph ( m_state->render.active_graph, workload );
+        }
 
         m_state->reload = false;
+        m_state->render.graph_reload = true;
     }
 
     viewapp_update_workload_uniforms ( workload );
+
+    m_state->render.graph_reload = false;
 
     xf->execute_graph ( m_state->render.active_graph, workload, 0 );
     xg->submit_workload ( workload );
@@ -2645,7 +3015,10 @@ void* viewer_app_load ( void* runtime ) {
 void viewer_app_unload ( void ) {
     xg_i* xg = m_state->modules.xg;
     xg->wait_all_workload_complete();
-    
+
+    xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+
     se_i* se = m_state->modules.se;
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
@@ -2655,8 +3028,10 @@ void viewer_app_unload ( void ) {
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_geo_util_free_data ( &mesh_component->geo_data );
-        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data );
+        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, resource_cmd_buffer );
     }
+
+    xg->submit_workload ( workload );
 
     std_module_unload_m ( xi_module_name_m );
     std_module_unload_m ( rv_module_name_m );

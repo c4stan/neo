@@ -95,7 +95,7 @@ static xg_sampler_h xg_sampler_create_default ( xg_device_h device, xg_default_s
                 .mipmap_filter = xg_sampler_filter_point_m,
                 .address_mode = xg_sampler_address_mode_clamp_m,
             );
-            std_str_copy_static_m ( params.debug_name, "default point clamp" );
+            std_str_copy_static_m ( params.debug_name, "default_point_clamp" );
             break;
 
         case xg_default_sampler_linear_clamp_m:
@@ -106,7 +106,18 @@ static xg_sampler_h xg_sampler_create_default ( xg_device_h device, xg_default_s
                 .mipmap_filter = xg_sampler_filter_linear_m,
                 .address_mode = xg_sampler_address_mode_clamp_m,
             );
-            std_str_copy_static_m ( params.debug_name, "default linear clamp" );
+            std_str_copy_static_m ( params.debug_name, "default_linear_clamp" );
+            break;
+
+        case xg_default_sampler_linear_wrap_m:
+            params = xg_sampler_params_m (
+                .device = device,
+                .min_filter = xg_sampler_filter_linear_m,
+                .mag_filter = xg_sampler_filter_linear_m,
+                .mipmap_filter = xg_sampler_filter_linear_m,
+                .address_mode = xg_sampler_address_mode_wrap_m,
+            );
+            std_str_copy_static_m ( params.debug_name, "default_linear_wrap" );
             break;
 
         default:

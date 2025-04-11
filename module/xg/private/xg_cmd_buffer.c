@@ -77,38 +77,24 @@ void xg_cmd_buffer_unload ( void ) {
     std_mutex_deinit ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 }
 
-// ======================================================================================= //
-//                               C O M M A N D   B U F F E R
-// ======================================================================================= //
-
-void xg_cmd_buffer_open_n ( xg_cmd_buffer_h* cmd_buffer_handles, size_t count, xg_workload_h workload ) {
+xg_cmd_buffer_h xg_cmd_buffer_create ( xg_workload_h workload ) {
     std_mutex_lock ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 
-    for ( size_t i = 0; i < count; ++i ) {
-        xg_cmd_buffer_t* cmd_buffer = std_list_pop_m ( &xg_cmd_buffer_state->cmd_buffers_freelist );
+    xg_cmd_buffer_t* cmd_buffer = std_list_pop_m ( &xg_cmd_buffer_state->cmd_buffers_freelist );
 
-        if ( cmd_buffer == NULL ) {
-            std_assert_m ( xg_cmd_buffer_state->allocated_cmd_buffers_count + 1 <= xg_cmd_buffer_max_cmd_buffers_m );
-            std_log_info_m ( "Allocating additional command buffer " std_fmt_u64_m "/" std_fmt_int_m ", consider increasing xg_cmd_buffer_preallocated_cmd_buffers_m.", xg_cmd_buffer_state->allocated_cmd_buffers_count + 1, xg_cmd_buffer_max_cmd_buffers_m );
-            // Buffers are linearly added to the pool. Therefore if freeing is allowed it must also be linear and back-to-front.
-            cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[xg_cmd_buffer_state->allocated_cmd_buffers_count++];
-            xg_cmd_buffer_alloc_memory ( cmd_buffer );
-        }
-
-        cmd_buffer->workload = workload;
-
-        xg_cmd_buffer_h cmd_buffer_handle = ( xg_cmd_buffer_h ) ( cmd_buffer - xg_cmd_buffer_state->cmd_buffers_array );
-        cmd_buffer_handles[i] = cmd_buffer_handle;
-
-        //xg_workload_add_cmd_buffer ( workload_handle, cmd_buffer_handle );
+    if ( cmd_buffer == NULL ) {
+        std_assert_m ( xg_cmd_buffer_state->allocated_cmd_buffers_count + 1 <= xg_cmd_buffer_max_cmd_buffers_m );
+        std_log_info_m ( "Allocating additional command buffer " std_fmt_u64_m "/" std_fmt_int_m ", consider increasing xg_cmd_buffer_preallocated_cmd_buffers_m.", xg_cmd_buffer_state->allocated_cmd_buffers_count + 1, xg_cmd_buffer_max_cmd_buffers_m );
+        // Buffers are linearly added to the pool. Therefore if freeing is allowed it must also be linear and back-to-front.
+        cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[xg_cmd_buffer_state->allocated_cmd_buffers_count++];
+        xg_cmd_buffer_alloc_memory ( cmd_buffer );
     }
 
-    std_mutex_unlock ( &xg_cmd_buffer_state->cmd_buffers_mutex );
-}
+    cmd_buffer->workload = workload;
+    xg_cmd_buffer_h handle = ( xg_cmd_buffer_h ) ( cmd_buffer - xg_cmd_buffer_state->cmd_buffers_array );
 
-xg_cmd_buffer_h xg_cmd_buffer_open ( xg_workload_h workload ) {
-    xg_cmd_buffer_h handle;
-    xg_cmd_buffer_open_n ( &handle, 1, workload );
+    std_mutex_unlock ( &xg_cmd_buffer_state->cmd_buffers_mutex );
+
     return handle;
 }
 
@@ -140,7 +126,7 @@ xg_cmd_buffer_h xg_cmd_buffer_open ( xg_workload_h workload ) {
                 2 input read, 1 count write, 1 count read, 1 output write
 
 */
-void xg_cmd_buffer_sort_n ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count ) {
+void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count ) {
     size_t total_header_size = 0;
 
     for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
@@ -152,17 +138,6 @@ void xg_cmd_buffer_sort_n ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_h
     std_assert_m ( total_header_count <= cmd_header_cap );
 
     // Stable u64 LSD radix sort using 8-bit bins
-    // Allocate 2 buffers of same size as total items to be sorted and ping-pong on each sorting step
-    // TODO pre-allocate these
-    //std_alloc_t alloc1 = std_virtual_heap_alloc ( total_header_size, 16 );
-    //std_alloc_t alloc2 = std_virtual_heap_alloc ( total_header_size, 16 );
-    //alloc1.buffer.size = total_header_size;
-    //alloc2.buffer.size = total_header_size;
-    //std_auto_m buffer1 = ( xg_cmd_header_t* ) alloc1.buffer.base;
-    //std_auto_m buffer2 = ( xg_cmd_header_t* ) alloc2.buffer.base;
-
-    //std_auto_m buffer1 = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
-    //std_auto_m buffer2 = std_virtual_heap_alloc_array_m ( xg_cmd_header_t, total_header_count );
     void* buffer1 = cmd_headers_temp;
     void* buffer2 = cmd_headers;
 

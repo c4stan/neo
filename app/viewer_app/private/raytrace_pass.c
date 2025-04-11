@@ -87,7 +87,10 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     // Fill raytrace instance buffer
     se_query_result_t mesh_query_result;
-    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( 
+        .component_count = 1, 
+        .components = { viewapp_mesh_component_id_m } 
+    ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 

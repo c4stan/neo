@@ -515,10 +515,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                     bool compile_result = xs_shader_compiler_compile ( &params );
 
-                    std_assert_m ( compile_result );
-
                     if ( !compile_result ) {
                         ++shader_fail;
+                        bytecode->buffer = std_null_buffer_m;
                         continue;
                     } else {
                         ++shader_success;
@@ -706,10 +705,16 @@ void xs_database_update_pipelines ( xg_workload_h last_workload ) {
                 }
 
                 if ( xg->is_workload_complete ( workload ) ) {
-                    if ( pipeline_state->type == xg_pipeline_graphics_m ) {
+                    switch ( pipeline_state->type ) {
+                    case xg_pipeline_graphics_m:
                         xg->destroy_graphics_pipeline ( pipeline_state->old_pipeline_handle );
-                    } else {
+                        break;
+                    case xg_pipeline_compute_m:
                         xg->destroy_compute_pipeline ( pipeline_state->old_pipeline_handle );
+                        break;
+                    case xg_pipeline_raytrace_m:
+                        xg->destroy_raytrace_pipeline ( pipeline_state->old_pipeline_handle );
+                        break;
                     }
 
                     pipeline_state->old_pipeline_handle = xg_null_handle_m;

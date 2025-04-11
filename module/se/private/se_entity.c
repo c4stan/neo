@@ -191,7 +191,15 @@ static void* se_entity_family_get_component_stream_data ( se_entity_family_strea
 void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t mask ) {
     se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
     se_entity_family_t* family = se_entity_family_get ( mask );
-    std_assert_m ( family );
+#if std_log_error_enabled_m
+    if ( !family ) {
+        char buffer[64 * se_component_mask_block_count_m];
+        for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
+            std_u64_to_bin ( mask.u64[se_component_mask_block_count_m - i - 1], buffer + 64 * i );
+        }
+        std_log_error_m ( "Missing family " std_fmt_str_m, buffer );
+    }
+#endif
 
     //entity->mask = mask;
     entity->family = family - se_entity_state->family_array;

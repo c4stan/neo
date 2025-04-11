@@ -40,7 +40,10 @@ void                std_hash_map_destroy ( std_hash_map_t* map ); // Call on hea
 //      - Access to the 'count' field is NOT supported. Reason being that it is NOT updated atomically with the insertion.
 bool                std_hash_map_insert_shared ( std_hash_map_t* map, uint64_t hash, uint64_t payload );
 
-#define std_static_hash_map_m( keys, payloads ) std_hash_map ( keys, payloads, std_static_array_capacity_m ( keys ) )
+#define std_static_hash_map_m( keys, payloads ) ({ \
+    std_assert_m ( std_static_array_capacity_m ( keys ) == std_static_array_capacity_m ( payloads ) ); \
+    std_hash_map ( keys, payloads, std_static_array_capacity_m ( keys ) ); \
+})
 
 // Hash set, same as hash_map but doesn't store payloads
 typedef struct {

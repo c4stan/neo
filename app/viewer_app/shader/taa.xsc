@@ -3,7 +3,7 @@ compute_shader taa.comp
 include common.xsi
 
 begin bindings
-    texture sampled[4]
+    texture sampled[5]
     texture storage
     sampler[2]
 end

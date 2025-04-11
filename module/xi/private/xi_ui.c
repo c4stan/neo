@@ -20,7 +20,6 @@ void xi_ui_load ( xi_ui_state_t* state ) {
     xi_ui_state = state;
 
     std_mem_zero_m ( xi_ui_state );
-    xi_ui_state->focus_stack_idx = -1;
     xi_ui_state->device = xg_null_handle_m;
 
     xi_ui_state->windows_map = std_static_hash_map_m ( xi_ui_state->windows_map_ids, xi_ui_state->windows_map_values );
@@ -32,8 +31,12 @@ void xi_ui_reload ( xi_ui_state_t* state ) {
 
 void xi_ui_unload ( void ) {
     if ( xi_ui_state->device != xg_null_handle_m ) {
+        xg_i* xg = std_module_get_m ( xg_module_name_m );
+        xg_workload_h workload = xg->create_workload ( xi_ui_state->device );
+        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg_geo_util_free_data ( &xi_ui_state->transform_geo.cpu );
-        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu );
+        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu, resource_cmd_buffer );
+        xg->submit_workload ( workload );
     }
 }
 
@@ -273,12 +276,21 @@ static uint32_t xi_ui_focus_stack_push ( uint64_t id, uint32_t sub_id ) {
     uint32_t idx = xi_ui_state->focus_stack_count++;
     xi_ui_state->focus_stack_ids[idx] = id;
     xi_ui_state->focus_stack_sub_ids[idx] = sub_id;
-    return idx;
-}
 
-static void xi_ui_focus_stack_acquire ( void ) {
-    std_assert_m ( xi_ui_state->focus_stack_count > 0 );
-    xi_ui_state->focus_stack_idx = xi_ui_state->focus_stack_count - 1;
+    // Insert sort into the "stack" to keep same id entries sorted by sub_id.
+    // This allows property fields to tab in the right order even if they get
+    // added to the window in the opposite order.
+    while ( idx > 0 ) {
+        if ( xi_ui_state->focus_stack_ids[idx - 1] != id || xi_ui_state->focus_stack_sub_ids[idx - 1] <= sub_id ) {
+            break;
+        }
+        idx -= 1;
+        xi_ui_state->focus_stack_ids[idx + 1] = xi_ui_state->focus_stack_ids[idx];
+        xi_ui_state->focus_stack_sub_ids[idx + 1] = xi_ui_state->focus_stack_sub_ids[idx];
+        xi_ui_state->focus_stack_ids[idx] = id;
+        xi_ui_state->focus_stack_sub_ids[idx] = sub_id;
+    }
+    return idx;
 }
 
 static bool xi_ui_release_keyboard ( uint64_t id ) {
@@ -305,7 +317,6 @@ static bool xi_ui_acquire_focus ( uint64_t id, uint32_t sub_id ) {
     xi_ui_state->focused_id = id;
     xi_ui_state->focused_sub_id = sub_id;
     xi_ui_state->focus_time = 0;
-    xi_ui_focus_stack_acquire();
     return true;
 }
 
@@ -503,11 +514,19 @@ void xi_ui_update_begin ( const wm_window_info_t* window_info, const wm_input_st
         xi_ui_state->focus_time += delta;
     }
 
-    //xi_ui_state->focus_stack_idx = -1;
     xi_ui_state->focus_stack_change = false;
     xi_ui_state->focus_stack_count = 0;
 
     xi_ui_state->active_scissor = xi_null_scissor_m;
+}
+
+static uint32_t xi_ui_get_focus_stack_idx ( uint64_t id, uint32_t sub_id ) {
+    for ( uint32_t i = 0; i < xi_ui_state->focus_stack_count; ++i ) {
+        if ( xi_ui_state->focus_stack_ids[i] == id && xi_ui_state->focus_stack_sub_ids[i] == sub_id ) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 void xi_ui_update_end ( void ) {
@@ -516,14 +535,13 @@ void xi_ui_update_end ( void ) {
         if ( event->type == wm_event_key_down_m ) {
             wm_keyboard_event_args_t args = event->args.keyboard;
             if ( args.keycode == wm_keyboard_state_tab_m ) {
-                uint32_t idx;
+                uint32_t idx = xi_ui_get_focus_stack_idx ( xi_ui_state->focused_id, xi_ui_state->focused_sub_id );
                 if ( args.flags & wm_input_flag_bits_shift_m ) {
-                    idx = ( xi_ui_state->focus_stack_idx - 1 ) % xi_ui_state->focus_stack_count;
+                    idx = ( idx - 1 ) % xi_ui_state->focus_stack_count;
                 } else {
-                    idx = ( xi_ui_state->focus_stack_idx + 1 ) % xi_ui_state->focus_stack_count;
+                    idx = ( idx + 1 ) % xi_ui_state->focus_stack_count;
                 }
                 xi_ui_acquire_focus ( xi_ui_state->focus_stack_ids[idx], xi_ui_state->focus_stack_sub_ids[idx] );
-                xi_ui_state->focus_stack_idx = idx;
                 xi_ui_state->focus_stack_change = true;
             }
         }
@@ -635,34 +653,29 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     }
 
     // scroll
-    if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 3 ) {
-        int32_t handle_y = ( scrollbar_height - scroll_handle_height ) * scroll;
-        handle_y += xi_ui_state->update.mouse_delta_y;
-        handle_y = std_max_i32 ( handle_y, 0 );
-        scroll = ( float ) handle_y / ( scrollbar_height - scroll_handle_height );
-    }
     if ( state->scrollable ) {
-        if ( xi_ui_layer_cursor_test ( 0, 0, window_width, layer->height ) ) {
-            if ( xi_ui_state->update.wheel_up ) {
-                scroll -= 0.05;
-            }
-
-            if ( xi_ui_state->update.wheel_down ) {
-                scroll += 0.05;
-            }
+        if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 3 ) {
+            int32_t handle_y = ( scrollbar_height - scroll_handle_height ) * scroll;
+            handle_y += xi_ui_state->update.mouse_delta_y;
+            handle_y = std_max_i32 ( handle_y, 0 );
+            scroll = ( float ) handle_y / ( scrollbar_height - scroll_handle_height );
         }
-        scroll = std_min_f32 ( std_max_f32 ( scroll, 0 ), 1 );
 
         uint64_t* lookup = std_hash_map_lookup ( &xi_ui_state->windows_map, state->id );
         if ( lookup ) {
             uint64_t prev_height = *lookup;
+            float tick = ( float ) ( window_height - header_height ) / prev_height;
+            tick *= 0.5f;
+            if ( xi_ui_layer_cursor_test ( 0, 0, window_width, layer->height ) ) {
+                if ( xi_ui_state->update.wheel_up ) {
+                    scroll -= tick;
+                }
 
-            //if ( prev_height <= layer->height ) { 
-            //    scroll = 0;
-            //} else {
-            //    prev_height -= layer->height;
-            //}
-
+                if ( xi_ui_state->update.wheel_down ) {
+                    scroll += tick;
+                }
+            }
+            scroll = std_min_f32 ( std_max_f32 ( scroll, 0 ), 1 );
             state->scroll = scroll;
             layer->line_y -= prev_height * scroll;
         }
@@ -1076,6 +1089,7 @@ bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state ) {
 bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
+    uint32_t top_margin = 2;
     uint32_t padding = 2;
     uint32_t inner_padding = 1;
     uint32_t x, y;
@@ -1083,7 +1097,7 @@ bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     //xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
     //std_log_info_m ( std_fmt_i64_m, layer->delta_y );
 
-    if ( !xi_ui_layer_add_element ( &x, &y, state->width, state->height, &style ) ) {
+    if ( !xi_ui_layer_add_element ( &x, &y, state->width, state->height + top_margin, &style ) ) {
         return false;
     }
 

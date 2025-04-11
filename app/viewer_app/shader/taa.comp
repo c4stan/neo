@@ -8,11 +8,12 @@ layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
 layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_history;
 layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_id;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_velocity;
 
-layout ( binding = 4, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
 
-layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
-layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
@@ -51,17 +52,21 @@ void main ( void ) {
     // Sample
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
     float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
+    vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy;
 
     // Reproject
     vec3 view = view_from_depth ( screen_uv, depth );
     vec3 world = ( frame_cbuffer.world_from_view * vec4 ( view, 1 ) ).xyz;
     vec3 prev_screen = prev_screen_from_world ( world );
     vec2 screen_offset = prev_screen.xy - screen_uv;
-    vec2 reprojected_uv = screen_uv + screen_offset;
+    vec2 reprojected_uv = screen_uv - velocity;
 
 #if 1
     // Sample history
     vec3 history = texture ( sampler2D ( tex_history, sampler_linear ), reprojected_uv ).xyz;
+    if ( frame_cbuffer.is_reload > 0 ) {
+        history = color;
+    }
 #else
     // TODO test on moving scene
     vec3 history = sample_catmull_rom ( tex_history, sampler_linear, reprojected_uv, frame_cbuffer.resolution_f32 ).xyz;
@@ -113,4 +118,5 @@ void main ( void ) {
     // Blend
     vec3 blend = mix ( history, color, blend_factor );
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( blend, 1 ) );
+    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( velocity, 0, 1 ) );
 }

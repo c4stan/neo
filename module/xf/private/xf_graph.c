@@ -1146,7 +1146,7 @@ static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_device_h devic
             // If tagged as upload the buffer needs to be available immediately
             new_buffer = xg->create_buffer ( &params );
         } else {
-            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params );
+            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params, NULL );
         }
 #endif
 
@@ -1265,7 +1265,7 @@ static xf_graph_resource_dependencies_t xf_graph_alloc_buffer_resource_dependenc
 static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     uint64_t texture_hashes[xf_graph_max_textures_m * 2];
-    uint64_t texture_values[xf_graph_max_textures_m];
+    uint64_t texture_values[xf_graph_max_textures_m * 2];
     std_hash_map_t graph_textures_map = std_static_hash_map_m ( texture_hashes, texture_values );
     std_auto_m graph_textures_array = std_static_array_m ( xf_graph_texture_t, graph->textures_array );
 
@@ -1927,7 +1927,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
     }
 
     // Debug print transient to committed aliasing
-    bool print_alias_list = true;
+    bool print_alias_list = false;
     if ( print_alias_list ) {
         for ( uint32_t i = 0; i < committed_textures_count; ++i ) {
             xf_graph_committed_texture_t* committed_texture = &committed_textures_array[i];
@@ -2073,7 +2073,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         xf_graph_committed_texture_t* committed_texture = heap_texture->committed_texture;
         committed_texture->params.creation_address.base = heap_alloc.base;
         committed_texture->params.creation_address.offset = heap_alloc.offset + heap_texture->range.begin;
-        xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &committed_texture->params );
+        xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &committed_texture->params, NULL );
         xg_texture_info_t texture_info;
         xg->get_texture_info ( &texture_info, xg_handle );
         xf_physical_texture_h physical_texture_handle = xf_resource_physical_texture_create ( &xf_physical_texture_params_m (
@@ -2110,7 +2110,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
 
         if ( create_new ) {
             xg_texture_params_t params = xf_graph_texture_params ( graph->params.device, texture_handle );
-            xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params );
+            xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params, NULL );
             xg_texture_info_t texture_info;
             xg->get_texture_info ( &texture_info, xg_handle );
             xf_physical_texture_h physical_texture_handle = xf_resource_physical_texture_create ( &xf_physical_texture_params_m (
@@ -2134,7 +2134,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
             xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
             if ( texture->physical_texture_handle == xg_null_handle_m ) {
                 xg_texture_params_t params = xf_graph_texture_params ( graph->params.device, texture_handle );
-                xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params );
+                xg_texture_h xg_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params, NULL );
                 xg_texture_info_t texture_info;
                 xg->get_texture_info ( &texture_info, xg_handle );
                 xf_physical_texture_h physical_texture_handle = xf_resource_physical_texture_create ( &xf_physical_texture_params_m (
@@ -2758,7 +2758,7 @@ static void xf_graph_create_segment_events ( xf_graph_h graph_handle, xg_i* xg )
     }
 }
 
-static void xf_graph_print ( xf_graph_h graph_handle ) {
+void xf_graph_print ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
     char stack_buffer[2048];
@@ -2874,7 +2874,7 @@ void xf_graph_invalidate ( xf_graph_h graph_handle, xg_workload_h workload ) {
     for ( uint32_t i = 0; i < graph->textures_count; ++i ) {
         xf_texture_h texture_handle = graph->textures_array[i].handle;
         xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( texture_handle );
-        if ( !physical_texture->is_external ) {
+        if ( physical_texture && !physical_texture->is_external ) {
             xf_resource_texture_unbind ( graph->textures_array[i].handle );
         }
     }
@@ -2942,7 +2942,7 @@ void xf_graph_finalize ( xf_graph_h graph_handle ) {
         xf_graph_add_resource_refs ( graph_handle );
     }
 
-    xf_graph_print ( graph_handle );
+    //xf_graph_print ( graph_handle );
     graph->is_finalized = true;
 }
 
@@ -3853,9 +3853,7 @@ void xf_graph_get_node_info ( xf_node_info_t* info, xf_graph_h graph_handle, xf_
 }
 
 void xf_graph_debug_print ( xf_graph_h graph_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    // TODO
-    std_unused_m ( graph );
+    xf_graph_print ( graph_handle );
 }
 
 void xf_graph_node_set_enabled ( xf_graph_h graph_handle, xf_node_h node_handle, bool enabled ) {

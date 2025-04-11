@@ -61,6 +61,8 @@ void xg_vk_texture_load ( xg_vk_texture_state_t* state );
 void xg_vk_texture_reload ( xg_vk_texture_state_t* state );
 void xg_vk_texture_unload ( void );
 
+void xg_vk_texture_activate_device ( xg_device_h device, xg_workload_h workload );
+
 // create = reserve + alloc
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params );
 xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params );
@@ -86,3 +88,5 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
         check VkMemoryDedicatedRequirements when allocating resources, create a dedicated memory allocation if needed instead of the shared allocator
         see https://asawicki.info/articles/memory_management_vulkan_direct3d_12.php5 "Dedicated allocations"
 */
+
+xg_texture_h xg_texture_get_default ( xg_device_h device, xg_default_texture_e texture_enum );

@@ -50,10 +50,18 @@ typedef struct {
 
 //#if xg_enable_raytracing_m
     // vkGetAccelerationStructureBuildSizesKHR
-    void ( *get_acceleration_structure_build_sizes ) ( VkDevice, VkAccelerationStructureBuildTypeKHR, const VkAccelerationStructureBuildGeometryInfoKHR*, const uint32_t*, VkAccelerationStructureBuildSizesInfoKHR* );
+    void ( *get_acceleration_structure_build_sizes ) ( 
+        VkDevice, 
+        VkAccelerationStructureBuildTypeKHR, 
+        const VkAccelerationStructureBuildGeometryInfoKHR*, 
+        const uint32_t*, 
+        VkAccelerationStructureBuildSizesInfoKHR* );
 
     // vkCreateAccelerationStructureKHR
-    VkResult ( *create_acceleration_structure ) ( VkDevice, const VkAccelerationStructureCreateInfoKHR*, const VkAllocationCallbacks*, VkAccelerationStructureKHR* );
+    VkResult ( *create_acceleration_structure ) ( 
+        VkDevice, const VkAccelerationStructureCreateInfoKHR*, 
+        const VkAllocationCallbacks*, 
+        VkAccelerationStructureKHR* );
     
     // vkCmdBuildAccelerationStructuresKHR
     void ( *cmd_build_acceleration_structures ) (
@@ -63,7 +71,9 @@ typedef struct {
     const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos );
 
     // vkGetAccelerationStructureDeviceAddressKHR
-    VkDeviceAddress ( *get_acceleration_structure_device_address ) ( VkDevice, const VkAccelerationStructureDeviceAddressInfoKHR* );
+    VkDeviceAddress ( *get_acceleration_structure_device_address ) ( 
+        VkDevice, 
+        const VkAccelerationStructureDeviceAddressInfoKHR* );
 
 #if xg_vk_enable_nv_raytracing_ext_m
     // vkCreateRayTracingPipelinesNV

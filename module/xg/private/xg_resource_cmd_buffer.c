@@ -7,6 +7,8 @@
     #include "vulkan/xg_vk_workload.h"
 #endif
 
+#include <xg_enum.h>
+
 #include <std_list.h>
 #include <std_mutex.h>
 
@@ -142,7 +144,7 @@ static void* xg_resource_cmd_buffer_record_cmd ( xg_resource_cmd_buffer_t* cmd_b
 }
 #define xg_resource_cmd_buffer_record_cmd_m(cmd_buffer, cmd_type, args_type) (args_type*) xg_resource_cmd_buffer_record_cmd(cmd_buffer, cmd_type, sizeof(args_type))
 
-xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_texture_params_t* params ) {
+xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_texture_params_t* params, xg_texture_init_t* init ) {
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
     xg_resource_cmd_texture_create_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_texture_create_m, xg_resource_cmd_texture_create_t );
 
@@ -150,6 +152,25 @@ xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cm
     std_assert_m ( texture_handle != xg_null_handle_m );
 
     cmd_args->texture = texture_handle;
+
+    if ( init ) {
+        cmd_args->init = true;
+        cmd_args->init_mode = init->mode;
+        // TODO just memcpy?
+        if ( init->mode == xg_texture_init_mode_upload_m ) {
+            // TODO proper sizing accounting for array size etc
+            //      just store the offset in the cmd?
+            size_t size = params->width * params->height * xg_format_size ( params->format );
+            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload_data, size );
+        } else if ( init->mode == xg_texture_init_mode_clear_m ) {
+            cmd_args->clear = init->clear;
+        } else if ( init->mode == xg_texture_init_mode_clear_depth_stencil_m ) {
+            cmd_args->depth_stencil_clear = init->depth_stencil_clear;
+        }
+        cmd_args->init_layout = init->final_layout;
+    } else {
+        cmd_args->init = false;
+    }
 
     return texture_handle;
 }
@@ -162,7 +183,7 @@ void xg_resource_cmd_buffer_texture_destroy ( xg_resource_cmd_buffer_h cmd_buffe
     cmd_args->destroy_time = destroy_time;
 }
 
-xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_buffer_params_t* params ) {
+xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_buffer_params_t* params, xg_buffer_init_t* init ) {
     xg_buffer_h buffer_handle;
 
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
@@ -172,6 +193,19 @@ xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_
     std_assert_m ( buffer_handle != xg_null_handle_m );
 
     cmd_args->buffer = buffer_handle;
+
+    if ( init ) {
+        cmd_args->init = true;
+        cmd_args->init_mode = init->mode;
+        if ( init->mode == xg_buffer_init_mode_upload_m ) {
+            size_t size = params->size;
+            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload_data, size );
+        } else if ( init->mode == xg_buffer_init_mode_clear_m ) {
+            cmd_args->clear = init->clear;
+        }
+    } else {
+        cmd_args->init = false;
+    }
 
     return buffer_handle;
 }

@@ -53,7 +53,7 @@ static RENDERDOC_API_1_5_0* xg_debug_capture_get_api ( void ) {
     return ( RENDERDOC_API_1_5_0* ) xg_debug_capture_state->renderdoc_api;
 }
 
-static bool xg_debug_capture_is_available ( void ) {
+bool xg_debug_capture_is_available ( void ) {
     return xg_debug_capture_state->renderdoc_api != NULL;
 }
 
