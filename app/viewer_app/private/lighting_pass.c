@@ -23,6 +23,8 @@ typedef struct {
     float intensity;
     rv_matrix_4x4_t proj_from_view;
     rv_matrix_4x4_t view_from_world;
+    float shadow_tile[3];
+    uint32_t _pad0;
 } uniform_light_data_t;
 
 typedef struct {
@@ -90,6 +92,11 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
             .intensity = light_component->intensity,
             .proj_from_view = view_info.proj_matrix,
             .view_from_world = view_info.view_matrix,
+            .shadow_tile = {
+                light_component->shadow_x,
+                light_component->shadow_y,
+                light_component->shadow_size
+            },
         };
     }
 

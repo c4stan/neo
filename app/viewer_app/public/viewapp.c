@@ -296,9 +296,10 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     m_state->render.raster_graph = graph;
 
+    uint32_t shadow_size = 1024 * 2;
     xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
-        .width = 1024,
-        .height = 1024,
+        .width = shadow_size,
+        .height = shadow_size,
         .format = xg_format_d16_unorm_m,
         .debug_name = "shadow_texture"
     ) );
@@ -478,12 +479,14 @@ static void viewapp_boot_raster_graph ( void ) {
         uint32_t grid_size[3];
         float z_scale;
         float z_bias;
+        uint32_t shadow_size;
     } lighting_uniforms = {
         .grid_size[0] = light_grid_size[0],
         .grid_size[1] = light_grid_size[1],
         .grid_size[2] = light_grid_size[2],
         .z_scale = 0, // TODO
         .z_bias = 0,
+        .shadow_size = shadow_size,
     };
 
     xf->add_node ( graph, &xf_node_params_m (
@@ -2308,6 +2311,7 @@ static void duplicate_selection ( void ) {
 static void spawn_sphere ( void ) {
     xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
+    rv_i* rv = m_state->modules.rv;
 
     xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
     xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
@@ -2352,6 +2356,27 @@ static void spawn_sphere ( void ) {
         .color = { 1, 1, 1 },
         .shadow_casting = true
     );
+
+    rv_view_params_t view_params = rv_view_params_m (
+        .position = {
+            light_component.position[0],
+            light_component.position[1],
+            light_component.position[2],
+        },
+        .focus_point = {
+            view_params.position[0],
+            view_params.position[1] - 1,
+            view_params.position[2],
+        },
+        .proj_params = rv_projection_params_m (
+            .aspect_ratio = 1,
+            .near_z = 0.01,
+            .far_z = 100,
+            .reverse_z = false, // TODO ?
+        ),
+    );
+    light_component.view = rv->create_view ( &view_params );
+
 
     se_entity_h entity = se->create_entity( &se_entity_params_m (
         .debug_name = "sphere",

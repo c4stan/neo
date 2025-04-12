@@ -7,6 +7,7 @@ layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform uniform_b
     uvec3 grid_size;
     float z_scale;
     float z_bias;
+    uint shadow_size;
 } uniform_buffer;
 
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) buffer readonly light_buffer_t {
@@ -86,21 +87,24 @@ void main ( void ) {
         vec4 shadow_proj = light.proj_from_view * light.view_from_world * world_geo_pos;
         shadow_proj /= shadow_proj.w;
         vec3 shadow_screen = vec3 ( shadow_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, shadow_proj.z );
+        vec2 shadow_texel = light.shadow_tile.xy + shadow_screen.xy * light.shadow_tile.z;
 
         float shadow = 0;
     #if 1
         int pcf_radius = 3;
 
-        for ( int x = -pcf_radius; x <= pcf_radius; ++x ) {
-            for ( int y = -pcf_radius; y <= pcf_radius; ++y ) {
-                vec2 shadow_uv = shadow_screen.xy + vec2 ( x, y ) * ( 1.f / 1024.f ); // TODO shadow texel size
+        for ( int dx = -pcf_radius; dx <= pcf_radius; ++dx ) {
+            for ( int dy = -pcf_radius; dy <= pcf_radius; ++dy ) {
+                vec2 shadow_uv = shadow_texel + vec2 ( dx, dy );
+                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy, light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) );
+                shadow_uv *= ( 1.f / uniform_buffer.shadow_size );
                 float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_point ), shadow_uv ).x;
 
                 //if ( shadow_screen.x > 1.f || shadow_screen.x < 0.f || shadow_screen.y > 1.f || shadow_screen.y < 0.f ) {
                 //    shadow_depth = 1.f;
                 //}
 
-                float shadow_bias = 0.001;
+                float shadow_bias = 0.0001;
                 float shadow_contribution = shadow_proj.z - shadow_bias > shadow_depth ? 1.f : 0.f;
 
                 if ( shadow_screen.z > 1.f ) {

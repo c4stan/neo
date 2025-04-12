@@ -16,6 +16,8 @@ typedef struct {
 
 typedef struct {
     xg_resource_bindings_layout_h pass_layout;
+    uint64_t width;
+    uint64_t height;
 } shadow_pass_args_t;
 
 static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -43,8 +45,30 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     uint64_t light_count = light_query_result.entity_count;
 
+    uint64_t shadow_count = light_count;
+
+    uint64_t size = std_pow2_round_down_u64 ( std_min_u64 ( pass_args->width, pass_args->height ) );
+    uint64_t cols = pass_args->width / size;
+    uint64_t rows = pass_args->height / size;
+    while ( size >= 1 ) {
+        if ( cols * rows >= shadow_count ) {
+            break;
+        }
+        size >>= 1;
+        cols = pass_args->width / size;
+        rows = pass_args->height / size;
+    }
+
     for ( uint64_t i = 0; i < light_count; ++i ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
+
+        uint32_t row = i / cols;
+        uint32_t col = i % cols;
+
+        // TODO better way to pass this from here to lighting
+        light_component->shadow_x = col * size;
+        light_component->shadow_y = row * size;
+        light_component->shadow_size = size;
 
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, light_component->view );
@@ -65,12 +89,13 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
             )
         ) );
 
-        // TODO
-        //xg_viewport_state_t viewport = xg_viewport_state_m (
-        //    .width = 1024,
-        //    .height = 1024,
-        //);
-        //xg->cmd_set_dynamic_viewport ( node_args->cmd_buffer, &viewport, key );
+        xg_viewport_state_t viewport = xg_viewport_state_m (
+            .x = size * col,
+            .y = size * row,
+            .width = size,
+            .height = size,
+        );
+        xg->cmd_set_dynamic_viewport ( node_args->cmd_buffer, key, &viewport );
 
         se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
         se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
@@ -131,6 +156,9 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     xf_graph_info_t graph_info;
     xf->get_graph_info ( &graph_info, graph );
 
+    xf_texture_info_t texture_info;
+    xf->get_texture_info ( &texture_info, target );
+
     xg_resource_bindings_layout_h pass_layout = xg->create_resource_layout ( &xg_resource_bindings_layout_params_m (
         .device = graph_info.device,
         .resource_count = 1,
@@ -138,7 +166,9 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     ) );
 
     shadow_pass_args_t args = {
-        .pass_layout = pass_layout
+        .pass_layout = pass_layout,
+        .width = texture_info.width,
+        .height = texture_info.height,
     };
 
     xf_node_h node = xf->add_node ( graph, &xf_node_params_m (

@@ -393,7 +393,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     bool screen_ray_is_backward = screen_ray_dir.z < 0;
 
     uint sample_it = 0;
-    float depth_threshold = 0.001;
+    float depth_threshold = 0.0001;
 
     while ( t > 0.f && t < 1.f && sample_it < max_sample_count ) {
         //

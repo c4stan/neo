@@ -249,6 +249,9 @@ typedef struct {
     float radius;
     float color[3];
     float intensity;
+    uint32_t shadow_x;
+    uint32_t shadow_y;
+    uint32_t shadow_size;
 } viewapp_light_component_t; // spotlight
 
 #define viewapp_light_component_m( ... ) ( viewapp_light_component_t ) { \
