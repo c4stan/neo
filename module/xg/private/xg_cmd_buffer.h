@@ -73,7 +73,8 @@ typedef enum {
     xg_cmd_stop_debug_capture_m,
     xg_cmd_begin_debug_region_m,
     xg_cmd_end_debug_region_m,
-    //xg_cmd_write_timestamp_m,
+    xg_cmd_write_timestamp_m,
+    xg_cmd_reset_query_pool_m,
 } xg_cmd_type_e;
 
 #define xg_cmd_buffer_cmd_alignment_m 8
@@ -112,13 +113,11 @@ typedef struct {
     uint32_t color_rgba;
 } xg_cmd_begin_debug_region_t;
 
-#if 0
 typedef struct {
-    xg_query_buffer_h query_buffer;
-    xg_pipeline_stage_bit_e dependency;
+    xg_query_pool_h pool;
+    uint32_t idx;
+    xg_pipeline_stage_bit_e stage;
 } xg_cmd_write_timestamp_t;
-#endif
-//
 
 typedef struct {
     xg_cmd_buffer_t*    cmd_buffers_array;
@@ -189,7 +188,5 @@ void xg_cmd_buffer_start_debug_capture ( xg_cmd_buffer_h cmd_buffer, uint64_t ke
 void xg_cmd_buffer_stop_debug_capture ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 void xg_cmd_buffer_begin_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const char* name, uint32_t color );
 void xg_cmd_buffer_end_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
-
-#if 0
-    void    xg_cmd_buffer_write_timestamp                   ( xg_cmd_buffer_h cmd_buffer, const xg_timestamp_query_params_t* params, uint64_t key );
-#endif
+void xg_cmd_buffer_write_timestamp ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_query_timestamp_params_t* params );
+void xg_cmd_buffer_reset_query_pool ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_query_pool_h pool );

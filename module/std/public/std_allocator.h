@@ -78,7 +78,7 @@ typedef struct {
 
 std_buffer_t std_buffer ( void* base, size_t size );
 #define std_buffer_m( item ) std_buffer ( item, sizeof ( *item ) )
-#define std_buffer_static_array_m( item ) std_buffer ( item, sizeof ( item ) )
+#define std_buffer_static_array_m( array ) std_buffer ( array, sizeof ( array ) )
 #define std_null_buffer_m ( std_buffer_t ) { NULL, 0 }
 
 // TODO split the stacks out to new file std_stack?

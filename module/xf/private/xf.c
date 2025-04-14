@@ -38,6 +38,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->get_node_info = xf_graph_get_node_info;
 
     xf->invalidate_graph = xf_graph_invalidate;
+    xf->get_graph_timings = xf_graph_get_timings;
 
     xf->debug_print_graph = xf_graph_debug_print;
     xf->get_base_texture = xf_resource_multi_texture_get_base;

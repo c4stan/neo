@@ -1172,3 +1172,8 @@ void xg_vk_device_unmap_host_buffer ( xg_host_buffer_t* buffer ) {
     buffer->mapped_base = NULL;
 }
 #endif
+
+float xg_vk_device_timestamp_period ( xg_device_h device_handle ) {
+    xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
+    return device->generic_properties.limits.timestampPeriod;
+}

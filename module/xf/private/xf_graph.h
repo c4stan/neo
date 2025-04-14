@@ -3,6 +3,7 @@
 #include <xf.h>
 
 #include <std_hash.h>
+#include <std_queue.h>
 
 #include "xf_resource.h"
 
@@ -325,6 +326,11 @@ typedef struct xf_node_t {
 } xf_node_t;
 
 typedef struct {
+    xg_query_pool_h pool;
+    xg_workload_h workload;
+} xf_graph_query_context_t;
+
+typedef struct {
     xf_graph_params_t params;
 
     xf_node_t nodes_array[xf_graph_max_nodes_m];
@@ -366,6 +372,10 @@ typedef struct {
 
     std_virtual_stack_t resource_dependencies_allocator;
     std_virtual_stack_t physical_resource_dependencies_allocator;
+
+    xf_graph_query_context_t query_contexts_array[16];
+    std_ring_t query_contexts_ring;
+    uint64_t latest_timings[xf_graph_max_nodes_m];
 } xf_graph_t;
 
 typedef struct {
@@ -395,3 +405,5 @@ void xf_graph_debug_print ( xf_graph_h graph );
 void xf_graph_node_set_enabled ( xf_graph_h graph, xf_node_h node, bool enabled );
 void xf_graph_node_enable ( xf_graph_h graph, xf_node_h node );
 void xf_graph_node_disable ( xf_graph_h graph, xf_node_h node );
+
+const uint64_t* xf_graph_get_timings ( xf_graph_h graph );

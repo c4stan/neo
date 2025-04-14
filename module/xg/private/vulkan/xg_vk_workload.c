@@ -19,6 +19,7 @@
 #include "xg_vk_sampler.h"
 #include "xg_vk_instance.h"
 #include "xg_vk_raytrace.h"
+#include "xg_vk_query.h"
 
 #include <std_list.h>
 
@@ -389,7 +390,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
 #if 0
     workload->timestamp_query_pools_count = 0;
 #endif
-    
+
     return workload_handle;
 }
 
@@ -889,11 +890,14 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
         case xg_cmd_begin_debug_region_m:
         case xg_cmd_end_debug_region_m:
         case xg_cmd_barrier_set_m:
+        case xg_cmd_reset_query_pool_m:
             std_assert_m ( !in_renderpass );
             if ( cmd_chunk.begin == -1 ) cmd_chunk.begin = cmd_it;
             break;
+        case xg_cmd_write_timestamp_m:
         case xg_cmd_start_debug_capture_m:
         case xg_cmd_stop_debug_capture_m:
+            if ( cmd_chunk.begin == -1 ) cmd_chunk.begin = cmd_it;
             break;
         }        
     }
@@ -1789,6 +1793,18 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
             case xg_cmd_end_debug_region_m:
                 xg_vk_instance_ext_api()->cmd_end_debug_region ( vk_cmd_buffer );
                 break;
+            case xg_cmd_write_timestamp_m: {
+                std_auto_m args = ( xg_cmd_write_timestamp_t* ) header->args;
+                xg_vk_query_pool_t* pool = xg_vk_query_pool_get ( args->pool );
+                vkCmdWriteTimestamp ( vk_cmd_buffer, xg_pipeline_stage_to_vk ( args->stage ), pool->vk_handle, args->idx );
+            }
+            break;
+            case xg_cmd_reset_query_pool_m: {
+                std_auto_m args = ( xg_query_pool_h* ) header->args;
+                xg_vk_query_pool_t* pool = xg_vk_query_pool_get ( *args );
+                vkCmdResetQueryPool ( vk_cmd_buffer, pool->vk_handle, 0, pool->params.capacity );
+            }
+            break;
             default:
                 break;
             }

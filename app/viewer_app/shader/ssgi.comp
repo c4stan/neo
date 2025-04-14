@@ -34,7 +34,7 @@ void main ( void ) {
     // init rng
     uint rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
 
-#define RAY_COUNT 2
+#define RAY_COUNT 1
 
     // init accumulators
     float sample_distances[RAY_COUNT];

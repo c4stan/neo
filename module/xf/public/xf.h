@@ -577,6 +577,8 @@ typedef struct {
 
     void ( *invalidate_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
+    const uint64_t* ( *get_graph_timings ) ( xf_graph_h graph );
+
     // TODO remove this
     xf_texture_h ( *get_base_texture ) ( xf_texture_h multi_texture );
 } xf_i;

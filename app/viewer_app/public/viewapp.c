@@ -2691,20 +2691,22 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         xf_graph_info_t graph_info;
         xf->get_graph_info ( &graph_info, m_state->render.active_graph );
-        uint32_t passthrough_nodes_count = 0;
+        uint32_t passthrough_nodes_count = 0; // TODO remove?
+
+        const uint64_t* timings = xf->get_graph_timings ( m_state->render.active_graph );
 
         for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
             xf_node_info_t node_info;
             xf->get_node_info ( &node_info, m_state->render.active_graph, graph_info.nodes[i] );
 
+            xi_label_state_t node_label = xi_label_state_m ();
+            std_str_copy_static_m ( node_label.text, node_info.debug_name );
+            xi->add_label ( xi_workload, &node_label );
+
             if ( node_info.passthrough ) {
                 ++passthrough_nodes_count;
                 bool node_enabled = node_info.enabled;
-
-                xi_label_state_t node_label = xi_label_state_m ();
-                std_str_copy_static_m ( node_label.text, node_info.debug_name );
-                xi->add_label ( xi_workload, &node_label );
-
+                
                 xi_switch_state_t node_switch = xi_switch_state_m (
                     .width = 14,
                     .height = 14,
@@ -2715,14 +2717,42 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 );
                 xi->add_switch ( xi_workload, &node_switch );
 
-                xi->newline();
-
                 if ( node_switch.value != node_enabled ) {
                     xf->node_set_enabled ( m_state->render.active_graph, graph_info.nodes[i], node_switch.value );
                     xf->invalidate_graph ( m_state->render.active_graph, workload );
                     m_state->render.graph_reload = true;
                 }
             }
+
+            uint64_t timestamp_diff = timings[i * 2 + 1] - timings[i * 2];
+            float ms = xg->timestamp_to_ns ( m_state->render.device ) * timestamp_diff / 1000000.f;
+            char buffer[32];
+            std_f32_to_str ( ms, buffer, 32 );
+            xi_label_state_t time_label = xi_label_state_m (
+                .style = xi_style_m (
+                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+                )
+            );
+            std_str_copy_static_m ( time_label.text, buffer );
+            xi->add_label ( xi_workload, &time_label );
+
+            xi->newline();
+        }
+
+        xi->newline();
+
+        {
+            uint64_t timestamp_diff = timings[graph_info.node_count * 2 - 1] - timings[0];
+            float ms = xg->timestamp_to_ns ( m_state->render.device ) * timestamp_diff / 1000000.f;
+            char buffer[32];
+            std_f32_to_str ( ms, buffer, 32 );
+            xi_label_state_t time_label = xi_label_state_m (
+                .style = xi_style_m (
+                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+                )
+            );
+            std_str_copy_static_m ( time_label.text, buffer );
+            xi->add_label ( xi_workload, &time_label );
         }
 
         xi->newline();

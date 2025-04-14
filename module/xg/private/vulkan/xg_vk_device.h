@@ -223,3 +223,5 @@ void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc );
 void xg_vk_device_wait_idle_all ( void );
 
 xg_vk_device_ext_api_i* xg_vk_device_ext_api ( xg_device_h device );
+
+float xg_vk_device_timestamp_period ( xg_device_h device );

@@ -13,10 +13,12 @@
 #include "xg_vk_swapchain.h"
 #include "xg_vk_workload.h"
 #include "xg_vk_raytrace.h"
+#include "xg_vk_query.h"
 
 typedef struct {
     xg_vk_instance_state_t instance;
     xg_vk_device_state_t device;
+    xg_vk_query_state_t query;
     xg_vk_event_state_t event;
     xg_vk_pipeline_state_t pipeline;
     xg_vk_allocator_state_t allocator;

@@ -50,6 +50,8 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     graph->params = *params;
     graph->heap.memory_handle = xg_null_memory_handle_m;
 
+    graph->query_contexts_ring = std_ring ( 16 );
+
     // xf_graph_texture_t * xf_resource_max_mip_levels_m + xf_graph_buffer_t
     graph->resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
     // xf_graph_physical_texture_t * xf_resource_max_mip_levels_m
@@ -3255,6 +3257,46 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
     std_bitset_clear ( xf_graph_state->graphs_bitset, graph_handle );
 }
 
+const uint64_t* xf_graph_get_timings ( xf_graph_h graph_handle ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    return graph->latest_timings;
+}
+
+static void xf_graph_timestamp_query_pool_consume ( xf_graph_h graph_handle, xg_i* xg ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    
+    size_t count = std_ring_count ( &graph->query_contexts_ring );
+    while ( count > 0 ) {
+        xf_graph_query_context_t* context = &graph->query_contexts_array[std_ring_bot_idx ( &graph->query_contexts_ring )];
+        if ( !xg->is_workload_complete ( context->workload ) ) {
+            break;
+        }
+
+        std_buffer_t buffer = std_buffer ( graph->latest_timings, sizeof ( uint64_t ) * 2 * graph->nodes_count );
+        xg->read_query_pool ( buffer, context->pool );
+        xg->destroy_query_pool ( context->pool );
+        std_ring_pop ( &graph->query_contexts_ring, 1 );
+        count = std_ring_count ( &graph->query_contexts_ring );
+    }
+}
+
+static xg_query_pool_h xf_graph_timestamp_query_pool_create ( xf_graph_h graph_handle, xg_workload_h workload, xg_i* xg ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    xg_query_pool_h pool = xg->create_query_pool ( &xg_query_pool_params_m (
+        .device = graph->params.device,
+        .type = xg_query_pool_type_timestamp_m,
+        .capacity = graph->nodes_count * 2,
+        .debug_name = "xf_graph_timestamp_pool"
+    ) );
+    uint64_t pool_idx = std_ring_top_idx ( &graph->query_contexts_ring );
+    graph->query_contexts_array[pool_idx] = ( xf_graph_query_context_t ) {
+        .pool = pool,
+        .workload = workload
+    };
+    std_ring_push ( &graph->query_contexts_ring, 1 );
+    return pool;
+}
+
 uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, uint64_t base_key ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     std_assert_m ( graph );
@@ -3399,6 +3441,10 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
         }
     }
 #endif
+
+    xf_graph_timestamp_query_pool_consume ( graph_handle, xg );
+    xg_query_pool_h timestamp_query_pool = xf_graph_timestamp_query_pool_create ( graph_handle, xg_workload, xg );
+    xg->cmd_reset_query_pool ( cmd_buffer, sort_key++, timestamp_query_pool );
 
     // Execute
     for ( size_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
@@ -3663,6 +3709,13 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             xg->cmd_bind_queue ( cmd_buffer, sort_key++, &bind_queue_params );
         }
 
+        // if timing enabled
+        xg->cmd_query_timestamp ( cmd_buffer, sort_key++, &xg_cmd_query_timestamp_params_m (
+            .pool = timestamp_query_pool,
+            .idx = node_it * 2 + 0,
+            .stage = xg_pipeline_stage_bit_top_of_pipe_m,
+        ) );
+
         if ( node->enabled ) {
             xg->cmd_begin_debug_region ( cmd_buffer, sort_key++, node->params.debug_name, node->params.debug_color );
             {
@@ -3803,6 +3856,13 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
         if ( node->enabled ) {
             xg->cmd_end_debug_region ( cmd_buffer, sort_key++ );
         }
+
+        // if timing enabled
+        xg->cmd_query_timestamp ( cmd_buffer, sort_key++, &xg_cmd_query_timestamp_params_m (
+            .pool = timestamp_query_pool,
+            .idx = node_it * 2 + 1,
+            .stage = xg_pipeline_stage_bit_bottom_of_pipe_m,
+        ) );
     }
 
     // Advance multi resources, skip those created without auto_advance

@@ -20,6 +20,7 @@ typedef uint64_t xg_resource_cmd_buffer_h;
 typedef uint64_t xg_cmd_buffer_h;
 typedef uint64_t xg_swapchain_h;
 typedef uint64_t xg_renderpass_h;
+typedef uint64_t xg_query_pool_h;
 
 typedef uint64_t xg_resource_h;
 typedef uint64_t xg_buffer_h;
@@ -2386,6 +2387,38 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    xg_query_pool_type_timestamp_m,
+} xg_query_pool_type_e;
+
+typedef struct {
+    xg_device_h device;
+    xg_query_pool_type_e type;
+    uint32_t capacity;
+    char debug_name[xg_debug_name_size_m];
+} xg_query_pool_params_t;
+
+#define xg_query_pool_params_m( ... ) ( xg_query_pool_params_t ) { \
+    .device = xg_null_handle_m, \
+    .type = xg_query_pool_type_timestamp_m, \
+    .capacity = 0, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_query_pool_h pool;
+    uint32_t idx;
+    xg_pipeline_stage_bit_e stage;
+} xg_cmd_query_timestamp_params_t;
+
+#define xg_cmd_query_timestamp_params_m( ... ) ( xg_cmd_query_timestamp_params_t ) { \
+    .pool = xg_null_handle_m, \
+    .idx = -1, \
+    .stage = xg_pipeline_stage_bit_none_m, \
+    ##__VA_ARGS__ \
+}
+
 // XG API
 typedef struct {
     // Device
@@ -2512,13 +2545,13 @@ typedef struct {
     xg_alloc_t              ( *alloc_memory )                       ( const xg_alloc_params_t* params );
     void                    ( *free_memory )                        ( xg_memory_h handle );
 
-#if 0
     xg_query_pool_h         ( *create_query_pool )                  ( const xg_query_pool_params_t* params );
-    void                    ( *cmd_query_timestamp )                ( xg_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_pipeline_stage_bit_e depenency, uint64_t key );
-    void                    ( *cmd_readback_query_pool )            ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h readback_buffer, uint64_t key );
-    void                    ( *cmd_reset_query_pool )               ( xg_resource_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_resource_cmd_buffer_time_e time );
-    void                    ( *cmd_destroy_query_pool )             ( xg_resource_cmd_buffer_h cmd_buffer, xg_query_pool_h pool, xg_resource_cmd_buffer_time_e time );
-#endif
+    void                    ( *cmd_query_timestamp )                ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_query_timestamp_params_t* params );
+    void                    ( *cmd_reset_query_pool )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_query_pool_h pool );
+    void                    ( *read_query_pool )                    ( std_buffer_t buffer, xg_query_pool_h pool );
+    void                    ( *destroy_query_pool )                 ( xg_query_pool_h pool );
+
+    float                   ( *timestamp_to_ns )                    ( xg_device_h device );
 
     void                    ( *enable_texture_view )                ( xg_texture_h texture, xg_texture_view_t view );
 

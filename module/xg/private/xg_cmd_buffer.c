@@ -561,12 +561,17 @@ void xg_cmd_buffer_end_debug_region ( xg_cmd_buffer_h cmd_buffer_handle, uint64_
     xg_cmd_buffer_record_cmd_noargs_m ( cmd_buffer, xg_cmd_end_debug_region_m, key );
 }
 
-#if 0
-void xg_cmd_buffer_write_timestamp ( xg_cmd_buffer_h cmd_buffer_handle, const xg_timestamp_query_params_t* params, uint64_t key ) {
+void xg_cmd_buffer_write_timestamp ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_query_timestamp_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_write_timestamp_m, key, xg_cmd_write_timestamp_t );
 
-    cmd_args->query_buffer = params->buffer;
-    cmd_args->dependency = params->dependency;
+    cmd_args->pool = params->pool;
+    cmd_args->idx = params->idx;
+    cmd_args->stage = params->stage;
 }
-#endif
+
+void xg_cmd_buffer_reset_query_pool ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_query_pool_h pool ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_reset_query_pool_m, key, xg_query_pool_h );
+    *cmd_args = pool;
+}
