@@ -6,6 +6,9 @@
 
 #include <math.h>
 
+#include <sm_vector.h>
+#include <sm_quat.h>
+
 static rv_view_state_t* rv_view_state;
 
 static void rv_view_crossf3 ( float* dest, const float* a, const float* b ) {
@@ -51,7 +54,8 @@ static void rv_view_rotation_matrix_from_quaternion ( rv_matrix_4x4_t* m, float*
 }
 #endif
 
-static void rv_view_view_matrix ( rv_matrix_4x4_t* m, const float* pos, const float* focus ) {
+// const float* pos, const float* dir
+static void rv_view_view_matrix ( rv_matrix_4x4_t* m, const rv_view_transform_t* transform ) {
     /*
         https://www.3dgep.com/understanding-the-view-matrix/
         view = orientation^-1 * translation^-1
@@ -62,14 +66,23 @@ static void rv_view_view_matrix ( rv_matrix_4x4_t* m, const float* pos, const fl
 
     std_mem_zero_m ( m );
 
-    float up[3] = { 0.f, 1.f, 0.f };
-    float dir[3] = { focus[0] - pos[0], focus[1] - pos[1], focus[2] - pos[2] };
+    const float* pos = transform->position;
+    //float up[3] = { 0.f, 1.f, 0.f };
+    //sm_vec_3f_t oriented_up = sm_quat_transform_f3 ( sm_quat ( transform->orientation ), sm_vec_3f_set ( 0, 1, 0 ) );
+    sm_vec_3f_t oriented_dir = sm_quat_to_vec ( sm_quat ( transform->orientation ) );
+    //float* up = oriented_up.e;
+    float* dir = oriented_dir.e;
+    //float dir[3] = { focus[0] - pos[0], focus[1] - pos[1], focus[2] - pos[2] };
+    sm_vec_3f_t right = sm_vec_3f_norm ( sm_vec_3f_cross ( oriented_dir, sm_vec_3f_set ( 0, 1, 0 ) ) );
+    sm_vec_3f_t oriented_up = sm_vec_3f_cross ( right, oriented_dir );
+    float* up = oriented_up.e;
 
 #if 1
     // z axis
+
     rv_view_normf3 ( m->r2, dir );
 
-    if ( m->r2[0] == 0 && m->r2[1] == -1 && m->r2[2] == 0 ) {
+    if ( m->r2[0] == 0 && ( m->r2[1] == -1 || m->r2[1] == 1 ) && m->r2[2] == 0 ) {
         up[0] = 0;
         up[1] = 0;
         up[2] = 1;
@@ -116,7 +129,33 @@ static void rv_view_view_matrix ( rv_matrix_4x4_t* m, const float* pos, const fl
 #endif
 }
 
-static void rv_view_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_projection_params_t* params ) {
+static void rv_view_orthographic_proj_matrix ( rv_matrix_4x4_t* m, const rv_orthographic_projection_params_t* params ) {
+    // row 0
+    m->f[0] = 2.0f / ( params->right - params->left );
+    m->f[1] = 0;
+    m->f[2] = 0;
+    m->f[3] = - ( params->right + params->left ) / ( params->right - params->left );
+
+    // row 1
+    m->f[4] = 0;
+    m->f[5] = 2.0f / ( params->top - params->bottom );
+    m->f[6] = 0;
+    m->f[7] = - ( params->top + params->bottom ) / ( params->top - params->bottom );
+
+    // row 2
+    m->f[8] = 0;
+    m->f[9] = 0;
+    m->f[10] = -2.0f / ( params->far_z - params->near_z );
+    m->f[11] = - ( params->far_z + params->near_z ) / ( params->far_z - params->near_z );
+
+    // row 3
+    m->f[12] = 0;
+    m->f[13] = 0;
+    m->f[14] = 0;
+    m->f[15] = 1;
+}
+
+static void rv_view_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_perspective_projection_params_t* params ) {
     /*
         http://www.songho.ca/opengl/gl_projectionmatrix.html
         https://matthewwellings.com/blog/the-new-vulkan-coordinate-system/
@@ -157,8 +196,6 @@ static void rv_view_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_proje
             B = -A*zfar -> (A*znear - A*zfar) / znear = 1 -> A = znear / (znear - zfar)
             B = -(zfar * znear) / (znear - zfar)
     */
-
-    std_assert_m ( params->type == rv_projection_perspective_m );
 
     float near_z = params->near_z;
     float far_z = params->far_z;
@@ -243,7 +280,7 @@ static void rv_view_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_proje
 #endif
 }
 
-static void rv_view_jittered_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_projection_params_t* params, uint64_t frame_id ) {
+static void rv_view_jittered_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_perspective_projection_params_t* params, uint64_t frame_id ) {
     rv_view_perspective_proj_matrix ( m, params );
 
     // jitter
@@ -292,6 +329,7 @@ void rv_view_load ( rv_view_state_t* state ) {
 
 void rv_view_unload ( void ) {
     std_virtual_heap_free ( rv_view_state->views_array );
+    std_mutex_deinit ( &rv_view_state->views_mutex );
 }
 
 void rv_view_reload ( rv_view_state_t* state ) {
@@ -306,16 +344,14 @@ rv_view_h rv_view_create ( const rv_view_params_t* params ) {
     view->params = *params;
     view->layer_mask = params->layer_mask;
 
-    view->transform.position[0] = params->position[0];
-    view->transform.position[1] = params->position[1];
-    view->transform.position[2] = params->position[2];
-    view->transform.focus_point[0] = params->focus_point[0];
-    view->transform.focus_point[1] = params->focus_point[1];
-    view->transform.focus_point[2] = params->focus_point[2];
-
-    rv_view_view_matrix ( &view->view_matrix, params->position, params->focus_point );
-    rv_view_perspective_proj_matrix ( &view->proj_matrix, &params->proj_params );
-    rv_view_jittered_perspective_proj_matrix ( &view->jittered_proj_matrix, &params->proj_params, 0 );
+    view->transform = params->transform;
+    rv_view_view_matrix ( &view->view_matrix, &params->transform );
+    if ( params->proj_params.type == rv_projection_perspective_m ) {
+        rv_view_perspective_proj_matrix ( &view->proj_matrix, &params->proj_params.perspective );
+        rv_view_jittered_perspective_proj_matrix ( &view->jittered_proj_matrix, &params->proj_params.perspective, 0 );
+    } else {
+        rv_view_orthographic_proj_matrix ( &view->proj_matrix, &params->proj_params.orthographic );
+    }
 
     return ( rv_view_h ) ( view - rv_view_state->views_array );
 }
@@ -392,13 +428,8 @@ void rv_view_get_info ( rv_view_info_t* info, rv_view_h view_handle ) {
 void rv_view_update_transform ( rv_view_h view_handle, const rv_view_transform_t* transform ) {
     rv_view_t* view = &rv_view_state->views_array[view_handle];
 
-    view->transform.position[0] = transform->position[0];
-    view->transform.position[1] = transform->position[1];
-    view->transform.position[2] = transform->position[2];
-    view->transform.focus_point[0] = transform->focus_point[0];
-    view->transform.focus_point[1] = transform->focus_point[1];
-    view->transform.focus_point[2] = transform->focus_point[2];
-    rv_view_view_matrix ( &view->view_matrix, transform->position, transform->focus_point );
+    view->transform = *transform;
+    rv_view_view_matrix ( &view->view_matrix, transform );
 }
 
 void rv_view_update_prev_frame_data ( rv_view_h view_handle ) {
@@ -411,7 +442,8 @@ void rv_view_update_prev_frame_data ( rv_view_h view_handle ) {
 void rv_view_update_jitter ( rv_view_h view_handle, uint64_t frame_id ) {
     rv_view_t* view = &rv_view_state->views_array[view_handle];
 
-    rv_view_jittered_perspective_proj_matrix ( &view->jittered_proj_matrix, &view->params.proj_params, frame_id );
+    std_assert_m ( view->params.proj_params.type == rv_projection_perspective_m );
+    rv_view_jittered_perspective_proj_matrix ( &view->jittered_proj_matrix, &view->params.proj_params.perspective, frame_id );
 }
 
 #if 0

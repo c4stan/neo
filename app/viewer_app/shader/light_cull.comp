@@ -32,6 +32,11 @@ layout ( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
 
 shared light_t shared_lights[64];
 
+/*
+    currently the only culling happening is distance based (from light source to aabb )
+    can it be extended to do something more accurate? light frustum to aabb? some simple approximate form of that?
+*/
+
 float sq_distance_point_aabb ( vec3 p, vec3 min, vec3 max ) {
     float sq_dist = 0;
 
@@ -57,7 +62,6 @@ void main ( void ) {
     cluster_3d_idx.y = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) / uniform_buffer.grid_size.x;
     cluster_3d_idx.x = ( cluster_idx % ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) ) % uniform_buffer.grid_size.x;
 
-    // TODO
     uint light_count = light_buffer.light_count;
     uint thread_count = 64;
     uint light_batch_count = ( light_count + thread_count - 1 ) / thread_count;
@@ -98,7 +102,4 @@ void main ( void ) {
 
     light_grid_buffer.grid[cluster_idx].offset = list_offset;
     light_grid_buffer.grid[cluster_idx].count = visible_light_count;
-
-    //if ( visible_light_count == 0 )
-    //    debugPrintfEXT("%d %d %d %d", gl_WorkGroupID, gl_LocalInvocationID.x, gl_LocalInvocationID.y, gl_LocalInvocationID.z );
 }

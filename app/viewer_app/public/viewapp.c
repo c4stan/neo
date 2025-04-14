@@ -9,6 +9,7 @@
 
 #include <math.h>
 #include <sm_matrix.h>
+#include <sm_quat.h>
 
 #include <geometry_pass.h>
 #include <lighting_pass.h>
@@ -87,6 +88,10 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
         rv_view_info_t view_info;
         rv->get_view_info ( &view_info, camera_component->view );
 
+        if ( view_info.proj_params.type == rv_projection_orthographic_m ) {
+            continue;
+        }
+
         workload_uniforms_t uniforms = {
             .frame_id = m_state->render.frame_id,
             .time_ms = m_state->render.time_ms,
@@ -101,8 +106,8 @@ static void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             .view_from_proj = view_info.inverse_proj_matrix,
             .prev_view_from_world = view_info.prev_frame_view_matrix,
             .prev_proj_from_view = view_info.prev_frame_proj_matrix,
-            .z_near = view_info.proj_params.near_z,
-            .z_far = view_info.proj_params.far_z,
+            .z_near = view_info.proj_params.perspective.near_z,
+            .z_far = view_info.proj_params.perspective.far_z,
             .reload = m_state->render.graph_reload,
         };
 
@@ -418,7 +423,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     xf_buffer_h light_list_buffer = xf->create_buffer ( &xf_buffer_params_m (
-        .size = sizeof ( uint32_t ) * light_cluster_count * 8,
+        .size = sizeof ( uint32_t ) * light_cluster_count * viewapp_max_lights_m,
         .debug_name = "light_list",
     ) );
 
@@ -997,7 +1002,33 @@ static void viewapp_build_raytrace_world ( void ) {
 
 // ---
 
-std_unused_static_m()
+static sm_vec_3f_t viewapp_light_view_dir ( uint32_t idx ) {
+    sm_vec_3f_t dir = { 0, 0, 0 };
+    switch ( idx ) {
+    case 0:
+        dir = sm_vec_3f_set ( 0, -1, 0 ); // up
+        break;
+    case 1:
+        dir = sm_vec_3f_set ( 0, 1, 0 ); // down
+        break;
+    case 2:
+        dir = sm_vec_3f_set ( 0, 0, 1 ); // fw
+        break;
+    case 3:
+        dir = sm_vec_3f_set ( 0, 0, -1 ); // bw
+        break;
+    case 4:
+        dir = sm_vec_3f_set ( 1, 0, 0 ); // right
+        break;
+    case 5:
+        dir = sm_vec_3f_set ( -1, 0, 0 ); // left
+        break;
+    default:
+        std_assert_m ( false );
+    }
+    return dir;
+}
+
 static void viewapp_boot_scene_cornell_box ( void ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
@@ -1202,28 +1233,35 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .position = { 0, 1.5, 0 },
             .intensity = 5,
             .color = { 1, 1, 1 },
-            .shadow_casting = true
+            .shadow_casting = true,
+            .view_count = viewapp_light_max_views_m,
         );
 
-        rv_view_params_t view_params = rv_view_params_m (
-            .position = {
-                light_component.position[0],
-                light_component.position[1],
-                light_component.position[2],
-            },
-            .focus_point = {
-                view_params.position[0],
-                view_params.position[1] - 1,
-                view_params.position[2],
-            },
-            .proj_params = rv_projection_params_m (
-                .aspect_ratio = 1,
-                .near_z = 0.01,
-                .far_z = 100,
-                .reverse_z = false, // TODO ?
-            ),
-        );
-        light_component.view = rv->create_view ( &view_params );
+        for ( uint32_t i = 0; i < viewapp_light_max_views_m; ++i ) {
+            sm_vec_3f_t dir = viewapp_light_view_dir ( i );
+            sm_quat_t orientation = sm_quat_from_vec ( dir );
+            rv_view_params_t view_params = rv_view_params_m (
+                .transform = rv_view_transform_m (
+                    .position = {
+                        light_component.position[0],
+                        light_component.position[1],
+                        light_component.position[2],
+                    },
+                    .orientation = {
+                        orientation.e[0],
+                        orientation.e[1],
+                        orientation.e[2],
+                        orientation.e[3],
+                    },
+                ),
+                .proj_params.perspective = rv_perspective_projection_params_m (
+                    .aspect_ratio = 1,
+                    .near_z = 0.01,
+                    .far_z = 100,
+                ),
+            );
+            light_component.views[i] = rv->create_view ( &view_params );
+        }
 
         se->create_entity ( &se_entity_params_m (
             .debug_name = "light",
@@ -1490,25 +1528,33 @@ static void viewapp_boot_scene_field ( void ) {
             .intensity = 20,
             .color = { 1, 1, 1 },
             .shadow_casting = true,
-        );        
-        light_component.view = rv->create_view ( &rv_view_params_m (
-            .position = {
-                light_component.position[0],
-                light_component.position[1],
-                light_component.position[2],
-            },
-            .focus_point = {
-                light_component.position[0],
-                light_component.position[1] - 1.f,
-                light_component.position[2],
-            },
-            .proj_params = rv_projection_params_m (
-                .aspect_ratio = 1,
-                .near_z = 0.1f,
-                .far_z = 100.f,
-                .reverse_z = false,
-            ),
-        ) );
+            .view_count = viewapp_light_max_views_m,
+        );
+        for ( uint32_t i = 0; i < viewapp_light_max_views_m; ++i ) {
+            sm_quat_t orientation = sm_quat_from_vec ( viewapp_light_view_dir ( i ) );
+            rv_view_params_t view_params = rv_view_params_m (
+                .transform = rv_view_transform_m (
+                    .position = {
+                        transform_component.position[0],
+                        transform_component.position[1],
+                        transform_component.position[2],
+                    },
+                    .orientation = {
+                        orientation.e[0],
+                        orientation.e[1],
+                        orientation.e[2],
+                        orientation.e[3],
+                    },
+                ),
+                .proj_params.perspective = rv_perspective_projection_params_m (
+                    .aspect_ratio = 1,
+                    .near_z = 0.01,
+                    .far_z = 100,
+                    .reverse_z = false, // TODO ?
+                ),
+            );
+            light_component.views[i] = rv->create_view ( &view_params );
+        }
 
         se->create_entity ( &se_entity_params_m ( 
             .debug_name = "light",
@@ -1542,8 +1588,10 @@ static void viewapp_create_cameras ( void ) {
 
     // view
     rv_view_params_t view_params = rv_view_params_m (
-        .position = { 0, 0, -8 },
-        .proj_params = rv_projection_params_m (
+        .transform = rv_view_transform_m (
+            .position = { 0, 0, -8 },
+        ),
+        .proj_params.perspective = rv_perspective_projection_params_m (
             .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
             .near_z = 0.1,
             .far_z = 10000,
@@ -1809,7 +1857,8 @@ static void viewapp_import_scene ( const char* input_path ) {
                 .position = { light->mPosition.x, light->mPosition.y, light->mPosition.z },
                 .intensity = 5,
                 .color = { light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b },
-                .shadow_casting = false
+                .shadow_casting = false,
+                .view_count = 6,
             );
 
             // TOOD
@@ -1893,8 +1942,8 @@ static void viewapp_load_scene ( uint32_t id ) {
 }
 
 static void viewapp_boot ( void ) {
-    uint32_t resolution_x = 1024;//1920;
-    uint32_t resolution_y = 768;//1024;
+    uint32_t resolution_x = 1920;
+    uint32_t resolution_y = 1024;
 
     m_state->render.resolution_x = resolution_x;
     m_state->render.resolution_y = resolution_y;
@@ -1989,11 +2038,12 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_light_component_id_m, "Light", &se_component_properties_params_m (
-        .count = 3,
+        .count = 4,
         .properties = {
             se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, intensity, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, color, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, shadow_casting, se_property_bool_m ),
         }
     ) );
 
@@ -2138,9 +2188,9 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
                 float drag_scale = -1.f / 400;
                 sm_vec_3f_t v = {
-                    xform.position[0] - xform.focus_point[0],
-                    xform.position[1] - xform.focus_point[1],
-                    xform.position[2] - xform.focus_point[2],
+                    //xform.position[0] - xform.focus_point[0],
+                    //xform.position[1] - xform.focus_point[1],
+                    //xform.position[2] - xform.focus_point[2],
                 };
 
                 int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
@@ -2163,9 +2213,9 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                 }
 
                 if ( delta_x != 0 || delta_y != 0 ) {
-                    xform.position[0] = xform.focus_point[0] + v.x;
-                    xform.position[1] = xform.focus_point[1] + v.y;
-                    xform.position[2] = xform.focus_point[2] + v.z;
+                    //xform.position[0] = xform.focus_point[0] + v.x;
+                    //xform.position[1] = xform.focus_point[1] + v.y;
+                    //xform.position[2] = xform.focus_point[2] + v.z;
 
                     dirty_xform = true;
                 }
@@ -2179,18 +2229,18 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                     float zoom_min = 0.001;
 
                     sm_vec_3f_t v = {
-                        xform.position[0] - xform.focus_point[0],
-                        xform.position[1] - xform.focus_point[1],
-                        xform.position[2] - xform.focus_point[2],
+                        //xform.position[0] - xform.focus_point[0],
+                        //xform.position[1] - xform.focus_point[1],
+                        //xform.position[2] - xform.focus_point[2],
                     };
 
                     float dist = sm_vec_3f_len ( v );
                     float new_dist = fmaxf ( zoom_min, dist + ( zoom_step * wheel ) * dist );
                     v = sm_vec_3f_mul ( v, new_dist / dist );
 
-                    xform.position[0] = xform.focus_point[0] + v.x;
-                    xform.position[1] = xform.focus_point[1] + v.y;
-                    xform.position[2] = xform.focus_point[2] + v.z;
+                    //xform.position[0] = xform.focus_point[0] + v.x;
+                    //xform.position[1] = xform.focus_point[1] + v.y;
+                    //xform.position[2] = xform.focus_point[2] + v.z;
 
                     dirty_xform = true;
                 }
@@ -2214,7 +2264,7 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             bool left_press = new_input_state->keyboard[wm_keyboard_state_a_m];
             if ( ( forward_press && !backward_press ) || ( backward_press && !forward_press ) 
                 || ( right_press && !left_press ) || ( left_press && !right_press ) ) {
-                sm_vec_3f_t z_axis = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( xform.focus_point ), sm_vec_3f ( xform.position ) ) );
+                sm_vec_3f_t z_axis = sm_quat_to_vec ( sm_quat ( xform.orientation ) );
                 sm_vec_3f_t up = { 0, 1, 0 };
                 sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
                 //sm_vec_3f_t y_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( x_axis, z_axis ) );
@@ -2227,9 +2277,6 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                 xform.position[0] += move.e[0];
                 xform.position[1] += move.e[1];
                 xform.position[2] += move.e[2];
-                xform.focus_point[0] += move.e[0];
-                xform.focus_point[1] += move.e[1];
-                xform.focus_point[2] += move.e[2];
                 dirty_xform = true;
             }
 
@@ -2238,7 +2285,6 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             if ( ( up_press && !down_press ) || ( !up_press && down_press ) ) {
                 float above = ( up_press ? 1.f : 0.f ) - ( down_press ? 1.f : 0.f );
                 xform.position[1] += above * speed * dt;
-                xform.focus_point[1] += above * speed * dt;
                 dirty_xform = true;
             }
 
@@ -2246,7 +2292,7 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                 int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
                 int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
 
-                sm_vec_3f_t z_axis = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( xform.focus_point ), sm_vec_3f ( xform.position ) ) );
+                sm_vec_3f_t z_axis = sm_quat_to_vec ( sm_quat ( xform.orientation ) );
                 sm_vec_3f_t up = { 0, 1, 0 };
                 sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
                 sm_vec_3f_t dir = z_axis;
@@ -2263,9 +2309,12 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                     dir = sm_matrix_4x4f_transform_f3_dir ( mat, dir );
                 }
 
-                xform.focus_point[0] = xform.position[0] + dir.x;
-                xform.focus_point[1] = xform.position[1] + dir.y;
-                xform.focus_point[2] = xform.position[2] + dir.z;
+                sm_quat_t orientation = sm_quat_from_vec ( dir );
+
+                xform.orientation[0] = orientation.e[0];
+                xform.orientation[1] = orientation.e[1];
+                xform.orientation[2] = orientation.e[2];
+                xform.orientation[3] = orientation.e[3];
                 dirty_xform = true;
             }
 
@@ -2354,28 +2403,35 @@ static void spawn_sphere ( void ) {
         .position = { 0, 0, 0 },
         .intensity = 5,
         .color = { 1, 1, 1 },
-        .shadow_casting = true
+        .shadow_casting = true,
+        .view_count = viewapp_light_max_views_m,
     );
 
-    rv_view_params_t view_params = rv_view_params_m (
-        .position = {
-            light_component.position[0],
-            light_component.position[1],
-            light_component.position[2],
-        },
-        .focus_point = {
-            view_params.position[0],
-            view_params.position[1] - 1,
-            view_params.position[2],
-        },
-        .proj_params = rv_projection_params_m (
-            .aspect_ratio = 1,
-            .near_z = 0.01,
-            .far_z = 100,
-            .reverse_z = false, // TODO ?
-        ),
-    );
-    light_component.view = rv->create_view ( &view_params );
+    for ( uint32_t i = 0; i < viewapp_light_max_views_m; ++i ) {
+        sm_quat_t orientation = sm_quat_from_vec ( viewapp_light_view_dir ( i ) );
+        rv_view_params_t view_params = rv_view_params_m (
+            .transform = rv_view_transform_m (
+                .position = {
+                    light_component.position[0],
+                    light_component.position[1],
+                    light_component.position[2],
+                },
+                .orientation = {
+                    orientation.e[0],
+                    orientation.e[1],
+                    orientation.e[2],
+                    orientation.e[3],
+                },
+            ),
+            .proj_params.perspective = rv_perspective_projection_params_m (
+                .aspect_ratio = 1,
+                .near_z = 0.01,
+                .far_z = 100,
+                .reverse_z = false, // TODO ?
+            ),
+        );
+        light_component.views[i] = rv->create_view ( &view_params );
+    }
 
 
     se_entity_h entity = se->create_entity( &se_entity_params_m (
@@ -2821,22 +2877,28 @@ static void viewapp_update_lights ( void ) {
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
     se_stream_iterator_t transform_iterator = se_component_iterator_m ( &query_result.components[1], 0 );
 
-    for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
+    for ( uint32_t light_it = 0; light_it < query_result.entity_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
         viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
-        rv_view_transform_t transform = {
-            .position = { 
-                transform_component->position[0],
-                transform_component->position[1],
-                transform_component->position[2],
-            },
-            .focus_point = {
-                transform_component->position[0],
-                transform_component->position[1] - 1.f, // TODO
-                transform_component->position[2],
-            },
-        };
-        rv->update_view_transform ( light_component->view, &transform );
+
+        for ( uint32_t view_it = 0; view_it < viewapp_light_max_views_m; ++view_it ) {
+            rv_view_info_t view_info;
+            rv->get_view_info ( &view_info, light_component->views[view_it] );
+            rv_view_transform_t transform = rv_view_transform_m (
+                .position = { 
+                    transform_component->position[0],
+                    transform_component->position[1],
+                    transform_component->position[2],
+                },
+                .orientation = {
+                    view_info.transform.orientation[0],
+                    view_info.transform.orientation[1],
+                    view_info.transform.orientation[2],
+                    view_info.transform.orientation[3],
+                }
+            );
+            rv->update_view_transform ( light_component->views[view_it], &transform );
+        }
     }
 }
 

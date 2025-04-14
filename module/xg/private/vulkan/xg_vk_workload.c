@@ -389,7 +389,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
 #if 0
     workload->timestamp_query_pools_count = 0;
 #endif
-
+    
     return workload_handle;
 }
 

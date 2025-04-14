@@ -3,6 +3,8 @@
 #include "common.glsl"
 #include "lighting_common.glsl"
 
+#extension GL_EXT_debug_printf : enable
+
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform uniform_buffer_t {
     uvec3 grid_size;
     float z_scale;
@@ -51,7 +53,7 @@ void main ( void ) {
     // https://mynameismjp.wordpress.com/2013/09/10/shadow-maps/
     // https://c0de517e.blogspot.com/2011/05/shadowmap-bias-notes.html
     // https://ndotl.wordpress.com/2014/12/19/notes-on-shadow-bias/
-    view_geo_pos += view_normal * 0.01;
+    view_geo_pos += view_normal * 0.1;
     vec4 world_geo_pos = frame_cbuffer.world_from_view * vec4 ( view_geo_pos, 1.f );
 
     vec3 irradiance = vec3 ( 0, 0, 0 );
@@ -67,36 +69,31 @@ void main ( void ) {
 
     uint cluster_idx = cluster_3d_idx.x + uniform_buffer.grid_size.x * cluster_3d_idx.y + ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) * cluster_3d_idx.z;
 
-    // TOOD
-#if 0
-    uint light_count = 1;
+    uint light_count = light_grid_buffer.grid[cluster_idx].count;
     for ( uint i = 0; i < light_count; ++i ) {
-        light_t light = light_buffer.lights[i];
-#else
-    for ( uint i = 0; i < light_grid_buffer.grid[cluster_idx].count; ++i ) {
         uint list_idx = light_grid_buffer.grid[cluster_idx].offset + i;
         uint light_idx = light_list_buffer.list[list_idx];
         light_t light = light_buffer.lights[light_idx];
-#endif
 
         vec3 world_light_pos = light.pos;
         float light_emissive = light.emissive;
         vec3 light_color = light_buffer.lights[i].color;
 
         // TODO refactor screen_from_view to take in a proj_from_view matrix and use that
-        vec4 shadow_proj = light.proj_from_view * light.view_from_world * world_geo_pos;
+        vec4 shadow_proj = light.view_from_world * world_geo_pos;
+        shadow_proj = light.proj_from_view * shadow_proj;
         shadow_proj /= shadow_proj.w;
         vec3 shadow_screen = vec3 ( shadow_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, shadow_proj.z );
         vec2 shadow_texel = light.shadow_tile.xy + shadow_screen.xy * light.shadow_tile.z;
 
+        float in_view = 1;
         float shadow = 0;
-    #if 1
         int pcf_radius = 3;
 
         for ( int dx = -pcf_radius; dx <= pcf_radius; ++dx ) {
             for ( int dy = -pcf_radius; dy <= pcf_radius; ++dy ) {
                 vec2 shadow_uv = shadow_texel + vec2 ( dx, dy );
-                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy, light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) );
+                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 0.5 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 0.5 ) );
                 shadow_uv *= ( 1.f / uniform_buffer.shadow_size );
                 float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_point ), shadow_uv ).x;
 
@@ -116,22 +113,12 @@ void main ( void ) {
         }
 
         shadow /= ( pcf_radius * 2 + 1 ) * ( pcf_radius * 2 + 1 );
-    #else
-        float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_point ), shadow_screen.xy ).x;
-        float shadow_bias = 0.03;
-        if ( shadow_screen.z > 1.f ) {
-            shadow = 0;
-        } else {
-            shadow = shadow_proj.z - shadow_bias > shadow_depth ? 1.f : 0.f;
-        }
-    #endif
 
         if ( any ( greaterThan ( shadow_screen, vec3(1.0) ) ) || any ( lessThan ( shadow_screen, vec3(0.0) ) ) ) {
-            shadow = 0;
+            in_view = 0;
         }
 
-        float light_visibility = 1.f - shadow;
-        //float shadow_occlusion = shadow_depth + 0.001 > shadow_proj.z ? 1.f : 0.f;
+        float light_visibility = ( 1.f - shadow ) * in_view;
 
         vec3 view_light_pos = ( frame_cbuffer.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
         vec3 view_light_dir = normalize ( view_light_pos - view_geo_pos );

@@ -20,6 +20,8 @@ typedef enum {
     rv_projection_orthographic_m
 } rv_projection_type_e;
 
+// align required by freelist
+std_static_align_m ( 8 )
 typedef struct {
     rv_projection_type_e type;
     float aspect_ratio;
@@ -30,11 +32,9 @@ typedef struct {
     float jitter[2];
     bool reverse_z;         // todo
     bool infinite_far_z;    // todo
-    uint32_t _pad0;         // freelist alignment
-} rv_projection_params_t;
+} rv_perspective_projection_params_t;
 
-// TODO just take in resolution and compute aspect ration and jitter from that
-#define rv_projection_params_m(...) ( rv_projection_params_t ) { \
+#define rv_perspective_projection_params_m( ... ) ( rv_perspective_projection_params_t ) { \
     .type = rv_projection_perspective_m, \
     .aspect_ratio = ( 16.f / 9.f ), \
     .near_z = 0.1f, \
@@ -43,7 +43,42 @@ typedef struct {
     .jitter = { 0, 0 }, \
     .reverse_z = false, \
     .infinite_far_z = false, \
-    ._pad0 = 0, \
+    ##__VA_ARGS__ \
+}
+
+std_static_align_m ( 8 )
+typedef struct {
+    rv_projection_type_e type;
+    float left;
+    float right;
+    float bottom;
+    float top;
+    float near_z;
+    float far_z;
+} rv_orthographic_projection_params_t;
+
+#define rv_orthographic_projection_params_m( ... ) ( rv_orthographic_projection_params_t ) { \
+    .type = rv_projection_orthographic_m, \
+    .left = 0, \
+    .right = 0, \
+    .bottom = 0, \
+    .top = 0, \
+    .near = 0, \
+    .far = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    union {
+        rv_projection_type_e type;
+        rv_perspective_projection_params_t perspective;
+        rv_orthographic_projection_params_t orthographic;
+    };
+} rv_projection_params_t;
+
+// TODO just take in resolution and compute aspect ration and jitter from that
+#define rv_projection_params_m(...) ( rv_projection_params_t ) { \
+    .perspective = rv_perspective_projection_params_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -74,24 +109,30 @@ typedef union {
 
 typedef struct {
     float position[3];    // x y z
-    // TODO
-    //float orientation[4]; // xi yj zk w
-    float focus_point[3];
+    float orientation[4]; // xi yj zk w
+    //float focus_point[3];
 } rv_view_transform_t;
+
+#define rv_view_transform_m( ... ) ( rv_view_transform_t ) { \
+    .position = { 0, 0, 0 }, \
+    .orientation = { 0, 0, 0, 1 }, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     //rv_view_params_t view_params;
     //rv_view_transform_t initial_transform;
-    float position[3];
-    float focus_point[3];
+    //float position[3];
+    //float focus_point[3];
+    //float orientation[4];
+    rv_view_transform_t transform;
     rv_projection_params_t proj_params;
     uint32_t view_type;     // main view, shadow view, ... | TODO make it a bitfield instead of an enum?
     uint32_t layer_mask;    // bitmask of layers the view will render
 } rv_view_params_t;
 
 #define rv_view_params_m(...) ( rv_view_params_t ) { \
-    .position = { 0, 0, 0 }, \
-    .focus_point = { 0, 0, 0 }, \
+    .transform = rv_view_transform_m(), \
     .proj_params = rv_projection_params_m(), \
     .view_type = 0, \
     .layer_mask = 0, \

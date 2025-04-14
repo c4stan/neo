@@ -111,7 +111,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .format = xg_format_r8_uint_m,
             .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_sampled_m,
         );
-        std_str_copy_static_m ( texture_params.debug_name, "font atlas temp" );
+        std_str_copy_static_m ( texture_params.debug_name, "font_atlas_temp" );
         raster_texture = xg->create_texture ( &texture_params );
     }
 
@@ -122,7 +122,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .device = params->xg_device,
             .size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m,
             .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-            .debug_name = "font atlas staging buffer",
+            .debug_name = "font_atlas_staging",
         );
         staging_buffer = xg->create_buffer ( &buffer_params );
     }
@@ -180,7 +180,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .format = xg_format_r8g8b8a8_unorm_m,
             .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m,
         );
-        std_str_copy_static_m ( texture_params.debug_name, "font atlas" );
+        std_str_copy_static_m ( texture_params.debug_name, "font_atlas" );
         atlas_texture = xg->create_texture ( &texture_params );
     }
 
@@ -223,7 +223,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .device = params->xg_device,
             .size = sizeof ( xi_font_atlas_uniform_data_t ),
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
-            .debug_name = "xi font cbuffer",
+            .debug_name = "xi_font_uniforms",
         );
         uniform_buffer = xg->create_buffer ( &cbuffer_params );
 

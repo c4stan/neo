@@ -103,7 +103,7 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
     #endif
 
         // TODO enable in debug only
-#if 0
+#if 1
         VkValidationFeatureEnableEXT enabled_validation_features[] = { VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT };
         VkValidationFeaturesEXT validation_features = {
             .sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
@@ -123,7 +123,7 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
         };
         VkInstanceCreateInfo instanceInfo = {
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-            .pNext = NULL,//&validation_features,
+            .pNext = &validation_features,
             .flags = 0,
             .pApplicationInfo = &applicationInfo,
             .enabledLayerCount = enabled_layers_count,
@@ -171,8 +171,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
         return VK_FALSE;
     }
 
-    if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT ) {
-        //std_log_info_m ( data->pMessage );
+    if ( severity == VK_DEBUG_REPORT_INFORMATION_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT ) {
+        std_log_info_m ( data->pMessage );
     } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) {
         //std_log_warn_m ( data->pMessage );
     } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ) {
@@ -203,7 +203,7 @@ static void xg_vk_instance_create_debug_callback ( void ) {
 
     VkDebugUtilsMessengerCreateInfoEXT info = {0};
     info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    info.messageSeverity = VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     info.pfnUserCallback = xg_vk_instance_debug_callback;
     info.pUserData = NULL;
@@ -368,5 +368,6 @@ xg_vk_instance_ext_api_i* xg_vk_instance_ext_api ( void ) {
 }
 
 VkAllocationCallbacks* xg_vk_cpu_allocator ( void ) {
-    return &xg_vk_instance_state->cpu_allocator;
+    return NULL;
+    return &xg_vk_instance_state->cpu_allocator; // TODO make it thread safe
 }

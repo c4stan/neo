@@ -18,25 +18,6 @@ typedef struct {
     float emissive;
 } raytrace_shader_instance_t;
 
-#define MAX_LIGHTS_COUNT 32
-
-typedef struct {
-    float pos[3];
-    float intensity;
-    float color[3];
-    uint32_t _pad0;
-    rv_matrix_4x4_t proj_from_view;
-    rv_matrix_4x4_t view_from_world;
-} light_uniform_t;;
-
-typedef struct {
-    uint32_t light_count;
-    uint32_t _pad0;
-    uint32_t _pad1;
-    uint32_t _pad2;
-    light_uniform_t lights[MAX_LIGHTS_COUNT];
-} lights_uniform_buffer_t;
-
 static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
     xg_resource_cmd_buffer_h resource_cmd_buffer = node_args->resource_cmd_buffer;
@@ -47,43 +28,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
     xs_i* xs = state->modules.xs;
-    rv_i* rv = state->modules.rv;
     se_i* se = state->modules.se;
-
-    // Fill lights buffer
-    se_query_result_t light_query_result;
-    se->query_entities ( &light_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_light_component_id_m } ) );
-    uint64_t light_count = light_query_result.entity_count;
-    se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
-    std_assert_m ( light_count <= MAX_LIGHTS_COUNT );
-
-    lights_uniform_buffer_t cbuffer;
-    std_mem_zero_m ( &cbuffer );
-
-    cbuffer.light_count = light_count;
-
-    for ( uint64_t i = 0; i < light_count; ++i ) {
-        viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
-
-        rv_view_info_t view_info;
-        rv->get_view_info ( &view_info, light_component->view );
-
-        cbuffer.lights[i] = ( light_uniform_t ) {
-            .pos =  {
-                light_component->position[0],
-                light_component->position[1],
-                light_component->position[2],
-            },
-            .intensity = light_component->intensity,
-            .color = { 
-                light_component->color[0],
-                light_component->color[1],
-                light_component->color[2],
-            },
-            .proj_from_view = view_info.proj_matrix,
-            .view_from_world = view_info.view_matrix,
-        };
-    }
 
     // Fill raytrace instance buffer
     se_query_result_t mesh_query_result;
@@ -140,16 +85,12 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
             .textures = {  
                 xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[0], 1 ),
             },
-            .buffer_count = 2,
+            .buffer_count = 1,
             .buffers = {
                 xg_buffer_resource_binding_m ( 
                     .shader_register = 2,
                     .range = xg_buffer_range_m ( .handle = shader_instance_buffer, .offset = 0, .size = shader_instance_buffer_size ),
                 ),
-                xg_buffer_resource_binding_m ( 
-                    .shader_register = 3,
-                    .range = xg->write_workload_uniform ( node_args->workload, &cbuffer, sizeof ( cbuffer ) ),
-                )
             }
         )
     ) );

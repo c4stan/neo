@@ -158,7 +158,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
                 .format = xg_format_r8g8b8a8_unorm_m,
                 .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_sampled_m,
             );
-            std_str_copy_static_m ( params.debug_name, "xi null texture" );
+            std_str_copy_static_m ( params.debug_name, "xi_null_texture" );
             texture = xg->create_texture ( &params );
         }
 

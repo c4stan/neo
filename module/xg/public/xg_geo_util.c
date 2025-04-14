@@ -217,7 +217,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "vbuffer pos stream",
+        .debug_name = "vbuffer_pos",
     ), NULL );
 
     xg_buffer_h nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
@@ -225,7 +225,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 3,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m,
-        .debug_name = "vbuffer nor stream",
+        .debug_name = "vbuffer_nor",
     ), NULL );
 
     xg_buffer_h uv_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
@@ -233,7 +233,7 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .device = device,
         .size = geo->vertex_count * sizeof ( float ) * 2,
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m,
-        .debug_name = "vbuffer uv stream",
+        .debug_name = "vbuffer_uv",
     ), NULL );
 
     xg_buffer_h idx_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (

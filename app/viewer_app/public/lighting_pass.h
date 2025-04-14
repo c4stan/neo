@@ -3,7 +3,7 @@
 #include <xf.h>
 
 // Keep in sync with lighting.frag!
-#define viewapp_max_lights_m 32
+#define viewapp_max_lights_m 1024
 
 uint32_t uniform_light_size ( void );
 

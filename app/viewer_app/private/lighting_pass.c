@@ -16,6 +16,12 @@ typedef struct {
     uint32_t height;
 } lighting_pass_args_t;
 
+typedef enum {
+    light_type_point_m,
+    light_type_spot_m,
+    light_type_directional_m,
+} light_type_e;
+
 typedef struct {
     float pos[3];
     float radius;
@@ -23,8 +29,8 @@ typedef struct {
     float intensity;
     rv_matrix_4x4_t proj_from_view;
     rv_matrix_4x4_t view_from_world;
-    float shadow_tile[3];
-    uint32_t _pad0;
+    float shadow_tile[3]; // origin and size of the light shadow map in the shadow atlas
+    uint32_t type;
 } uniform_light_data_t;
 
 typedef struct {
@@ -63,45 +69,50 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     se_stream_iterator_t transform_iterator = se_component_iterator_m ( &light_query_result.components[1], 0 );
     uint64_t light_count = light_query_result.entity_count;
-    std_assert_m ( light_count <= viewapp_max_lights_m );
     light_count = std_min ( light_count, viewapp_max_lights_m );
 
     std_auto_m light_data = ( light_buffer_t* ) upload_buffer_info.allocation.mapped_address;
     std_assert_m ( light_data );
-    light_data->light_count = light_count;
 
-    for ( uint64_t i = 0; i < light_count; ++i ) {
+    uint32_t light_view_count = 0;
+
+    for ( uint64_t light_it = 0; light_it < light_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
         viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-        rv_view_info_t view_info;
-        rv->get_view_info ( &view_info, light_component->view );
+        for ( uint32_t view_it = 0; view_it < light_component->view_count; ++view_it) {
+            rv_view_info_t view_info;
+            rv->get_view_info ( &view_info, light_component->views[view_it] );
 
-        light_data->lights[i] = ( uniform_light_data_t ) {
-            .pos =  {
-                transform_component->position[0],
-                transform_component->position[1],
-                transform_component->position[2],
-            },
-            .radius = light_component->radius,
-            .color = { 
-                light_component->color[0],
-                light_component->color[1],
-                light_component->color[2],
-            },
-            .intensity = light_component->intensity,
-            .proj_from_view = view_info.proj_matrix,
-            .view_from_world = view_info.view_matrix,
-            .shadow_tile = {
-                light_component->shadow_x,
-                light_component->shadow_y,
-                light_component->shadow_size
-            },
-        };
+            light_data->lights[light_view_count++] = ( uniform_light_data_t ) {
+                .pos =  {
+                    transform_component->position[0],
+                    transform_component->position[1],
+                    transform_component->position[2],
+                },
+                .radius = light_component->radius,
+                .color = { 
+                    light_component->color[0],
+                    light_component->color[1],
+                    light_component->color[2],
+                },
+                .intensity = light_component->intensity,
+                .proj_from_view = view_info.proj_matrix,
+                .view_from_world = view_info.view_matrix,
+                .shadow_tile = {
+                    light_component->shadow_tiles[view_it].x,
+                    light_component->shadow_tiles[view_it].y,
+                    light_component->shadow_tiles[view_it].size
+                },
+            };
+        }
     }
 
     // Null light (radius == 0) at the end needed by the light cull pass
-    light_data->lights[light_count] = ( uniform_light_data_t ) { 0 };
+    light_data->lights[light_view_count] = ( uniform_light_data_t ) { 0 };
+
+    light_data->light_count = light_view_count;
+    std_assert_m ( light_view_count <= viewapp_max_lights_m );
 
     xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( .source = upload_buffer, .destination = light_buffer ) );
 }

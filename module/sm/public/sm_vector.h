@@ -1,4 +1,5 @@
 #pragma once
+// TODO rename to sm_vec
 
 // ======================================================================================= //
 //                                       V E C T O R
@@ -46,6 +47,7 @@ typedef union {
         float x;
         float y;
         float z;
+
     };
 } sm_vec_3f_t;
 
@@ -97,6 +99,34 @@ make <float, f, 4>
 // template generation begin
 sm_vec_3f_t sm_vec_3f ( const float f[3] );
 sm_vec_4f_t sm_vec_4f ( const float f[4] );
+// template generation end
+
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+$IF $SIZE == 1
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x );
+$END_IF
+$IF $SIZE == 2
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x, float y );
+$END_IF
+$IF $SIZE == 3
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x, float y, float z );
+$END_IF
+$IF $SIZE == 4
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x, float y, float z, float w );
+$END_IF
+
+make <float, f, 3>
+make <float, f, 4>
+
+*/
+// template generation begin
+
+sm_vec_3f_t sm_vec_3f_set ( float x, float y, float z );
+
+
+sm_vec_4f_t sm_vec_4f_set ( float x, float y, float z, float w );
 // template generation end
 
 // ======================================================================================= //

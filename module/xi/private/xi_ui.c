@@ -5,6 +5,7 @@
 
 #include <sm_vector.h>
 #include <sm_matrix.h>
+#include <sm_quat.h>
 
 // TODO
 #include <math.h>
@@ -1568,8 +1569,8 @@ static bool xi_ui_mouse_camera_ray_build ( xi_ui_camera_ray_t* ray ) {
     float screen_x = 2 * ndc_x - 1;
     float screen_y = 1 - 2 * ndc_y;
     // [-tan(fov_y/2):tan(fov_y/2)], x scaled by aspect_ratio
-    float frustum_x = screen_x * tanf ( view->proj_params.fov_y / 2 ) * view->proj_params.aspect_ratio;
-    float frustum_y = screen_y * tanf ( view->proj_params.fov_y / 2 );
+    float frustum_x = screen_x * tanf ( view->proj_params.perspective.fov_y / 2 ) * view->proj_params.perspective.aspect_ratio;
+    float frustum_y = screen_y * tanf ( view->proj_params.perspective.fov_y / 2 );
     sm_vec_3f_t dir = { frustum_x, frustum_y, 1 };
     dir = sm_vec_3f_norm ( dir );
 
@@ -1619,7 +1620,7 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     sm_vec_3f_t p = sm_vec_3f ( state->position );
     sm_vec_3f_t cam_p = sm_vec_3f ( xi_ui_state->update.view_info.transform.position );
     float d = sm_vec_3f_len ( sm_vec_3f_sub ( p, cam_p ) );
-    float fov_y = xi_ui_state->update.view_info.proj_params.fov_y;
+    float fov_y = xi_ui_state->update.view_info.proj_params.perspective.fov_y;
     float pixel_size = 15;
     float scale = ( 2 * pixel_size * d ) / ( xi_ui_state->update.os_window_height * tan ( fov_y / 2 ) );
 
@@ -1654,7 +1655,8 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     if ( xi_ui_state->active_id == state->id ) {
         const rv_view_info_t* view = &xi_ui_state->update.view_info;
         // TODO negate v
-        sm_vec_3f_t n = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( view->transform.focus_point ), sm_vec_3f ( view->transform.position ) ) );
+        sm_vec_3f_t n = sm_quat_to_vec ( sm_quat ( view->transform.orientation ) );
+        //sm_vec_3f_t n = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( view->transform.focus_point ), sm_vec_3f ( view->transform.position ) ) );
         float d = sm_vec_3f_dot ( sm_vec_3f_neg ( n ), p );
         sm_vec_4f_t plane = { n.x, n.y, n.z, d };
         float depth;

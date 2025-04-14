@@ -16,13 +16,9 @@ static void rv_api_init ( rv_i* rv ) {
 
 void* rv_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
-
     rv_state_t* state = rv_state_alloc();
-
     rv_view_load ( &state->view );
-
     rv_api_init ( &state->api );
-
     return &state->api;
 }
 
@@ -33,12 +29,10 @@ void rv_unload ( void ) {
 
 void rv_reload ( void* std_runtime, void* api ) {
     std_runtime_bind ( std_runtime );
-
     std_auto_m state = ( rv_state_t* ) api;
-
     rv_view_reload ( &state->view );
-
     rv_api_init ( &state->api );
+    rv_state_bind ( state );
 }
 
 // https://advances.realtimerendering.com/destiny/gdc_2015/Tatarchuk_GDC_2015__Destiny_Renderer_web.pdf

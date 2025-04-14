@@ -12,6 +12,16 @@ sm_vec_4f_t sm_vec_4f ( const float f[4] ) {
     return vec;
 }
 
+sm_vec_3f_t sm_vec_3f_set ( float x, float y, float z ) {
+    sm_vec_3f_t vec = { x, y, z };
+    return vec;
+}
+
+sm_vec_4f_t sm_vec_4f_set ( float x, float y, float z, float w ) {
+    sm_vec_4f_t vec = { x, y, z, w };
+    return vec;
+}
+
 sm_vec_3f_t sm_vec_4f_to_3f ( sm_vec_4f_t vec ) {
     sm_vec_3f_t result;
     result.x = vec.x;

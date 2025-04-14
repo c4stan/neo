@@ -32,9 +32,3 @@ begin buffer
     update dispatch
     access write
 end
-
-begin buffer
-    register 3
-    stage ray_hit_closest
-    update dispatch
-end

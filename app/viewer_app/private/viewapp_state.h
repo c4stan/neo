@@ -242,21 +242,29 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+#define viewapp_light_max_views_m 6
+
+typedef struct {
+    uint32_t x;
+    uint32_t y;
+    uint32_t size;
+} viewapp_light_view_shadow_tile_t;
+
 typedef struct {
     bool shadow_casting;
-    rv_view_h view;
+    rv_view_h views[viewapp_light_max_views_m];
+    uint32_t view_count;
     float position[3];
     float radius;
     float color[3];
     float intensity;
-    uint32_t shadow_x;
-    uint32_t shadow_y;
-    uint32_t shadow_size;
-} viewapp_light_component_t; // spotlight
+    viewapp_light_view_shadow_tile_t shadow_tiles[viewapp_light_max_views_m];
+} viewapp_light_component_t;
 
 #define viewapp_light_component_m( ... ) ( viewapp_light_component_t ) { \
     .shadow_casting = false, \
-    .view = rv_null_handle_m, \
+    .views = { [0 ... viewapp_light_max_views_m-1] = rv_null_handle_m }, \
+    .view_count = 0, \
     .position = { 0, 0, 0 }, \
     .radius = 100, \
     .color = { 0, 0, 0 }, \
