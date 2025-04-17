@@ -3,6 +3,8 @@
 #define PI 3.1415f
 #define REVERSE_Z 0 // TODO
 
+#define print debugPrintfEXT
+
 // ======================================================================================= //
 //                                     U N I F O R M S
 // ======================================================================================= //
@@ -155,12 +157,18 @@ vec2 dejitter_ndc ( vec2 ndc ) {
 }
 
 vec2 dejitter_uv ( vec2 screen_uv ) {
+#if 1
     float proj_x = screen_uv.x * 2 - 1;
     float proj_y = ( 1 - screen_uv.y ) * 2 - 1;
     vec2 ndc = vec2 ( proj_x, proj_y );
     vec2 dejittered_ndc = dejitter_ndc ( ndc );
     vec2 dejittered_uv = dejittered_ndc * vec2 ( 0.5, -0.5 ) + 0.5;
     return dejittered_uv;
+#else
+    vec2 jitter = vec2 ( frame_cbuffer.jittered_proj_from_view[2][0], frame_cbuffer.jittered_proj_from_view[2][1] );
+    vec2 jitter_uv = jitter * vec2 ( 0.5f, -0.5f );
+    return screen_uv - jitter_uv;
+#endif
 }
 
 //vec2 dejittered_screen_uv() { 

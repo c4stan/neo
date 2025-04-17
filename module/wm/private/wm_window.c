@@ -252,6 +252,8 @@ static uint32_t wm_window_keycode ( uint64_t os_keycode ) {
         return wm_keyboard_state_f12_m;
     case VK_CAPITAL:
         return wm_keyboard_state_capslock_m;
+    case VK_DELETE:
+        return wm_keyboard_state_del_m;
     default:
         return wm_keyboard_state_count_m;
     }
@@ -918,6 +920,7 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
 #endif // wm_enable_input_events_m
 
 #if wm_enable_input_state_m
+// TODO move this to wm_test?
 void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_console ) {
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
     char* kb = window->input_state.keyboard;
@@ -954,9 +957,9 @@ void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_cons
         kb[wm_keyboard_state_m_m] );
     char line6[1024];
     std_str_format ( line6, sizeof ( line6 ),
-        "TAB:"std_fmt_u8_m " LSHIFT:"std_fmt_u8_m" LCTRL:"std_fmt_u8_m" LALT:"std_fmt_u8_m" SPACE:"std_fmt_u8_m" RALT:"std_fmt_u8_m" RCTRL:"std_fmt_u8_m" RSHIFT:"std_fmt_u8_m" ENTER:"std_fmt_u8_m" BACKSPACE:"std_fmt_u8_m,
+        "TAB:"std_fmt_u8_m " LSHIFT:"std_fmt_u8_m" LCTRL:"std_fmt_u8_m" LALT:"std_fmt_u8_m" SPACE:"std_fmt_u8_m" RALT:"std_fmt_u8_m" RCTRL:"std_fmt_u8_m" RSHIFT:"std_fmt_u8_m" ENTER:"std_fmt_u8_m" BACKSPACE:"std_fmt_u8_m" DEL:"std_fmt_u8_m,
         kb[wm_keyboard_state_tab_m], kb[wm_keyboard_state_shift_left_m], kb[wm_keyboard_state_ctrl_left_m], kb[wm_keyboard_state_alt_left_m], kb[wm_keyboard_state_space_m],
-        kb[wm_keyboard_state_alt_right_m], kb[wm_keyboard_state_ctrl_right_m], kb[wm_keyboard_state_shift_right_m], kb[wm_keyboard_state_enter_m], kb[wm_keyboard_state_backspace_m] );
+        kb[wm_keyboard_state_alt_right_m], kb[wm_keyboard_state_ctrl_right_m], kb[wm_keyboard_state_shift_right_m], kb[wm_keyboard_state_enter_m], kb[wm_keyboard_state_backspace_m], kb[wm_keyboard_state_del_m] );
     char line7[1024];
     std_str_format ( line7, sizeof ( line7 ),
         "UP:" std_fmt_u8_m " LEFT:" std_fmt_u8_m " DOWN:" std_fmt_u8_m " RIGHT:" std_fmt_u8_m " X:" std_fmt_u32_pad_m ( 4 ) " Y:" std_fmt_u32_pad_m ( 4 ) " LB:" std_fmt_u8_m " RB:" std_fmt_u8_m " WU:" std_fmt_u8_m " WD:" std_fmt_u8_m,
@@ -1066,10 +1069,9 @@ static void wm_update_input_state ( wm_window_h handle ) {
             window->input_state.keyboard[wm_keyboard_state_alt_right_m] = keyboard[0xA5] >> 7;
 
             window->input_state.keyboard[wm_keyboard_state_space_m] = keyboard[0X20] >> 7;
-
             window->input_state.keyboard[wm_keyboard_state_enter_m] = keyboard[0x0D] >> 7;
-
             window->input_state.keyboard[wm_keyboard_state_backspace_m] = keyboard[0x08] >> 7;
+            window->input_state.keyboard[wm_keyboard_state_del_m] = keyboard[0x2E] >> 7;
 
             window->input_state.keyboard[wm_keyboard_state_up_m] = keyboard[0x26] >> 7;
             window->input_state.keyboard[wm_keyboard_state_left_m] = keyboard[0x25] >> 7;
@@ -1215,6 +1217,11 @@ static void wm_update_input_state ( wm_window_h handle ) {
             byte_idx = code / 8;
             shift = code % 8;
             window->input_state.keyboard[wm_keyboard_state_backspace_m] = ( keyboard[byte_idx] & ( 1 << shift ) ) != 0;
+
+            code = XKeysymToKeycode ( x_display, XK_Delete );
+            byte_idx = code / 8;
+            shift = code % 8;
+            window->input_state.keyboard[wm_keyboard_state_del_m] = ( keyboard[byte_idx] & ( 1 << shift ) ) != 0;
 
             code = XKeysymToKeycode ( x_display, XK_Up );
             byte_idx = code / 8;

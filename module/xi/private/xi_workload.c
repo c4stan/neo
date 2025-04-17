@@ -604,8 +604,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             const xi_draw_tri_t* tri = &workload->tri_array[i];
 
             // TODO
-            //xi_scissor_h scissor_handle = rect->scissor;
-            xi_scissor_h scissor_handle = xi_null_scissor_m;
+            xi_scissor_h scissor_handle = tri->scissor;
             //if ( scissor_handle != active_scissor ) 
             {
                 xg_scissor_state_t scissor = xg_scissor_state_m();

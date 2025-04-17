@@ -65,8 +65,8 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
     std_assert_m ( kernel_size < 32 );
 
     // TODO
-    kernel_size = 11;
-    sigma = 5;
+    //kernel_size = 11;
+    //sigma = 5;
 
     xs_database_pipeline_h database_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "bi_blur" ) );
     xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( database_pipeline );

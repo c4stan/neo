@@ -121,6 +121,7 @@ typedef enum {
     wm_keyboard_state_down_m,
     wm_keyboard_state_right_m,
     wm_keyboard_state_capslock_m,
+    wm_keyboard_state_del_m,
 
     wm_keyboard_state_count_m
 } wm_keyboard_state_e;

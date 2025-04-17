@@ -179,13 +179,19 @@ static void* se_entity_family_get_component ( se_entity_family_t* family, uint32
 }
 
 // idx is entity->idx field
-static void* se_entity_family_get_component_stream_data ( se_entity_family_stream_t* stream, uint64_t idx  ) {
+static void* se_entity_family_get_stream_data ( se_entity_family_stream_t* stream, uint32_t idx  ) {
     uint32_t stride = stream->stride;
     uint32_t items_per_page = stream->items_per_page;
     uint32_t page_idx = idx / items_per_page;
     uint32_t page_sub_idx = idx % items_per_page;   
 
     return stream->pages[page_idx] + page_sub_idx * stride;
+}
+
+static void se_entity_family_move_stream_data ( se_entity_family_stream_t* stream, uint32_t from, uint32_t to ) {
+    void* src = se_entity_family_get_stream_data ( stream, from );
+    void* dst = se_entity_family_get_stream_data ( stream, to );
+    std_mem_copy ( dst, src, stream->stride );
 }
 
 void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t mask ) {
@@ -288,6 +294,20 @@ void se_entity_update ( se_entity_h entity_handle,  const se_entity_update_t* up
     }
 }
 
+#if 0
+static void se_entity_debug_print ( void ) {
+    std_log_info_m ( "------" ); 
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, se_entity_state->entity_meta->used_entities, idx, std_bitset_u64_count_m ( se_max_entities_m ) ) ) {
+        se_entity_name_t* name = &se_entity_state->entity_meta->names[idx];
+        se_entity_t* entity = &se_entity_state->entity_array[idx];
+        std_log_info_m ( "handle: " std_fmt_u64_m ", famiy: " std_fmt_u32_m ", idx: " std_fmt_u32_m ", name: " std_fmt_str_m, 
+            idx, entity->family, entity->idx, name->string );
+        ++idx;
+    }
+}
+#endif
+
 se_entity_h se_entity_create_init ( const se_entity_params_t* params ) {
     se_component_mask_t mask = {};
     for ( uint32_t i = 0; i < params->update.component_count; ++i ) {
@@ -306,19 +326,19 @@ void se_entity_destroy ( const se_entity_h entity_handle ) {
     se_entity_t* entity = &se_entity_state->entity_array[entity_handle];
     se_entity_family_t* family = &se_entity_state->family_array[entity->family];
     uint32_t entity_idx = entity->idx;
-    se_entity_h* family_entity = se_entity_family_get_component_stream_data ( &family->entity_stream, entity_idx );
     uint32_t swap_idx = family->entity_count - 1;
     if ( swap_idx != entity_idx ) {
-        se_entity_h* swap_entity = se_entity_family_get_component_stream_data ( &family->entity_stream, swap_idx );
-        *family_entity = *swap_entity;
+        se_entity_h* family_entity_handle_ptr = se_entity_family_get_stream_data ( &family->entity_stream, entity_idx );
+        se_entity_h* swap_entity_handle_ptr = se_entity_family_get_stream_data ( &family->entity_stream, swap_idx );
+        se_entity_h swap_entity_handle = *swap_entity_handle_ptr;
+        *family_entity_handle_ptr = swap_entity_handle;
+        se_entity_t* swap_entity = &se_entity_state->entity_array[swap_entity_handle];
+        swap_entity->idx = entity->idx;
 
         for ( uint32_t i = 0; i < family->component_count; ++i ) {
             se_entity_family_component_t* family_component = &family->components[i];
             for ( uint32_t j = 0; j < family_component->stream_count; ++j ) {
-                se_entity_family_stream_t* component_stream = &family_component->streams[j];
-                void* entity_component = se_entity_family_get_component_stream_data ( component_stream, entity_idx );
-                void* swap_component = se_entity_family_get_component_stream_data ( component_stream, swap_idx );
-                std_mem_copy ( entity_component, swap_component, component_stream->stride );
+                se_entity_family_move_stream_data ( &family_component->streams[j], swap_idx, entity_idx );
             }
         }
     }
@@ -332,6 +352,10 @@ const char* se_entity_name ( se_entity_h entity_handle ) {
 }
 
 static void se_entity_extract_stream ( se_data_stream_t* result, const se_entity_family_stream_t* stream, uint32_t entity_count ) {
+    if ( entity_count == 0 ) {
+        return;
+    }
+
     uint32_t capacity = stream->items_per_page;
     
     result->page_capacity = capacity;
@@ -554,7 +578,7 @@ void se_entity_property_set ( se_property_h property_handle, void* data ) {
     uint8_t slot = family->component_slots[property_handle.component];
     se_entity_family_stream_t* stream = &family->components[slot].streams[property->stream];
 
-    void* dst_data = se_entity_family_get_component_stream_data ( stream, entity->idx );
+    void* dst_data = se_entity_family_get_stream_data ( stream, entity->idx );
     dst_data += property->offset;
     uint32_t stride = se_entity_property_stride ( property->type );
 

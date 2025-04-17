@@ -35,9 +35,7 @@ void* net_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
 
     net_platform_init();
-    std_log_info_m ( "net_platform initialized." );
     net_socket_init();
-    std_log_info_m ( "net_socket initialized." );
 
     s_api = net_api();
 

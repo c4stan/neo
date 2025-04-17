@@ -1663,8 +1663,10 @@ void std_allocator_boot ( void ) {
 void std_allocator_init ( std_allocator_state_t* state ) {
     std_mem_copy_m ( state, std_allocator_state );
 
+#if std_build_debug_m
     std_allocator_tlsf_heap_t* heap = &state->tlsf_heap;
     heap->debug_records_freelist = std_static_freelist_m ( heap->debug_records_array );
+#endif
 }
 
 void std_allocator_attach ( std_allocator_state_t* state ) {
@@ -1672,6 +1674,7 @@ void std_allocator_attach ( std_allocator_state_t* state ) {
 }
 
 void std_allocator_shutdown ( void ) {
+#if std_build_debug_m
     std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, heap->debug_records_bitset, idx, std_bitset_u64_count_m ( std_allocator_max_debug_records_m ) ) ) {
@@ -1679,6 +1682,7 @@ void std_allocator_shutdown ( void ) {
         std_log_warn_m ( "MEMLEAK: " std_fmt_str_m " " std_fmt_str_m ":" std_fmt_size_m, record->scope.file, record->scope.function, record->scope.line );
         ++idx;
     }
+#endif
 }
 
 /*

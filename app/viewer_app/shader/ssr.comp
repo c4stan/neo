@@ -47,7 +47,7 @@ void main ( void ) {
     vec3 wi = ggx_sample ( e2, wo, view_normal, roughness );
     //float p = ggx_pdf ( wi, wo, view_normal, roughness );
     //view_ray_dir = wi;
-    //view_ray_dir = normalize ( view_ray_dir + wi );
+    view_ray_dir = normalize ( view_ray_dir + wi );
 
     vec3 sample_color = vec3 ( 0, 0, 0 );
     float sample_distance = 1;

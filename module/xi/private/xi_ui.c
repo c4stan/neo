@@ -233,6 +233,14 @@ static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, 
     //width += layer->line_padding_x * 2;
     //height += layer->line_padding_y * 2;
 
+    if ( style->horizontal_margin != xi_style_margin_invalid_m ) {
+        if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
+            layer->line_offset = std_max_u32 ( layer->line_offset, style->horizontal_margin );
+        } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
+            layer->line_offset_rev = std_max_u32 ( layer->line_offset_rev, style->horizontal_margin );
+        }
+    }
+
     // check for enough horizontal space
     if ( /*width +*/ layer->line_offset + layer->line_offset_rev > layer->width ) {
         result = false;
@@ -389,7 +397,54 @@ static void xi_ui_draw_tri ( xi_workload_h workload, xi_color_t color, uint32_t 
     tri.xy2[1] = y2;
     tri.color = color;
     tri.sort_order = sort_order;
+    tri.scissor = xi_ui_state->active_scissor;
     xi_workload_cmd_draw_tri ( workload, &tri, 1 );
+}
+
+static uint32_t xi_ui_draw_string2 ( xi_workload_h workload, xi_font_h font, xi_color_t color, const char* text, uint32_t x, uint32_t y, uint64_t sort_order ) {
+    size_t len = std_str_len ( text );
+    // TODO assert on len
+
+    xi_font_info_t font_info;
+    xi_font_get_info ( &font_info, font );
+    float scale = 0.5;//( float ) height / font_info.pixel_height;
+
+    uint32_t x_offset = 0;
+    float fx = x;
+    float fy = y + font_info.pixel_height + font_info.descent;
+
+    for ( uint32_t i = 0; i < len; ++i ) {
+        xi_font_char_box_t box = xi_font_char_box_get ( &fx, &fy, font, text[i] );
+
+        xi_draw_rect_t rect = xi_default_draw_rect_m;
+        //rect.x = x + x_offset;
+        //rect.y = y + ( font_info.pixel_height - box.height ) * scale;
+        //rect.width = box.width * scale;
+        //rect.height = box.height * scale;
+        rect.x = box.xy0[0];
+        rect.y = box.xy0[1];
+        rect.width = box.xy1[0] - box.xy0[0];
+        rect.height = box.xy1[1] - box.xy0[1];
+        rect.color = color;
+        rect.texture = xi_font_atlas_get ( font );
+        rect.linear_sampler_filter = false;
+        rect.uv0[0] = box.uv0[0];
+        rect.uv0[1] = box.uv0[1];
+        rect.uv1[0] = box.uv1[0];
+        rect.uv1[1] = box.uv1[1];
+        rect.sort_order = sort_order;
+        rect.scissor = xi_ui_state->active_scissor;
+
+        x_offset += box.width * scale;
+
+        xi_workload_cmd_draw ( workload, &rect, 1 ); // TODO batch? change the api to only take 1?
+    }
+
+    uint32_t width = fx - x;
+
+    //xi_ui_draw_rect ( workload, xi_color_red_m, x, y, width, font_info.pixel_height, 0 );
+
+    return width;
 }
 
 static uint32_t xi_ui_draw_string ( xi_workload_h workload, xi_font_h font, const char* text, uint32_t x, uint32_t y, uint64_t sort_order ) {
@@ -555,7 +610,7 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
     }
 
     xi_style_t* parent = &xi_ui_state->layers[xi_ui_state->layer_count - 1].style;
-    xi_style_t result;
+    xi_style_t result = xi_style_m();
 
     result.font = style->font != xi_null_handle_m ? style->font : parent->font;
     result.font_height = style->font_height != 0 ? style->font_height : parent->font_height;
@@ -563,6 +618,7 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
     result.font_color = style->font_color.u32 != 0 ? style->font_color : parent->font_color;
     result.horizontal_alignment = style->horizontal_alignment != xi_horizontal_alignment_invalid_m ? style->horizontal_alignment : parent->horizontal_alignment;
     result.vertical_alignment = style->vertical_alignment != xi_vertical_alignment_invalid_m ? style->vertical_alignment : parent->vertical_alignment;
+    result.horizontal_margin = style->horizontal_margin != xi_style_margin_invalid_m ? style->horizontal_margin : parent->horizontal_margin;
 
     return result;
 }
@@ -985,7 +1041,7 @@ void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state ) {
     uint32_t height = std_max_u32 ( state->height, font_info.pixel_height );
 
     if ( xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
-        xi_ui_draw_string ( workload, style.font, state->text, x, y, state->sort_order );
+        xi_ui_draw_string2 ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
     }
 }
 

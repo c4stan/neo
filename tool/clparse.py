@@ -406,6 +406,10 @@ def run_app(name, flags, params):
     else:
         cmd = './build/' + config + '/output/' + name + '.exe'
         SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars)
+
+    if ('-a' in flags):
+        debug_process()
+
     pop_path()
 
 def debug_process():

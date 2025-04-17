@@ -17,13 +17,11 @@ layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 void main() {
     vec2 dst_to_src = draw_cbuffer.src_resolution_f32 / draw_cbuffer.dst_resolution_f32;
-    //vec2 src_uv = gl_FragCoord.xy * dst_to_src / draw_cbuffer.src_resolution_f32;
     vec2 src_uv = ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) * dst_to_src / draw_cbuffer.src_resolution_f32;
 
     vec4 depths = textureGather ( sampler2D ( tex_depth, sampler_point ), src_uv );
 
     float min_depth = min ( min ( depths.x, depths.y ), min ( depths.z, depths.w ) );
 
-    //out_depth = min_depth;
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( min_depth ) );
 }

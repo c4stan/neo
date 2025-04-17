@@ -55,6 +55,8 @@ typedef struct {
 
 // Style
 
+#define xi_style_margin_invalid_m 0xffffffff
+
 typedef enum {
     xi_horizontal_alignment_left_to_right_m,
     xi_horizontal_alignment_right_to_left_m,
@@ -78,6 +80,7 @@ typedef struct {
     xi_color_t font_color;
     xi_horizontal_alignment_e horizontal_alignment;
     xi_vertical_alignment_e vertical_alignment;
+    uint32_t horizontal_margin;
     // TODO add padding/margin here
 } xi_style_t;
 
@@ -88,6 +91,7 @@ typedef struct {
     .font_color = xi_color_white_m, \
     .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
     .vertical_alignment = xi_vertical_alignment_bottom_m, \
+    .horizontal_margin = 0, \
     ##__VA_ARGS__ \
 }
 
@@ -98,6 +102,7 @@ typedef struct {
     .font_color = xi_color_invalid_m, \
     .horizontal_alignment = xi_horizontal_alignment_invalid_m, \
     .vertical_alignment = xi_vertical_alignment_invalid_m, \
+    .horizontal_margin = 0, \
     ##__VA_ARGS__ \
 }
 
@@ -107,6 +112,7 @@ typedef struct {
 
 // TODO XOR instead of + ?
 #define xi_line_id_m() ( xi_id_t ) ( std_hash_64_m ( std_file_name_hash_m + std_line_num_m ) )
+#define xi_mix_id_m( offset ) std_hash_murmur_64 ( xi_line_id_m() + offset )
 
 typedef struct {
     char title[xi_window_title_size];

@@ -25,26 +25,6 @@ layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 // https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
 // https://bartwronski.com/2014/03/15/temporal-supersampling-and-antialiasing/
 
-vec4 clip_aabb ( vec4 color, float p, vec3 minimum, vec3 maximum ) {
-    // note: only clips towards aabb center (but fast!)
-    vec3 center  = 0.5 * ( maximum + minimum );
-    vec3 extents = 0.5 * ( maximum - minimum );
-
-    // This is actually `distance`, however the keyword is reserved
-    vec4 offset = color - vec4 ( center, p );
-    vec3 repeat = abs ( offset.xyz / extents );
-
-    repeat.x = max ( repeat.x, max ( repeat.y, repeat.z ) );
-
-    if ( repeat.x > 1.0 ) {
-        // `color` is not intersecting (nor inside) the AABB; it's clipped to the closest extent
-        return vec4 ( center, p ) + offset / repeat.x;
-    } else {
-        // `color` is intersecting (or inside) the AABB.
-        return color;
-    }
-}
-
 void main ( void ) {
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_cbuffer.resolution_f32 );
     vec2 texel_size = 1.0 / frame_cbuffer.resolution_f32;
@@ -55,11 +35,12 @@ void main ( void ) {
     vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy;
 
     // Reproject
-    vec3 view = view_from_depth ( screen_uv, depth );
-    vec3 world = ( frame_cbuffer.world_from_view * vec4 ( view, 1 ) ).xyz;
-    vec3 prev_screen = prev_screen_from_world ( world );
-    vec2 screen_offset = prev_screen.xy - screen_uv;
-    vec2 reprojected_uv = screen_uv - velocity;
+    vec2 jitter = vec2 ( frame_cbuffer.jittered_proj_from_view[2][0], frame_cbuffer.jittered_proj_from_view[2][1] );
+    //vec3 view = view_from_depth ( screen_uv, depth );
+    //vec3 world = ( frame_cbuffer.world_from_view * vec4 ( view, 1 ) ).xyz;
+    //vec3 prev_screen = prev_screen_from_world ( world );
+    //vec2 screen_offset = prev_screen.xy - screen_uv;
+    vec2 reprojected_uv = screen_uv - velocity - jitter / 2;
 
 #if 1
     // Sample history
@@ -84,7 +65,7 @@ void main ( void ) {
     vec3 color_min = min ( color, min ( n0, min ( n1, min ( n2, n3 ) ) ) );
     vec3 color_max = max ( color, max ( n0, max ( n1, max ( n2, n3 ) ) ) );
 
-    history = clamp ( history, color_min, color_max );
+    vec3 clamped_history = clamp ( history, color_min, color_max );
 #else
     // Variance clipping [Salvi16]
     const float VARIANCE_CLIPPING_GAMMA = 1.f;
@@ -101,7 +82,45 @@ void main ( void ) {
     history = clamp ( history, color_min, color_max );
 #endif
 
+    // --- Anti-flicker weight modulation ---
+#if 1
+#if 0
     float blend_factor = 0.1f;
+
+    float weight = 1.0;
+
+    for (int i = 0; i < 3; ++i) {
+        float range = color_max[i] - color_min[i] + 0.0001f;
+        float norm_range = ( history[i] - color_min[i] ) / range;
+        float proximity = min ( norm_range, 1.0 - norm_range ); // 0 = near edge, 0.5 = center
+        float threshold = 0.2;
+        float fade = clamp ( proximity / threshold, 0.0, 1.0 ); // 0 near edge, 1 in center
+        weight *= fade;
+    }
+
+    blend_factor = mix ( 0.0, blend_factor, weight );
+#else
+    vec3 blend_factor = vec3 ( 0.1f );
+
+    vec3 weight = vec3 ( 1.0 );
+
+    vec3 range = color_max - color_min + vec3 ( 0.0001f );
+    vec3 norm_range = ( history - color_min ) / range;
+    vec3 proximity = min ( norm_range, vec3 ( 1.0 ) - norm_range ); // 0 = near edge, 0.5 = center
+    vec3 threshold = vec3 ( 0.2 );
+    vec3 fade = clamp ( proximity / threshold, vec3 ( 0.0 ), vec3 ( 1.0 ) ); // 0 near edge, 1 in center
+    weight *= fade;
+
+    blend_factor = mix ( vec3 ( 0.0 ), blend_factor, weight );
+#endif
+#else
+    vec3 blend_factor = vec3 ( 0.1f );
+
+    vec3 weight = smoothstep ( 0.0, 0.05, min ( abs ( color_min - history), abs ( color_max - history ) ) );
+
+    blend_factor = mix ( vec3 ( 0.0 ), blend_factor, weight );
+#endif
+    history = clamped_history;
 
 #if 0
     // reduces flickering on edges

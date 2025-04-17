@@ -45,7 +45,7 @@ static void test_udp_msg ( void ) {
 
         char* msg = "hello world";
         size_t msg_size = std_str_len ( msg ) + 1;
-        std_log_info_m ( "Sending string '" std_fmt_str_m "' to address 127.0.0.1:" std_fmt_u16_m"...", msg, s2_address.port );
+        std_log_info_m ( "Sending UDP string '" std_fmt_str_m "' to address 127.0.0.1:" std_fmt_u16_m"...", msg, s2_address.port );
         size_t write_size = net->write_socket ( s1, &s2_address, msg, msg_size );
         std_assert_m ( write_size == msg_size );
 
@@ -53,7 +53,7 @@ static void test_udp_msg ( void ) {
         char buffer[32];
         size_t read_size = net->read_socket ( &read_address, buffer, sizeof ( buffer ), s2 );
         std_assert_m ( read_size == msg_size );
-        std_log_info_m ( "Received string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, read_address.port );
+        std_log_info_m ( "Received UDP string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, read_address.port );
 
         net->destroy_socket ( s1 );
         net->destroy_socket ( s2 );
@@ -79,7 +79,7 @@ static void test_tcp_msg_t1 ( void* _args ) {
 
     char* msg = "hello world";
     size_t msg_size = std_str_len ( msg ) + 1;
-    std_log_info_m ( "Sending string '" std_fmt_str_m "' to address " std_fmt_str_m ":" std_fmt_u16_m"...", msg, buffer, client_address.port );
+    std_log_info_m ( "Sending TCP string '" std_fmt_str_m "' to address " std_fmt_str_m ":" std_fmt_u16_m"...", msg, buffer, client_address.port );
     net->write_connected_socket ( client_socket, msg, msg_size );
 }
 
@@ -122,7 +122,7 @@ static void test_tcp_msg ( void ) {
         net->connect_socket ( s2, &s1_address );
         char buffer[32];
         size_t read_size = net->read_connected_socket ( buffer, sizeof ( buffer ), s2 );
-        std_log_info_m ( "Received string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, s1_address.port );
+        std_log_info_m ( "Received TCP string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, s1_address.port );
 
         net->destroy_socket ( s1 );
         net->destroy_socket ( s2 );

@@ -51,6 +51,7 @@ typedef struct {
     float uv1[2];
     float uv2[2];
     uint64_t sort_order;
+    xi_scissor_h scissor;
 } xi_draw_tri_t;
 
 #define xi_default_draw_tri_m ( xi_draw_tri_t ) { \

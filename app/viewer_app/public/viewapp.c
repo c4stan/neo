@@ -301,7 +301,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     m_state->render.raster_graph = graph;
 
-    uint32_t shadow_size = 1024 * 2;
+    uint32_t shadow_size = 1024 * 4;
     xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
         .width = shadow_size,
         .height = shadow_size,
@@ -502,7 +502,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
             .samplers_count = 1,
-            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
             .uniform_data = std_buffer_m ( &lighting_uniforms ),
         ),
         .resources = xf_node_resource_params_m (
@@ -575,7 +575,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_blur_x_texture",
     ) );
-    add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_texture, 11, 15, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
+    add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
 
     xf_texture_h ssgi_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
@@ -583,7 +583,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_blur_y_texture",
     ) );
-    add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_texture, 11, 15, blur_pass_direction_vertical_m, "ssgi_blur_y" );
+    add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_vertical_m, "ssgi_blur_y" );
 
     // ssgi temporal accumulation
     xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -625,6 +625,7 @@ static void viewapp_boot_raster_graph ( void ) {
         )
     ) );
 
+#if 0
     // ssgi2
     xf_texture_h ssgi_2_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
@@ -689,6 +690,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssgi_2_blur_y_texture ) ) }
         ),
     ) );
+#endif
 
     // ssr
     xf_texture_h ssr_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
@@ -706,7 +708,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_blur_x_texture",
     ) );
-    add_bilateral_blur_pass ( graph, ssr_blur_x_texture, ssr_raymarch_texture, normal_texture, depth_texture, 1, 5, blur_pass_direction_horizontal_m, "ssr_blur_x" );
+    add_bilateral_blur_pass ( graph, ssr_blur_x_texture, ssr_raymarch_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_horizontal_m, "ssr_blur_x" );
 
     xf_texture_h ssr_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
@@ -714,7 +716,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format  = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_blur_y_texture",
     ) );
-    add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_texture, 1, 5, blur_pass_direction_vertical_m, "ssr_blur_y" );
+    add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_vertical_m, "ssr_blur_y" );
 
     // ssr ta
     xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -777,12 +779,12 @@ static void viewapp_boot_raster_graph ( void ) {
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = combine_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 4,
+            .sampled_textures_count = 3,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = lighting_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssr_accumulation_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_accumulation_texture ), 
-                xf_compute_texture_dependency_m ( .texture = ssgi_2_accumulation_texture ) 
+                //xf_compute_texture_dependency_m ( .texture = ssgi_2_accumulation_texture ) 
             },
         ),
     ) );
@@ -1065,7 +1067,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0.1,
+                .roughness = 0,
                 .metalness = 0,
             )
         );
@@ -1149,7 +1151,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     plane_col[i][2],
                 },
                 .ssr = true,
-                .roughness = 0.1,
+                .roughness = 0,
                 .metalness = 0,
             ),
         );
@@ -1219,7 +1221,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0.1,
+                .roughness = 0,
                 .metalness = 0,
                 .emissive = 1,
             )
@@ -1406,7 +1408,7 @@ static void viewapp_boot_scene_field ( void ) {
     }
 
     // lights
-    #if 0
+    #if 1
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
@@ -1447,24 +1449,31 @@ static void viewapp_boot_scene_field ( void ) {
             .color = { 1, 1, 1 },
             .shadow_casting = true,
         );
-        light_component.view = rv->create_view( &rv_view_params_m (
-            .position = {
-                light_component.position[0],
-                light_component.position[1],
-                light_component.position[2],
-            },
-            .focus_point = {
-                light_component.position[0],
-                light_component.position[1] - 1.f,
-                light_component.position[2],
-            },
-            .proj_params = rv_projection_params_m ( 
-                .aspect_ratio = 1,
-                .near_z = 0.1,
-                .far_z = 100,
-                .reverse_z = false,
-            ),
-        ) );
+        for ( uint32_t i = 0; i < viewapp_light_max_views_m; ++i ) {
+            sm_quat_t orientation = sm_quat_from_vec ( viewapp_light_view_dir ( i ) );
+            rv_view_params_t view_params = rv_view_params_m (
+                .transform = rv_view_transform_m (
+                    .position = {
+                        transform_component.position[0],
+                        transform_component.position[1],
+                        transform_component.position[2],
+                    },
+                    .orientation = {
+                        orientation.e[0],
+                        orientation.e[1],
+                        orientation.e[2],
+                        orientation.e[3],
+                    },
+                ),
+                .proj_params.perspective = rv_perspective_projection_params_m (
+                    .aspect_ratio = 1,
+                    .near_z = 0.01,
+                    .far_z = 100,
+                    .reverse_z = false, // TODO ?
+                ),
+            );
+            light_component.views[i] = rv->create_view ( &view_params );
+        }
 
         se->create_entity ( &se_entity_params_m ( 
             .debug_name = "light",
@@ -1513,7 +1522,7 @@ static void viewapp_boot_scene_field ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0.1,
+                .roughness = 0,
                 .metalness = 0,
                 .emissive = 1,
             )
@@ -1942,8 +1951,8 @@ static void viewapp_load_scene ( uint32_t id ) {
 }
 
 static void viewapp_boot ( void ) {
-    uint32_t resolution_x = 1920;
-    uint32_t resolution_y = 1024;
+    uint32_t resolution_x = 1920;//1024;
+    uint32_t resolution_y = 1024;//768;
 
     m_state->render.resolution_x = resolution_x;
     m_state->render.resolution_y = resolution_y;
@@ -2250,11 +2259,11 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             bool speed_down_press = new_input_state->keyboard[wm_keyboard_state_q_m];
             float speed = camera_component->move_speed;
             if ( speed_up_press ) {
-                speed *= 1.1f;
+                speed *= 1.2f;
                 camera_component->move_speed = speed;
             }
             if ( speed_down_press ) {
-                speed *= 0.9f;
+                speed *= 0.8f;
                 camera_component->move_speed = speed;
             }
 
@@ -2389,7 +2398,7 @@ static void spawn_sphere ( void ) {
                 powf ( 250 / 255.f, 2.2 )
             },
             .ssr = true,
-            .roughness = 0.1,
+            .roughness = 0,
             .metalness = 0,
             .emissive = 1,
         )
@@ -2730,7 +2739,8 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             std_f32_to_str ( ms, buffer, 32 );
             xi_label_state_t time_label = xi_label_state_m (
                 .style = xi_style_m (
-                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+                    .horizontal_margin = 25,
                 )
             );
             std_str_copy_static_m ( time_label.text, buffer );
@@ -2748,7 +2758,8 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             std_f32_to_str ( ms, buffer, 32 );
             xi_label_state_t time_label = xi_label_state_m (
                 .style = xi_style_m (
-                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+                    .horizontal_margin = 25,
                 )
             );
             std_str_copy_static_m ( time_label.text, buffer );
@@ -2795,16 +2806,54 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         se_i* se = m_state->modules.se;
 
         se_entity_h entity_list[se_max_entities_m];
+        se_entity_h destroy_list[se_max_entities_m];
+        uint32_t destroy_count = 0;
         size_t entity_count = se->get_entity_list ( entity_list, se_max_entities_m );
-        
+
+        bool delete_selected = false;
+        if ( !old_input_state->keyboard[wm_keyboard_state_del_m] && input_state->keyboard[wm_keyboard_state_del_m] ) {
+            delete_selected = true;
+        }
+
         for ( uint32_t i = 0; i < entity_count; ++i ) {
+            se_entity_h entity = entity_list[i];
+
+            xi_color_t font_color = xi_color_invalid_m;
+            if ( entity == m_state->ui.mouse_pick_entity ) {
+                if ( delete_selected ) {
+                    destroy_list[destroy_count++] = entity;
+                    m_state->ui.mouse_pick_entity = se_null_handle_m;
+                    continue;
+                }
+                font_color = xi_color_yellow_m;
+            }
+
             se_entity_properties_t props;
-            se->get_entity_properties ( &props, entity_list[i] );
+            se->get_entity_properties ( &props, entity );
 
             // entity label
-            xi_label_state_t label = xi_label_state_m();
+            xi_label_state_t label = xi_label_state_m(
+                .style = xi_style_m (
+                    .font_color = font_color
+                )
+            );
             std_str_copy_static_m ( label.text, props.name );
             xi->add_label ( xi_workload, &label );
+            label.style.font_color = xi_color_invalid_m;
+            
+            xi_button_state_t delete_buttom = xi_button_state_m (
+                .style = xi_style_m (
+                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+                ),
+                .text = "X",
+                .width = 15,
+                .id = xi_mix_id_m ( i ),
+            );
+            if ( xi->add_button ( xi_workload, &delete_buttom ) ) {
+                destroy_list[destroy_count++] = entity;
+                continue;
+            }
+
             xi->newline();
 
             char buffer[1024];
@@ -2833,7 +2882,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     xi->add_label ( xi_workload, &label );
 
                     // property editor
-                    void* component_data = se->get_entity_component ( entity_list[i], component->id, property->stream );
+                    void* component_data = se->get_entity_component ( entity, component->id, property->stream );
                     xi_property_e type = ( xi_property_e ) property->type; // This assumes the se and xi enums are laid out identical...
                     xi_property_editor_state_t property_editor_state = xi_property_editor_state_m ( 
                         .type = type,
@@ -2847,6 +2896,10 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     xi->newline();
                 }
             }
+        }
+
+        for ( uint32_t i = 0; i < destroy_count; ++i ) {
+            se->destroy_entity ( destroy_list[i] );
         }
     }
     xi->end_section ( xi_workload );
