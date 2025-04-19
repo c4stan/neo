@@ -222,6 +222,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "mouse_pick_object_id_copy",
         .type = xf_node_type_copy_pass_m,
+        .pass.copy = xf_node_copy_pass_params_m(),
         .resources = xf_node_resource_params_m (
             .copy_texture_reads_count = 1,
             .copy_texture_reads = {
@@ -269,6 +270,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
+        .pass.copy = xf_node_copy_pass_params_m(),
         .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
             .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
@@ -529,6 +531,57 @@ static void viewapp_boot_raster_graph ( void ) {
             .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) ) },
         ),
     ) );
+
+    // downsample lighting result
+    uint32_t lighting_mip_count = 8;
+    std_assert_m ( resolution_x % ( 1 << ( lighting_mip_count - 1 ) ) == 0 );
+    std_assert_m ( resolution_y % ( 1 << ( lighting_mip_count - 1 ) ) == 0 );
+    xf_texture_h downsampled_lighting_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x / 2,
+        .height = resolution_y / 2,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "downsampled_lighting_texture",
+        .mip_levels = lighting_mip_count,
+        .view_access = xg_texture_view_access_separate_mips_m,
+    ) );
+
+    xf->add_node ( graph, &xf_node_params_m (
+        .debug_name = "lighting_mip_0",
+        .type = xf_node_type_copy_pass_m,
+        .pass.copy = xf_node_copy_pass_params_m (
+            .filter = xg_sampler_filter_linear_m,
+        ),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { 
+                xf_copy_texture_dependency_m ( .texture = downsampled_lighting_texture, .view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ),
+            },
+            .copy_texture_reads_count = 1,
+            .copy_texture_reads = { 
+                xf_copy_texture_dependency_m ( .texture = lighting_texture ),
+            },
+        ),
+    ) );
+
+    for ( uint32_t i = 1; i < lighting_mip_count; ++i ) {
+        xf->add_node ( graph, &xf_node_params_m (
+            .debug_name = "lighting_mip_i",
+            .type = xf_node_type_copy_pass_m,
+            .pass.copy = xf_node_copy_pass_params_m (
+                .filter = xg_sampler_filter_linear_m,
+            ),
+            .resources = xf_node_resource_params_m (
+                .copy_texture_writes_count = 1,
+                .copy_texture_writes = { 
+                    xf_copy_texture_dependency_m ( .texture = downsampled_lighting_texture, .view = xg_texture_view_m ( .mip_base = i, .mip_count = 1 ) ),
+                },
+                .copy_texture_reads_count = 1,
+                .copy_texture_reads = { 
+                    xf_copy_texture_dependency_m ( .texture = downsampled_lighting_texture, .view = xg_texture_view_m ( .mip_base = i-1, .mip_count = 1 ) ),
+                },
+            ),
+        ) );
+    }
 
     // hi-z
     uint32_t hiz_mip_count = 8;
@@ -874,6 +927,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
+        .pass.copy = xf_node_copy_pass_params_m(),
         .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
             .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
@@ -1646,10 +1700,28 @@ static void viewapp_create_cameras ( void ) {
 
 #include <xg_enum.h>
 
+typedef struct {
+    void* data;
+    uint32_t width;
+    uint32_t height;
+    uint32_t channels;
+    xg_format_e format;
+} viewapp_texture_t;
+
+static void* viewapp_stbi_realloc ( void* p, size_t old_size, size_t new_size ) {
+    void* new = std_virtual_heap_alloc_m ( new_size, 16 );
+    std_mem_copy ( new, p, old_size );
+    std_virtual_heap_free ( p );
+    return new;
+}
+
+#define STBI_MALLOC(sz) std_virtual_heap_alloc_m ( sz, 16 )
+#define STBI_FREE(p) std_virtual_heap_free ( p )
+#define STBI_REALLOC_SIZED(p,oldsz,newsz) viewapp_stbi_realloc ( p, oldsz, newsz )
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 std_unused_static_m()
-static xg_texture_h viewapp_import_texture ( const struct aiScene* scene, const char* path, xg_resource_cmd_buffer_h cmd_buffer ) {
+static viewapp_texture_t viewapp_import_texture ( const struct aiScene* scene, const char* path ) {
     void* data;
     xg_format_e format;
     int width, height, channels;
@@ -1672,7 +1744,7 @@ static xg_texture_h viewapp_import_texture ( const struct aiScene* scene, const 
     } else {
         if ( !stbi_info ( path, &width, &height, &channels ) ) {
             std_log_error_m ( "failed to read texture " std_fmt_str_m, path );
-            return xg_null_handle_m;
+            return ( viewapp_texture_t ) {0};
         }
         if ( channels == 3 ) channels = 4;
         data = stbi_load ( path, &width, &height, NULL, channels );
@@ -1689,20 +1761,32 @@ static xg_texture_h viewapp_import_texture ( const struct aiScene* scene, const 
         format = xg_format_undefined_m;
     }
 
-    xg_i* xg = m_state->modules.xg;
+    viewapp_texture_t texture = {
+        .data = data,
+        .width = width,
+        .height = height,
+        .channels = channels,
+        .format = format
+    };
+    return texture;
+}
+
+static xg_texture_h viewapp_upload_texture_to_gpu ( xg_resource_cmd_buffer_h cmd_buffer, const viewapp_texture_t* texture, const char* name ) {
+     xg_i* xg = m_state->modules.xg;
     xg_texture_params_t params = xg_texture_params_m ( 
         .memory_type = xg_memory_type_gpu_only_m,
         .device = m_state->render.device,
-        .width = width,
-        .height = height,
-        .format = format,
+        .width = texture->width,
+        .height = texture->height,
+        .format = texture->format,
         .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_copy_dest_m,
     );
-    std_path_name ( params.debug_name, sizeof ( params.debug_name ), path );
+    std_str_copy_static_m ( params.debug_name, name );
+    //std_path_name ( params.debug_name, sizeof ( params.debug_name ), path );
 
     xg_texture_h texture_handle = xg->cmd_create_texture ( cmd_buffer, &params, &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
-        .upload_data = data,
+        .upload_data = texture->data,
         .final_layout = xg_texture_layout_shader_read_m
     ) );
 
@@ -1725,6 +1809,7 @@ static void viewapp_import_scene ( const char* input_path ) {
     //flags |= aiProcess_GenBoundingBoxes;
     //flags |= aiProcess_FlipWindingOrder;
     flags |= aiProcess_PreTransformVertices;
+    flags |= aiProcess_CalcTangentSpace;
 
     std_tick_t start_tick = std_tick_now();
 
@@ -1750,6 +1835,8 @@ static void viewapp_import_scene ( const char* input_path ) {
             geo.index_count = mesh->mNumFaces * 3;
             geo.pos = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 3 );
             geo.nor = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 3 );
+            geo.tan = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 3 );
+            geo.bitan = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 3 );
             geo.uv = std_virtual_heap_alloc_array_m ( float, geo.vertex_count * 2 );
             geo.idx = std_virtual_heap_alloc_array_m ( uint32_t, geo.index_count );
 
@@ -1757,12 +1844,18 @@ static void viewapp_import_scene ( const char* input_path ) {
                 geo.pos[i * 3 + 0] = mesh->mVertices[i].x;
                 geo.pos[i * 3 + 1] = mesh->mVertices[i].y;
                 geo.pos[i * 3 + 2] = mesh->mVertices[i].z;
-            }
 
-            for ( uint32_t i = 0; i < mesh->mNumVertices; i++ ) {
                 geo.nor[i * 3 + 0] = mesh->mNormals[i].x;
                 geo.nor[i * 3 + 1] = mesh->mNormals[i].y;
                 geo.nor[i * 3 + 2] = mesh->mNormals[i].z;
+
+                geo.tan[i * 3 + 0] = mesh->mTangents[i].x;
+                geo.tan[i * 3 + 1] = mesh->mTangents[i].y;
+                geo.tan[i * 3 + 2] = mesh->mTangents[i].z;
+            
+                geo.bitan[i * 3 + 0] = mesh->mBitangents[i].x;
+                geo.bitan[i * 3 + 1] = mesh->mBitangents[i].y;
+                geo.bitan[i * 3 + 2] = mesh->mBitangents[i].z;
             }
 
             if ( mesh->mTextureCoords[0] ) {
@@ -1807,13 +1900,32 @@ static void viewapp_import_scene ( const char* input_path ) {
                     mesh_material.base_color[2] = diffuse.b;
                 }
 
-                struct aiString texture_name;
-                if ( aiGetMaterialTexture ( material, aiTextureType_DIFFUSE, 0, &texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
-                    char texture_path[128];
-                    std_path_normalize ( texture_path, 128, input_path );
+                struct aiString color_texture_name;
+                if ( aiGetMaterialTexture ( material, aiTextureType_DIFFUSE, 0, &color_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
+                    char texture_path[256];
+                    std_path_normalize ( texture_path, 256, input_path );
                     size_t len = std_path_pop ( texture_path );
-                    std_path_append ( texture_path, 128 - len, texture_name.data );
-                    mesh_material.color_texture = viewapp_import_texture ( scene, texture_path, resource_cmd_buffer );
+                    std_path_append ( texture_path, 256 - len, color_texture_name.data );
+                    viewapp_texture_t texture = viewapp_import_texture ( scene, texture_path );
+                    mesh_material.color_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &texture, std_path_name_ptr ( texture_path ) );
+                }
+
+                struct aiString normal_texture_name;
+                if ( aiGetMaterialTexture ( material, aiTextureType_NORMALS, 0, &normal_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
+                    char texture_path[256];
+                    std_path_normalize ( texture_path, 256, input_path );
+                    size_t len = std_path_pop ( texture_path );
+                    std_path_append ( texture_path, 256 - len, normal_texture_name.data );
+                    viewapp_texture_t texture = viewapp_import_texture ( scene, texture_path );
+                    mesh_material.normal_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &texture, std_path_name_ptr ( texture_path ) );
+                }
+
+                struct aiString metalness_texture_name;
+                struct aiString roughness_texture_name;
+                bool has_metalness = aiGetMaterialTexture ( material, AI_MATKEY_METALLIC_TEXTURE, &metalness_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS;
+                bool has_roughness = aiGetMaterialTexture ( material, AI_MATKEY_ROUGHNESS_TEXTURE, &roughness_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS;
+                if ( has_roughness && has_metalness ) {
+                    std_assert_m ( std_str_cmp ( metalness_texture_name.data, roughness_texture_name.data ) == 0 );
                 }
 
                 aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );

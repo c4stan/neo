@@ -1552,7 +1552,7 @@ void xi_ui_geo_init ( xg_device_h device_handle ) {
 }
 
 static bool xi_ui_ray_triangle_intersect ( sm_vec_3f_t* intersection, float* ray_depth,  sm_vec_3f_t ray_origin, sm_vec_3f_t ray_direction, sm_vec_3f_t tri_a, sm_vec_3f_t tri_b, sm_vec_3f_t tri_c ) {
-    const float epsilon = 1e-4f;
+    const float epsilon = 1e-5f;
     bool ret = false;
     
     sm_vec_3f_t e1 = sm_vec_3f_sub ( tri_b, tri_a );
@@ -1654,6 +1654,8 @@ static bool xi_ui_transform_mouse_pick_test ( const xi_ui_camera_ray_t* ray, sm_
         tri_a = sm_matrix_4x4f_transform_f3 ( xform, tri_a );
         tri_b = sm_matrix_4x4f_transform_f3 ( xform, tri_b );
         tri_c = sm_matrix_4x4f_transform_f3 ( xform, tri_c );
+
+        //std_log_info_m ( std_fmt_f32_m" "std_fmt_f32_m" "std_fmt_f32_m, ray->direction[0], ray->direction[1], ray->direction[2] );
 
         bool intersects = xi_ui_ray_triangle_intersect ( &pos, &depth, sm_vec_3f ( ray->origin ), sm_vec_3f ( ray->direction ), tri_a, tri_b, tri_c );
         if ( intersects ) {

@@ -12,8 +12,8 @@ layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 void main ( void ) {
     // screen uv
-    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2(0.5) ) / frame_cbuffer.resolution_f32 );
-    //vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2(0.5) ) / frame_uniforms.resolution_f32 );
+    //vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 );
 
     // sample
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;

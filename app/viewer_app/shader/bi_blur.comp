@@ -39,7 +39,7 @@ void main ( void ) {
     vec3 view_pos = view_from_depth ( screen_uv, depth );
 
     vec2 color_texel_size = 1.0 / draw_uniforms.src_resolution_f32;
-    vec2 frame_texel_size = 1.0 / frame_cbuffer.resolution_f32;
+    vec2 frame_texel_size = 1.0 / frame_uniforms.resolution_f32;
     vec3 color_sum = vec3 ( 0, 0, 0 );
     float weight_sum = 0;
 

@@ -265,7 +265,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         ) },
     ) );
 
-    xg_buffer_range_t cbuffer_range;
+    xg_buffer_range_t uniform_buffer_range;
     {
         draw_uniforms_t uniforms;
         uniforms.color[0] = 0.0;
@@ -282,9 +282,9 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
         xg_buffer_info_t buffer_info;
         xg->get_buffer_info ( &buffer_info, buffer_handle );
         std_mem_copy ( buffer_info.allocation.mapped_address, &uniforms, sizeof ( uniforms ) );
-        cbuffer_range.handle = buffer_handle;
-        cbuffer_range.offset = 0;
-        cbuffer_range.size = sizeof ( uniforms );
+        uniform_buffer_range.handle = buffer_handle;
+        uniform_buffer_range.offset = 0;
+        uniform_buffer_range.size = sizeof ( uniforms );
 
         xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer_handle, xg_resource_cmd_buffer_time_workload_complete_m );
     }
@@ -300,7 +300,7 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
             .buffers = {
                 xg_buffer_resource_binding_m (
                     .shader_register = 0,
-                    .range = cbuffer_range,
+                    .range = uniform_buffer_range,
                 )
             }
         )

@@ -1926,7 +1926,7 @@ typedef struct {
 } xg_buffer_params_t;
 
 #define xg_buffer_params_m( ... ) ( xg_buffer_params_t ) { \
-    .memory_type = xg_memory_type_null_m, \
+    .memory_type = xg_memory_type_gpu_only_m, \
     .device = xg_null_handle_m, \
     .size = 0, \
     .align = 0, \
@@ -2199,12 +2199,16 @@ typedef struct {
 
 typedef struct {
     xg_buffer_h source;
+    uint64_t source_offset;
     xg_buffer_h destination;
+    uint64_t size;
 } xg_buffer_copy_params_t;
 
 #define xg_buffer_copy_params_m( ... ) ( xg_buffer_copy_params_t ) { \
     .source = xg_null_handle_m, \
+    .source_offset = 0, \
     .destination = xg_null_handle_m, \
+    .size = xg_buffer_whole_size_m, \
     ##__VA_ARGS__ \
 }
 
@@ -2252,6 +2256,7 @@ typedef struct {
 typedef enum {
     xg_default_texture_r8g8b8a8_unorm_black_m,
     xg_default_texture_r8g8b8a8_unorm_white_m,
+    xg_default_texture_r8g8b8a8_unorm_tbn_up_m,
     xg_default_texture_count_m,
 } xg_default_texture_e;
 

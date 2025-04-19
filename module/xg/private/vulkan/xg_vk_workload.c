@@ -879,6 +879,7 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
         case xg_cmd_raytrace_m:
         case xg_cmd_texture_clear_m:
         case xg_cmd_texture_depth_stencil_clear_m:
+        case xg_cmd_buffer_clear_m:
             std_assert_m ( !in_renderpass );
             std_assert_m ( queue_chunk.queue == xg_cmd_queue_graphics_m || queue_chunk.queue == xg_cmd_queue_compute_m );
             if ( cmd_chunk.begin == -1 ) cmd_chunk.begin = cmd_it;
@@ -1404,12 +1405,15 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 const xg_vk_buffer_t* source = xg_vk_buffer_get ( args->source );
                 const xg_vk_buffer_t* dest = xg_vk_buffer_get ( args->destination );
 
-                std_assert_m ( source->params.size == dest->params.size );
+                uint64_t size = args->size;
+                if ( size == xg_buffer_whole_size_m ) {
+                    size = dest->params.size; // TODO
+                }
 
                 VkBufferCopy copy;
-                copy.srcOffset = 0;
+                copy.srcOffset = args->source_offset;
                 copy.dstOffset = 0;
-                copy.size = source->params.size;
+                copy.size = size;
 
                 vkCmdCopyBuffer ( vk_cmd_buffer, source->vk_handle, dest->vk_handle, 1, &copy );
             }
@@ -1452,7 +1456,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 
                     if ( copy_mip_count == xg_texture_all_mips_m ) {
                         if ( source_mip_count != dest_mip_count ) {
-                            std_log_warn_m ( "Copy texture command has source and destination textures with non matching mip levels count" );
+                            //std_log_warn_m ( "Copy texture command has source and destination textures with non matching mip levels count" );
                         }
 
                         mip_count = std_min_u32 ( source_mip_count, dest_mip_count );
@@ -1471,7 +1475,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 
                     if ( copy_array_count == xg_texture_whole_array_m ) {
                         if ( source_array_count != dest_array_count ) {
-                            std_log_warn_m ( "Copy texture command has source and destination textures with non matching array layers count" );
+                            //std_log_warn_m ( "Copy texture command has source and destination textures with non matching array layers count" );
                         }
 
                         array_count = std_min_u32 ( source_array_count, dest_array_count );
@@ -1628,6 +1632,16 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 };
 
                 vkCmdClearDepthStencilImage ( vk_cmd_buffer, texture->vk_handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear, 1, &range );
+            }
+            break;
+            case xg_cmd_buffer_clear_m: {
+                std_auto_m args = ( xg_cmd_buffer_clear_t* ) header->args;
+                std_assert_m ( !in_renderpass );
+
+                const xg_vk_buffer_t* buffer = xg_vk_buffer_get ( args->buffer );
+
+                // TODO custom base and size
+                vkCmdFillBuffer ( vk_cmd_buffer, buffer->vk_handle, 0, buffer->params.size, args->clear );
             }
             break;
             case xg_cmd_barrier_set_m: {
@@ -2027,10 +2041,10 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
                     if ( args->init ) {
                         switch ( args->init_mode ) {
                         case xg_texture_init_mode_clear_m:
-                            xg_cmd_buffer_texture_clear ( cmd_buffer, 0, texture_handle, args->clear );
+                            xg_cmd_buffer_clear_texture ( cmd_buffer, 0, texture_handle, args->clear );
                             break;
                         case xg_texture_init_mode_clear_depth_stencil_m:
-                            xg_cmd_buffer_texture_depth_stencil_clear ( cmd_buffer, 0, texture_handle, args->depth_stencil_clear );
+                            xg_cmd_buffer_clear_depth_stencil_texture ( cmd_buffer, 0, texture_handle, args->depth_stencil_clear );
                             break;
                         case xg_texture_init_mode_upload_m:
                             // TODO batch
@@ -2077,7 +2091,40 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
 
                 case xg_resource_cmd_buffer_create_m: {
                     std_auto_m args = ( xg_resource_cmd_buffer_create_t* ) header->args;
-                    std_verify_m ( xg_buffer_alloc ( args->buffer ) );
+                    
+                    xg_buffer_h buffer_handle = args->buffer;
+                    std_verify_m ( xg_buffer_alloc ( buffer_handle ) );
+                    if ( args->init ) {
+                        switch ( args->init_mode ) {
+                        case xg_buffer_init_mode_clear_m:
+                            xg_cmd_buffer_clear_buffer ( cmd_buffer, 0, buffer_handle, args->clear );
+                            break;
+                        case xg_buffer_init_mode_upload_m:
+                            // TODO batch
+                            xg_cmd_buffer_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+                                .buffer_memory_barriers_count = 1,
+                                .buffer_memory_barriers = &xg_buffer_memory_barrier_m (
+                                    .buffer = buffer_handle,
+                                    .offset = 0,
+                                    .size = xg_buffer_whole_size_m,
+                                    .memory.flushes = xg_memory_access_bit_none_m,
+                                    .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+                                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                                    .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+                                ),
+                            ) );
+                            // TODO handle mip/array
+                            xg_cmd_buffer_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m (
+                                .source = args->staging.handle,
+                                .source_offset = args->staging.offset,
+                                .destination = buffer_handle,
+                                .size = args->staging.size,
+                            ) );
+                            break;
+                        default:
+                            break;
+                        }
+                    }
                 }
                 break;
                 

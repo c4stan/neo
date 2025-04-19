@@ -218,14 +218,13 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     {
         xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-        xg_buffer_params_t cbuffer_params = xg_buffer_params_m (
+        uniform_buffer = xg->create_buffer ( &xg_buffer_params_m (
             .memory_type = xg_memory_type_gpu_mapped_m,
             .device = params->xg_device,
             .size = sizeof ( xi_font_atlas_uniform_data_t ),
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
             .debug_name = "xi_font_uniforms",
-        );
-        uniform_buffer = xg->create_buffer ( &cbuffer_params );
+        ) );
 
         xg->cmd_destroy_buffer ( resource_cmd_buffer, uniform_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 

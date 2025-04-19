@@ -5,6 +5,8 @@
 typedef struct {
     float* pos;
     float* nor;
+    float* tan;
+    float* bitan;
     float* uv;
     uint32_t* idx;
     uint64_t vertex_count;
@@ -15,6 +17,8 @@ typedef struct {
     xg_device_h device;
     xg_buffer_h pos_buffer;
     xg_buffer_h nor_buffer;
+    xg_buffer_h tan_buffer;
+    xg_buffer_h bitan_buffer;
     xg_buffer_h uv_buffer;
     xg_buffer_h idx_buffer;
 } xg_geo_util_geometry_gpu_data_t;

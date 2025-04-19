@@ -18,5 +18,5 @@ layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_unif
 void main() {
     vec4 pos = vec4 ( in_pos, 1.0 );
     gl_Position = pass_uniforms.proj_from_view * pass_uniforms.view_from_world * draw_uniforms.world_from_model * pos;
-    //gl_Position = frame_cbuffer.jittered_proj_from_view * frame_cbuffer.view_from_world * draw_cbuffer.world_from_model * pos;
+    //gl_Position = frame_uniforms.jittered_proj_from_view * frame_uniforms.view_from_world * draw_uniforms.world_from_model * pos;
 }

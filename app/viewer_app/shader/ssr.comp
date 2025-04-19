@@ -4,6 +4,8 @@
 
 #include "common.glsl"
 
+#extension GL_EXT_debug_printf : enable
+
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     vec2 resolution_f32;
     uint hiz_mip_count;
@@ -18,6 +20,50 @@ layout ( binding = 4, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) u
 layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+#define do_ggx 0
+
+#if !do_ggx
+vec3 ggx_sample ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
+    float theta = atan ( roughness * sqrt ( e.x / ( 1.f - e.x ) ) );
+    float phi = PI * 2.f * e.y;
+    vec3 wh = vec3_from_spherical ( theta, phi );
+
+    mat3 tnb = tnb_from_normal ( normal );
+    wh = normalize ( tnb * wh );
+
+    vec3 wi = ( wh * dot ( wo, wh ) * 2 ) - wo;
+    return wi;
+}
+#else
+vec3 ggx_sample ( vec2 Xi, float roughness, vec3 N ) {
+    float a = roughness * roughness;
+    float phi = 2.0 * PI * Xi.x;
+    float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+    // Spherical to cartesian
+    vec3 H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
+
+    // Tangent space to world space
+    vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, N));
+    vec3 bitangent = cross(N, tangent);
+
+    return normalize(tangent * H.x + bitangent * H.y + N * H.z);
+}
+
+float D_GGX(float NoH, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NoH2 = NoH * NoH;
+    float denom = NoH2 * (a2 - 1.0) + 1.0;
+    return a2 / (PI * denom * denom);
+}
+#endif
 
 // ---
 // TODO: try: downsample depth & normals -> raytrace in half-resolution -> upsample result back using a bi-filter (read half res depth and normals)
@@ -44,10 +90,16 @@ void main ( void ) {
     float ey = rng_wang ( rng_state );
     vec2 e2 = vec2 ( ex, ey );
     vec3 wo = normalize ( -view_pos );
+#if !do_ggx
     vec3 wi = ggx_sample ( e2, wo, view_normal, roughness );
     //float p = ggx_pdf ( wi, wo, view_normal, roughness );
     //view_ray_dir = wi;
     view_ray_dir = normalize ( view_ray_dir + wi );
+#else
+    vec3 H = ggx_sample ( e2, roughness, view_normal );
+    vec3 wi = reflect ( - normalize ( -view_pos ), H );
+    view_ray_dir = wi;
+#endif
 
     vec3 sample_color = vec3 ( 0, 0, 0 );
     float sample_distance = 1;
@@ -64,15 +116,39 @@ void main ( void ) {
     if ( depth < 1 && roughness < 1 ) {
         vec3 hit_screen_pos;
         float hit_depth;
+        bool hit;
 
-        if ( trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 300 ) ) {
+        if ( roughness < 0.09 ) {
+            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 200 );
+        } else {
+            hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 20 );
+        }
+
+        if ( hit ) {
             vec3 hit_color = texture ( sampler2D ( tex_color, sampler_point ), hit_screen_pos.xy ).xyz;
             float depth_delta = - ( linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ) );
             float depth_threshold = 0.4;
-            sample_color = mix ( hit_color, vec3 ( 0, 0, 0 ), clamp ( depth_delta, 0, depth_threshold ) * 1.f / depth_threshold );
-            //sample_color = hit_color;
+            //sample_color = mix ( hit_color, vec3 ( 0, 0, 0 ), clamp ( depth_delta, 0, depth_threshold ) * 1.f / depth_threshold );
+            hit_color = clamp ( hit_color, vec3(0), vec3(1) );
+            sample_color = hit_color;
         }
     }
+
+    #if do_ggx
+    float p = ggx_pdf ( wi, wo, view_normal, roughness );
+    float pdf = p;//1.0; // Replace with actual PDF
+
+    // Weight sample
+    float NoH = max(dot(view_normal, H), 0.0);
+    float NoL = max(dot(view_normal, view_ray_dir), 0.0);
+    float VoH = max(dot(wi, H), 0.0);
+
+    if (NoL > 0.0 && pdf > 0.0) {
+        float ggx = D_GGX(NoH, roughness);
+        float weight = ggx * VoH / (pdf * max(NoH, 0.001));
+        sample_color *= weight * NoL;
+    }
+    #endif
 
     // TODO should the attenuation depend on the specular of the reflecting surface?
     //out_color = vec4 ( sample_color, 1 );

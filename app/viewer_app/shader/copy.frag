@@ -10,7 +10,7 @@ layout ( set = xs_shader_binding_set_dispatch_m, binding = 1 ) uniform sampler s
 layout ( location = 0 ) out vec4 out_color;
 
 void main ( void ) {
-    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 );
 
     vec4 sample_value = texture ( sampler2D ( tex_input, sampler_input ), screen_uv );
 

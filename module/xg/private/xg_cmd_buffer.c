@@ -520,7 +520,7 @@ void xg_cmd_bind_queue ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const 
     *cmd_args = *params;
 }
 
-void xg_cmd_buffer_texture_clear ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_texture_h texture, xg_color_clear_t clear_color ) {
+void xg_cmd_buffer_clear_texture ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_texture_h texture, xg_color_clear_t clear_color ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_texture_clear_m, key, xg_cmd_texture_clear_t );
 
@@ -528,11 +528,19 @@ void xg_cmd_buffer_texture_clear ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t k
     cmd_args->clear = clear_color;
 }
 
-void xg_cmd_buffer_texture_depth_stencil_clear ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear_value ) {
+void xg_cmd_buffer_clear_depth_stencil_texture ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear_value ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_texture_depth_stencil_clear_m, key, xg_cmd_texture_depth_stencil_clear_t );
 
     cmd_args->texture = texture;
+    cmd_args->clear = clear_value;
+}
+
+void xg_cmd_buffer_clear_buffer ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_buffer_h buffer, uint32_t clear_value ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_buffer_clear_m, key, xg_cmd_buffer_clear_t );
+
+    cmd_args->buffer = buffer;
     cmd_args->clear = clear_value;
 }
 

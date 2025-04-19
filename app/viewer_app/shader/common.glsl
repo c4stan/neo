@@ -9,7 +9,7 @@
 //                                     U N I F O R M S
 // ======================================================================================= //
 
-layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_uniforms_t {
     vec2 resolution_f32;
     uvec2 resolution_u32;
     uint frame_id; // TODO enable GL_ARB_gpu_shader_int64 and use uint64_t
@@ -27,7 +27,7 @@ layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_cbu
     float z_far;
 
     uint is_reload;
-} frame_cbuffer; // TODO rename
+} frame_uniforms;
 
 // ======================================================================================= //
 //                                     R A Y T R A C E
@@ -115,8 +115,8 @@ float proj_depth_diff ( float a, float b ) {
 
 // https://stackoverflow.com/questions/51108596/linearize-depth
 float linearize_depth ( float d ) {
-    float z_near = frame_cbuffer.z_near;
-    float z_far = frame_cbuffer.z_far;
+    float z_near = frame_uniforms.z_near;
+    float z_far = frame_uniforms.z_far;
     return z_near * z_far / ( z_far + d * ( z_near - z_far ) );
 }
 
@@ -125,13 +125,13 @@ vec3 view_from_depth ( vec2 screen_uv, float depth ) {
     float proj_x = screen_uv.x * 2 - 1;
     float proj_y = ( 1 - screen_uv.y ) * 2 - 1;
     vec3 proj_pos = vec3 ( proj_x, proj_y, depth );
-    vec4 unnormalized_view_pos = frame_cbuffer.view_from_proj * vec4 ( proj_pos, 1 );
+    vec4 unnormalized_view_pos = frame_uniforms.view_from_proj * vec4 ( proj_pos, 1 );
     vec3 view_pos = unnormalized_view_pos.xyz / unnormalized_view_pos.w;
     return view_pos;
 }
 
 vec3 screen_from_view ( vec3 view ) {
-    vec4 proj = frame_cbuffer.proj_from_view * vec4 ( view, 1 );
+    vec4 proj = frame_uniforms.proj_from_view * vec4 ( view, 1 );
     proj /= proj.w;
     vec3 screen = vec3 ( proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, proj.z );
     return screen;
@@ -143,8 +143,8 @@ vec3 view_from_screen ( vec3 screen ) {
 
 // https://mynameismjp.wordpress.com/the-museum/samples-tutorials-tools/motion-blur-sample/
 vec3 prev_screen_from_world ( vec3 world ) {
-    vec3 prev_view = ( frame_cbuffer.prev_view_from_world * vec4 ( world, 1 ) ).xyz;
-    vec4 prev_proj = ( frame_cbuffer.prev_proj_from_view * vec4 ( prev_view, 1 ) );
+    vec3 prev_view = ( frame_uniforms.prev_view_from_world * vec4 ( world, 1 ) ).xyz;
+    vec4 prev_proj = ( frame_uniforms.prev_proj_from_view * vec4 ( prev_view, 1 ) );
     prev_proj /= prev_proj.w;
     vec3 screen = vec3 ( prev_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, prev_proj.z );
     return screen;
@@ -152,7 +152,7 @@ vec3 prev_screen_from_world ( vec3 world ) {
 
 // takes in post-divide by w coords, before moving from NDC to screen
 vec2 dejitter_ndc ( vec2 ndc ) {
-    vec2 jitter = vec2 ( frame_cbuffer.jittered_proj_from_view[2][0], frame_cbuffer.jittered_proj_from_view[2][1] );
+    vec2 jitter = vec2 ( frame_uniforms.jittered_proj_from_view[2][0], frame_uniforms.jittered_proj_from_view[2][1] );
     return ndc - jitter;
 }
 
@@ -165,14 +165,14 @@ vec2 dejitter_uv ( vec2 screen_uv ) {
     vec2 dejittered_uv = dejittered_ndc * vec2 ( 0.5, -0.5 ) + 0.5;
     return dejittered_uv;
 #else
-    vec2 jitter = vec2 ( frame_cbuffer.jittered_proj_from_view[2][0], frame_cbuffer.jittered_proj_from_view[2][1] );
+    vec2 jitter = vec2 ( frame_uniforms.jittered_proj_from_view[2][0], frame_uniforms.jittered_proj_from_view[2][1] );
     vec2 jitter_uv = jitter * vec2 ( 0.5f, -0.5f );
     return screen_uv - jitter_uv;
 #endif
 }
 
 //vec2 dejittered_screen_uv() { 
-//    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+//    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 );
 //    screen_uv = dejitter_uv ( screen_uv );
 //    return screen_uv;
 //}
@@ -262,7 +262,7 @@ float rng_wang ( inout uint state ) {
 }
 
 uint rng_wang_init ( vec2 tex_coord ) {
-    return uint ( uint ( tex_coord.x ) * uint ( 1973 ) + uint ( tex_coord.y ) * uint ( 9277 ) + uint ( frame_cbuffer.frame_id ) * uint ( 26699 ) ) | uint ( 1 );
+    return uint ( uint ( tex_coord.x ) * uint ( 1973 ) + uint ( tex_coord.y ) * uint ( 9277 ) + uint ( frame_uniforms.frame_id ) * uint ( 26699 ) ) | uint ( 1 );
 }
 
 // https://mathworld.wolfram.com/SpherePointPicking.html
@@ -311,17 +311,6 @@ float ggx_d ( float NoH, float roughness ) {
 
 // takes in wo (view vector V)
 // returns wi (light vector L)
-vec3 ggx_sample ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
-    float theta = atan ( roughness * sqrt ( e.x / ( 1.f - e.x ) ) );
-    float phi = PI * 2.f * e.y;
-    vec3 wh = vec3_from_spherical ( theta, phi );
-
-    mat3 tnb = tnb_from_normal ( normal );
-    wh = normalize ( tnb * wh );
-
-    vec3 wi = ( wh * dot ( wo, wh ) * 2 ) - wo;
-    return wi;
-}
 
 float ggx_pdf ( vec3 wi, vec3 wo, vec3 normal, float roughness ) {
     vec3 wh = normalize ( wi + wo );
@@ -347,7 +336,7 @@ float ggx_pdf ( vec3 wi, vec3 wo, vec3 normal, float roughness ) {
 // steps forward the ray sample until it exits the hi-z mip cell it is currently in and goes a bit further (controlled by cross_offset)
 // returns the ray path t value for the new sample position
 float intersect_cell_boundary ( vec3 screen_ray_start, vec3 screen_ray_path, vec3 screen_ray_sample, uint hiz_mip, vec2 cross_step, vec2 cross_offset ) {
-    vec2 hiz_resolution = vec2 ( frame_cbuffer.resolution_u32 >> hiz_mip );
+    vec2 hiz_resolution = vec2 ( frame_uniforms.resolution_u32 >> hiz_mip );
     // index of the next cell in ray dir if dir is positive, or the current cell if dir is negative
     vec2 cell_index = floor ( screen_ray_sample.xy * hiz_resolution ) + cross_step;
     // get screen coords for the vertical and horizontal planes defining the cell boundary we want to cross
@@ -364,7 +353,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     //
     vec3 view_ray_start = view_pos;
     vec3 screen_ray_start = screen_from_view ( view_ray_start );
-    //screen_ray_start.y += 1.f / frame_cbuffer.resolution_f32.y;
+    //screen_ray_start.y += 1.f / frame_uniforms.resolution_f32.y;
     vec3 screen_ray_hemisphere_sample = screen_from_view ( view_ray_start + hemisphere_normal );
     vec3 screen_ray_dir = normalize ( screen_ray_hemisphere_sample - screen_ray_start );
 
@@ -381,7 +370,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     //
     uint hiz_max_mip = hiz_mip_count - 1;
     vec2 cross_dir = vec2 ( screen_ray_dir.x > 0.f ? 1.f : -1.f, screen_ray_dir.y > 0.f ? 1.f : -1.f );
-    vec2 cross_offset = cross_dir * ( 1.f / float ( frame_cbuffer.resolution_u32 << hiz_max_mip ) );// * 0.5f );
+    vec2 cross_offset = cross_dir * ( 1.f / float ( frame_uniforms.resolution_u32 << hiz_max_mip ) );// * 0.5f );
     vec2 cross_step = clamp ( cross_dir, 0, 1 );
 
     //
@@ -411,7 +400,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
         float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_point ), screen_ray_sample.xy, hiz_mip ).x;
 
         // compute ray cell index for current hiz mip
-        vec2 hiz_resolution = vec2 ( frame_cbuffer.resolution_u32 >> hiz_mip );
+        vec2 hiz_resolution = vec2 ( frame_uniforms.resolution_u32 >> hiz_mip );
         vec2 cell_index = floor ( screen_ray_sample.xy * hiz_resolution );
 
         //
@@ -475,7 +464,7 @@ vec2 cell ( vec2 ray, vec2 cell_count, uint camera ) {
 }
 
 vec2 cell_count ( float level ) {
-    return frame_cbuffer.resolution_f32 / ( level == 0.0 ? 1.0 : exp2 ( level ) );
+    return frame_uniforms.resolution_f32 / ( level == 0.0 ? 1.0 : exp2 ( level ) );
 }
 
 vec3 intersect_cell_boundary ( vec3 pos, vec3 dir, vec2 cell_id, vec2 cell_count, vec2 cross_step, vec2 cross_offset, uint camera ) {
@@ -563,9 +552,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
 }
 #endif
 
-#if 0
-// delete this?
-void trace_screen_space_ray ( inout vec3 out_color, inout float out_distance, inout float out_depth_delta, vec3 view_pos, vec3 hemisphere_normal, texture2D tex_color, texture2D tex_depth, sampler sampler_point ) {
+bool trace_screen_space_ray_linear ( out vec3 out_screen_pos, out float out_depth, vec3 view_pos, vec3 hemisphere_normal, texture2D tex_depth, sampler sampler_point, uint max_sample_count, uint step_size ) {
     // go into screen space
     vec3 view_ray_start = view_pos;
     vec3 screen_ray_start = screen_from_view ( view_ray_start );
@@ -581,29 +568,34 @@ void trace_screen_space_ray ( inout vec3 out_color, inout float out_distance, in
     vec3 screen_ray_length = screen_ray_end - screen_ray_start;
 
     // find screen space step size
-    ivec2 tex_ray_start = ivec2 ( screen_ray_start.xy * frame_cbuffer.resolution_u32 );
-    ivec2 tex_ray_end = ivec2 ( screen_ray_end.xy * frame_cbuffer.resolution_u32 );
+    ivec2 tex_ray_start = ivec2 ( screen_ray_start.xy * frame_uniforms.resolution_u32 );
+    ivec2 tex_ray_end = ivec2 ( screen_ray_end.xy * frame_uniforms.resolution_u32 );
     ivec2 tex_ray_length = tex_ray_end - tex_ray_start;
     uint tex_ray_max_dist = max ( abs ( tex_ray_length.x ), abs ( tex_ray_length.y ) );
     vec3 screen_ray_step = screen_ray_length / tex_ray_max_dist;
 
     // trace the ray
-    uint sample_steps = 1;
+    uint sample_steps = step_size;
     vec3 screen_ray_sample = screen_ray_start + screen_ray_step * sample_steps;
+    float depth_threshold = 0.0001 * sample_steps;
 
-    for ( uint sample_it = 0; sample_it < tex_ray_max_dist && sample_it < 20000; sample_it += sample_steps ) {
+    for ( uint sample_it = 0; sample_it < tex_ray_max_dist && sample_it < max_sample_count; ++sample_it ) {
         float sample_depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_ray_sample.xy ).x;
-        //float depth_delta = screen_ray_sample.z - sample_depth;
-        float linear_depth_delta = linearize_depth ( screen_ray_sample.z ) - linearize_depth ( sample_depth );
 
-        if ( linear_depth_delta >= 0 ) {
-            out_distance = distance ( view_ray_start, view_from_depth ( screen_ray_sample.xy, sample_depth ) );
-            out_color = texture ( sampler2D ( tex_color, sampler_point ), screen_ray_sample.xy ).xyz;
-            out_depth_delta = linear_depth_delta;
-            break;
+        float depth_delta = sample_depth - screen_ray_sample.z;
+
+        if ( depth_delta < 0 ) {
+            if ( depth_delta > -depth_threshold ) {
+                out_screen_pos = screen_ray_sample;
+                out_depth = sample_depth;
+                return true;
+            } else {
+                return false;
+            }
         }
 
         screen_ray_sample += screen_ray_step * sample_steps;
     }
+
+    return false;
 }
-#endif

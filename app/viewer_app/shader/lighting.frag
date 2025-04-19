@@ -15,18 +15,18 @@ layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform sampler s
 
 #define MAX_LIGHT_COUNT 32
 
-layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     uint light_count;
     uint _pad0;
     uint _pad1;
     uint _pad2;
     light_t lights[MAX_LIGHT_COUNT];
-} draw_cbuffer;
+} draw_uniforms;
 
 layout ( location = 0 ) out vec4 out_color;
 
 void main ( void ) {
-    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 );
     screen_uv = dejitter_uv ( screen_uv );
 
     vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
@@ -41,17 +41,17 @@ void main ( void ) {
     // https://c0de517e.blogspot.com/2011/05/shadowmap-bias-notes.html
     // https://ndotl.wordpress.com/2014/12/19/notes-on-shadow-bias/
     view_geo_pos += view_normal * 0.01;
-    vec4 world_geo_pos = frame_cbuffer.world_from_view * vec4 ( view_geo_pos, 1.f );
+    vec4 world_geo_pos = frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f );
 
     vec3 irradiance = vec3 ( 0, 0, 0 );
 
-    for ( uint i = 0; i < draw_cbuffer.light_count; ++i ) {
-        vec3 world_light_pos = draw_cbuffer.lights[i].pos;
-        float light_emissive = draw_cbuffer.lights[i].emissive;
-        vec3 light_color = draw_cbuffer.lights[i].color;
+    for ( uint i = 0; i < draw_uniforms.light_count; ++i ) {
+        vec3 world_light_pos = draw_uniforms.lights[i].pos;
+        float light_emissive = draw_uniforms.lights[i].emissive;
+        vec3 light_color = draw_uniforms.lights[i].color;
 
         // TODO refactor screen_from_view to take in a proj_from_view matrix and use that
-        vec4 shadow_proj = draw_cbuffer.lights[i].proj_from_view * draw_cbuffer.lights[i].view_from_world * world_geo_pos;
+        vec4 shadow_proj = draw_uniforms.lights[i].proj_from_view * draw_uniforms.lights[i].view_from_world * world_geo_pos;
         shadow_proj /= shadow_proj.w;
         vec3 shadow_screen = vec3 ( shadow_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, shadow_proj.z );
 
@@ -93,7 +93,7 @@ void main ( void ) {
         float light_visibility = 1.f - shadow;
         //float shadow_occlusion = shadow_depth + 0.001 > shadow_proj.z ? 1.f : 0.f;
 
-        vec3 view_light_pos = ( frame_cbuffer.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
+        vec3 view_light_pos = ( frame_uniforms.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
         vec3 view_light_dir = normalize ( view_light_pos - view_geo_pos );
         float nl = clamp ( dot ( view_light_dir, view_normal ), 0, 1 );
         float d = distance ( view_geo_pos, view_light_pos );

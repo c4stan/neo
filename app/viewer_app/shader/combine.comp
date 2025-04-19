@@ -16,7 +16,7 @@ layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform sampler s
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
 void main ( void ) {
-    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_cbuffer.resolution_f32 );
+    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
 
     vec3 direct = texture ( sampler2D ( tex_direct, sampler_point ), screen_uv ).xyz;
     vec3 ssr = texture ( sampler2D ( tex_ssr, sampler_point ), screen_uv ).xyz;

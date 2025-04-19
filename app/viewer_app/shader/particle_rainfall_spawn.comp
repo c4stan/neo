@@ -3,10 +3,10 @@
 #include "xs.glsl"
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     uint particle_count;
     uint spawn_count;
-} draw_cbuffer;
+} draw_uniforms;
 
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) buffer particle_buffer_t {
     vec4 data[];
@@ -18,7 +18,7 @@ void main() {
     return;
     uint spawn_idx = gl_GlobalInvocationID.x;
 
-    if ( spawn_idx >= draw_cbuffer.spawn_count ) {
+    if ( spawn_idx >= draw_uniforms.spawn_count ) {
         return;
     }
 
@@ -26,7 +26,7 @@ void main() {
     float u = rng_wang ( rng_state );
     float v = rng_wang ( rng_state );
 
-    uint data_idx = ( draw_cbuffer.particle_count + spawn_idx );
+    uint data_idx = ( draw_uniforms.particle_count + spawn_idx );
     particle_buffer.data[data_idx][0] = u;
     particle_buffer.data[data_idx][1] = v;
     particle_buffer.data[data_idx][2] = 0;

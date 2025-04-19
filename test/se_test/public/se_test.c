@@ -121,13 +121,13 @@ typedef struct {
     float pos_x;
     float pos_y;
     float scale;
-} vertex_cbuffer_data_t;
+} vertex_uniforms_t;
 
 typedef struct {
     xs_database_pipeline_h pipeline_state;
     float vel_x;
     float vel_y;
-    vertex_cbuffer_data_t vertex_cbuffer_data;
+    vertex_uniforms_t vertex_uniform_data;
 } se_test_pass_component_t;
 
 #define se_test_pass_component_m 0
@@ -162,7 +162,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( test_pass_component->pipeline_state );
 
-        xg_buffer_range_t vert_uniform_range = xg->write_workload_uniform ( node_args->workload, &test_pass_component->vertex_cbuffer_data, sizeof ( vertex_cbuffer_data_t ) );
+        xg_buffer_range_t vert_uniform_range = xg->write_workload_uniform ( node_args->workload, &test_pass_component->vertex_uniform_data, sizeof ( vertex_uniforms_t ) );
         xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .range = vert_uniform_range );
 
         xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( node_args->resource_cmd_buffer, &xg_resource_bindings_params_m ( 
@@ -196,8 +196,8 @@ static void update_entities ( float t ) {
         float o = ( std_hash_32_m ( i ) / ( (float)UINT32_MAX ) );
         float oscillation_x = sinf ( t * 0.001 + o * 10 ) * 0.002;
         float oscillation_y = cosf ( t * 0.001 + o * 10 ) * 0.002;
-        component->vertex_cbuffer_data.pos_x += oscillation_x;
-        component->vertex_cbuffer_data.pos_y += oscillation_y;
+        component->vertex_uniform_data.pos_x += oscillation_x;
+        component->vertex_uniform_data.pos_y += oscillation_y;
     }
 }
 
@@ -288,7 +288,7 @@ static void run_se_test_2 ( void ) {
         .count = 2,
         .properties = {
             se_field_property_m ( 0, se_test_pass_component_t, pipeline_state, se_property_u64_m ),
-            se_field_property_m ( 0, se_test_pass_component_t, vertex_cbuffer_data, se_property_3f32_m ),
+            se_field_property_m ( 0, se_test_pass_component_t, vertex_uniform_data, se_property_3f32_m ),
         }
     ) );
 
@@ -296,9 +296,9 @@ static void run_se_test_2 ( void ) {
 
     for ( uint64_t i = 0; i < 1024*2; ++i ) {
         se_test_pass_component_t component_data;
-        component_data.vertex_cbuffer_data.pos_x = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
-        component_data.vertex_cbuffer_data.pos_y = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
-        component_data.vertex_cbuffer_data.scale = 0.05f;
+        component_data.vertex_uniform_data.pos_x = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
+        component_data.vertex_uniform_data.pos_y = ( float ) ( rand() ) / ( float ) ( RAND_MAX ) * 2.f - 1.f;
+        component_data.vertex_uniform_data.scale = 0.05f;
         component_data.pipeline_state = pipeline_state;
 
         se_entity_h t = se->create_entity ( &se_entity_params_m (

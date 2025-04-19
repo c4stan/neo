@@ -30,7 +30,7 @@ void main ( void ) {
     }
 
 #if 0
-    vec2 tile_size = frame_cbuffer.resolution_f32.xy / uniform_buffer.grid_size.xy;
+    vec2 tile_size = frame_uniforms.resolution_f32.xy / uniform_buffer.grid_size.xy;
     
     uvec3 cluster_3d_idx;
     cluster_3d_idx.z = cluster_idx / ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y );
@@ -53,13 +53,13 @@ void main ( void ) {
 
     vec3 view_cluster_start = view_from_screen ( vec3 ( screen_tile_start, 1 ) );
     vec3 view_cluster_end = view_from_screen ( vec3 ( screen_tile_end, 1 ) );
-    float b = frame_cbuffer.z_far / frame_cbuffer.z_near;
+    float b = frame_uniforms.z_far / frame_uniforms.z_near;
     float e1 = float ( cluster_3d_idx.z ) / uniform_buffer.grid_size.z;
     float e2 = float ( cluster_3d_idx.z + 1 ) / uniform_buffer.grid_size.z;
     float p1 = pow ( b, e1 );
     float p2 = pow ( b, e2 );
-    float view_cluster_near = frame_cbuffer.z_near * p1;
-    float view_cluster_far = frame_cbuffer.z_near * p2;
+    float view_cluster_near = frame_uniforms.z_near * p1;
+    float view_cluster_far = frame_uniforms.z_near * p2;
 
     vec3 p0 = vec3 ( 0 );
     vec3 view_cluster_start_near = intersect_line_z_plane ( p0, view_cluster_start, view_cluster_near );

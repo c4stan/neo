@@ -48,7 +48,7 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
             .sampled_textures_count = 3,
             .sampled_textures = {
                 xf_compute_texture_dependency_m ( .texture = normals ),
-                xf_compute_texture_dependency_m ( .texture = color ),
+                xf_compute_texture_dependency_m ( .texture = color, .view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ),
                 xf_compute_texture_dependency_m ( .texture = hiz ),
             },
             .storage_texture_writes_count = 1,

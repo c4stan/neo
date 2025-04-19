@@ -96,6 +96,11 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
             color_texture = xg->get_default_texture ( node_args->device, xg_default_texture_r8g8b8a8_unorm_white_m );
         }
 
+        xg_texture_h normal_texture = mesh_component->material.normal_texture;
+        if ( normal_texture == xg_null_handle_m ) {
+            normal_texture = xg->get_default_texture ( node_args->device, xg_default_texture_r8g8b8a8_unorm_tbn_up_m );
+        }
+
         // Bind draw resources
         xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
             .layout = xg->get_pipeline_resource_layout ( pipeline_state, xg_shader_binding_set_dispatch_m ),
@@ -111,18 +116,23 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
                         .range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) ),
                     )
                 },
-                .texture_count = 1,
+                .texture_count = 2,
                 .textures = {
                     xg_texture_resource_binding_m (
                         .shader_register = 2,
                         .layout = xg_texture_layout_shader_read_m,
                         .texture = color_texture,
                     ),
+                    xg_texture_resource_binding_m (
+                        .shader_register = 3,
+                        .layout = xg_texture_layout_shader_read_m,
+                        .texture = normal_texture,
+                    ),
                 },
                 .sampler_count = 1,
                 .samplers = {
                     xg_sampler_resource_binding_m (
-                        .shader_register = 3,
+                        .shader_register = 4,
                         .sampler = xg->get_default_sampler ( node_args->device, xg_default_sampler_linear_wrap_m ),
                     ),
                 }
@@ -134,8 +144,14 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
             .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings,
             .index_buffer = mesh_component->idx_buffer,
             .primitive_count = mesh_component->index_count / 3,
-            .vertex_buffers_count = 3,
-            .vertex_buffers = { mesh_component->pos_buffer, mesh_component->nor_buffer, mesh_component->uv_buffer },
+            .vertex_buffers_count = 5,
+            .vertex_buffers = { 
+                mesh_component->geo_gpu_data.pos_buffer, 
+                mesh_component->geo_gpu_data.nor_buffer, 
+                mesh_component->geo_gpu_data.tan_buffer, 
+                mesh_component->geo_gpu_data.bitan_buffer, 
+                mesh_component->geo_gpu_data.uv_buffer 
+            },
         ) );
     }
 }

@@ -2,12 +2,12 @@
 
 #include "xs.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_cbuffer_t {
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     vec3 color;
-} draw_cbuffer;
+} draw_uniforms;
 
 layout ( location = 0 ) out vec4 outColor;
 
 void main() {
-    outColor = vec4 ( draw_cbuffer.color, 1.0 );
+    outColor = vec4 ( draw_uniforms.color, 1.0 );
 }

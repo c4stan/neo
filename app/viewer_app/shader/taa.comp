@@ -26,8 +26,8 @@ layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 // https://bartwronski.com/2014/03/15/temporal-supersampling-and-antialiasing/
 
 void main ( void ) {
-    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_cbuffer.resolution_f32 );
-    vec2 texel_size = 1.0 / frame_cbuffer.resolution_f32;
+    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
+    vec2 texel_size = 1.0 / frame_uniforms.resolution_f32;
 
     // Sample
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
@@ -35,9 +35,9 @@ void main ( void ) {
     vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy;
 
     // Reproject
-    vec2 jitter = vec2 ( frame_cbuffer.jittered_proj_from_view[2][0], frame_cbuffer.jittered_proj_from_view[2][1] );
+    vec2 jitter = vec2 ( frame_uniforms.jittered_proj_from_view[2][0], frame_uniforms.jittered_proj_from_view[2][1] );
     //vec3 view = view_from_depth ( screen_uv, depth );
-    //vec3 world = ( frame_cbuffer.world_from_view * vec4 ( view, 1 ) ).xyz;
+    //vec3 world = ( frame_uniforms.world_from_view * vec4 ( view, 1 ) ).xyz;
     //vec3 prev_screen = prev_screen_from_world ( world );
     //vec2 screen_offset = prev_screen.xy - screen_uv;
     vec2 reprojected_uv = screen_uv - velocity - jitter / 2;
@@ -45,12 +45,12 @@ void main ( void ) {
 #if 1
     // Sample history
     vec3 history = texture ( sampler2D ( tex_history, sampler_linear ), reprojected_uv ).xyz;
-    if ( frame_cbuffer.is_reload > 0 ) {
+    if ( frame_uniforms.is_reload > 0 ) {
         history = color;
     }
 #else
     // TODO test on moving scene
-    vec3 history = sample_catmull_rom ( tex_history, sampler_linear, reprojected_uv, frame_cbuffer.resolution_f32 ).xyz;
+    vec3 history = sample_catmull_rom ( tex_history, sampler_linear, reprojected_uv, frame_uniforms.resolution_f32 ).xyz;
 #endif
 
     // Sample neighborhood

@@ -7,7 +7,7 @@ import sublime_plugin
 /* template begin
 
 def<T, P, N> $T add_$P ( $T* a, $T* b ) {
-    $FOR $N
+    $FOR 0 $N
     // $i
     $END_FOR
     $IF $N > 1
@@ -62,6 +62,25 @@ typedef union {
         float y;
     };
 } sm_vec_3f_t;
+// template generation end
+'''
+
+'''
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+$IF $SIZE > 1
+    $TYPE x;
+$END_IF
+make <float, f, 3>
+make <float, f, 4>
+
+*/
+// template generation begin
+
+    float x;
+
+    float x;
 // template generation end
 '''
 
@@ -138,8 +157,8 @@ def generate_template(body):
 
             # generate loop body, replace $i with loop index
             generated_body = ''
-            i = 0
-            for_condition = for_args[1]
+            i = int(for_args[1])
+            for_condition = for_args[2]
             if for_condition[0] == '$':
                 idx = param_list.index(for_condition[1:])
                 for_condition = arg_list[idx]
@@ -159,7 +178,7 @@ def generate_template(body):
             if_args_end = generated_code.find('\n', if_begin)
             if_args = generated_code[if_begin : if_args_end].split(' ')
             if_end = generated_code.find(if_end_token, if_begin)
-            if_body = generated_code[if_args_end : if_end].rstrip()
+            if_body = generated_code[if_args_end+1 : if_end].rstrip()
 
             print(generated_code[if_begin:if_end])
 

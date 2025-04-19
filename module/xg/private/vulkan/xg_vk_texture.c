@@ -12,6 +12,8 @@
 
 #include <std_list.h>
 
+#include <math.h>
+
 static xg_vk_texture_state_t* xg_vk_texture_state;
 
 void xg_vk_texture_load ( xg_vk_texture_state_t* state ) {
@@ -71,6 +73,18 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
     ), &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
         .upload_data = white,
+    ) );
+
+    char blue[4] = { 0x7f, 0x7f, 0xff, 0xff };
+    xg_vk_texture_state->default_textures[device_idx][xg_default_texture_r8g8b8a8_unorm_tbn_up_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+        .device = device_handle,
+        .memory_type = xg_memory_type_gpu_only_m,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m,
+        .debug_name = "default_r8g8b8a8_unorm_blue",
+    ), &xg_texture_init_m (
+        .mode = xg_texture_init_mode_upload_m,
+        .upload_data = blue,
     ) );
 
     xg_texture_memory_barrier_t barriers[xg_default_texture_count_m];
@@ -185,6 +199,10 @@ void xg_texture_create_view ( xg_vk_texture_view_t* view, xg_texture_h texture_h
     view->params = params;
 }
 
+uint32_t xg_texture_max_mip_levels ( uint32_t width, uint32_t height ) {
+    return floor ( log2 ( std_max_u32 ( width, height ) ) ) + 1;
+}
+
 xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
     xg_vk_texture_t* texture = std_list_pop_m ( &xg_vk_texture_state->textures_freelist );
@@ -212,6 +230,11 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     texture->params = *params;
     texture->flags = flags;
     texture->default_view.vk_handle = VK_NULL_HANDLE;
+
+    // TODO add proper support for this everywhere
+    if ( params->mip_levels == xg_texture_all_mips_m ) {
+        texture->params.mip_levels = xg_texture_max_mip_levels ( params->width, params->height );
+    }
 
     texture->state = xg_vk_texture_state_reserved_m;
 
@@ -256,12 +279,17 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
 xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_t* params ) {
     const xg_vk_device_t* device = xg_vk_device_get ( params->device );
     
+    uint32_t mip_levels = params->mip_levels;
+    if ( mip_levels == xg_texture_all_mips_m ) {
+        mip_levels = xg_texture_max_mip_levels ( params->width, params->height );
+    }
+
     // Create Vulkan image
     VkImage vk_image;
     std_assert_m ( params->width < UINT32_MAX );
     std_assert_m ( params->height < UINT32_MAX );
     std_assert_m ( params->depth < UINT32_MAX );
-    std_assert_m ( params->mip_levels < UINT32_MAX );
+    std_assert_m ( mip_levels < UINT8_MAX );
     std_assert_m ( params->array_layers < UINT32_MAX );
     VkImageCreateInfo vk_image_info;
     vk_image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -272,7 +300,7 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
     vk_image_info.extent.width = ( uint32_t ) params->width;
     vk_image_info.extent.height = ( uint32_t ) params->height;
     vk_image_info.extent.depth = ( uint32_t ) params->depth;
-    vk_image_info.mipLevels = ( uint32_t ) params->mip_levels;
+    vk_image_info.mipLevels = mip_levels;
     vk_image_info.arrayLayers = ( uint32_t ) params->array_layers;
     vk_image_info.samples = xg_sample_count_to_vk ( params->samples_per_pixel );
     vk_image_info.tiling = xg_texture_tiling_to_vk ( params->tiling );

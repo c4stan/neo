@@ -190,6 +190,8 @@ typedef struct {
     xs_database_pipeline_h shadow_pipeline;
     xg_buffer_h pos_buffer;
     xg_buffer_h nor_buffer;
+    xg_buffer_h tan_buffer;
+    xg_buffer_h bitan_buffer;
     xg_buffer_h uv_buffer;
     xg_buffer_h idx_buffer;
     uint32_t vertex_count;
@@ -210,6 +212,8 @@ typedef struct {
     .shadow_pipeline = xs_null_handle_m, \
     .pos_buffer = xg_null_handle_m, \
     .nor_buffer = xg_null_handle_m, \
+    .tan_buffer = xg_null_handle_m, \
+    .bitan_buffer = xg_null_handle_m, \
     .uv_buffer = xg_null_handle_m, \
     .idx_buffer = xg_null_handle_m, \
     .vertex_count = 0, \

@@ -66,6 +66,8 @@ typedef enum {
     xg_cmd_texture_clear_m,
     xg_cmd_texture_depth_stencil_clear_m,
 
+    xg_cmd_buffer_clear_m,
+
     xg_cmd_barrier_set_m,
     xg_cmd_bind_queue_m,
 
@@ -103,6 +105,11 @@ typedef struct {
     xg_texture_h texture;
     xg_depth_stencil_clear_t clear;
 } xg_cmd_texture_depth_stencil_clear_t;
+
+typedef struct {
+    xg_buffer_h buffer;
+    uint32_t clear;
+} xg_cmd_buffer_clear_t;
 
 typedef struct {
     xg_debug_capture_stop_time_e stop_time;
@@ -182,8 +189,9 @@ void xg_cmd_buffer_copy_texture_to_buffer ( xg_cmd_buffer_h buffer, uint64_t key
 // ======================================================================================= //
 void xg_cmd_buffer_barrier_set ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_barrier_set_t* barrier_set );
 void xg_cmd_bind_queue ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_bind_queue_params_t* params );
-void xg_cmd_buffer_texture_clear ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_color_clear_t clear_color );
-void xg_cmd_buffer_texture_depth_stencil_clear ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear_value );
+void xg_cmd_buffer_clear_texture ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_color_clear_t clear_color );
+void xg_cmd_buffer_clear_depth_stencil_texture ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear_value );
+void xg_cmd_buffer_clear_buffer ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_buffer_h buffer, uint32_t clear_value );
 void xg_cmd_buffer_start_debug_capture ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_debug_capture_stop_time_e stop_time );
 void xg_cmd_buffer_stop_debug_capture ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 void xg_cmd_buffer_begin_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const char* name, uint32_t color );

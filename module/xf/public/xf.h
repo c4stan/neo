@@ -345,6 +345,15 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef struct {
+    xg_sampler_filter_e filter;
+} xf_node_copy_pass_params_t;
+
+#define xf_node_copy_pass_params_m( ... ) ( xf_node_copy_pass_params_t ) { \
+    .filter = xg_sampler_filter_point_m, \
+    ##__VA_ARGS__ \
+}
+
 typedef enum {
     xf_texture_clear_color_m,
     xf_texture_clear_depth_stencil_m,
@@ -378,6 +387,7 @@ typedef struct {
     union {
         xf_node_custom_pass_params_t custom;
         xf_node_compute_pass_params_t compute;
+        xf_node_copy_pass_params_t copy;
         xf_node_clear_pass_params_t clear;
     };
 } xf_node_pass_params_t;

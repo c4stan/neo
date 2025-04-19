@@ -57,8 +57,12 @@ void main ( void ) {
             // trace
             vec3 hit_screen_pos;
             float hit_depth;
+            bool hit;
 
-            if ( trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 50 ) ) {
+            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 50 ); 
+            //hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, hemisphere_normal, tex_hiz, sampler_point, 50, 100 ); 
+
+            if ( hit ) {
                 vec3 hit_color = texture ( sampler2D ( tex_lighting, sampler_point ), hit_screen_pos.xy ).xyz;
                 float hit_distance = distance ( view_pos, view_from_depth ( hit_screen_pos.xy, hit_depth ) );
                 sample_colors[ray_it] = hit_color *  dot ( view_normal, hemisphere_normal );

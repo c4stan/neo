@@ -111,15 +111,6 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
         xg->cmd_clear_texture ( cmd_buffer, 2, temp_texture, color_clear );
     }
 
-    {
-        xg_color_clear_t cbuffer_data;
-        cbuffer_data.f32[0] = 0.0;
-        cbuffer_data.f32[1] = 0.0;
-        cbuffer_data.f32[2] = 1.0;
-        xg_buffer_range_t cbuffer_range;
-        cbuffer_range = xg->write_workload_uniform ( workload, &cbuffer_data, sizeof ( cbuffer_data ) );
-    }
-
     xg->cmd_end_debug_region ( cmd_buffer, 4 );
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, temp_texture, xg_resource_cmd_buffer_time_workload_complete_m );

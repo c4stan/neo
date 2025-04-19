@@ -3086,10 +3086,14 @@ void xf_graph_copy_pass_routine ( const xf_node_execute_args_t* node_args, void*
     std_assert_m ( resources->copy_texture_reads_count == resources->copy_texture_writes_count );
 
     for ( uint32_t i = 0; i < resources->copy_texture_writes_count; ++i ) {
+        xf_copy_texture_resource_t src = node_args->io->copy_texture_reads[i];
+        xf_copy_texture_resource_t dst = node_args->io->copy_texture_writes[i];
         xg_texture_copy_params_t copy_params = xg_texture_copy_params_m (
-            .source = xf_copy_texture_resource_m ( node_args->io->copy_texture_reads[i] ),
-            .destination = xf_copy_texture_resource_m ( node_args->io->copy_texture_writes[i] ),
-            .filter = xg_sampler_filter_point_m, // TODO use linear for not same-size textures? expose a param?
+            .source = xf_copy_texture_resource_m ( src ),
+            .destination = xf_copy_texture_resource_m ( dst ),
+            //.filter = xg_sampler_filter_linear_m, // TODO use linear for not same-size textures? expose a param?
+            .filter = pass_args->params->pass.copy.filter,
+            .mip_count = std_min_u32 ( src.view.mip_count, dst.view.mip_count ),
         );
         xg->cmd_copy_texture ( cmd_buffer, key, &copy_params );
     }
