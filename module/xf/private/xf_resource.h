@@ -305,3 +305,6 @@ void xf_resource_physical_texture_remove_ref ( xf_physical_texture_h texture );
 xf_texture_h xf_resource_multi_texture_get_base ( xf_texture_h multi_texture );
 
 bool xf_resource_texture_is_depth ( xf_texture_h texture );
+
+uint32_t xf_resource_texture_list ( xf_texture_h* textures, uint32_t capacity );
+void xf_resource_texture_set_aliasing ( xf_texture_h texture_handle, bool allowed );

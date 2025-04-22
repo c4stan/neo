@@ -146,6 +146,8 @@ bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
 bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state );
 bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state );
 
+void xi_ui_texture ( xi_workload_h workload, xi_texture_state_t* state );
+
 void xi_ui_newline ( void );
 
 uint64_t xi_ui_get_active_id ( void );

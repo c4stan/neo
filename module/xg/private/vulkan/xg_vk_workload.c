@@ -281,12 +281,6 @@ void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
     std_assert_m ( device_context->is_active );
     const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
 
-    std_virtual_heap_free ( device_context->workload_contexts_array );
-    std_virtual_heap_free ( device_context->desc_allocators_array );
-
-    std_virtual_heap_free ( device_context->uniform_buffers_array );
-    std_virtual_heap_free ( device_context->staging_buffers_array );
-
     for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
         xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[i];
 
@@ -314,6 +308,12 @@ void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
     for ( uint32_t i = 0; i < xg_vk_workload_max_desc_allocators_m; ++i ) {
         vkDestroyDescriptorPool ( device->vk_handle, device_context->desc_allocators_array[i].vk_desc_pool, NULL );
     }
+
+    std_virtual_heap_free ( device_context->workload_contexts_array );
+    std_virtual_heap_free ( device_context->desc_allocators_array );
+
+    std_virtual_heap_free ( device_context->uniform_buffers_array );
+    std_virtual_heap_free ( device_context->staging_buffers_array );
 }
 
 static xg_vk_desc_allocator_t* xg_vk_desc_allocator_pop ( xg_device_h device_handle, xg_workload_h workload_handle ) {

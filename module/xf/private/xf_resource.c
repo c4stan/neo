@@ -146,6 +146,13 @@ void xf_resource_texture_get_info ( xf_texture_info_t* info, xf_texture_h textur
     info->allow_aliasing = texture->params.allow_aliasing;
     info->debug_name = texture->params.debug_name;
     info->view_access = texture->params.view_access;
+
+    xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( texture_handle );
+    if ( physical_texture ) {
+        info->xg_handle = physical_texture->handle;
+    } else {
+        info->xg_handle = xg_null_handle_m;
+    }
 }
 
 bool xf_resource_texture_is_multi ( xf_texture_h texture_handle ) {
@@ -928,4 +935,20 @@ xf_texture_h xf_resource_multi_texture_get_base ( xf_texture_h multi_texture_han
     subtexture_index = ( subtexture_index + multi_texture->index ) % multi_texture->params.multi_texture_count;
     xf_texture_h texture_handle = multi_texture->textures[subtexture_index];
     return texture_handle;
+}
+
+uint32_t xf_resource_texture_list ( xf_texture_h* textures, uint32_t capacity ) {
+    uint64_t idx = 0;
+    uint32_t i = 0;
+    while ( std_bitset_scan ( &idx, xf_resource_state->textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_textures_m ) ) ) {
+        textures[i++] = idx;
+        ++idx;
+    }
+
+    return idx;
+}
+
+void xf_resource_texture_set_aliasing ( xf_texture_h texture_handle, bool allowed ) {
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    texture->params.allow_aliasing = allowed;
 }

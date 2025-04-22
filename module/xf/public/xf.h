@@ -515,6 +515,7 @@ typedef struct {
     xg_sample_count_e sample_count;
     xg_texture_view_access_e view_access;
     bool allow_aliasing;
+    xg_texture_h xg_handle;
     const char* debug_name;
 } xf_texture_info_t;
 
@@ -589,6 +590,6 @@ typedef struct {
 
     const uint64_t* ( *get_graph_timings ) ( xf_graph_h graph );
 
-    // TODO remove this
-    xf_texture_h ( *get_base_texture ) ( xf_texture_h multi_texture );
+    uint32_t ( *list_textures ) ( xf_texture_h* textures, uint32_t capacity );
+    void ( *set_texture_aliasing ) ( xf_texture_h texture, bool allowed );
 } xf_i;

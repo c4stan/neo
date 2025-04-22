@@ -4,7 +4,7 @@
 #define xs_shader_binding_set_dispatch_m    3
 
 ////////
-// Means that all uniform/storage matrix data is loaded in as-is (assuming calling code is C-like and therefore row-major)
+// Means that all uniform/storage matrix data is treated as row-majow (which is the default in C-like code)
 // https://www.khronos.org/opengl/wiki/Interface_Block_(GLSL)#Matrix_storage_order
 // NOTE: remember that in glsl
 // - mat4x3 is a matrix with 4 columns and 3 rows

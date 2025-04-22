@@ -41,7 +41,9 @@ static void xf_api_init ( xf_i* xf ) {
     xf->get_graph_timings = xf_graph_get_timings;
 
     xf->debug_print_graph = xf_graph_debug_print;
-    xf->get_base_texture = xf_resource_multi_texture_get_base;
+
+    xf->list_textures = xf_resource_texture_list;
+    xf->set_texture_aliasing = xf_resource_texture_set_aliasing;
 }
 
 void* xf_load ( void* std_runtime ) {

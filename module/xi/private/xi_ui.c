@@ -375,15 +375,34 @@ static bool xi_ui_release_hovered ( uint64_t id ) {
     return false;
 }
 
+static void xi_ui_draw_rect_textured ( xi_workload_h workload, xi_color_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint64_t sort_order, xg_texture_h texture ) {
+    xi_draw_rect_t rect = xi_draw_rect_m (
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height,
+        .color = color,
+        .sort_order = sort_order,
+        .scissor = xi_ui_state->active_scissor,
+        .texture = texture,
+        .uv0[0] = 0,
+        .uv0[1] = 0,
+        .uv1[0] = 1,
+        .uv1[1] = 1,
+    );
+    xi_workload_cmd_draw ( workload, &rect, 1 );
+}
+
 static void xi_ui_draw_rect ( xi_workload_h workload, xi_color_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint64_t sort_order ) {
-    xi_draw_rect_t rect = xi_default_draw_rect_m;
-    rect.x = x;
-    rect.y = y;
-    rect.width = width;
-    rect.height = height;
-    rect.color = color;
-    rect.sort_order = sort_order;
-    rect.scissor = xi_ui_state->active_scissor;
+    xi_draw_rect_t rect = xi_draw_rect_m (
+        .x = x,
+        .y = y,
+        .width = width,
+        .height = height,
+        .color = color,
+        .sort_order = sort_order,
+        .scissor = xi_ui_state->active_scissor,
+    );
     xi_workload_cmd_draw ( workload, &rect, 1 );
 }
 
@@ -416,7 +435,7 @@ static uint32_t xi_ui_draw_string2 ( xi_workload_h workload, xi_font_h font, xi_
     for ( uint32_t i = 0; i < len; ++i ) {
         xi_font_char_box_t box = xi_font_char_box_get ( &fx, &fy, font, text[i] );
 
-        xi_draw_rect_t rect = xi_default_draw_rect_m;
+        xi_draw_rect_t rect = xi_draw_rect_m();
         //rect.x = x + x_offset;
         //rect.y = y + ( font_info.pixel_height - box.height ) * scale;
         //rect.width = box.width * scale;
@@ -462,7 +481,7 @@ static uint32_t xi_ui_draw_string ( xi_workload_h workload, xi_font_h font, cons
     for ( uint32_t i = 0; i < len; ++i ) {
         xi_font_char_box_t box = xi_font_char_box_get ( &fx, &fy, font, text[i] );
 
-        xi_draw_rect_t rect = xi_default_draw_rect_m;
+        xi_draw_rect_t rect = xi_draw_rect_m();
         //rect.x = x + x_offset;
         //rect.y = y + ( font_info.pixel_height - box.height ) * scale;
         //rect.width = box.width * scale;
@@ -1256,6 +1275,20 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     uint32_t x_offset = range * state->value + padding;
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.5f ), x, y, state->width, state->height, state->sort_order );
     xi_ui_draw_rect ( workload, style.color, x + x_offset, y + padding, handle_width, state->height - padding * 2, state->sort_order );
+}
+
+void xi_ui_texture ( xi_workload_h workload, xi_texture_state_t* state ) {
+    xi_style_t style = xi_ui_inherit_style ( &state->style );
+
+    uint32_t width = state->width;
+    uint32_t height = state->height;
+
+    uint32_t x, y;
+    if ( !xi_ui_layer_add_element (&x, &y, width, height, &style ) ) {
+        return;
+    }
+
+    xi_ui_draw_rect_textured ( workload, xi_color_rgba_u32_m ( 255, 255, 255, 255 ), x, y, width, height, state->sort_order, state->handle );
 }
 
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {

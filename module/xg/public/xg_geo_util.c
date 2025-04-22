@@ -15,10 +15,6 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
     float* pos = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
     float* nor = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
     float* uv = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 2 );
-    //std_alloc_t tan_alloc = std_virtual_heap_alloc ( sizeof ( float ) * vertex_capacity * 3, 16 );
-    //float* pos = ( float* ) pos_alloc.buffer.base;
-    //float* nor = ( float* ) nor_alloc.buffer.base;
-    //float* tang = ( float* ) tan_alloc.buffer.base;
     uint32_t vert_count = 0;
 
     for ( uint32_t i = 0; i <= parallels_count; ++i ) {
@@ -51,7 +47,6 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
 
     // ibuffer
     uint32_t* idx = std_virtual_heap_alloc_array_m ( uint32_t, parallels_count * meridians_count * 6 );
-    //uint32_t* idx =  ( uint32_t* ) idx_alloc.buffer.base;
     uint32_t idx_count = 0;
 
     for ( uint32_t i = 0; i < parallels_count; ++i ) {
@@ -220,125 +215,6 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_plane ( float side ) {
 xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h device, const xg_geo_util_geometry_data_t* geo ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
-#if 0
-    xg_buffer_params_t pos_staging_params = xg_buffer_params_m (
-        .memory_type = xg_memory_type_upload_m,
-        .device = device,
-        .size = geo->vertex_count * sizeof ( float ) * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-        .debug_name = "staging temp buffer",
-    );
-    xg_buffer_h pos_staging = xg->create_buffer ( &pos_staging_params );
-
-    xg_buffer_params_t nor_staging_params = xg_buffer_params_m (
-        .memory_type = xg_memory_type_upload_m,
-        .device = device,
-        .size = geo->vertex_count * sizeof ( float ) * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-        .debug_name = "staging temp buffer",
-    );
-    xg_buffer_h nor_staging = xg->create_buffer ( &nor_staging_params );
-
-    xg_buffer_params_t uv_staging_params = xg_buffer_params_m (
-        .memory_type = xg_memory_type_upload_m,
-        .device = device,
-        .size = geo->vertex_count * sizeof ( float ) * 2,
-        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-        .debug_name = "staging temp buffer",
-    );
-    xg_buffer_h uv_staging = xg->create_buffer ( &uv_staging_params );
-
-    xg_buffer_params_t idx_staging_params = xg_buffer_params_m (
-        .memory_type = xg_memory_type_upload_m,
-        .device = device,
-        .size = geo->index_count * sizeof ( uint32_t ),
-        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-        .debug_name = "staging temp buffer",
-    );
-    xg_buffer_h idx_staging = xg->create_buffer ( &idx_staging_params );
-
-    xg_buffer_info_t pos_staging_info;
-    xg->get_buffer_info ( &pos_staging_info, pos_staging );
-    float* pos_buffer_data = ( float* ) pos_staging_info.allocation.mapped_address;
-
-    xg_buffer_info_t nor_staging_info;
-    xg->get_buffer_info ( &nor_staging_info, nor_staging );
-    float* nor_buffer_data = ( float* ) nor_staging_info.allocation.mapped_address;
-
-    xg_buffer_info_t uv_staging_info;
-    xg->get_buffer_info ( &uv_staging_info, uv_staging );
-    float* uv_buffer_data = ( float* ) uv_staging_info.allocation.mapped_address;
-
-    xg_buffer_info_t idx_staging_info;
-    xg->get_buffer_info ( &idx_staging_info, idx_staging );
-    uint32_t* idx_buffer_data = ( uint32_t* ) idx_staging_info.allocation.mapped_address;
-
-    for ( uint64_t i = 0; i < geo->vertex_count; ++i ) {
-        pos_buffer_data[i * 3 + 0] = geo->pos[i * 3 + 0];
-        pos_buffer_data[i * 3 + 1] = geo->pos[i * 3 + 1];
-        pos_buffer_data[i * 3 + 2] = geo->pos[i * 3 + 2];
-
-        nor_buffer_data[i * 3 + 0] = geo->nor[i * 3 + 0];
-        nor_buffer_data[i * 3 + 1] = geo->nor[i * 3 + 1];
-        nor_buffer_data[i * 3 + 2] = geo->nor[i * 3 + 2];
-    
-        uv_buffer_data[i * 2 + 0] = geo->uv[i * 2 + 0];
-        uv_buffer_data[i * 2 + 1] = geo->uv[i * 2 + 1];
-    }
-
-    for ( uint64_t i = 0; i < geo->index_count; ++i ) {
-        idx_buffer_data[i] = geo->idx[i];
-    }
-
-    xg_workload_h workload = xg->create_workload ( device );
-    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-
-    // TODO make separate temporary buffers for pos and idx with the additional xg_buffer_usage_bit_raytrace_geometry_buffer_m flag? what's the additional cost?
-    xg_buffer_h pos_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_only_m,
-        .device = device,
-        .size = geo->vertex_count * sizeof ( float ) * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "vbuffer_pos",
-    ), NULL );
-
-    xg_buffer_h nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_only_m,
-        .device = device,
-        .size = geo->vertex_count * sizeof ( float ) * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m,
-        .debug_name = "vbuffer_nor",
-    ), NULL );
-
-    xg_buffer_h uv_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_only_m,
-        .device = device,
-        .size = geo->vertex_count * sizeof ( float ) * 2,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m,
-        .debug_name = "vbuffer_uv",
-    ), NULL );
-
-    xg_buffer_h idx_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .memory_type = xg_memory_type_gpu_only_m,
-        .device = device,
-        .size = geo->index_count * sizeof ( uint32_t ),
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_index_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "ibuffer",
-    ), NULL );
-
-    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = pos_staging, .destination = pos_buffer ) );
-    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = nor_staging, .destination = nor_buffer ) );
-    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source =  uv_staging, .destination =  uv_buffer ) );
-    xg->cmd_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m ( .source = idx_staging, .destination = idx_buffer ) );
-
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, pos_staging, xg_resource_cmd_buffer_time_workload_complete_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, nor_staging, xg_resource_cmd_buffer_time_workload_complete_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer,  uv_staging, xg_resource_cmd_buffer_time_workload_complete_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, idx_staging, xg_resource_cmd_buffer_time_workload_complete_m );
-
-    xg->submit_workload ( workload );
-#else
     xg_workload_h workload = xg->create_workload ( device );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
@@ -403,16 +279,16 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
     ) );
 
     xg->submit_workload ( workload );
-#endif
 
-    xg_geo_util_geometry_gpu_data_t result;
-    result.device = device;
-    result.pos_buffer = pos_buffer;
-    result.nor_buffer = nor_buffer;
-    result.tan_buffer = tan_buffer;
-    result.bitan_buffer = bitan_buffer;
-    result.uv_buffer = uv_buffer;
-    result.idx_buffer = idx_buffer;
+    xg_geo_util_geometry_gpu_data_t result = {
+        .device = device,
+        .pos_buffer = pos_buffer,
+        .nor_buffer = nor_buffer,
+        .tan_buffer = tan_buffer,
+        .bitan_buffer = bitan_buffer,
+        .uv_buffer = uv_buffer,
+        .idx_buffer = idx_buffer,
+    };
     return result;
 }
 

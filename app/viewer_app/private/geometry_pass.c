@@ -142,8 +142,8 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
         xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
             .pipeline = pipeline_state,
             .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings,
-            .index_buffer = mesh_component->idx_buffer,
-            .primitive_count = mesh_component->index_count / 3,
+            .index_buffer = mesh_component->geo_gpu_data.idx_buffer,
+            .primitive_count = mesh_component->geo_data.index_count / 3,
             .vertex_buffers_count = 5,
             .vertex_buffers = { 
                 mesh_component->geo_gpu_data.pos_buffer, 
@@ -281,10 +281,10 @@ static void object_id_pass ( const xf_node_execute_args_t* node_args, void* user
         xg->cmd_draw ( cmd_buffer, key, &xg_cmd_draw_params_m (
             .pipeline = pipeline_state,
             .bindings[xg_shader_binding_set_dispatch_m] = draw_bindings,
-            .index_buffer = mesh_component->idx_buffer,
-            .primitive_count = mesh_component->index_count / 3,
+            .index_buffer = mesh_component->geo_gpu_data.idx_buffer,
+            .primitive_count = mesh_component->geo_data.index_count / 3,
             .vertex_buffers_count = 1,
-            .vertex_buffers = { mesh_component->pos_buffer },
+            .vertex_buffers = { mesh_component->geo_gpu_data.pos_buffer },
         ) );
     }
 }

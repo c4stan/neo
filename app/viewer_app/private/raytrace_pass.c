@@ -55,9 +55,9 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     for ( uint32_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_buffer_info_t pos_buffer_info, nor_buffer_info, idx_buffer_info;
-        xg->get_buffer_info ( &pos_buffer_info, mesh_component->pos_buffer );
-        xg->get_buffer_info ( &nor_buffer_info, mesh_component->nor_buffer );
-        xg->get_buffer_info ( &idx_buffer_info, mesh_component->idx_buffer );
+        xg->get_buffer_info ( &pos_buffer_info, mesh_component->geo_gpu_data.pos_buffer );
+        xg->get_buffer_info ( &nor_buffer_info, mesh_component->geo_gpu_data.nor_buffer );
+        xg->get_buffer_info ( &idx_buffer_info, mesh_component->geo_gpu_data.idx_buffer );
 
         instances[i].pos_buffer = pos_buffer_info.gpu_address;
         instances[i].nor_buffer = nor_buffer_info.gpu_address;

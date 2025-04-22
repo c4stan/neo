@@ -18,6 +18,7 @@ vec3 linear_to_srgb ( vec3 color ) {
 void main() {
     vec4 tex = texture ( sampler2D ( tex_color, tex_sampler ), in_uv ).xyzw;
     vec4 color = in_color * tex;
+    // TODO do this in a final full screen pass, otherwise alpha blended UI is broken
     color.rgb = linear_to_srgb ( color.rgb );
     out_color = color;
 }

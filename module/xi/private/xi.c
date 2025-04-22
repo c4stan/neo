@@ -48,6 +48,7 @@ static void xi_api_init ( xi_i* xi ) {
     xi->add_select = xi_ui_select;
     xi->add_textfield  = xi_ui_textfield;
     xi->add_property_editor = xi_ui_property_editor;
+    xi->add_texture = xi_ui_texture;
 
     xi->newline = xi_ui_newline;
 

@@ -330,6 +330,23 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef struct {
+    xg_texture_h handle;
+    uint32_t width;
+    uint32_t height;
+    uint64_t sort_order;
+    xi_style_t style;
+} xi_texture_state_t;
+
+#define xi_texture_state_m( ... ) ( xi_texture_state_t ) { \
+    .handle = xg_null_handle_m, \
+    .width = 0, \
+    .height = 0, \
+    .sort_order = 0, \
+    .style = xi_null_style_m(), \
+    ##__VA_ARGS__ \
+}
+
 typedef enum {
     xi_property_f32_m,
     xi_property_u32_m,
@@ -502,6 +519,8 @@ typedef struct {
     bool ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
     bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
     bool ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
+
+    void ( *add_texture )   ( xi_workload_h workload, xi_texture_state_t* state );
 
     void ( *init_geos )     ( xg_device_h device );
     void ( *draw_line )     ( xi_workload_h workload, xi_line_state_t* state );

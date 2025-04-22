@@ -155,9 +155,9 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
                     .pipeline = pipeline_state,
                     .bindings = { xg_null_handle_m, pass_bindings, xg_null_handle_m, draw_bindings },
                     .vertex_buffers_count = 2,
-                    .vertex_buffers = { mesh_component->pos_buffer, mesh_component->nor_buffer },
-                    .index_buffer = mesh_component->idx_buffer,
-                    .primitive_count = mesh_component->index_count / 3,
+                    .vertex_buffers = { mesh_component->geo_gpu_data.pos_buffer, mesh_component->geo_gpu_data.nor_buffer },
+                    .index_buffer = mesh_component->geo_gpu_data.idx_buffer,
+                    .primitive_count = mesh_component->geo_data.index_count / 3,
                 ) );
             }
         }

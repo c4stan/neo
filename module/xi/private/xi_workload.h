@@ -26,7 +26,7 @@ typedef struct {
     xi_scissor_h scissor;
 } xi_draw_rect_t;
 
-#define xi_default_draw_rect_m ( xi_draw_rect_t ) { \
+#define xi_draw_rect_m( ... ) ( xi_draw_rect_t ) { \
     .x = 0, \
     .y = 0, \
     .width = 0, \
@@ -38,6 +38,7 @@ typedef struct {
     .uv1 = { 0, 0 }, \
     .sort_order = 0, \
     .scissor = xi_null_scissor_m, \
+    ##__VA_ARGS__ \
 }
 
 typedef struct {

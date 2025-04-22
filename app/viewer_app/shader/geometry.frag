@@ -33,8 +33,8 @@ layout ( location = 3 ) out vec2 out_vel;
 
 void main() {
     // color
-    vec4 texture_color = texture ( sampler2D ( color_texture, sampler_linear ), in_uv );
-    out_color = vec4 ( draw_uniforms.color * texture_color.xyz, draw_uniforms.metalness );
+    vec4 color_sample = texture ( sampler2D ( color_texture, sampler_linear ), in_uv );
+    out_color = vec4 ( draw_uniforms.color * color_sample.xyz, draw_uniforms.metalness * color_sample.w );
     
     // normals
 #if 0
@@ -44,15 +44,15 @@ void main() {
     vec4 normal_sample = texture ( sampler2D ( normal_texture, sampler_linear ), in_uv );
     vec3 normal = normal_sample.xyz * 2 - 1;
     mat3 tbn = mat3 ( in_t, in_b, in_n );
-    //tbn = transpose ( tbn );
     normal = normalize ( tbn * normal );
-    normal = ( frame_uniforms.view_from_world * vec4 ( normal, 0 ) ).xyz;
-    out_nor = vec4 ( normal * 0.5 + 0.5, draw_uniforms.roughness );
+    normal = normalize ( ( frame_uniforms.view_from_world * vec4 ( normal, 0 ) ).xyz );
+    out_nor = vec4 ( normal * 0.5 + 0.5, draw_uniforms.roughness * normal_sample.w );
 #endif
 
     // obj id
     uint tri_id = gl_PrimitiveID;
-    out_id = uvec4 ( draw_uniforms.object_id, tri_id >> 8, tri_id & 0xff, 0 );
+    uint object_id = draw_uniforms.object_id;
+    out_id = uvec4 ( object_id >> 8, object_id & 0xff, tri_id >> 8, tri_id & 0xff );
     
     // velocity
     vec2 curr_vel_pos = in_curr_clip_pos.xy / in_curr_clip_pos.w;

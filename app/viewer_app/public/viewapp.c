@@ -950,12 +950,12 @@ static void viewapp_build_mesh_raytrace_geo ( se_entity_h entity, viewapp_mesh_c
     se->get_entity_properties ( &entity_properties, entity );
 
     xg_raytrace_geometry_data_t rt_data = xg_raytrace_geometry_data_m (
-        .vertex_buffer = mesh->pos_buffer,
+        .vertex_buffer = mesh->geo_gpu_data.pos_buffer,
         .vertex_format = xg_format_r32g32b32_sfloat_m,
-        .vertex_count = mesh->vertex_count,
+        .vertex_count = mesh->geo_data.vertex_count,
         .vertex_stride = 12,
-        .index_buffer = mesh->idx_buffer,
-        .index_count = mesh->index_count,
+        .index_buffer = mesh->geo_gpu_data.idx_buffer,
+        .index_count = mesh->geo_data.index_count,
     );
     std_str_copy_static_m ( rt_data.debug_name, entity_properties.name );
 
@@ -1107,12 +1107,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1191,12 +1185,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
@@ -1261,12 +1249,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             .object_id_pipeline = object_id_pipeline_state,
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1366,12 +1348,6 @@ static void viewapp_boot_scene_field ( void ) {
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .object_id_pipeline = object_id_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
@@ -1417,12 +1393,6 @@ static void viewapp_boot_scene_field ( void ) {
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .object_id_pipeline = object_id_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
@@ -1473,12 +1443,6 @@ static void viewapp_boot_scene_field ( void ) {
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .object_id_pipeline = object_id_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1562,12 +1526,6 @@ static void viewapp_boot_scene_field ( void ) {
             .geometry_pipeline = geometry_pipeline_state,
             .shadow_pipeline = shadow_pipeline_state,
             .object_id_pipeline = object_id_pipeline_state,
-            .pos_buffer = gpu_data.pos_buffer,
-            .nor_buffer = gpu_data.nor_buffer,
-            .uv_buffer = gpu_data.uv_buffer,
-            .idx_buffer = gpu_data.idx_buffer,
-            .vertex_count = geo.vertex_count,
-            .index_count = geo.index_count,
             .object_id = m_state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = { 
@@ -1701,7 +1659,7 @@ static void viewapp_create_cameras ( void ) {
 #include <xg_enum.h>
 
 typedef struct {
-    void* data;
+    char* data;
     uint32_t width;
     uint32_t height;
     uint32_t channels;
@@ -1900,24 +1858,24 @@ static void viewapp_import_scene ( const char* input_path ) {
                     mesh_material.base_color[2] = diffuse.b;
                 }
 
+                viewapp_texture_t color_texture = {};
                 struct aiString color_texture_name;
                 if ( aiGetMaterialTexture ( material, aiTextureType_DIFFUSE, 0, &color_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
                     char texture_path[256];
                     std_path_normalize ( texture_path, 256, input_path );
                     size_t len = std_path_pop ( texture_path );
                     std_path_append ( texture_path, 256 - len, color_texture_name.data );
-                    viewapp_texture_t texture = viewapp_import_texture ( scene, texture_path );
-                    mesh_material.color_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &texture, std_path_name_ptr ( texture_path ) );
+                    color_texture = viewapp_import_texture ( scene, texture_path );
                 }
 
+                viewapp_texture_t normal_texture = {};
                 struct aiString normal_texture_name;
                 if ( aiGetMaterialTexture ( material, aiTextureType_NORMALS, 0, &normal_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
                     char texture_path[256];
                     std_path_normalize ( texture_path, 256, input_path );
                     size_t len = std_path_pop ( texture_path );
                     std_path_append ( texture_path, 256 - len, normal_texture_name.data );
-                    viewapp_texture_t texture = viewapp_import_texture ( scene, texture_path );
-                    mesh_material.normal_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &texture, std_path_name_ptr ( texture_path ) );
+                    normal_texture = viewapp_import_texture ( scene, texture_path );
                 }
 
                 struct aiString metalness_texture_name;
@@ -1926,6 +1884,35 @@ static void viewapp_import_scene ( const char* input_path ) {
                 bool has_roughness = aiGetMaterialTexture ( material, AI_MATKEY_ROUGHNESS_TEXTURE, &roughness_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS;
                 if ( has_roughness && has_metalness ) {
                     std_assert_m ( std_str_cmp ( metalness_texture_name.data, roughness_texture_name.data ) == 0 );
+                    char texture_path[256];
+                    std_path_normalize ( texture_path, 256, input_path );
+                    size_t len = std_path_pop ( texture_path );
+                    std_path_append ( texture_path, 256 - len, roughness_texture_name.data );
+                    viewapp_texture_t material_texture = viewapp_import_texture ( scene, texture_path );
+                    
+                    for ( uint32_t i = 0; i < material_texture.width * material_texture.height; ++i ) {
+                        char metalness = material_texture.data[i * 2 + 0];
+                        char roughness = material_texture.data[i * 2 + 1];
+
+                        if ( color_texture.data ) {
+                            color_texture.data[i * 4 + 3] = metalness;
+                        }
+                        if ( normal_texture.data ) {
+                            normal_texture.data[i * 4 + 3] = roughness;
+                        }
+                    }
+
+                    std_virtual_heap_free ( material_texture.data );
+                }
+
+                if ( color_texture.data ) {
+                    mesh_material.color_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &color_texture, color_texture_name.data );
+                    std_virtual_heap_free ( color_texture.data );
+                }
+
+                if ( normal_texture.data ) {
+                    mesh_material.normal_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &normal_texture, normal_texture_name.data );
+                    std_virtual_heap_free ( normal_texture.data );
                 }
 
                 aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );
@@ -1938,12 +1925,6 @@ static void viewapp_import_scene ( const char* input_path ) {
                 .object_id_pipeline = object_id_pipeline_state,
                 .geometry_pipeline = geometry_pipeline_state,
                 .shadow_pipeline = shadow_pipeline_state,
-                .pos_buffer = gpu_data.pos_buffer,
-                .nor_buffer = gpu_data.nor_buffer,
-                .uv_buffer = gpu_data.uv_buffer,
-                .idx_buffer = gpu_data.idx_buffer,
-                .vertex_count = geo.vertex_count,
-                .index_count = geo.index_count,
                 .object_id = m_state->render.next_object_id++,
                 .material = mesh_material,
             );
@@ -2241,6 +2222,7 @@ static void viewapp_boot ( void ) {
         m_state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
         m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
         m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
+        m_state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
     }
 
     viewapp_boot_workload_resources_layout();
@@ -2496,12 +2478,6 @@ static void spawn_sphere ( void ) {
         .object_id_pipeline = object_id_pipeline_state,
         .geometry_pipeline = geometry_pipeline_state,
         .shadow_pipeline = shadow_pipeline_state,
-        .pos_buffer = gpu_data.pos_buffer,
-        .nor_buffer = gpu_data.nor_buffer,
-        .uv_buffer = gpu_data.uv_buffer,
-        .idx_buffer = gpu_data.idx_buffer,
-        .vertex_count = geo.vertex_count,
-        .index_count = geo.index_count,
         .object_id = m_state->render.next_object_id++,
         .material = viewapp_material_data_m (
             .base_color = { 
@@ -2672,21 +2648,21 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     // frame
     xi->begin_section ( xi_workload, &m_state->ui.frame_section_state );
     {
-        xi_label_state_t frame_id_label = xi_label_state_m ( .text = "frame id:" );
+        xi_label_state_t frame_id_label = xi_label_state_m ( .text = "frame id" );
         xi_label_state_t frame_id_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
         std_u32_to_str ( frame_id_value.text, xi_label_text_size, m_state->render.frame_id, 0 );
         xi->add_label ( xi_workload, &frame_id_label );
         xi->add_label ( xi_workload, &frame_id_value );
         xi->newline();
 
-        xi_label_state_t frame_time_label = xi_label_state_m ( .text = "frame time:" );
+        xi_label_state_t frame_time_label = xi_label_state_m ( .text = "frame time" );
         xi_label_state_t frame_time_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
         std_f32_to_str ( m_state->render.delta_time_ms, frame_time_value.text, xi_label_text_size );
         xi->add_label ( xi_workload, &frame_time_label );
         xi->add_label ( xi_workload, &frame_time_value );
         xi->newline();
 
-        xi_label_state_t fps_label = xi_label_state_m ( .text = "fps:" );
+        xi_label_state_t fps_label = xi_label_state_m ( .text = "fps" );
         xi_label_state_t fps_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
         float fps = 1000.f / m_state->render.delta_time_ms;
         std_f32_to_str ( fps, fps_value.text, xi_label_text_size );
@@ -2911,6 +2887,52 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
     xi->end_section ( xi_workload );
 
+    // xf textures
+    xi->begin_section ( xi_workload, &m_state->ui.xf_textures_state );
+    {
+        xf_texture_h textures_array[64];
+        uint32_t textures_count = xf->list_textures ( textures_array, 64 );
+
+        static bool show[64] = { 0 };
+
+        for ( uint32_t i = 0; i < textures_count; ++i ) {
+            xf_texture_info_t info;
+            xf->get_texture_info ( &info, textures_array[i] );
+            xi_label_state_t label = xi_label_state_m ();
+            std_str_copy_static_m ( label.text, info.debug_name );
+            xi->add_label ( xi_workload, &label );
+            xi_switch_state_t show_switch = xi_switch_state_m (
+                .width = 14,
+                .height = 14,
+                .value = show[i],
+                .style = xi_style_m (
+                    //.horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+                ),
+            );
+            xi->add_switch ( xi_workload, &show_switch );
+
+            if ( show_switch.value ) {
+                uint32_t width = 256;
+                xi->newline();
+                xi->add_texture ( xi_workload, &xi_texture_state_m (
+                    .handle = info.xg_handle,
+                    .width = width * ( ( float ) info.width / info.height ),
+                    .height = width,
+                ) );                
+            }
+
+            if ( show_switch.value != show[i] ) {
+                xf->set_texture_aliasing ( info.xg_handle, !show_switch.value );
+                m_state->reload = true;
+                std_log_info_m ( "reload" );
+            }
+
+            show[i] = show_switch.value;
+            xi->newline();
+        }
+    }
+    xi->end_section ( xi_workload );
+
     // se entities
     bool entity_edit = false;
     xi->begin_section ( xi_workload, &m_state->ui.entities_section_state );
@@ -3128,7 +3150,7 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
-    float target_fps = 30.f;
+    float target_fps = 160.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;
@@ -3257,6 +3279,10 @@ static std_app_state_e viewapp_update ( void ) {
 
     xs->update_pipeline_states ( workload );
     //xf->destroy_unreferenced_resources();
+
+    std_tick_t update_tick = std_tick_now();
+    float update_ms = std_tick_to_milli_f32 ( update_tick - new_tick );
+    m_state->render.update_time_ms = update_ms;
 
     return std_app_state_tick_m;
 }

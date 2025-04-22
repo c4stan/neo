@@ -59,6 +59,7 @@ typedef struct {
     bool capture_frame;
     float time_ms;
     float delta_time_ms;
+    float update_time_ms;
     std_tick_t frame_tick;
 
     uint32_t next_object_id;
@@ -93,6 +94,7 @@ typedef struct {
     .capture_frame = false, \
     .time_ms = 0, \
     .delta_time_ms = 0, \
+    .update_time_ms = 0, \
     .next_object_id = 1, \
     .window = wm_null_handle_m, \
     .device = xg_null_handle_m, \
@@ -121,6 +123,7 @@ typedef struct {
     xi_section_state_t xf_graph_section_state;
     xi_section_state_t scene_section_state;
     xi_section_state_t entities_section_state;
+    xi_section_state_t xf_textures_state;
 
     se_entity_h mouse_pick_entity;
 } viewapp_ui_state_t;
@@ -188,18 +191,9 @@ typedef struct {
     xs_database_pipeline_h object_id_pipeline;
     xs_database_pipeline_h geometry_pipeline;
     xs_database_pipeline_h shadow_pipeline;
-    xg_buffer_h pos_buffer;
-    xg_buffer_h nor_buffer;
-    xg_buffer_h tan_buffer;
-    xg_buffer_h bitan_buffer;
-    xg_buffer_h uv_buffer;
-    xg_buffer_h idx_buffer;
-    uint32_t vertex_count;
-    uint32_t index_count;
     viewapp_transform_component_t prev_transform;
     uint32_t object_id;
     viewapp_material_data_t material;
-
     xg_raytrace_geometry_h rt_geo;
     uint32_t rt_instance_id;
 } viewapp_mesh_component_t;
@@ -210,14 +204,6 @@ typedef struct {
     .object_id_pipeline = xs_null_handle_m, \
     .geometry_pipeline = xs_null_handle_m, \
     .shadow_pipeline = xs_null_handle_m, \
-    .pos_buffer = xg_null_handle_m, \
-    .nor_buffer = xg_null_handle_m, \
-    .tan_buffer = xg_null_handle_m, \
-    .bitan_buffer = xg_null_handle_m, \
-    .uv_buffer = xg_null_handle_m, \
-    .idx_buffer = xg_null_handle_m, \
-    .vertex_count = 0, \
-    .index_count = 0, \
     .prev_transform = viewapp_transform_component_m(), \
     .object_id = 0, \
     .material = viewapp_material_data_m(), \

@@ -35,12 +35,16 @@ void main ( void ) {
     vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy;
 
     // Reproject
+#if 0
+    vec3 view = view_from_depth ( screen_uv, depth );
+    vec3 world = ( frame_uniforms.world_from_view * vec4 ( view, 1 ) ).xyz;
+    vec3 prev_screen = prev_screen_from_world ( world );
+    vec2 screen_offset = prev_screen.xy - screen_uv;
+    vec2 reprojected_uv = screen_uv + screen_offset;
+#else
     vec2 jitter = vec2 ( frame_uniforms.jittered_proj_from_view[2][0], frame_uniforms.jittered_proj_from_view[2][1] );
-    //vec3 view = view_from_depth ( screen_uv, depth );
-    //vec3 world = ( frame_uniforms.world_from_view * vec4 ( view, 1 ) ).xyz;
-    //vec3 prev_screen = prev_screen_from_world ( world );
-    //vec2 screen_offset = prev_screen.xy - screen_uv;
     vec2 reprojected_uv = screen_uv - velocity - jitter / 2;
+#endif
 
 #if 1
     // Sample history
@@ -133,6 +137,11 @@ void main ( void ) {
     luma_diff *= luma_diff;
     blend_factor *= luma_diff;
 #endif
+
+    // Reject history if not valid
+    if ( any ( lessThan ( reprojected_uv, vec2 ( 0 ) ) ) || any ( greaterThan ( reprojected_uv, vec2 ( 1 ) ) ) ) {
+        blend_factor = vec3 ( 1.0 );
+    }
 
     // Blend
     vec3 blend = mix ( history, color, blend_factor );

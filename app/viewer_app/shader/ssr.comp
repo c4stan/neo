@@ -113,12 +113,13 @@ void main ( void ) {
             sample thickness from the SSR shader to determine proper thickness value
     */
 
+    // TODO SSR flag
     if ( depth < 1 && roughness < 1 ) {
         vec3 hit_screen_pos;
         float hit_depth;
         bool hit;
 
-        if ( roughness < 0.09 ) {
+        if ( roughness < 1.09 ) {
             hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 200 );
         } else {
             hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 20 );
