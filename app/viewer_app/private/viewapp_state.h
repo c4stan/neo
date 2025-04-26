@@ -85,6 +85,11 @@ typedef struct {
     xg_resource_bindings_layout_h workload_bindings_layout;
 
     bool graph_reload;
+    bool allow_graph_aliasing;
+
+    xg_texture_h xg_export_texture;
+    xf_texture_h xf_export_texture;
+    xf_texture_h exported_texture;
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
@@ -108,6 +113,10 @@ typedef struct {
     .window_info = {}, \
     .input_state = {}, \
     .frame_tick = 0, \
+    .allow_graph_aliasing = true, \
+    .xg_export_texture = xg_null_handle_m, \
+    .xf_export_texture = xf_null_handle_m, \
+    .exported_texture = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
 
@@ -125,6 +134,12 @@ typedef struct {
     xi_section_state_t entities_section_state;
     xi_section_state_t xf_textures_state;
 
+    uint64_t expanded_nodes_bitset[1];
+
+    bool debug_textures_state[64];
+    xf_texture_h debug_textures_array[32];
+    uint32_t debug_textures_count;
+
     se_entity_h mouse_pick_entity;
 } viewapp_ui_state_t;
 
@@ -136,6 +151,7 @@ typedef struct {
     .xg_alloc_section_state = xi_section_state_m(), \
     .xf_graph_section_state = xi_section_state_m(), \
     .entities_section_state = xi_section_state_m(), \
+    .debug_textures_count = 0, \
     .mouse_pick_entity = se_null_handle_m, \
     ##__VA_ARGS__ \
 }

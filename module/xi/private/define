@@ -1,6 +1,6 @@
 xi_ui_max_layers_m 32
 
-xi_workload_max_rects_m 1024 * 2
+xi_workload_max_rects_m 1024 * 8
 xi_workload_max_tris_m 1024 * 2
 xi_workload_max_meshes_m 32
 xi_workload_max_workloads_m 8

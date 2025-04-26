@@ -43,7 +43,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->debug_print_graph = xf_graph_debug_print;
 
     xf->list_textures = xf_resource_texture_list;
-    xf->set_texture_aliasing = xf_resource_texture_set_aliasing;
+    xf->set_graph_texture_export = xf_graph_set_texture_export;
 }
 
 void* xf_load ( void* std_runtime ) {

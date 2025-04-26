@@ -447,7 +447,9 @@ xg_alloc_t xg_alloc ( const xg_alloc_params_t* params ) {
 #if 1
     uint64_t device_idx = xg_vk_device_get_idx ( params->device );
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
-    xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[params->type];
+    xg_memory_type_e type = params->type;
+    std_assert_m ( type < xg_memory_type_count_m );
+    xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[type];
     return xg_vk_tlsf_heap_alloc ( heap, params->size, params->align );
 #else
     return xg_vk_allocator_simple_alloc ( params->device, params->size, params->type );

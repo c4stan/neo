@@ -103,7 +103,7 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
     std_tick_t now = std_tick_now();
     float delta_millis = std_tick_to_milli_f32 ( now - program_start );
 
-    bool verbose_format = false;
+    bool verbose_format = true;
     if ( verbose_format ) {
         printf ( std_fmt_str_m
             "[" std_fmt_f32_dec_m(3) "] "

@@ -49,6 +49,7 @@ static void xi_api_init ( xi_i* xi ) {
     xi->add_textfield  = xi_ui_textfield;
     xi->add_property_editor = xi_ui_property_editor;
     xi->add_texture = xi_ui_texture;
+    xi->add_arrow = xi_ui_arrow;
 
     xi->newline = xi_ui_newline;
 
@@ -59,6 +60,10 @@ static void xi_api_init ( xi_i* xi ) {
     xi->get_hovered_element_id = xi_ui_get_hovered_id;
 
     xi->file_pick = xi_ui_file_pick;
+
+    xi->test_layer_row_hover = xi_ui_layer_row_hover_test;
+
+    xi->show_fullwindow_texture = xi_ui_show_fullwindow_texture;
 }
 
 void* xi_load ( void* std_runtime ) {

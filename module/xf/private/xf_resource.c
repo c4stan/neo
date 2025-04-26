@@ -948,7 +948,16 @@ uint32_t xf_resource_texture_list ( xf_texture_h* textures, uint32_t capacity ) 
     return idx;
 }
 
-void xf_resource_texture_set_aliasing ( xf_texture_h texture_handle, bool allowed ) {
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    texture->params.allow_aliasing = allowed;
+xf_texture_execution_state_t xf_resource_texture_get_state ( xf_texture_h texture_handle, xg_texture_view_t view ) {
+    xf_physical_texture_t* texture = xf_resource_texture_get_physical_texture ( texture_handle );
+    std_assert_m ( texture );
+    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) { 
+        return texture->state.shared.execution;
+    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
+        std_assert_m ( view.mip_count == 1 );
+        return texture->state.mips[view.mip_base].execution;
+    } else {
+        std_not_implemented_m();
+        return xf_texture_execution_state_m();
+    }
 }

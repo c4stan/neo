@@ -23,6 +23,7 @@ void xi_ui_load ( xi_ui_state_t* state ) {
     std_mem_zero_m ( xi_ui_state );
     xi_ui_state->device = xg_null_handle_m;
 
+    std_mem_zero_static_array_m ( xi_ui_state->windows_map_values );
     xi_ui_state->windows_map = std_static_hash_map_m ( xi_ui_state->windows_map_ids, xi_ui_state->windows_map_values );
 }
 
@@ -181,36 +182,48 @@ static bool xi_ui_layer_add_section ( uint32_t width, uint32_t height ) {
     return result;
 }
 
-static void xi_ui_layer_align ( uint32_t* x, uint32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
+static void xi_ui_layer_align ( int32_t* x, int32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
+    int32_t rx = 0, ry = 0;
+
+    uint32_t horizontal_padding = 0;
+    if ( style->horizontal_padding != xi_style_padding_invalid_m ) {
+        horizontal_padding = style->horizontal_padding;
+    }
+
     if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
-        *x = layer->line_offset + layer->line_padding_x;
+        rx = layer->line_offset + layer->line_padding_x + horizontal_padding;
     } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
-        *x = layer->width - layer->line_offset_rev - layer->line_padding_x - width;
+        rx = layer->width - layer->line_offset_rev - layer->line_padding_x - width - horizontal_padding;
     }
 
     if ( style->vertical_alignment != xi_vertical_alignment_unaligned_m ) {
-        *y = layer->line_y + layer->line_padding_y;
+        ry = layer->line_y + layer->line_padding_y;
     }
 
     if ( style->vertical_alignment == xi_vertical_alignment_centered_m ) {
         if ( layer->line_height > height ) {
-            *y += ( layer->line_height - height ) / 2;
+            ry += ( layer->line_height - height ) / 2;
         }
     } else if ( style->vertical_alignment == xi_vertical_alignment_bottom_m ) {
         if ( layer->line_height > height ) {
-            *y += ( layer->line_height - height );
+            ry += ( layer->line_height - height );
         }
     }
 
-    *x = layer->x + *x;
-    *y = layer->y + *y;
+    *x = layer->x + rx;
+    *y = layer->y + ry;
+}
+
+bool xi_ui_layer_row_hover_test ( uint32_t height ) {
+    xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+    return xi_ui_layer_cursor_test ( 0, layer->line_y, layer->width, height );
 }
 
 // try to make space for a new element in a layer.
 // elements get appended horizontally on the current line, from left to right
-static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
+static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
     bool result = true;
@@ -258,15 +271,20 @@ static bool xi_ui_layer_add_element ( uint32_t* x, uint32_t* y, uint32_t width, 
         layer->line_height = height;
     }
 
+    uint32_t horizontal_padding = 0;
+    if ( style->horizontal_padding != xi_style_padding_invalid_m ) {
+        horizontal_padding = style->horizontal_padding;
+    }
+
     // update horizontal layer offset
     if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
-        layer->line_offset += width;
+        layer->line_offset += width + horizontal_padding;
     } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
-        layer->line_offset_rev += width;
+        layer->line_offset_rev += width + horizontal_padding;
     }
 
     if ( layer->line_y < 0 ) {
-        result = false;
+        //result = false;
     }
 
     return result;
@@ -363,7 +381,9 @@ static bool xi_ui_release_active ( uint64_t id ) {
     return false;
 }
 
+// TODO is this needed?
 static bool xi_ui_release_hovered ( uint64_t id ) {
+    return false;
     if ( xi_ui_state->hovered_id == id ) {
         xi_ui_state->hovered_id = 0;
         xi_ui_state->hovered_sub_id = 0;
@@ -375,7 +395,7 @@ static bool xi_ui_release_hovered ( uint64_t id ) {
     return false;
 }
 
-static void xi_ui_draw_rect_textured ( xi_workload_h workload, xi_color_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint64_t sort_order, xg_texture_h texture ) {
+static void xi_ui_draw_rect_textured ( xi_workload_h workload, xi_color_t color, int32_t x, int32_t y, uint32_t width, uint32_t height, uint64_t sort_order, xg_texture_h texture ) {
     xi_draw_rect_t rect = xi_draw_rect_m (
         .x = x,
         .y = y,
@@ -393,7 +413,7 @@ static void xi_ui_draw_rect_textured ( xi_workload_h workload, xi_color_t color,
     xi_workload_cmd_draw ( workload, &rect, 1 );
 }
 
-static void xi_ui_draw_rect ( xi_workload_h workload, xi_color_t color, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint64_t sort_order ) {
+static void xi_ui_draw_rect ( xi_workload_h workload, xi_color_t color, int32_t x, int32_t y, uint32_t width, uint32_t height, uint64_t sort_order ) {
     xi_draw_rect_t rect = xi_draw_rect_m (
         .x = x,
         .y = y,
@@ -406,7 +426,7 @@ static void xi_ui_draw_rect ( xi_workload_h workload, xi_color_t color, uint32_t
     xi_workload_cmd_draw ( workload, &rect, 1 );
 }
 
-static void xi_ui_draw_tri ( xi_workload_h workload, xi_color_t color, uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2, uint64_t sort_order ) {
+static void xi_ui_draw_tri ( xi_workload_h workload, xi_color_t color, int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint64_t sort_order ) {
     xi_draw_tri_t tri = xi_default_draw_tri_m;
     tri.xy0[0] = x0;
     tri.xy0[1] = y0;
@@ -638,12 +658,11 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
     result.horizontal_alignment = style->horizontal_alignment != xi_horizontal_alignment_invalid_m ? style->horizontal_alignment : parent->horizontal_alignment;
     result.vertical_alignment = style->vertical_alignment != xi_vertical_alignment_invalid_m ? style->vertical_alignment : parent->vertical_alignment;
     result.horizontal_margin = style->horizontal_margin != xi_style_margin_invalid_m ? style->horizontal_margin : parent->horizontal_margin;
+    result.horizontal_padding = style->horizontal_padding != xi_style_padding_invalid_m ? style->horizontal_padding : parent->horizontal_padding;
 
     return result;
 }
 
-// TODO allow minimizing whole windows, similar to sections
-// TODO fix window scroll range, add side scrollbar?
 void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
@@ -730,6 +749,18 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
 
     // scroll
     if ( state->scrollable ) {
+        uint64_t* lookup = std_hash_map_lookup ( &xi_ui_state->windows_map, state->id );
+        // stabilize scroll
+        // if total window content height changed from prev, fit the scroll to keep the window view steady
+        if ( lookup ) {
+            uint32_t prev_height = ( *lookup ) & 0xffffffff;
+            uint32_t prev_prev_height = ( *lookup ) >> 32;
+            if ( prev_height != prev_prev_height && prev_prev_height != 0 ) {
+                scroll = scroll * prev_prev_height / prev_height;
+            }
+        }
+
+        // update scroll bar
         if ( xi_ui_state->active_id == state->id && xi_ui_state->active_sub_id == 3 ) {
             int32_t handle_y = ( scrollbar_height - scroll_handle_height ) * scroll;
             handle_y += xi_ui_state->update.mouse_delta_y;
@@ -737,11 +768,11 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
             scroll = ( float ) handle_y / ( scrollbar_height - scroll_handle_height );
         }
 
-        uint64_t* lookup = std_hash_map_lookup ( &xi_ui_state->windows_map, state->id );
+        // update scroll
         if ( lookup ) {
-            uint64_t prev_height = *lookup;
+            uint32_t prev_height = ( *lookup ) & 0xffffffff;
             float tick = ( float ) ( window_height - header_height ) / prev_height;
-            tick *= 0.5f;
+            tick *= 0.2f;
             if ( xi_ui_layer_cursor_test ( 0, 0, window_width, layer->height ) ) {
                 if ( xi_ui_state->update.wheel_up ) {
                     scroll -= tick;
@@ -934,7 +965,8 @@ void xi_ui_window_end ( xi_workload_h workload ) {
 
     uint64_t* lookup = std_hash_map_lookup_insert ( &xi_ui_state->windows_map, xi_ui_state->window_id, NULL );
     xi_ui_layer_t* layer = &xi_ui_state->layers[0];
-    *lookup = layer->total_content_height;
+    uint64_t prev_total_content_heigh = ( *lookup ) & 0xffffffff;
+    *lookup = layer->total_content_height | ( prev_total_content_heigh << 32 );
 
     xi_ui_layer_pop_all();
     xi_ui_state->active_scissor = xi_null_scissor_m;
@@ -1055,12 +1087,20 @@ void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state ) {
     xi_font_info_t font_info;
     xi_font_get_info ( &font_info, style.font );
 
-    uint32_t x, y;
+    int32_t x, y;
     uint32_t width = xi_ui_string_width ( state->text, style.font );
     uint32_t height = std_max_u32 ( state->height, font_info.pixel_height );
 
-    if ( xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
-        xi_ui_draw_string2 ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
+    if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
+        return;
+    }
+
+    xi_ui_draw_string2 ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
+
+    if ( xi_ui_cursor_test ( x, y, width, height ) ) {
+        xi_ui_acquire_hovered ( state->id, 0 );
+    } else {
+        xi_ui_release_hovered ( state->id );
     }
 }
 
@@ -1074,7 +1114,7 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
     uint32_t width = std_max_u32 ( text_width, state->width );
     uint32_t height = std_max_u32 ( font_info.pixel_height, state->height );
 
-    uint32_t x, y;
+    int32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
         return false;
@@ -1168,7 +1208,7 @@ bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     uint32_t top_margin = 2;
     uint32_t padding = 2;
     uint32_t inner_padding = 1;
-    uint32_t x, y;
+    int32_t x, y;
 
     //xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
     //std_log_info_m ( std_fmt_i64_m, layer->delta_y );
@@ -1229,11 +1269,60 @@ bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state ) {
     return changed;
 }
 
+bool xi_ui_arrow ( xi_workload_h workload, xi_arrow_state_t* state ) {
+    xi_style_t style = xi_ui_inherit_style ( &state->style );
+
+    int32_t x, y;
+    uint32_t width = state->width;
+    uint32_t height = state->height;
+
+    if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
+        return false;
+    }
+
+    if ( xi_ui_cursor_test ( x, y, width, height ) ) {
+        xi_ui_acquire_hovered ( state->id, 0 );
+
+        if ( xi_ui_cursor_click() ) {
+            xi_ui_acquire_active ( state->id, 0 );
+        }
+    } else {
+        xi_ui_release_hovered ( state->id );
+    }
+
+    // state update
+    bool changed = false;
+    if ( xi_ui_state->active_id == state->id && xi_ui_state->update.mouse_down ) {
+        if ( xi_ui_state->hovered_id == state->id ) {
+            state->expanded = ! ( state->expanded );
+            changed = true;
+        }
+
+        xi_ui_release_active ( state->id );
+    }
+
+    if ( state->expanded ) {
+        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
+            x,                  y,
+            x + width,          y,
+            x + width / 2,      y + height,
+            state->sort_order );
+    } else {
+        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
+            x,                  y,
+            x + width,          y + height / 2,
+            x,                  y + height,
+            state->sort_order );
+    }
+
+    return changed;
+}
+
 void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
     uint32_t padding = 2;
-    uint32_t x, y;
+    int32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, state->width, state->height, &style ) ) {
         return;
@@ -1283,12 +1372,23 @@ void xi_ui_texture ( xi_workload_h workload, xi_texture_state_t* state ) {
     uint32_t width = state->width;
     uint32_t height = state->height;
 
-    uint32_t x, y;
+    int32_t x, y;
     if ( !xi_ui_layer_add_element (&x, &y, width, height, &style ) ) {
         return;
     }
 
     xi_ui_draw_rect_textured ( workload, xi_color_rgba_u32_m ( 255, 255, 255, 255 ), x, y, width, height, state->sort_order, state->handle );
+}
+
+void xi_ui_show_fullwindow_texture ( xi_workload_h workload, xg_texture_h texture ) {
+    uint32_t width = xi_ui_state->update.os_window_width;
+    uint32_t height = xi_ui_state->update.os_window_height;
+    xi_ui_layer_t* window_layer = &xi_ui_state->layers[0];
+    xi_scissor_h active_scissor = xi_ui_state->active_scissor;
+    xi_ui_state->active_scissor = xi_null_scissor_m;
+    // TODO sort order as param?
+    xi_ui_draw_rect_textured ( workload, xi_color_rgba_u32_m ( 255, 255, 255, 255 ), 0, 0, width, height, 0, texture );
+    xi_ui_state->active_scissor = active_scissor;
 }
 
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
@@ -1301,7 +1401,7 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     uint32_t width = std_max_u32 ( text_width, state->width );
     uint32_t height = std_max_u32 ( font_info.pixel_height, state->height );
 
-    uint32_t x, y;
+    int32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
         return false;
@@ -1361,7 +1461,7 @@ bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
     uint32_t width = std_max_u32 ( selected_text_width, state->width );
     uint32_t height = std_max_u32 ( font_info.pixel_height, state->height );
 
-    uint32_t x, y;
+    int32_t x, y;
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
         return false;

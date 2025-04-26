@@ -531,21 +531,45 @@ typedef struct {
     xf_node_h nodes[xf_graph_max_nodes_m];
 } xf_graph_info_t;
 
+typedef enum {
+    xf_resource_access_sampled_m,
+    xf_resource_access_uniform_m,
+    xf_resource_access_storage_read_m,
+    xf_resource_access_copy_read_m,
+    xf_resource_access_render_target_m,
+    xf_resource_access_depth_target_m,
+    xf_resource_access_storage_write_m,
+    xf_resource_access_copy_write_m,
+    xf_resource_access_invalid_m,
+} xf_resource_access_e;
+
+typedef struct {
+    xf_texture_h handle;
+    xf_resource_access_e access;
+} xf_node_texture_info_t;
+
 typedef struct {
     bool enabled;
     bool passthrough;
+    xf_node_resource_params_t resources;
     char debug_name[xf_debug_name_size_m];
+    xf_node_texture_info_t texture_info[xf_node_max_textures_m];
+    uint32_t texture_count;
 } xf_node_info_t;
 
 typedef struct {
     xg_device_h device;
     bool sort;
+    bool alias_resources;
+    bool alias_memory;
     char debug_name[xf_debug_name_size_m];
 } xf_graph_params_t;
 
 #define xf_graph_params_m( ... ) ( xf_graph_params_t ) { \
     .device = xg_null_handle_m, \
     .sort = true, \
+    .alias_resources = true, \
+    .alias_memory = true, \
     .debug_name = "", \
     ##__VA_ARGS__ \
 }
@@ -591,5 +615,5 @@ typedef struct {
     const uint64_t* ( *get_graph_timings ) ( xf_graph_h graph );
 
     uint32_t ( *list_textures ) ( xf_texture_h* textures, uint32_t capacity );
-    void ( *set_texture_aliasing ) ( xf_texture_h texture, bool allowed );
+    void ( *set_graph_texture_export ) ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest );
 } xf_i;

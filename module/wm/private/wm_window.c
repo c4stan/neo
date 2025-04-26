@@ -993,6 +993,10 @@ static void wm_update_input_state ( wm_window_h handle ) {
         return;
     }
 
+    // TODO linux
+    // TODO remove event parsing entirely?
+    window->info.is_focus = GetForegroundWindow() == ( HWND ) window->info.os_handle.window;
+
     // Fetch system info before locking
     BOOL result;
     POINT cursor;
@@ -1392,6 +1396,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     size_t border_right;
     size_t border_width;
     size_t border_height;
+    bool is_focus;
 #if defined(std_platform_win32_m)
     {
         // TODO convert class_name from u8 to wchar and call RegisterClassExW
@@ -1441,6 +1446,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
         border_right = rect.right - params->width;
         border_width = ( size_t ) outer_width - params->width;
         border_height = ( size_t ) outer_height - params->height;
+        is_focus = params->gain_focus;
     }
 #elif defined(std_platform_linux_m)
     //std_unused_m ( gain_focus ); // TODO
@@ -1488,6 +1494,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
         border_right = 0;
         border_bottom = 0;
         border_left = 0;
+        is_focus = params->gain_focus;
     }
 #endif // defined(std_platform_linux_m)
 
@@ -1513,7 +1520,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     window->info.width = params->width;
     window->info.height = params->height;
     window->info.os_handle = os_handle;
-    window->info.is_focus = params->gain_focus; //flags & SW_SHOW; // TODO
+    window->info.is_focus = is_focus;
     window->info.is_minimized = false;
     window->info.border_top = border_top;
     window->info.border_right = border_right;

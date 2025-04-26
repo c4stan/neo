@@ -50,7 +50,7 @@ static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* use
     xi->flush_workload ( xi_workload, &params );
 }
 
-xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
+xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color, xf_texture_h export ) {
     xf_i* xf = std_module_get_m ( xf_module_name_m );
 
     xf_graph_info_t graph_info;
@@ -78,8 +78,11 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color ) {
         .resources = xf_node_resource_params_m (
             .render_targets_count = 1,
             .render_targets = { xf_render_target_dependency_m ( .texture = color ) },
+            .sampled_textures_count = 1,
+            .sampled_textures = { xf_shader_texture_dependency_m ( .texture = export, .stage = xg_pipeline_stage_bit_fragment_shader_m ) }
         ),
     );
+
     xf_node_h ui_node = xf->add_node ( graph, &params );
     return ui_node;
 }

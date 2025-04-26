@@ -69,37 +69,23 @@ typedef uint32_t xf_graph_buffer_h;
 typedef uint64_t xf_node_texture_h;
 typedef uint64_t xf_node_buffer_h;
 
-typedef enum {
-    //xf_graph_resource_access_read_m,
-    //xf_graph_resource_access_write_m,
-    xf_graph_resource_access_sampled_m,
-    xf_graph_resource_access_uniform_m,
-    xf_graph_resource_access_storage_read_m,
-    xf_graph_resource_access_copy_read_m,
-    xf_graph_resource_access_render_target_m,
-    xf_graph_resource_access_depth_target_m,
-    xf_graph_resource_access_storage_write_m,
-    xf_graph_resource_access_copy_write_m,
-    xf_graph_resource_access_invalid_m,
-} xf_graph_resource_access_e;
-
-#define xf_graph_resource_access_is_read( a ) ( a <= xf_graph_resource_access_copy_read_m )
-#define xf_graph_resource_access_is_write( a ) ( a > xf_graph_resource_access_copy_read_m && a <= xf_graph_resource_access_copy_write_m )
+#define xf_resource_access_is_read( a ) ( a <= xf_resource_access_copy_read_m )
+#define xf_resource_access_is_write( a ) ( a > xf_resource_access_copy_read_m && a <= xf_resource_access_copy_write_m )
 
 typedef struct {
     xf_node_h node;
     uint32_t resource_idx; // indexes node resources_array
     // TODO specify subresource too here?
-} xf_graph_resource_access_t;
+} xf_resource_access_t;
 
-#define xf_graph_resource_access_m( ... ) ( xf_graph_resource_access_t ) { \
+#define xf_resource_access_m( ... ) ( xf_resource_access_t ) { \
     .node = xf_null_handle_m, \
     .resource_idx = -1, \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
-    xf_graph_resource_access_t array[xf_graph_max_nodes_m];
+    xf_resource_access_t array[xf_graph_max_nodes_m];
     uint32_t count;
 } xf_graph_subresource_dependencies_t;
 
@@ -208,19 +194,19 @@ typedef struct {
 }
 
 //typedef enum {
-//    xf_graph_resource_access_sampled_m,
-//    xf_graph_resource_access_uniform_m,
-//    xf_graph_resource_access_storage_read_m,
-//    xf_graph_resource_access_copy_read_m,
-//    xf_graph_resource_access_render_target_m,
-//    xf_graph_resource_access_depth_target_m,
-//    xf_graph_resource_access_storage_write_m,
-//    xf_graph_resource_access_copy_write_m,
-//    xf_graph_resource_access_invalid_m,
-//} xf_graph_resource_access_e;
+//    xf_resource_access_sampled_m,
+//    xf_resource_access_uniform_m,
+//    xf_resource_access_storage_read_m,
+//    xf_resource_access_copy_read_m,
+//    xf_resource_access_render_target_m,
+//    xf_resource_access_depth_target_m,
+//    xf_resource_access_storage_write_m,
+//    xf_resource_access_copy_write_m,
+//    xf_resource_access_invalid_m,
+//} xf_resource_access_e;
 //
-//#define xf_graph_resource_access_is_read( a ) ( a <= xf_graph_resource_access_copy_read_m )
-//#define xf_graph_resource_access_is_write( a ) ( a > xf_graph_resource_access_copy_read_m && a <= xf_graph_resource_access_copy_write_m )
+//#define xf_resource_access_is_read( a ) ( a <= xf_resource_access_copy_read_m )
+//#define xf_resource_access_is_write( a ) ( a > xf_resource_access_copy_read_m && a <= xf_resource_access_copy_write_m )
 
 typedef enum {
     xf_node_resource_texture_m,
@@ -231,7 +217,7 @@ typedef enum {
 typedef struct {
     xf_node_resource_e type;
     xg_pipeline_stage_bit_e stage;
-    xf_graph_resource_access_e access;
+    xf_resource_access_e access;
     union {
         struct {
             xf_graph_texture_h graph_handle;
@@ -247,7 +233,7 @@ typedef struct {
 #define xf_node_resource_m( ... ) ( xf_node_resource_t ) { \
     .type = xf_node_resource_invalid_m, \
     .stage = xg_pipeline_stage_bit_none_m, \
-    .access = xf_graph_resource_access_invalid_m, \
+    .access = xf_resource_access_invalid_m, \
     ##__VA_ARGS__ \
 }
 
@@ -313,9 +299,9 @@ typedef struct xf_node_t {
 
     xf_node_resource_t resources_array[xf_node_max_textures_m + xf_node_max_buffers_m];
     uint32_t resources_count;
-    uint32_t textures_array[xf_node_max_textures_m];
+    uint32_t textures_array[xf_node_max_textures_m]; // indexes into resources_array
     uint32_t textures_count;
-    uint32_t buffers_array[xf_node_max_buffers_m];
+    uint32_t buffers_array[xf_node_max_buffers_m]; // indexes into resources_array
     uint32_t buffers_count;
 
     xf_graph_texture_transitions_t texture_transitions;
@@ -376,6 +362,10 @@ typedef struct {
     xf_graph_query_context_t query_contexts_array[16];
     std_ring_t query_contexts_ring;
     uint64_t latest_timings[xf_graph_max_nodes_m];
+
+    xf_node_h export_node;
+    xf_texture_h export_source;
+    xf_texture_h export_dest;
 } xf_graph_t;
 
 typedef struct {
@@ -407,3 +397,6 @@ void xf_graph_node_enable ( xf_graph_h graph, xf_node_h node );
 void xf_graph_node_disable ( xf_graph_h graph, xf_node_h node );
 
 const uint64_t* xf_graph_get_timings ( xf_graph_h graph );
+
+void xf_graph_set_texture_export ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest );
+

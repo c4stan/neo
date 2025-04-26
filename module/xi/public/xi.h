@@ -56,6 +56,7 @@ typedef struct {
 // Style
 
 #define xi_style_margin_invalid_m 0xffffffff
+#define xi_style_padding_invalid_m 0xffffffff
 
 typedef enum {
     xi_horizontal_alignment_left_to_right_m,
@@ -81,7 +82,7 @@ typedef struct {
     xi_horizontal_alignment_e horizontal_alignment;
     xi_vertical_alignment_e vertical_alignment;
     uint32_t horizontal_margin;
-    // TODO add padding/margin here
+    uint32_t horizontal_padding;
 } xi_style_t;
 
 #define xi_style_m( ... ) ( xi_style_t ) { \
@@ -91,7 +92,6 @@ typedef struct {
     .font_color = xi_color_white_m, \
     .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
     .vertical_alignment = xi_vertical_alignment_bottom_m, \
-    .horizontal_margin = 0, \
     ##__VA_ARGS__ \
 }
 
@@ -260,7 +260,6 @@ typedef struct {
 #define xi_textfield_state_m( ... ) ( xi_textfield_state_t ) { \
     .text = "", \
     .font = xi_null_handle_m, \
-    .height = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_null_style_m(), \
@@ -300,13 +299,8 @@ typedef struct {
 
 #define xi_select_state_m( ... ) ( xi_select_state_t ) { \
     .items = NULL, \
-    .item_count = 0, \
-    .item_idx = 0, \
     .font = xi_null_handle_m, \
-    .width = 0, \
-    .height = 0, \
     .id = xi_line_id_m(), \
-    .sort_order = 0, \
     .style = xi_null_style_m(), \
     ##__VA_ARGS__ \
 }
@@ -321,11 +315,22 @@ typedef struct {
 } xi_switch_state_t;
 
 #define xi_switch_state_m( ... ) ( xi_switch_state_t ) { \
-    .width = 0, \
-    .height = 0, \
-    .value = false, \
     .id = xi_line_id_m(), \
-    .sort_order = 0, \
+    .style = xi_null_style_m(), \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    bool expanded;
+    xi_id_t id;
+    uint64_t sort_order;
+    xi_style_t style;
+} xi_arrow_state_t;
+
+#define xi_arrow_state_m( ... ) ( xi_arrow_state_t ) { \
+    .id = xi_line_id_m(), \
     .style = xi_null_style_m(), \
     ##__VA_ARGS__ \
 }
@@ -340,9 +345,6 @@ typedef struct {
 
 #define xi_texture_state_m( ... ) ( xi_texture_state_t ) { \
     .handle = xg_null_handle_m, \
-    .width = 0, \
-    .height = 0, \
-    .sort_order = 0, \
     .style = xi_null_style_m(), \
     ##__VA_ARGS__ \
 }
@@ -517,6 +519,7 @@ typedef struct {
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );
     bool ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );
     bool ( *add_switch )    ( xi_workload_h workload, xi_switch_state_t* state );
+    bool ( *add_arrow )     ( xi_workload_h workload, xi_arrow_state_t* state );
     bool ( *add_textfield ) ( xi_workload_h workload, xi_textfield_state_t* state );
     bool ( *add_property_editor ) ( xi_workload_h workload, xi_property_editor_state_t* state );
 
@@ -527,4 +530,8 @@ typedef struct {
     bool ( *draw_transform )( xi_workload_h workload, xi_transform_state_t* state );    
 
     bool ( *file_pick)      ( std_buffer_t path_buffer, const char* initial_dir );
+
+    bool ( *test_layer_row_hover ) ( uint32_t height );
+
+    void ( *show_fullwindow_texture ) ( xi_workload_h workload, xg_texture_h texture );
 } xi_i;

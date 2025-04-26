@@ -1,4 +1,4 @@
-compute_shader ta.comp
+compute_shader ssgi_ta.comp
 
 include common.xsi
 

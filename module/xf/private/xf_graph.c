@@ -49,12 +49,11 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     std_mem_zero_m ( graph );
     graph->params = *params;
     graph->heap.memory_handle = xg_null_memory_handle_m;
+    graph->export_node = xf_null_handle_m;
 
-    graph->query_contexts_ring = std_ring ( 16 );
+    graph->query_contexts_ring = std_ring ( std_static_array_capacity_m ( graph->query_contexts_array ) );
 
-    // xf_graph_texture_t * xf_resource_max_mip_levels_m + xf_graph_buffer_t
     graph->resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
-    // xf_graph_physical_texture_t * xf_resource_max_mip_levels_m
     graph->physical_resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * 2 * xf_resource_max_mip_levels_m ) );
 
     xf_graph_h handle = ( xf_graph_h ) ( graph - xf_graph_state->graphs_array );
@@ -95,127 +94,27 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     }
 
     xf_node_h node_handle = ( xf_node_h ) ( node - graph->nodes_array );
-
-    // Accumulate resource usage on resources, will be used later when creating them
-    // TODO don't do this here
-    //xf_graph_node_accumulate_resource_usage ( node_handle );
-    //xf_graph_node_accumulate_reads_writes ( node_handle );
-
     return node_handle;
 }
-
-/*
-    TODO
-        go through the ordered nodes before each execute, take note for each resource usage in each pass
-        the previous use for that resource (read/write, pipeline stage) so that when filling barriers
-        all data is ready for each pass resource
-        this means some of the stuff done when a node is added to a graph can be removed (we're basically
-        moving it to execute time)
-*/
-
-#if 0
-static void xf_graph_clear_resource_dependencies ( xf_graph_h graph_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-
-    for ( uint32_t i = 0; i < graph->textures_count; ++i ) {
-        xf_graph_texture_t* texture = &graph->textures_array[i];
-        if ( texture->dependencies.subresources ) {
-            std_mem_zero_array_m ( texture->dependencies.subresources, texture->dependencies.subresource_count );
-        }
-    }
-
-    for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
-        xf_graph_buffer_t* buffer = &graph->buffers_array[i];
-        if ( buffer->dependencies.subresources ) {
-            std_mem_zero_array_m ( buffer->dependencies.subresources, buffer->dependencies.subresource_count );
-        }
-    }
-    std_virtual_stack_clear ( &graph->resource_dependencies_allocator );
-}
-#endif
-
-#if 0
-static int xf_graph_resource_access_cmp ( const void* a, const void* b, const void* arg ) {
-    std_auto_m graph = ( xf_graph_t* ) arg;
-    std_auto_m a1 = ( xf_graph_resource_access_t* ) a;
-    std_auto_m a2 = ( xf_graph_resource_access_t* ) b;
-
-    xf_node_t* n1 = &graph->nodes_array[a1->node];
-    xf_node_t* n2 = &graph->nodes_array[a2->node];
-    uint32_t o1 = n1->execution_order;
-    uint32_t o2 = n2->execution_order;
-    return o1 < o2 ? -1 : o1 > o2 ? 1 : 0;
-}
-
-std_unused_static_m()
-static void xf_graph_sort_resource_dependencies ( xf_graph_h graph_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-
-    for ( uint32_t i = 0; i < graph->textures_count; ++i ) {
-        xf_graph_texture_t* texture = &graph->textures_array[i];
-        xf_texture_info_t info;
-        xf_resource_texture_get_info ( &info, texture->handle );
-        
-        xf_graph_resource_access_t tmp;
-        if ( info.view_access == xg_texture_view_access_default_only_m ) {
-            if ( texture->deps.shared.count > 0 ) {
-                std_sort_insertion ( texture->deps.shared.array, sizeof ( xf_graph_resource_access_t ), texture->deps.shared.count, xf_graph_resource_access_cmp, graph, &tmp );
-            }
-        } else if ( info.view_access == xg_texture_view_access_separate_mips_m ) {
-            uint32_t mip_count = info.mip_levels;
-            for ( uint32_t i = 0; i < mip_count; ++i ) {
-                if ( texture->deps.mips[i].count > 0 ) {
-                    std_sort_insertion ( texture->deps.mips[i].array, sizeof ( xf_graph_resource_access_t ), texture->deps.mips[i].count, xf_graph_resource_access_cmp, graph, &tmp );
-                }
-            }
-        } else {
-            std_not_implemented_m();
-        }
-    }
-
-    for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
-        xf_graph_buffer_t* buffer = &graph->buffers_array[i];
-        xf_graph_resource_access_t tmp;
-        if ( buffer->deps.count > 0 ) {
-            std_sort_insertion ( buffer->deps.array, sizeof ( xf_graph_resource_access_t ), buffer->deps.count, xf_graph_resource_access_cmp, graph, &tmp );
-        }
-    }
-}
-#endif
 
 static void xf_graph_add_texture_dependency ( xf_graph_h graph_handle, xf_node_h node_handle, xf_graph_texture_h texture_handle, xg_texture_view_t view, uint32_t resource_idx ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xf_graph_texture_t* texture = &graph->textures_array[texture_handle];
 
-#if 0
-    xf_texture_info_t info;
-    xf_resource_texture_get_info ( &info, texture->handle );
-    if ( info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->deps.shared.array[texture->deps.shared.count++] = xf_graph_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
-    } else if ( info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? info.mip_levels - view.mip_base : view.mip_count;
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->deps.mips[view.mip_base + i].array[texture->deps.mips[view.mip_base + i].count++] = xf_graph_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
-        }
-    } else {
-        std_not_implemented_m();
-    }
-#else
     uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? texture->dependencies.subresource_count - view.mip_base : view.mip_count;
     for ( uint32_t i = 0; i < mip_count; ++i ) {
         std_assert_m ( i < texture->dependencies.subresource_count );
         xf_graph_subresource_dependencies_t* deps = &texture->dependencies.subresources[i + view.mip_base];
         std_assert_m ( deps->count + 1 < std_static_array_capacity_m ( deps->array ) );
-        deps->array[deps->count++] = xf_graph_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
+        deps->array[deps->count++] = xf_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
     }
-#endif
 }
 
 static void xf_graph_add_buffer_dependency ( xf_graph_h graph_handle, xf_node_h node_handle, xf_graph_buffer_h buffer_handle, uint32_t resource_idx ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xf_graph_buffer_t* buffer = &graph->buffers_array[buffer_handle];
     xf_graph_subresource_dependencies_t* deps = &buffer->dependencies.subresources[0];
-    deps->array[deps->count++] = xf_graph_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
+    deps->array[deps->count++] = xf_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
 }
 
 static void xf_graph_node_accumulate_dependencies ( xf_graph_h graph_handle, xf_node_h node_handle ) {
@@ -246,31 +145,10 @@ static void xf_graph_accumulate_physical_resources_dependencies ( xf_graph_h gra
             xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
             xf_graph_physical_texture_t* graph_physical_texture = &graph->physical_textures_array[graph_texture->physical_texture_handle];
 
-#if 0
-            if ( graph_texture->view_access == xg_texture_view_access_default_only_m ) {
-                for ( uint32_t access_it = 0; access_it < graph_texture->deps.shared.count; ++access_it ) {
-                    xf_graph_resource_access_t* access = &graph_texture->deps.shared.array[access_it];
-                    if ( access->node == node_handle ) {
-                        graph_physical_texture->deps.shared.array[graph_physical_texture->deps.shared.count++] = *access;
-                    }
-                }
-            } else if ( graph_texture->view_access == xg_texture_view_access_separate_mips_m ) {
-                for ( uint32_t mip_it = 0; mip_it < 16; ++mip_it ) {
-                    for ( uint32_t access_it = 0; access_it < graph_texture->deps.mips[mip_it].count; ++access_it ) {
-                        xf_graph_resource_access_t* access = &graph_texture->deps.mips[mip_it].array[access_it];
-                        if ( access->node == node_handle ) {
-                            graph_physical_texture->deps.mips[mip_it].array[graph_physical_texture->deps.mips[mip_it].count++] = *access;
-                        }
-                    }
-                }
-            } else {
-                std_not_implemented_m();
-            }
-#else
             for ( uint32_t mip_it = 0; mip_it < graph_texture->dependencies.subresource_count; ++mip_it ) {
                 xf_graph_subresource_dependencies_t* deps = &graph_texture->dependencies.subresources[mip_it];
                 for ( uint32_t access_it = 0; access_it < deps->count; ++access_it ) {
-                    xf_graph_resource_access_t* access = &deps->array[access_it];
+                    xf_resource_access_t* access = &deps->array[access_it];
                     if ( access->node == node_handle ) {
                         xf_graph_subresource_dependencies_t* acc_deps = &graph_physical_texture->dependencies.subresources[mip_it];
                         std_assert_m ( acc_deps->count + 1 < std_static_array_capacity_m ( acc_deps->array ) );
@@ -278,14 +156,13 @@ static void xf_graph_accumulate_physical_resources_dependencies ( xf_graph_h gra
                     }
                 }
             }
-#endif
         }
     }
 }
 
-static xf_graph_resource_access_t* xf_graph_get_subresource_node_access ( xf_graph_subresource_dependencies_t* dependencies, xf_node_h node ) {
+static xf_resource_access_t* xf_graph_get_subresource_node_access ( xf_graph_subresource_dependencies_t* dependencies, xf_node_h node ) {
     for ( uint32_t i = 0; i < dependencies->count; ++i ) {
-        xf_graph_resource_access_t* access = &dependencies->array[i];
+        xf_resource_access_t* access = &dependencies->array[i];
         if ( access->node == node ) {
             return &dependencies->array[i];
         }
@@ -293,20 +170,20 @@ static xf_graph_resource_access_t* xf_graph_get_subresource_node_access ( xf_gra
     return NULL;
 }
 
-static xg_memory_access_bit_e xf_graph_memory_access_from_resource_access ( xf_graph_resource_access_e access ) {
+static xg_memory_access_bit_e xf_graph_memory_access_from_resource_access ( xf_resource_access_e access ) {
     switch ( access ) {
-    case xf_graph_resource_access_sampled_m:
-    case xf_graph_resource_access_storage_read_m:
+    case xf_resource_access_sampled_m:
+    case xf_resource_access_storage_read_m:
         return xg_memory_access_bit_shader_read_m;
-    case xf_graph_resource_access_storage_write_m:
+    case xf_resource_access_storage_write_m:
         return xg_memory_access_bit_shader_write_m;
-    case xf_graph_resource_access_copy_read_m:
+    case xf_resource_access_copy_read_m:
         return xg_memory_access_bit_transfer_read_m;
-    case xf_graph_resource_access_copy_write_m:
+    case xf_resource_access_copy_write_m:
         return xg_memory_access_bit_transfer_write_m;
-    case xf_graph_resource_access_render_target_m:
+    case xf_resource_access_render_target_m:
         return xg_memory_access_bit_color_write_m;
-    case xf_graph_resource_access_depth_target_m:
+    case xf_resource_access_depth_target_m:
         return xg_memory_access_bit_depth_stencil_write_m;
     default:
         return xg_memory_access_bit_none_m;
@@ -365,8 +242,6 @@ static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_ha
             xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
             xf_graph_physical_texture_t* graph_physical_texture = &graph->physical_textures_array[graph_texture->physical_texture_handle];
             xf_texture_h texture_handle = graph_texture->handle;
-            xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-            std_unused_m ( texture );
 
             xf_texture_execution_state_t state = xf_texture_execution_state_m (
                 .layout = resource->texture.layout,
@@ -381,19 +256,18 @@ static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_ha
                 .view = resource->texture.view
             ) );
 
-#if 1
             xg_texture_view_t view = resource->texture.view;
             uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? graph_texture->dependencies.subresource_count - view.mip_base : view.mip_count;
             for ( uint32_t i = 0; i < mip_count; ++i ) {
                 uint32_t mip_idx = i + view.mip_base;
-                xf_graph_resource_access_t* access = xf_graph_get_subresource_node_access ( &graph_physical_texture->dependencies.subresources[mip_idx], node_handle );
+                xf_resource_access_t* access = xf_graph_get_subresource_node_access ( &graph_physical_texture->dependencies.subresources[mip_idx], node_handle );
+                // Look at the previous access, if any
                 if ( access > graph_physical_texture->dependencies.subresources[mip_idx].array ) {
-                    xf_graph_resource_access_t* prev_access = access - 1;
+                    xf_resource_access_t* prev_access = access - 1;
                     xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
                     xg_cmd_queue_e prev_node_queue = prev_node->enabled ? prev_node->params.queue : xg_cmd_queue_graphics_m;
-                    bool skip = false;
+                    // Transition out of prev access queue into this node's queue
                     if ( prev_node_queue != node_queue ) {
-                        if ( skip ) continue;
                         std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
                         std_auto_m texture_acquires_array = std_static_array_m ( xf_graph_texture_transition_t, node->texture_acquires.array );
                         texture_releases_array.count = prev_node->texture_releases.count;
@@ -452,228 +326,41 @@ static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_ha
                     }
                 }
             }
-
-#else
-            if ( graph_texture->view_access == xg_texture_view_access_default_only_m ) {
-                xf_graph_resource_access_t* access = xf_graph_get_resource_node_access ( &graph_physical_texture->deps.shared, node_handle );
-                if ( access > graph_physical_texture->deps.shared.array ) {
-                    xf_graph_resource_access_t* prev_access = access - 1;
-                    xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
-                    bool skip = false;
-                    if ( prev_node->params.queue != node->params.queue ) {
-                        if ( skip ) continue;
-                        std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
-                        std_auto_m texture_acquires_array = std_static_array_m ( xf_graph_texture_transition_t, node->texture_acquires.array );
-                        texture_releases_array.count = prev_node->texture_releases.count;
-                        texture_acquires_array.count = node->texture_acquires.count;
-
-                        xf_node_resource_t* prev_resource = &prev_node->resources_array[prev_access->resource_idx];
-                        xg_pipeline_stage_bit_e src_stage = prev_resource->stage;
-                        xg_pipeline_stage_bit_e dst_stage = resource->stage;
-                        xg_cmd_queue_e src_queue = prev_node->params.queue;
-                        xg_cmd_queue_e dst_queue = node->params.queue;
-
-                        xf_texture_execution_state_t prev_state = xf_texture_execution_state_m (
-                            .layout = prev_resource->texture.layout,
-                            .stage = src_stage,
-                            .access = xf_graph_memory_access_from_resource_access ( prev_resource->access ),
-                        );
-
-                        if ( xf_graph_queue_supports_stage ( src_queue, dst_stage ) ) {
-                            // Layout transition on source queue
-#if 1
-                            // TODO removing this one extra barrier on the source queue causes the validation layer to complain 
-                            // about the texture not being in the destination format on the destination queue. Why?
-                            std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                .state = state,
-                                .state.queue = src_queue,
-                                .texture = texture_handle,
-                                .view = resource->texture.view
-                            ) );
-
-                            std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                .state = state,
-                                .texture = texture_handle,
-                                .view = resource->texture.view
-                            ) );
-#else
-                            std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                .state = prev_state,
-                                .state.queue = dst_queue,
-                                .texture = texture_handle,
-                                .view = resource->texture.view
-                            ) );
-#endif
-                        } else {
-                            std_assert_m ( xf_graph_queue_supports_stage ( dst_queue, src_stage ) );
-                            // Layout transition on dest queue
-                            std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                .state = prev_state,
-                                .state.queue = dst_queue,
-                                .texture = texture_handle,
-                                .view = resource->texture.view
-                            ) );
-                        }
-                        
-                        prev_node->texture_releases.count = texture_releases_array.count;
-                        node->texture_acquires.count = texture_acquires_array.count;
-                    }
-                }
-            } else if ( graph_texture->view_access == xg_texture_view_access_separate_mips_m ) {
-                xg_texture_view_t view = resource->texture.view;
-                uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? graph_texture->mip_levels - view.mip_base : view.mip_count;
-                for ( uint32_t i = 0; i < mip_count; ++i ) {
-                    xf_graph_resource_access_t* access = xf_graph_get_resource_node_access ( &graph_physical_texture->deps.mips[i], node_handle );
-                    if ( access > graph_texture->deps.mips[i].array ) {
-                        xf_graph_resource_access_t* prev_access = access - 1;
-                        xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
-                        if ( prev_node->params.queue != node->params.queue ) {
-                            xg_texture_view_t mip_view = view;
-                            mip_view.mip_base = view.mip_base + i;
-                            mip_view.mip_count = 1;
-                            
-                            std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
-                            std_auto_m texture_acquires_array = std_static_array_m ( xf_graph_texture_transition_t, node->texture_acquires.array );
-                            texture_releases_array.count = prev_node->texture_releases.count;
-                            texture_acquires_array.count = node->texture_acquires.count;
-
-                            xf_node_resource_t* prev_resource = &prev_node->resources_array[prev_access->resource_idx];
-                            xg_pipeline_stage_bit_e src_stage = prev_resource->stage;
-                            xg_pipeline_stage_bit_e dst_stage = resource->stage;
-                            xg_cmd_queue_e src_queue = prev_node->params.queue;
-                            xg_cmd_queue_e dst_queue = node->params.queue;
-
-                            bool src_queue_dst_stage = xf_graph_queue_supports_stage ( src_queue, dst_stage );
-                            bool dst_queue_src_stage = xf_graph_queue_supports_stage ( dst_queue, src_stage );
-                            if ( src_queue_dst_stage && dst_queue_src_stage ) {
-                                // Both queues support both stages, can do it all in two barriers in total
-                                std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                    .state = state,
-                                    .texture = texture_handle,
-                                    .view = mip_view
-                                ) );
-                            } else if ( !dst_queue_src_stage ) {
-                                // Destination queue doesn't support source stage
-                                // Solution: do a double release on the source queue to hide source stage from destination queue
-                                std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                    .state = state,
-                                    .state.queue = src_queue,
-                                    .texture = texture_handle,
-                                    .view = mip_view
-                                ) );
-                                std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                    .state = state,
-                                    .texture = texture_handle,
-                                    .view = mip_view
-                                ) );
-                            } else if ( !src_queue_dst_stage ) {
-                                // Source queue doesn't support destination stage
-                                // Solution: do a double acquire on the destination queue to hide destination stage from source queue
-                                xf_texture_execution_state_t prev_state = xf_texture_execution_state_m (
-                                    .layout = prev_resource->texture.layout,
-                                    .stage = src_stage,
-                                    .access = xf_graph_memory_access_from_resource_access ( prev_resource->access ),
-                                );
-                                std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                    .state = prev_state,
-                                    .state.queue = src_queue,
-                                    .texture = texture_handle,
-                                    .view = mip_view
-                                ) );
-                                std_array_push_m ( &texture_acquires_array, xf_graph_texture_transition_m (
-                                    .state = prev_state,
-                                    .state.queue = dst_queue,
-                                    .texture = texture_handle,
-                                    .view = mip_view
-                                ) );
-                            }
-                            
-                            prev_node->texture_releases.count = texture_releases_array.count;
-                            node->texture_releases.count = texture_acquires_array.count;
-                        }
-                    }
-                }
-            } else {
-                std_not_implemented_m();
-            }
-#endif
         }
         node->texture_transitions.count = texture_transitions_array.count;
-
-#if 0
-        std_auto_m buffer_transitions_array = std_static_array_m ( xf_graph_buffer_transition_t, node->buffer_transitions.array );
-
-        for ( uint32_t buf_it = 0; buf_it < node->buffers_count; ++buf_it ) {
-            uint32_t resource_idx = node->buffers_array[buf_it];
-            xf_node_resource_t* resource = &node->resources_array[resource_idx];
-            xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
-            xf_buffer_h buffer_handle = graph_buffer->handle;
-
-            xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-                .stage = resource->stage,
-                .access = xf_graph_memory_access_from_resource_access ( resource->access ),
-                .queue = node->params.queue,
-                .release = false,
-            );
-
-            std_array_push_m ( &buffer_transitions_array, xf_graph_buffer_transition_m ( 
-                .state = state,
-                .buffer = buffer_handle,
-            ) );
-
-            state.release = true;
-
-            xf_graph_resource_access_t* access = xf_graph_get_resource_node_access ( &graph_buffer->deps, node_handle );
-            if ( access > graph_buffer->deps.array ) {
-                xf_graph_resource_access_t* prev_access = access - 1;
-                xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
-                if ( prev_node->params.queue != node->params.queue ) {
-                    std_auto_m buffer_releases_array = std_static_array_m ( xf_graph_buffer_transition_t, prev_node->buffer_releases.array );
-                    buffer_releases_array.count = prev_node->buffer_releases.count;
-                    std_array_push_m ( &buffer_releases_array, xf_graph_buffer_transition_m (
-                        .state = state,
-                        .buffer = buffer_handle
-                    ) );
-                    prev_node->buffer_releases.count = buffer_releases_array.count;
-                }
-            }
-        }
-
-        node->buffer_transitions.count = buffer_transitions_array.count;
-#endif
     }
 }
 
-static xg_texture_usage_bit_e xf_graph_texture_usage_from_access ( xf_graph_resource_access_e access ) {
+static xg_texture_usage_bit_e xf_graph_texture_usage_from_access ( xf_resource_access_e access ) {
     switch ( access ) {
-    case xf_graph_resource_access_sampled_m:
+    case xf_resource_access_sampled_m:
         return xg_texture_usage_bit_sampled_m;
-    case xf_graph_resource_access_storage_read_m:
-    case xf_graph_resource_access_storage_write_m:
+    case xf_resource_access_storage_read_m:
+    case xf_resource_access_storage_write_m:
         return xg_texture_usage_bit_storage_m;
-    case xf_graph_resource_access_copy_read_m:
+    case xf_resource_access_copy_read_m:
         return xg_texture_usage_bit_copy_source_m;
-    case xf_graph_resource_access_copy_write_m:
+    case xf_resource_access_copy_write_m:
         return xg_texture_usage_bit_copy_dest_m;
-    case xf_graph_resource_access_render_target_m:
+    case xf_resource_access_render_target_m:
         return xg_texture_usage_bit_render_target_m;
-    case xf_graph_resource_access_depth_target_m:
+    case xf_resource_access_depth_target_m:
         return xg_texture_usage_bit_depth_stencil_m;
     default:
         return xg_texture_usage_bit_none_m;
     }
 }
 
-static xg_buffer_usage_bit_e xf_graph_buffer_usage_from_access ( xf_graph_resource_access_e access ) {
+static xg_buffer_usage_bit_e xf_graph_buffer_usage_from_access ( xf_resource_access_e access ) {
     switch ( access ) {
-    case xf_graph_resource_access_uniform_m:
+    case xf_resource_access_uniform_m:
         return xg_buffer_usage_bit_uniform_m;
-    case xf_graph_resource_access_storage_read_m:
-    case xf_graph_resource_access_storage_write_m:
+    case xf_resource_access_storage_read_m:
+    case xf_resource_access_storage_write_m:
         return xg_buffer_usage_bit_storage_m;
-    case xf_graph_resource_access_copy_read_m:
+    case xf_resource_access_copy_read_m:
         return xg_buffer_usage_bit_copy_source_m;
-    case xf_graph_resource_access_copy_write_m:
+    case xf_resource_access_copy_write_m:
         return xg_buffer_usage_bit_copy_dest_m;
     default:
         return xg_buffer_usage_bit_none_m;
@@ -741,8 +428,8 @@ static void xf_graph_add_node_dependencies ( xf_graph_h graph_handle, xf_graph_s
         xf_node_h node_handle = deps->array[i].node;
         xf_node_t* node = &graph->nodes_array[node_handle];
         xf_node_resource_t* resource = &node->resources_array[deps->array[i].resource_idx];
-        xf_graph_resource_access_e access = resource->access;
-        if ( xf_graph_resource_access_is_write ( access ) ) {
+        xf_resource_access_e access = resource->access;
+        if ( xf_resource_access_is_write ( access ) ) {
             if ( prev_reads_count == 0 ) {
                 if ( prev_write != xf_null_handle_m ) {
                     xf_graph_add_node_dependency ( graph_handle, prev_write, node_handle );
@@ -754,7 +441,7 @@ static void xf_graph_add_node_dependencies ( xf_graph_h graph_handle, xf_graph_s
             }
             prev_reads_count = 0;
             prev_write = node_handle;
-        } else if ( xf_graph_resource_access_is_read ( access ) ) {
+        } else if ( xf_resource_access_is_read ( access ) ) {
             //std_assert_m ( !first ); // should assert this only for transient resources
             if ( prev_write != xf_null_handle_m ) {
                 xf_graph_add_node_dependency ( graph_handle, prev_write, node_handle );
@@ -805,41 +492,6 @@ static void xf_graph_accumulate_node_dependencies ( xf_graph_h graph_handle ) {
         }
     }
 }
-
-#if 0
-static void xf_graph_node_add_resource_dependency_edges ( xf_node_t* node, xf_resource_dependencies_t* deps ) {
-    for ( size_t i = 0; i < deps->writers_count; ++i ) {
-        node->edges[node->edge_count++] = deps->writers[i];
-    }
-}
-
-static void xf_graph_node_resolve_edges ( xf_node_h node_handle ) {
-    xf_node_t* node = &xf_graph_state.nodes_array[node_handle];
-    const xf_node_params_t* params = &node->params;
-
-    // Shader resources
-    for ( size_t i = 0; i < params->shader_texture_reads_count; ++i ) {
-        const xf_texture_t* resource = xf_resource_texture_get ( params->shader_texture_reads[i].texture );
-        xf_graph_node_add_resource_dependency_edges ( node, &resource->deps );
-    }
-
-    for ( size_t i = 0; i < params->shader_buffer_reads_count; ++i ) {
-        const xf_texture_t* resource = xf_resource_texture_get ( params->shader_buffer_reads[i].buffer );
-        xf_graph_node_add_resource_dependency_edges ( node, &resource->deps );
-    }
-
-    // Copy resources
-    for ( size_t i = 0; i < params->copy_texture_reads_count; ++i ) {
-        const xf_texture_t* resource = xf_resource_texture_get ( params->copy_texture_reads[i].texture );
-        xf_graph_node_add_resource_dependency_edges ( node, &resource->deps );
-    }
-
-    for ( size_t i = 0; i < params->copy_buffer_reads_count; ++i ) {
-        const xf_texture_t* resource = xf_resource_texture_get ( params->copy_buffer_reads[i].buffer );
-        xf_graph_node_add_resource_dependency_edges ( node, &resource->deps );
-    }
-}
-#endif
 
 static void xf_graph_fill_prev_nodes_from_next ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
@@ -953,31 +605,6 @@ static void xf_graph_build_cross_queue_deps ( xf_graph_h graph_handle ) {
             }
         }
     }
-
-    #if 0
-    for ( xg_cmd_queue_e q = 0; q < xg_cmd_queue_count_m; ++q ) {
-        char stack_buffer[128];
-        std_stack_t stack = std_static_stack_m ( stack_buffer );
-        char* queue_name = "";
-        if ( q == xg_cmd_queue_graphics_m ) queue_name = "GRAPH";
-        else if ( q == xg_cmd_queue_compute_m ) queue_name = "COMP "; 
-        else if ( q == xg_cmd_queue_copy_m ) queue_name = "COPY ";
-        else std_not_implemented_m();
-        std_stack_string_append ( &stack, queue_name );
-        std_stack_string_append ( &stack, " | " );
-        for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
-            char buffer[32] = " -";
-            if ( graph->cross_queue_node_deps[i][q] != -1 ) {
-                std_u32_to_str ( buffer, 32, graph->cross_queue_node_deps[i][q], 2 );
-            }
-            std_stack_string_append ( &stack, buffer );
-            std_stack_string_append ( &stack, " " );
-        }
-        std_log_info_m ( std_fmt_tab_m std_fmt_str_m, stack_buffer );
-    }
-    #else
-    
-    #endif
 }
 
 static void xf_graph_linearize ( xf_graph_h graph_handle ) {
@@ -1177,22 +804,22 @@ static int xf_graph_lifespan_overlap_test ( xf_graph_h graph_handle, const xf_gr
     return before ? -1 : after ? 1 : 0;
 }
 
-static xg_texture_layout_e xf_graph_texture_layout_from_resource_access ( xf_texture_h texture_handle, xf_graph_resource_access_e access ) {
+static xg_texture_layout_e xf_graph_texture_layout_from_resource_access ( xf_texture_h texture_handle, xf_resource_access_e access ) {
     bool is_depth = xf_resource_texture_is_depth ( texture_handle ); // TODO stencil
     switch ( access ) {
-    case xf_graph_resource_access_sampled_m:
-    case xf_graph_resource_access_storage_read_m:
+    case xf_resource_access_sampled_m:
+    case xf_resource_access_storage_read_m:
         return is_depth ? xg_texture_layout_depth_stencil_read_m : xg_texture_layout_shader_read_m;
         //return xg_texture_layout_shader_read_m;
-    case xf_graph_resource_access_storage_write_m:
+    case xf_resource_access_storage_write_m:
         return xg_texture_layout_shader_write_m;
-    case xf_graph_resource_access_copy_read_m:
+    case xf_resource_access_copy_read_m:
         return xg_texture_layout_copy_source_m;
-    case xf_graph_resource_access_copy_write_m:
+    case xf_resource_access_copy_write_m:
         return xg_texture_layout_copy_dest_m;
-    case xf_graph_resource_access_render_target_m:
+    case xf_resource_access_render_target_m:
         return xg_texture_layout_render_target_m;
-    case xf_graph_resource_access_depth_target_m:
+    case xf_resource_access_depth_target_m:
         // TODO check read-only depth
         return xg_texture_layout_depth_stencil_target_m;
     default:
@@ -1289,7 +916,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_sampled_m;
+                xf_resource_access_e access = xf_resource_access_sampled_m;
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
                     .stage = resource->stage, 
@@ -1311,7 +938,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_storage_read_m;
+                xf_resource_access_e access = xf_resource_access_storage_read_m;
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
                     .stage = resource->stage, 
@@ -1333,7 +960,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_storage_write_m;
+                xf_resource_access_e access = xf_resource_access_storage_write_m;
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
                     .stage = resource->stage, 
@@ -1355,7 +982,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_copy_read_m;
+                xf_resource_access_e access = xf_resource_access_copy_read_m;
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
                     .stage = xg_pipeline_stage_bit_transfer_m, 
@@ -1377,7 +1004,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_copy_write_m;
+                xf_resource_access_e access = xf_resource_access_copy_write_m;
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
                     .stage = xg_pipeline_stage_bit_transfer_m, 
@@ -1399,7 +1026,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_render_target_m;
+                xf_resource_access_e access = xf_resource_access_render_target_m;
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
                     .stage = xg_pipeline_stage_bit_color_output_m, 
@@ -1420,7 +1047,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     ) );
                 }
                 uint32_t node_resource_idx = node_resources_array.count;
-                xf_graph_resource_access_e access = xf_graph_resource_access_depth_target_m;
+                xf_resource_access_e access = xf_resource_access_depth_target_m;
                 // TODO early
                 std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                     .type = xf_node_resource_texture_m, 
@@ -1447,7 +1074,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     
                     if ( passthrough->render_targets[i].mode == xf_passthrough_mode_clear_m || passthrough->render_targets[i].mode == xf_passthrough_mode_copy_m ) {
                         uint32_t node_resource_idx = node_resources_array.count;
-                        xf_graph_resource_access_e access = xf_graph_resource_access_copy_write_m;
+                        xf_resource_access_e access = xf_resource_access_copy_write_m;
                         std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                             .type = xf_node_resource_texture_m, 
                             .stage = xg_pipeline_stage_bit_transfer_m, 
@@ -1470,7 +1097,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                         }
 
                         uint32_t node_resource_idx = node_resources_array.count;
-                        xf_graph_resource_access_e access = xf_graph_resource_access_copy_read_m;
+                        xf_resource_access_e access = xf_resource_access_copy_read_m;
                         std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                             .type = xf_node_resource_texture_m, 
                             .stage = xg_pipeline_stage_bit_transfer_m, 
@@ -1497,7 +1124,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     
                     if ( passthrough->storage_texture_writes[i].mode == xf_passthrough_mode_clear_m || passthrough->storage_texture_writes[i].mode == xf_passthrough_mode_copy_m ) {
                         uint32_t node_resource_idx = node_resources_array.count;
-                        xf_graph_resource_access_e access = xf_graph_resource_access_copy_write_m;
+                        xf_resource_access_e access = xf_resource_access_copy_write_m;
                         std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                             .type = xf_node_resource_texture_m, 
                             .stage = xg_pipeline_stage_bit_transfer_m, 
@@ -1520,7 +1147,7 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                         }
 
                         uint32_t node_resource_idx = node_resources_array.count;
-                        xf_graph_resource_access_e access = xf_graph_resource_access_copy_read_m;
+                        xf_resource_access_e access = xf_resource_access_copy_read_m;
                         std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                             .type = xf_node_resource_texture_m, 
                             .stage = xg_pipeline_stage_bit_transfer_m, 
@@ -1595,7 +1222,7 @@ static void xf_graph_scan_buffers ( xf_graph_h graph_handle ) {
             std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                 .type = xf_node_resource_buffer_m, 
                 .stage = resource->stage, 
-                .access = xf_graph_resource_access_uniform_m, 
+                .access = xf_resource_access_uniform_m, 
                 .buffer.graph_handle = graph_buffer_idx ) );
             std_array_push_m ( &node_buffers_array, node_resource_idx );
         }
@@ -1613,7 +1240,7 @@ static void xf_graph_scan_buffers ( xf_graph_h graph_handle ) {
             std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                 .type = xf_node_resource_buffer_m, 
                 .stage = resource->stage, 
-                .access = xf_graph_resource_access_storage_read_m, 
+                .access = xf_resource_access_storage_read_m, 
                 .buffer.graph_handle = graph_buffer_idx ) );
             std_array_push_m ( &node_buffers_array, node_resource_idx );
         }
@@ -1631,7 +1258,7 @@ static void xf_graph_scan_buffers ( xf_graph_h graph_handle ) {
             std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                 .type = xf_node_resource_buffer_m, 
                 .stage = resource->stage, 
-                .access = xf_graph_resource_access_storage_write_m, 
+                .access = xf_resource_access_storage_write_m, 
                 .buffer.graph_handle = graph_buffer_idx ) );
             std_array_push_m ( &node_buffers_array, node_resource_idx );
         }
@@ -1649,7 +1276,7 @@ static void xf_graph_scan_buffers ( xf_graph_h graph_handle ) {
             std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                 .type = xf_node_resource_buffer_m, 
                 .stage = xg_pipeline_stage_bit_transfer_m, 
-                .access = xf_graph_resource_access_copy_read_m, 
+                .access = xf_resource_access_copy_read_m, 
                 .buffer.graph_handle = graph_buffer_idx ) );
             std_array_push_m ( &node_buffers_array, node_resource_idx );
         }
@@ -1667,7 +1294,7 @@ static void xf_graph_scan_buffers ( xf_graph_h graph_handle ) {
             std_array_push_m ( &node_resources_array, xf_node_resource_m ( 
                 .type = xf_node_resource_buffer_m, 
                 .stage = xg_pipeline_stage_bit_transfer_m, 
-                .access = xf_graph_resource_access_copy_write_m, 
+                .access = xf_resource_access_copy_write_m, 
                 .buffer.graph_handle = graph_buffer_idx ) );
             std_array_push_m ( &node_buffers_array, node_resource_idx );
         }
@@ -1857,8 +1484,8 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
     //
     std_sort_insertion ( transient_textures_array, sizeof ( xf_graph_transient_texture_t ), transient_textures_count, xf_graph_transient_texture_sort, NULL, &transient_textures_array[xf_graph_max_textures_m] );
 
-    bool alias_resources = true;
-    bool alias_memory = true;
+    bool alias_resources = graph->params.alias_resources;
+    bool alias_memory = graph->params.alias_memory;
 
     //
     // 3. Alias identical transient textures into the same committed texture
@@ -2356,338 +1983,6 @@ static void xf_graph_remove_resource_refs ( xf_graph_h graph_handle ) {
         xf_resource_buffer_remove_ref ( graph->buffers_array[i].handle );
     }
 }
-
-#if 0
-static void xf_graph_add_texture_transition ( xf_graph_h graph_handle, xf_node_h node_handle, xf_graph_texture_h texture_handle, xg_texture_view_t view, xf_texture_execution_state_t state ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    xf_graph_texture_t* texture = &graph->textures_array[texture_handle];
-
-    xf_texture_info_t info;
-    xf_resource_texture_get_info ( &info, texture->handle );
-
-    if ( info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->transitions.shared.array[texture->transitions.shared.count++] = xf_graph_texture_transition_m ( .node = node_handle, .state = state, .texture = texture->handle );
-    } else if ( info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? info.mip_levels - view.mip_base : view.mip_count;
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->transitions.mips[view.mip_base + i].array[texture->transitions.mips[view.mip_base + i].count++] = xf_graph_texture_transition_m ( .node = node_handle, .state = state, .texture = texture->handle );
-        }
-    } else {
-        std_not_implemented_m();
-    }
-}
-
-static void xf_graph_add_buffer_transition ( xf_graph_h graph_handle, xf_node_h node_handle, xf_graph_buffer_h buffer_handle, xf_buffer_execution_state_t state ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    xf_graph_buffer_t* buffer = &graph->buffers_array[buffer_handle];
-    buffer->transitions.array[buffer->transitions.count++] = xf_graph_buffer_transition_m ( .node = node_handle, .state = state );
-}
-
-static void xf_graph_node_accumulate_transitions ( xf_graph_h graph_handle, xf_node_h node_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    xf_node_t* node = &graph->nodes_array[node_handle];
-    const xf_node_resource_params_t* params = &node->params.resources;
-    xg_cmd_queue_e queue = node->params.queue;
-
-    // Shader resources
-    for ( size_t i = 0; i < params->sampled_textures_count; ++i ) {
-        const xf_shader_texture_dependency_t* dep = &params->sampled_textures[i];
-        const xf_texture_t* texture = xf_resource_texture_get ( dep->texture );
-        
-        xg_texture_layout_e layout = xg_texture_layout_shader_read_m;
-        if ( texture->allowed_usage & xg_texture_usage_bit_depth_stencil_m ) {
-            layout = xg_texture_layout_depth_stencil_read_m;
-        }
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = layout,
-            .stage = dep->stage,
-            .access = xg_memory_access_bit_shader_read_m,
-            .queue = queue,
-        );
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.sampled_textures[i], dep->view, state );
-    }
-
-    for ( size_t i = 0; i < params->storage_texture_reads_count; ++i ) {
-        const xf_shader_texture_dependency_t* dep = &params->storage_texture_reads[i];
-        const xf_texture_t* texture = xf_resource_texture_get ( dep->texture );
-
-        xg_texture_layout_e layout = xg_texture_layout_shader_read_m;
-        if ( texture->allowed_usage & xg_texture_usage_bit_depth_stencil_m ) {
-            layout = xg_texture_layout_depth_stencil_read_m;
-        }
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = layout,
-            .stage = dep->stage,
-            .access = xg_memory_access_bit_shader_read_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.storage_texture_reads[i], dep->view, state );
-    }
-
-    for ( size_t i = 0; i < params->storage_texture_writes_count; ++i ) {
-        const xf_shader_texture_dependency_t* dep = &params->storage_texture_writes[i];
-
-        xg_texture_layout_e layout = xg_texture_layout_shader_write_m;
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = layout,
-            .stage = dep->stage,
-            .access = xg_memory_access_bit_shader_write_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.storage_texture_writes[i], dep->view, state );
-    }
-
-    for ( size_t i = 0; i < params->uniform_buffers_count; ++i ) {
-        const xf_shader_buffer_dependency_t* dep = &params->uniform_buffers[i];
-
-        xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-            .stage = dep->stage,
-            .access = xg_memory_access_bit_shader_read_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_buffer_transition ( graph_handle, node_handle, node->resource_refs.uniform_buffers[i], state );
-    }
-
-    for ( size_t i = 0; i < params->storage_buffer_reads_count; ++i ) {
-        const xf_shader_buffer_dependency_t* dep = &params->storage_buffer_reads[i];
-
-        xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-            .stage = dep->stage,
-            .access = xg_memory_access_bit_shader_read_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_buffer_transition ( graph_handle, node_handle, node->resource_refs.storage_buffer_reads[i], state );
-    }
-
-    for ( size_t i = 0; i < params->storage_buffer_writes_count; ++i ) {
-        const xf_shader_buffer_dependency_t* dep = &params->storage_buffer_writes[i];
-
-        xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-            .stage = dep->stage,
-            .access = xg_memory_access_bit_shader_write_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_buffer_transition ( graph_handle, node_handle, node->resource_refs.storage_buffer_writes[i], state );
-    }
-
-    // Copy resources
-    for ( size_t i = 0; i < params->copy_texture_reads_count; ++i ) {
-        const xf_copy_texture_dependency_t* dep = &params->copy_texture_reads[i];
-
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = xg_texture_layout_copy_source_m,
-            .stage = xg_pipeline_stage_bit_transfer_m,
-            .access = xg_memory_access_bit_transfer_read_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.copy_texture_reads[i], dep->view, state );
-    }
-
-    for ( size_t i = 0; i < params->copy_texture_writes_count; ++i ) {
-        const xf_copy_texture_dependency_t* dep = &params->copy_texture_writes[i];
-
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = xg_texture_layout_copy_dest_m,
-            .stage = xg_pipeline_stage_bit_transfer_m,
-            .access = xg_memory_access_bit_transfer_write_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.copy_texture_writes[i], dep->view, state );
-    }
-
-    for ( size_t i = 0; i < params->copy_buffer_reads_count; ++i ) {
-        xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-            .stage = xg_pipeline_stage_bit_transfer_m,
-            .access = xg_memory_access_bit_transfer_read_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_buffer_transition ( graph_handle, node_handle, node->resource_refs.copy_buffer_reads[i], state );
-    }
-
-    for ( size_t i = 0; i < params->copy_buffer_writes_count; ++i ) {
-        xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-            .stage = xg_pipeline_stage_bit_transfer_m,
-            .access = xg_memory_access_bit_transfer_write_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_buffer_transition ( graph_handle, node_handle, node->resource_refs.copy_buffer_writes[i], state );
-    }
-
-    // Render targets and depth stencil
-    for ( size_t i = 0; i < params->render_targets_count; ++i ) {
-        const xf_render_target_dependency_t* dep = &params->render_targets[i];
-
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = xg_texture_layout_render_target_m,
-            .stage = xg_pipeline_stage_bit_color_output_m,
-            .access = xg_memory_access_bit_color_write_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.render_targets[i], dep->view, state );
-    }
-
-    if ( params->depth_stencil_target != xf_null_handle_m ) {
-        std_assert_m ( params->depth_stencil_target != xf_null_handle_m );
-
-        // TODO support early fragment test
-        xf_texture_execution_state_t state = xf_texture_execution_state_m (
-            .layout = xg_texture_layout_depth_stencil_target_m,
-            .stage = xg_pipeline_stage_bit_late_fragment_test_m,
-            .access = xg_memory_access_bit_depth_stencil_write_m,
-            .queue = queue,
-        );
-
-        xf_graph_add_texture_transition ( graph_handle, node_handle, node->resource_refs.depth_stencil_target, xg_texture_view_m(), state );
-    }
-}
-#endif
-
-#if 0
-static xf_graph_resource_access_t* xf_graph_get_resource_node_access ( xf_resource_dependencies_t* dependencies, xf_node_h node ) {
-    for ( uint32_t i = 0; i < dependencies->count; ++i ) {
-        xf_graph_resource_access_t* access = &dependencies->array[i];
-        if ( access->node == node ) {
-            return &dependencies->array[i];
-        }
-    }
-    return NULL;
-}
-
-std_unused_static_m()
-static void xf_graph_accumulate_resource_transitions ( xf_graph_h graph_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-
-    for ( uint32_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
-        xf_node_h node_handle = node_it;
-        xf_node_t* node = &graph->nodes_array[node_handle];
-        
-        std_auto_m texture_transitions_array = std_static_array_m ( xf_graph_texture_transition_t, node->texture_transitions.array );
-
-        for ( uint32_t tex_it = 0; tex_it < node->textures_count; ++tex_it ) {
-            uint32_t resource_idx = node->textures_array[tex_it];
-            xf_node_resource_t* resource = &node->resources_array[resource_idx];
-            xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
-            xf_texture_h texture_handle = graph_texture->handle;
-            
-            xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-            bool is_depth_stencil = texture->allowed_usage & xg_texture_usage_bit_depth_stencil_m;
-            xg_texture_layout_e layout = xf_graph_texture_layout_from_resource_access ( resource->access, is_depth_stencil );
-            resource->texture.layout = layout;
-
-            xf_texture_execution_state_t state = xf_texture_execution_state_m (
-                .layout = layout,
-                .stage = resource->stage,
-                .access = xf_graph_memory_access_from_resource_access ( resource->access ),
-                .queue = node->params.queue,
-                .release = false,
-            );
-
-            std_array_push_m ( &texture_transitions_array, xf_graph_texture_transition_m (
-                .state = state,
-                .texture = texture_handle,
-                .view = resource->texture.view
-            ) );
-
-            state.release = true;
-
-            if ( graph_texture->view_access == xg_texture_view_access_default_only_m ) {
-                xf_graph_resource_access_t* access = xf_graph_get_resource_node_access ( &graph_texture->deps.shared, node_handle );
-                if ( access > graph_texture->deps.shared.array ) {
-                    xf_graph_resource_access_t* prev_access = access - 1;
-                    xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
-                    if ( prev_node->params.queue != node->params.queue ) {
-                        std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
-                        texture_releases_array.count = prev_node->texture_releases.count;
-                        std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                            .state = state,
-                            .texture = texture_handle,
-                            .view = resource->texture.view
-                        ) );
-                        prev_node->texture_releases.count = texture_releases_array.count;
-                    }
-                }
-            } else if ( graph_texture->view_access == xg_texture_view_access_separate_mips_m ) {
-                xg_texture_view_t view = resource->texture.view;
-                uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? graph_texture->mip_levels - view.mip_base : view.mip_count;
-                for ( uint32_t i = 0; i < mip_count; ++i ) {
-                    xf_graph_resource_access_t* access = xf_graph_get_resource_node_access ( &graph_texture->deps.mips[i], node_handle );
-                    if ( access > graph_texture->deps.mips[i].array ) {
-                        xf_graph_resource_access_t* prev_access = access - 1;
-                        xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
-                        if ( prev_node->params.queue != node->params.queue ) {
-                            std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
-                            texture_releases_array.count = prev_node->texture_releases.count;
-                            xg_texture_view_t mip_view = view;
-                            mip_view.mip_base = view.mip_base + i;
-                            mip_view.mip_count = 1;
-                            std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
-                                .state = state,
-                                .texture = texture_handle,
-                                .view = mip_view
-                            ) );
-                            prev_node->texture_releases.count = texture_releases_array.count;
-                        }
-                    }
-                }
-            } else {
-                std_not_implemented_m();
-            }
-        }
-
-        node->texture_transitions.count = texture_transitions_array.count;
-
-        std_auto_m buffer_transitions_array = std_static_array_m ( xf_graph_buffer_transition_t, node->buffer_transitions.array );
-
-        for ( uint32_t buf_it = 0; buf_it < node->buffers_count; ++buf_it ) {
-            uint32_t resource_idx = node->buffers_array[buf_it];
-            xf_node_resource_t* resource = &node->resources_array[resource_idx];
-            xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
-            xf_buffer_h buffer_handle = graph_buffer->handle;
-
-            xf_buffer_execution_state_t state = xf_buffer_execution_state_m (
-                .stage = resource->stage,
-                .access = xf_graph_memory_access_from_resource_access ( resource->access ),
-                .queue = node->params.queue,
-                .release = false,
-            );
-
-            std_array_push_m ( &buffer_transitions_array, xf_graph_buffer_transition_m ( 
-                .state = state,
-                .buffer = buffer_handle,
-            ) );
-
-            state.release = true;
-
-            xf_graph_resource_access_t* access = xf_graph_get_resource_node_access ( &graph_buffer->deps, node_handle );
-            if ( access > graph_buffer->deps.array ) {
-                xf_graph_resource_access_t* prev_access = access - 1;
-                xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
-                if ( prev_node->params.queue != node->params.queue ) {
-                    std_auto_m buffer_releases_array = std_static_array_m ( xf_graph_buffer_transition_t, prev_node->buffer_releases.array );
-                    buffer_releases_array.count = prev_node->buffer_releases.count;
-                    std_array_push_m ( &buffer_releases_array, xf_graph_buffer_transition_m (
-                        .state = state,
-                        .buffer = buffer_handle
-                    ) );
-                    prev_node->buffer_releases.count = buffer_releases_array.count;
-                }
-            }
-        }
-
-        node->buffer_transitions.count = buffer_transitions_array.count;
-    }
-}
-#endif
 
 static void xf_graph_compute_segments ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
@@ -3369,7 +2664,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( uint32_t j = 0; j < graph_physical_texture->dependencies.subresource_count; ++j ) {
                 xf_graph_subresource_dependencies_t* deps = &graph_physical_texture->dependencies.subresources[j];
                 if ( deps->count > 0 ) {
-                    xf_graph_resource_access_t* access = &deps->array[0];
+                    xf_resource_access_t* access = &deps->array[0];
                     xf_node_t* node = &graph->nodes_array[access->node];
                     xg_cmd_queue_e node_queue = node->enabled ? node->params.queue : xg_cmd_queue_graphics_m;
                     if ( node_queue != physical_texture->state.shared.execution.queue && physical_texture->state.shared.execution.queue != xg_cmd_queue_invalid_m ) {
@@ -3545,7 +2840,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.sampled_textures_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_sampled_m );
+                std_assert_m ( resource->access == xf_resource_access_sampled_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.sampled_textures[i].texture = physical_texture->handle;
@@ -3556,7 +2851,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.storage_texture_reads_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_storage_read_m );
+                std_assert_m ( resource->access == xf_resource_access_storage_read_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.storage_texture_reads[i].texture = physical_texture->handle;
@@ -3567,7 +2862,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.storage_texture_writes_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_storage_write_m );
+                std_assert_m ( resource->access == xf_resource_access_storage_write_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.storage_texture_writes[i].texture = physical_texture->handle;
@@ -3578,7 +2873,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.copy_texture_reads_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_copy_read_m );
+                std_assert_m ( resource->access == xf_resource_access_copy_read_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.copy_texture_reads[i].texture = physical_texture->handle;
@@ -3588,7 +2883,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.copy_texture_writes_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_copy_write_m );
+                std_assert_m ( resource->access == xf_resource_access_copy_write_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.copy_texture_writes[i].texture = physical_texture->handle;
@@ -3598,7 +2893,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.render_targets_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_render_target_m );
+                std_assert_m ( resource->access == xf_resource_access_render_target_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.render_targets[i].texture = physical_texture->handle;
@@ -3608,7 +2903,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             if ( node->params.resources.depth_stencil_target != xf_null_handle_m ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_texture_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_depth_target_m );
+                std_assert_m ( resource->access == xf_resource_access_depth_target_m );
                 xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
                 xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( graph_texture->handle );
                 io.depth_stencil_target = physical_texture->handle;
@@ -3621,7 +2916,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.uniform_buffers_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_buffer_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_uniform_m );
+                std_assert_m ( resource->access == xf_resource_access_uniform_m );
                 xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( graph_buffer->handle );
                 io.uniform_buffers[i] = buffer->xg_handle;
@@ -3636,7 +2931,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.storage_buffer_reads_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_buffer_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_storage_read_m );
+                std_assert_m ( resource->access == xf_resource_access_storage_read_m );
                 xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( graph_buffer->handle );
                 io.storage_buffer_reads[i] = buffer->xg_handle;
@@ -3651,7 +2946,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.storage_buffer_writes_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_buffer_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_storage_write_m );
+                std_assert_m ( resource->access == xf_resource_access_storage_write_m );
                 xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( graph_buffer->handle );
                 io.storage_buffer_writes[i] = buffer->xg_handle;
@@ -3666,7 +2961,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.copy_buffer_reads_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_buffer_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_copy_read_m );
+                std_assert_m ( resource->access == xf_resource_access_copy_read_m );
                 xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( graph_buffer->handle );
                 io.copy_buffer_reads[i] = buffer->xg_handle;
@@ -3681,7 +2976,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             for ( size_t i = 0; i < node->params.resources.copy_buffer_writes_count; ++i, ++resource_it ) {
                 xf_node_resource_t* resource = &node->resources_array[resource_it];
                 std_assert_m ( resource->type == xf_node_resource_buffer_m );
-                std_assert_m ( resource->access == xf_graph_resource_access_copy_write_m );
+                std_assert_m ( resource->access == xf_resource_access_copy_write_m );
                 xf_graph_buffer_t* graph_buffer = &graph->buffers_array[resource->buffer.graph_handle];
                 const xf_buffer_t* buffer = xf_resource_buffer_get ( graph_buffer->handle );
                 io.copy_buffer_writes[i] = buffer->xg_handle;
@@ -3832,6 +3127,55 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             }
         }
 
+        if ( graph->export_node == node_idx ) {
+            xg_texture_memory_barrier_t export_barriers[3];
+            std_stack_t export_barriers_stack = std_static_stack_m ( export_barriers );
+
+            xf_texture_execution_state_t state = xf_resource_texture_get_state ( graph->export_source, xg_texture_view_m() );
+
+            // TODO proper views
+            // TODO can't properly handle scheduling (queue transitions) here, instead trigger a reschedule via invalidate
+            //      when setting the export texture and properly handle it there
+            {
+                xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_source, xg_texture_view_m(), &xf_texture_execution_state_m (
+                    .layout = xg_texture_layout_copy_source_m,
+                    .stage = xg_pipeline_stage_bit_transfer_m,
+                    .access = xg_memory_access_bit_transfer_read_m,
+                    .queue = xg_cmd_queue_graphics_m,
+                ) );
+
+                xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_dest, xg_texture_view_m(), &xf_texture_execution_state_m (
+                    .layout = xg_texture_layout_copy_dest_m,
+                    .stage = xg_pipeline_stage_bit_transfer_m,
+                    .access = xg_memory_access_bit_transfer_write_m,
+                    .queue = xg_cmd_queue_graphics_m,
+                ) );
+
+                xg_barrier_set_t barrier_set = xg_barrier_set_m(
+                    .texture_memory_barriers = export_barriers,
+                    .texture_memory_barriers_count = 2,
+                );
+                xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
+            }
+
+            xf_physical_texture_t* export_source = xf_resource_texture_get_physical_texture ( graph->export_source );
+            xf_physical_texture_t* export_dest = xf_resource_texture_get_physical_texture ( graph->export_dest );
+
+            xg->cmd_copy_texture ( cmd_buffer, sort_key++, &xg_texture_copy_params_m (
+                .source = export_source->handle,
+                .destination = export_dest->handle,
+            ) );
+
+            std_stack_clear ( &export_barriers_stack );
+
+            xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_source, xg_texture_view_m(), &state );
+            xg_barrier_set_t barrier_set = xg_barrier_set_m(
+                .texture_memory_barriers = export_barriers,
+                .texture_memory_barriers_count = 1,
+            );
+            xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
+        }
+
         if ( node->texture_releases.count ) {
             std_stack_clear ( &texture_barriers_stack );
             std_stack_clear ( &buffer_barriers_stack );
@@ -3914,6 +3258,13 @@ void xf_graph_get_node_info ( xf_node_info_t* info, xf_graph_h graph_handle, xf_
     info->enabled = node->enabled;
     info->passthrough = node->params.passthrough.enable;
     std_str_copy_static_m ( info->debug_name, node->params.debug_name );
+    info->resources = node->params.resources;
+    for ( uint32_t i = 0; i < node->textures_count; ++i ) {
+        xf_node_resource_t* resource = &node->resources_array[node->textures_array[i]];
+        info->texture_info[i].handle = graph->textures_array[resource->texture.graph_handle].handle;
+        info->texture_info[i].access = resource->access;
+    }
+    info->texture_count = node->textures_count;
 }
 
 void xf_graph_debug_print ( xf_graph_h graph_handle ) {
@@ -3940,4 +3291,11 @@ void xf_graph_node_disable ( xf_graph_h graph_handle, xf_node_h node_handle ) {
     if ( node->params.passthrough.enable ) {
         node->enabled = false;
     }
+}
+
+void xf_graph_set_texture_export ( xf_graph_h graph_handle, xf_node_h node, xf_texture_h texture, xf_texture_h dest ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    graph->export_node = node;
+    graph->export_source = texture;
+    graph->export_dest = dest;
 }

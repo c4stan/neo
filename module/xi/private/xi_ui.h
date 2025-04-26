@@ -98,6 +98,7 @@ typedef struct {
     // used by property editors
     char property_editor_buffer[xi_textfield_text_size_m];
 
+    // TODO this should be related to a window? have one layer stack per window, access per-window state through the windows map?
     xi_ui_layer_t layers[xi_ui_max_layers_m];
     uint32_t layer_count;
 
@@ -143,6 +144,7 @@ bool xi_ui_switch ( xi_workload_h workload, xi_switch_state_t* state );
 void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state );
 bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state );
 bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state );
+bool xi_ui_arrow ( xi_workload_h workload, xi_arrow_state_t* state );
 bool xi_ui_textfield ( xi_workload_h workload, xi_textfield_state_t* state );
 bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state );
 
@@ -160,3 +162,7 @@ void xi_ui_draw_line ( xi_workload_h workload, xi_line_state_t* state );
 bool xi_ui_draw_transform ( xi_workload_h workload, xi_transform_state_t* state );
 
 bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir );
+
+bool xi_ui_layer_row_hover_test ( uint32_t height );
+
+void xi_ui_show_fullwindow_texture ( xi_workload_h workload, xg_texture_h texture );

@@ -2003,7 +2003,7 @@ typedef struct {
 } xg_texture_params_t;
 
 #define xg_texture_params_m(...) ( xg_texture_params_t ) { \
-    .memory_type = xg_memory_type_null_m, \
+    .memory_type = xg_memory_type_gpu_only_m, \
     .device = xg_null_handle_m, \
     .width = 1, \
     .height = 1, \

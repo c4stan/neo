@@ -2399,11 +2399,19 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     // chunk
     xg_vk_workload_cmd_chunk_result_t chunk_result = xg_vk_workload_chunk_cmd_headers ( &workload_context->chunk, sort_result.cmd_headers, sort_result.count );
 
+    if ( workload->debug_capture ) {
+        xg_debug_capture_start();
+    }
+
     // translate
     xg_vk_workload_translate_cmd_chunks_result_t translate_result = xg_vk_workload_translate_cmd_chunks ( &workload_context->translate, device_context->device_handle, workload_handle, sort_result.cmd_headers, chunk_result.cmd_chunks_array, chunk_result.cmd_chunks_count );
 
     // submit
     xg_vk_workload_submit_cmd_chunks ( &workload_context->submit, workload_handle, translate_result.translated_chunks_array, translate_result.translated_chunks_count, chunk_result.cmd_chunks_array, chunk_result.cmd_chunks_count, chunk_result.queue_chunks_array, chunk_result.queue_chunks_count );
+
+    if ( workload->debug_capture ) {
+        xg_debug_capture_stop();
+    }
 
     workload_context->is_submitted = true;
 
