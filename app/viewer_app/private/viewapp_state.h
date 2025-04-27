@@ -90,6 +90,8 @@ typedef struct {
     xg_texture_h xg_export_texture;
     xf_texture_h xf_export_texture;
     xf_texture_h exported_texture;
+    xf_node_h exported_node;
+    uint64_t exported_id;
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \

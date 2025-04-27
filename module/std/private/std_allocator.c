@@ -652,7 +652,7 @@ void std_stack_free ( std_stack_t* stack, size_t size ) {
     stack->top = top >= begin ? top : begin;
 }
 
-uint64_t std_stack_used_size ( std_stack_t* stack ) {
+uint64_t std_stack_used_size ( const std_stack_t* stack ) {
     void* top = stack->top;
     void* begin = stack->begin;
     return top - begin;
@@ -683,7 +683,7 @@ void std_virtual_stack_destroy ( std_virtual_stack_t* stack ) {
     std_virtual_free ( stack->mapped.begin, stack->virtual_end );
 }
 
-uint64_t std_virtual_stack_used_size ( std_virtual_stack_t* stack ) {
+uint64_t std_virtual_stack_used_size ( const std_virtual_stack_t* stack ) {
     return std_stack_used_size ( &stack->mapped );
 }
 

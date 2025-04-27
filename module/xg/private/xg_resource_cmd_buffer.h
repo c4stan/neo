@@ -7,11 +7,10 @@
 #include <std_mutex.h>
 
 // TODO allocate cmds on opposide sides of the buffer depending on time_e
-// TODO use virtual_stack instead of local_queue?
 typedef struct {
     xg_workload_h workload;
-    std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
-    std_queue_local_t cmd_args_allocator;
+    std_virtual_stack_t cmd_headers_allocator;    // xg_cmd_header_t
+    std_virtual_stack_t cmd_args_allocator;
 } xg_resource_cmd_buffer_t;
 
 typedef enum {

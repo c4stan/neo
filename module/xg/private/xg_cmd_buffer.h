@@ -35,16 +35,14 @@ typedef struct {
     // Args contains a memory address.
     uint64_t args : 48; // void*
     uint64_t type : 8; // xg_cmd_type_e
-    uint64_t tag  : 8; // room for custom byte-sized inline arg
+    uint64_t tag  : 8; // unused/room for custom byte-sized inline arg
     uint64_t key;
 } xg_cmd_header_t;
 
 typedef struct {
-    //xg_device_h device;
     xg_workload_h workload;
-    // TODO why is this not a stack
-    std_queue_local_t cmd_headers_allocator;    // xg_cmd_header_t
-    std_queue_local_t cmd_args_allocator;
+    std_virtual_stack_t cmd_headers_allocator; // xg_cmd_header_t
+    std_virtual_stack_t cmd_args_allocator;
 } xg_cmd_buffer_t;
 
 typedef enum {

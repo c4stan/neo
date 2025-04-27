@@ -2925,25 +2925,34 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         );
                         std_str_copy_static_m ( texture_label.text, texture_info.debug_name );
                         xi->add_label ( xi_workload, &texture_label );
-                        if ( xi->add_button ( xi_workload, &xi_button_state_m (
-                            .text = "toggle",
-                            .width = 60,
-                            .id = xi_mix_id_m ( j ),
+                        uint64_t id = xi_mix_id_m ( j );
+                        xi_switch_state_t export_switch = xi_switch_state_m (
+                            .width = 14,
+                            .height = 14,
+                            .value = m_state->render.exported_id == id,
+                            .id = id,
                             .style = xi_style_m (
                                 .horizontal_padding = 8,
                             )
-                        ) ) ) {
-                            if ( m_state->render.exported_texture == xf_null_handle_m ) {
-                                xf->set_graph_texture_export ( m_state->render.active_graph, graph_info.nodes[i], texture_handle, m_state->render.xf_export_texture );
-                                m_state->render.exported_texture = texture_handle;
-                            } else {
-                                m_state->render.exported_texture = xf_null_handle_m;
-                            }
+                        );
+                        xi->add_switch ( xi_workload, &export_switch );
+                        if ( export_switch.value ) {
+                            m_state->render.exported_id = id;
+                            m_state->render.exported_texture = texture_handle;
+                            m_state->render.exported_node = graph_info.nodes[i];
+                        } else if ( !export_switch.value && m_state->render.exported_id == id ) {
+                            m_state->render.exported_id = 0;
+                            m_state->render.exported_texture = xf_null_handle_m;
+                            m_state->render.exported_node = xf_null_handle_m;
                         }
                         xi->newline();
                     }
                 }
             }
+        }
+
+        if ( m_state->render.exported_texture != xf_null_handle_m ) {
+            xf->set_graph_texture_export ( m_state->render.active_graph, m_state->render.exported_node, m_state->render.exported_texture, m_state->render.xf_export_texture );
         }
 
         xi->newline();

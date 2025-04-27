@@ -27,13 +27,13 @@ int xg_vertex_stream_binding_cmp_f ( const void* _a, const void* _b ) {
 static xg_cmd_buffer_state_t* xg_cmd_buffer_state;
 
 static void xg_cmd_buffer_alloc_memory ( xg_cmd_buffer_t* cmd_buffer ) {
-    cmd_buffer->cmd_headers_allocator = std_queue_local_create ( xg_cmd_buffer_cmd_buffer_size_m );
-    cmd_buffer->cmd_args_allocator = std_queue_local_create ( xg_cmd_buffer_cmd_buffer_size_m );
+    cmd_buffer->cmd_headers_allocator = std_virtual_stack_create ( xg_cmd_buffer_cmd_buffer_size_m );
+    cmd_buffer->cmd_args_allocator = std_virtual_stack_create ( xg_cmd_buffer_cmd_buffer_size_m );
 }
 
 static void xg_cmd_buffer_free_memory ( xg_cmd_buffer_t* cmd_buffer ) {
-    std_queue_local_destroy ( &cmd_buffer->cmd_headers_allocator );
-    std_queue_local_destroy ( &cmd_buffer->cmd_args_allocator );
+    std_virtual_stack_destroy ( &cmd_buffer->cmd_headers_allocator );
+    std_virtual_stack_destroy ( &cmd_buffer->cmd_args_allocator );
 }
 
 void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state ) {
@@ -131,7 +131,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
 
     for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
         const xg_cmd_buffer_t* cmd_buffer = cmd_buffers[i];
-        total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+        total_header_size += std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
     }
 
     size_t total_header_count = total_header_size / sizeof ( xg_cmd_header_t );
@@ -152,9 +152,9 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // Fill the count table
     for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
         const xg_cmd_buffer_t* cmd_buffer = cmd_buffers[i];
-        size_t header_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
-        const xg_cmd_header_t* cmd_header_begin = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base );
-        const xg_cmd_header_t* cmd_header_end = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + header_size );
+        size_t header_size = std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
+        const xg_cmd_header_t* cmd_header_begin = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin );
+        const xg_cmd_header_t* cmd_header_end = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin + header_size );
 
         for ( const xg_cmd_header_t* header = cmd_header_begin; header < cmd_header_end; ++header ) {
             ++count_table[header->key & 255];
@@ -173,9 +173,9 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
 
     for ( size_t i = 0; i < cmd_buffer_count; ++i ) {
         const xg_cmd_buffer_t* cmd_buffer = cmd_buffers[i];
-        size_t header_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
-        const xg_cmd_header_t* cmd_header_begin = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base );
-        const xg_cmd_header_t* cmd_header_end = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + header_size );
+        size_t header_size = std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
+        const xg_cmd_header_t* cmd_header_begin = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin );
+        const xg_cmd_header_t* cmd_header_end = ( xg_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin + header_size );
 
         for ( const xg_cmd_header_t* header = cmd_header_begin; header < cmd_header_end; ++header ) {
             uint64_t idx = count_table[header->key & 255]++;
@@ -356,8 +356,8 @@ void xg_cmd_buffer_discard ( xg_cmd_buffer_h* cmd_buffer_handles, size_t count )
         xg_cmd_buffer_h handle = cmd_buffer_handles[i];
         xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[handle];
 
-        std_queue_local_clear ( &cmd_buffer->cmd_headers_allocator );
-        std_queue_local_clear ( &cmd_buffer->cmd_args_allocator );
+        std_virtual_stack_clear ( &cmd_buffer->cmd_headers_allocator );
+        std_virtual_stack_clear ( &cmd_buffer->cmd_args_allocator );
 
         std_list_push ( &xg_cmd_buffer_state->cmd_buffers_freelist, cmd_buffer );
     }
@@ -375,14 +375,14 @@ xg_cmd_buffer_t* xg_cmd_buffer_get ( xg_cmd_buffer_h cmd_buffer_handle ) {
 // ======================================================================================= //
 
 static void* xg_cmd_buffer_record_cmd ( xg_cmd_buffer_t* cmd_buffer, xg_cmd_type_e type, uint32_t tag, uint64_t key, size_t args_size ) {
-    std_queue_local_align_push ( &cmd_buffer->cmd_headers_allocator, xg_cmd_buffer_cmd_alignment_m );
-    std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, xg_cmd_buffer_cmd_alignment_m );
+    std_virtual_stack_align ( &cmd_buffer->cmd_headers_allocator, xg_cmd_buffer_cmd_alignment_m );
+    std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, xg_cmd_buffer_cmd_alignment_m );
 
-    xg_cmd_header_t* cmd_header = std_queue_local_emplace_array_m ( &cmd_buffer->cmd_headers_allocator, xg_cmd_header_t, 1 );
+    xg_cmd_header_t* cmd_header = std_virtual_stack_alloc_m ( &cmd_buffer->cmd_headers_allocator, xg_cmd_header_t );
     void* cmd_args = NULL;
 
     if ( args_size ) {
-        cmd_args = std_queue_local_emplace ( &cmd_buffer->cmd_args_allocator, args_size );
+        cmd_args = std_virtual_stack_alloc ( &cmd_buffer->cmd_args_allocator, args_size );
     }
 
     cmd_header->args = ( uint64_t ) cmd_args;
@@ -486,22 +486,22 @@ void xg_cmd_buffer_barrier_set ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key
     cmd_args->texture_memory_barriers = ( uint32_t ) barrier_set->texture_memory_barriers_count;
 
     if ( barrier_set->memory_barriers_count > 0 ) {
-        std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_memory_barrier_t ) );
-        xg_memory_barrier_t* barriers = std_queue_local_emplace_array_m ( &cmd_buffer->cmd_args_allocator, xg_memory_barrier_t, barrier_set->memory_barriers_count );
+        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_memory_barrier_t ) );
+        xg_memory_barrier_t* barriers = std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_memory_barrier_t, barrier_set->memory_barriers_count );
         std_mem_copy_array_m ( barriers, &barrier_set->memory_barriers, barrier_set->memory_barriers_count );
     }
 
     // TODO assert that all texture barriers have valid subresources (e.g. mip not set to xg_texture_all_mips_m)
 
     if ( barrier_set->buffer_memory_barriers_count > 0 ) {
-        std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_buffer_memory_barrier_t ) );
-        xg_buffer_memory_barrier_t* barriers = std_queue_local_emplace_array_m ( &cmd_buffer->cmd_args_allocator, xg_buffer_memory_barrier_t, barrier_set->buffer_memory_barriers_count );
+        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_buffer_memory_barrier_t ) );
+        xg_buffer_memory_barrier_t* barriers = std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_buffer_memory_barrier_t, barrier_set->buffer_memory_barriers_count );
         std_mem_copy_array_m ( barriers, barrier_set->buffer_memory_barriers, barrier_set->buffer_memory_barriers_count );
     }
 
     if ( barrier_set->texture_memory_barriers_count > 0 ) {
-        std_queue_local_align_push ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_texture_memory_barrier_t ) );
-        xg_texture_memory_barrier_t* barriers = std_queue_local_emplace_array_m ( &cmd_buffer->cmd_args_allocator, xg_texture_memory_barrier_t, barrier_set->texture_memory_barriers_count );
+        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_texture_memory_barrier_t ) );
+        xg_texture_memory_barrier_t* barriers = std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_texture_memory_barrier_t, barrier_set->texture_memory_barriers_count );
         
         for ( uint32_t i = 0; i < barrier_set->texture_memory_barriers_count; ++i ) {
             xg_texture_memory_barrier_t* barrier = &barrier_set->texture_memory_barriers[i];

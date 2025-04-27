@@ -464,12 +464,14 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
 
     for ( size_t i = 0; i < workload->resource_cmd_buffers_count; ++i ) {
         xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
-        xg_resource_cmd_header_t* cmd_header = ( xg_resource_cmd_header_t* ) cmd_buffer->cmd_headers_allocator.base;
+        xg_resource_cmd_header_t* cmd_header = ( xg_resource_cmd_header_t* ) cmd_buffer->cmd_headers_allocator.begin;
         std_assert_m ( std_align_test_ptr ( cmd_header, xg_resource_cmd_buffer_cmd_alignment_m ) );
-        size_t cmd_headers_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
-        const xg_resource_cmd_header_t* cmd_headers_end = ( xg_resource_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + cmd_headers_size );
+        size_t cmd_headers_size = std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
+        const xg_resource_cmd_header_t* cmd_headers_end = ( xg_resource_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin + cmd_headers_size );
 
+        uint32_t c = 0;
         for ( const xg_resource_cmd_header_t* header = cmd_header; header < cmd_headers_end; ++header ) {
+            ++c;
             switch ( header->type ) {
                 case xg_resource_cmd_resource_bindings_update_m: {
                     std_auto_m args = ( xg_resource_cmd_resource_bindings_update_t* ) header->args;
@@ -636,13 +638,13 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                 }
 
             }
-        }
 
-        if ( writes_count >= xg_vk_workload_resource_bindings_update_batch_size_m - xg_pipeline_resource_max_bindings_m ) {
-            vkUpdateDescriptorSets ( device->vk_handle, writes_count, writes_array, 0, NULL );
-            writes_count = 0;
-            buffer_info_count = 0;
-            image_info_count = 0;
+            if ( writes_count >= xg_vk_workload_resource_bindings_update_batch_size_m - xg_pipeline_resource_max_bindings_m ) {
+                vkUpdateDescriptorSets ( device->vk_handle, writes_count, writes_array, 0, NULL );
+                writes_count = 0;
+                buffer_info_count = 0;
+                image_info_count = 0;
+            }
         }
     }
 
@@ -769,7 +771,7 @@ static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_vk_
     for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {
         const xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->cmd_buffers[i] );
         cmd_buffers[i] = cmd_buffer;
-        total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+        total_header_size += std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
     }
 
     size_t total_header_count = total_header_size / sizeof ( xg_cmd_header_t );
@@ -2025,10 +2027,10 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
         xg_resource_cmd_buffer_t* resource_cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
         std_assert_m ( resource_cmd_buffer );
 
-        xg_resource_cmd_header_t* cmd_header = resource_cmd_buffer->cmd_headers_allocator.base;
+        xg_resource_cmd_header_t* cmd_header = resource_cmd_buffer->cmd_headers_allocator.begin;
         std_assert_m ( std_align_test_ptr ( cmd_header, xg_resource_cmd_buffer_cmd_alignment_m ) );
-        size_t cmd_headers_size = std_queue_local_used_size ( &resource_cmd_buffer->cmd_headers_allocator );
-        const xg_resource_cmd_header_t* cmd_headers_end = resource_cmd_buffer->cmd_headers_allocator.base + cmd_headers_size;
+        size_t cmd_headers_size = std_virtual_stack_used_size ( &resource_cmd_buffer->cmd_headers_allocator );
+        const xg_resource_cmd_header_t* cmd_headers_end = resource_cmd_buffer->cmd_headers_allocator.begin + cmd_headers_size;
 
         for ( const xg_resource_cmd_header_t* header = cmd_header; header < cmd_headers_end; ++header ) {
             xg_resource_cmd_type_e cmd_type = header->type;
@@ -2145,10 +2147,10 @@ static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg
         xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
         std_assert_m ( cmd_buffer );
 
-        xg_resource_cmd_header_t* cmd_header = ( xg_resource_cmd_header_t* ) cmd_buffer->cmd_headers_allocator.base;
+        xg_resource_cmd_header_t* cmd_header = ( xg_resource_cmd_header_t* ) cmd_buffer->cmd_headers_allocator.begin;
         std_assert_m ( std_align_test_ptr ( cmd_header, xg_resource_cmd_buffer_cmd_alignment_m ) );
-        size_t cmd_headers_size = std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
-        const xg_resource_cmd_header_t* cmd_headers_end = ( xg_resource_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.base + cmd_headers_size );
+        size_t cmd_headers_size = std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
+        const xg_resource_cmd_header_t* cmd_headers_end = ( xg_resource_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin + cmd_headers_size );
 
         for ( const xg_resource_cmd_header_t* header = cmd_header; header < cmd_headers_end; ++header ) {
             switch ( header->type ) {
@@ -2370,7 +2372,7 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
 
         for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {
             xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->cmd_buffers[i] );
-            total_header_size += std_queue_local_used_size ( &cmd_buffer->cmd_headers_allocator );
+            total_header_size += std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
         }
 
 

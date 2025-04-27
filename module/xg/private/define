@@ -18,11 +18,11 @@ xg_cmd_buffer_max_cmd_buffers_per_workload_m            32
 xg_cmd_buffer_max_resource_cmd_buffers_per_workload_m   32
 
 # TODO crash when trying to use non-preallocated resource cmd buffer ( allocator is null ) - investigate and fix 
-xg_cmd_buffer_cmd_buffer_size_m                     1024 * 1024
+xg_cmd_buffer_cmd_buffer_size_m                     32 * 1024 * 1024
 xg_cmd_buffer_max_cmd_buffers_m                     64
 xg_cmd_buffer_preallocated_cmd_buffers_m            64
 
-xg_cmd_buffer_resource_cmd_buffer_size_m            1024 * 1024 * 32
+xg_cmd_buffer_resource_cmd_buffer_size_m            64 * 1024 * 1024
 xg_cmd_buffer_max_resource_cmd_buffers_m            64
 xg_cmd_buffer_preallocated_resource_cmd_buffers_m   64
 

@@ -283,8 +283,8 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
         layer->line_offset_rev += width + horizontal_padding;
     }
 
-    if ( layer->line_y < 0 ) {
-        //result = false;
+    if ( layer->line_y + height < 0 ) {
+        result = false;
     }
 
     return result;
@@ -1383,7 +1383,6 @@ void xi_ui_texture ( xi_workload_h workload, xi_texture_state_t* state ) {
 void xi_ui_show_fullwindow_texture ( xi_workload_h workload, xg_texture_h texture ) {
     uint32_t width = xi_ui_state->update.os_window_width;
     uint32_t height = xi_ui_state->update.os_window_height;
-    xi_ui_layer_t* window_layer = &xi_ui_state->layers[0];
     xi_scissor_h active_scissor = xi_ui_state->active_scissor;
     xi_ui_state->active_scissor = xi_null_scissor_m;
     // TODO sort order as param?
