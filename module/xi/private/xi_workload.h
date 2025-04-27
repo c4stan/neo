@@ -157,10 +157,6 @@ typedef struct {
     xi_workload_renderpass_t ui_renderpass_rgba8;
     xi_workload_renderpass_t ui_renderpass_bgra8;
     xi_workload_renderpass_t ui_renderpass_a2bgr10;
-
-    xg_texture_h null_texture;
-    xg_sampler_h point_sampler;
-    xg_sampler_h linear_sampler;
 } xi_workload_state_t;
 
 void xi_workload_load ( xi_workload_state_t* state );

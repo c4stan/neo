@@ -656,7 +656,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_blur_x_texture",
     ) );
-    add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
+    add_bilateral_blur_pass ( graph, ssgi_blur_x_texture, ssgi_raymarch_texture, normal_texture, depth_texture, 5, 3, blur_pass_direction_horizontal_m, "ssgi_blur_x" );
 
     xf_texture_h ssgi_blur_y_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x / ssgi_scale,
@@ -664,7 +664,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_blur_y_texture",
     ) );
-    add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_vertical_m, "ssgi_blur_y" );
+    add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_texture, 5, 3, blur_pass_direction_vertical_m, "ssgi_blur_y" );
 
     // ssgi temporal accumulation
     xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -2259,7 +2259,7 @@ static void viewapp_boot ( void ) {
             .padding_y = 2,
             .style = xi_default_style_m (
                 .font = m_state->ui.font,
-                .color = xi_color_red_m,
+                .color = xi_color_gray_m,
             )
         );
 
@@ -3177,7 +3177,8 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         std_assert_m ( transform );
 
         xi_transform_state_t xform = xi_transform_state_m (
-            .position = { transform->position[0], transform->position[1], transform->position[2] }
+            .position = { transform->position[0], transform->position[1], transform->position[2] },
+            .sort_order = 1,
         );
         transform_drag = xi->draw_transform ( xi_workload, &xform );
 
