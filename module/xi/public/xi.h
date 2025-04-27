@@ -41,6 +41,7 @@ typedef struct {
 #define xi_color_rgb_mul_m( color, scalar )  ( xi_color_t ) xi_color_rgba_u32_m ( (color.r * scalar), (color.g * scalar), (color.b * scalar), color.a )
 #define xi_color_rgba_mul_m( color, scalar ) ( xi_color_t ) xi_color_rgba_u32_m ( (color.r * scalar), (color.g * scalar), (color.b * scalar), (color.a * scalar) )
 
+#if 0
 #define xi_color_red_m         xi_color_rgba_u32_m ( 176,  40,  48, 255 )
 #define xi_color_orange_m      xi_color_rgba_u32_m ( 222, 122,  34, 255 )
 #define xi_color_yellow_m      xi_color_rgba_u32_m ( 240, 201,   0, 255 )
@@ -52,6 +53,19 @@ typedef struct {
 #define xi_color_gray_m        xi_color_rgba_u32_m ( 118, 120, 119, 255 )
 #define xi_color_dark_gray_m   xi_color_rgba_u32_m (  79,  80,  81, 255 )
 #define xi_color_invalid_m     xi_color_rgba_u32_m (   0,   0,   0,   0 )
+#else
+#define xi_color_red_m         xi_color_rgba_u32_m (  58,   5,   6, 255 )
+#define xi_color_orange_m      xi_color_rgba_u32_m ( 108,  34,   5, 255 )
+#define xi_color_yellow_m      xi_color_rgba_u32_m ( 199, 138,   0, 255 )
+#define xi_color_cyan_m        xi_color_rgba_u32_m (   0,  39,  57, 255 )
+#define xi_color_blue_m        xi_color_rgba_u32_m (   8,  13,  42, 255 )
+#define xi_color_green_m       xi_color_rgba_u32_m (  36,  87,  35, 255 )
+#define xi_color_black_m       xi_color_rgba_u32_m (   3,   3,   3, 255 )
+#define xi_color_white_m       xi_color_rgba_u32_m ( 243, 243, 231, 255 )
+#define xi_color_gray_m        xi_color_rgba_u32_m (  47,  48,  48, 255 )
+#define xi_color_dark_gray_m   xi_color_rgba_u32_m (  17,  18,  18, 255 )
+#define xi_color_invalid_m     xi_color_rgba_u32_m (   0,   0,   0,   0 )
+#endif
 
 // Style
 
@@ -87,26 +101,23 @@ typedef struct {
 
 #define xi_style_m( ... ) ( xi_style_t ) { \
     .font = xi_null_handle_m, \
-    .font_height = 14, \
-    .color = xi_color_black_m, \
-    .font_color = xi_color_white_m, \
-    .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
-    .vertical_alignment = xi_vertical_alignment_bottom_m, \
-    ##__VA_ARGS__ \
-}
-
-#define xi_null_style_m( ... ) ( xi_style_t ) { \
-    .font = xi_null_handle_m, \
     .font_height = 0, \
     .color = xi_color_invalid_m, \
     .font_color = xi_color_invalid_m, \
     .horizontal_alignment = xi_horizontal_alignment_invalid_m, \
     .vertical_alignment = xi_vertical_alignment_invalid_m, \
-    .horizontal_margin = 0, \
     ##__VA_ARGS__ \
 }
 
-#define xi_default_style_m xi_style_m()
+#define xi_default_style_m( ... ) ( xi_style_t ) { \
+    .font = xi_null_handle_m, \
+    .font_height = 14, \
+    .color = xi_color_gray_m, \
+    .font_color = xi_color_white_m, \
+    .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
+    .vertical_alignment = xi_vertical_alignment_bottom_m, \
+    ##__VA_ARGS__ \
+}
 
 // Elements
 
@@ -149,7 +160,7 @@ typedef struct {
     .scroll = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_style_m(), \
+    .style = xi_default_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -172,7 +183,7 @@ typedef struct {
     .height = 20, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -197,7 +208,7 @@ typedef struct {
     .disabled = false, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -220,7 +231,7 @@ typedef struct {
     .value = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -262,7 +273,7 @@ typedef struct {
     .font = xi_null_handle_m, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -281,7 +292,7 @@ typedef struct {
     .height = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -301,7 +312,7 @@ typedef struct {
     .items = NULL, \
     .font = xi_null_handle_m, \
     .id = xi_line_id_m(), \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -316,7 +327,7 @@ typedef struct {
 
 #define xi_switch_state_m( ... ) ( xi_switch_state_t ) { \
     .id = xi_line_id_m(), \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -331,7 +342,7 @@ typedef struct {
 
 #define xi_arrow_state_m( ... ) ( xi_arrow_state_t ) { \
     .id = xi_line_id_m(), \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -345,7 +356,7 @@ typedef struct {
 
 #define xi_texture_state_m( ... ) ( xi_texture_state_t ) { \
     .handle = xg_null_handle_m, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -383,7 +394,7 @@ typedef struct {
     .property_height = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -400,7 +411,7 @@ typedef struct {
     .rotation = { 0, 0, 0, 1 }, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_null_style_m(), \
+    .style = xi_style_m(), \
     ##__VA_ARGS__ \
 }
 

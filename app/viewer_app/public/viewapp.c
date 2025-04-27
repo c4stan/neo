@@ -2257,8 +2257,9 @@ static void viewapp_boot ( void ) {
             .height = 500,
             .padding_x = 10,
             .padding_y = 2,
-            .style = xi_style_m (
+            .style = xi_default_style_m (
                 .font = m_state->ui.font,
+                .color = xi_color_red_m,
             )
         );
 

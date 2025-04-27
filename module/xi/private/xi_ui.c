@@ -653,8 +653,8 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
 
     result.font = style->font != xi_null_handle_m ? style->font : parent->font;
     result.font_height = style->font_height != 0 ? style->font_height : parent->font_height;
-    result.color = style->color.u32 != 0 ? style->color : parent->color;
-    result.font_color = style->font_color.u32 != 0 ? style->font_color : parent->font_color;
+    result.color = style->color.u32 != xi_color_invalid_m.u32 ? style->color : parent->color;
+    result.font_color = style->font_color.u32 != xi_color_invalid_m.u32 ? style->font_color : parent->font_color;
     result.horizontal_alignment = style->horizontal_alignment != xi_horizontal_alignment_invalid_m ? style->horizontal_alignment : parent->horizontal_alignment;
     result.vertical_alignment = style->vertical_alignment != xi_vertical_alignment_invalid_m ? style->vertical_alignment : parent->vertical_alignment;
     result.horizontal_margin = style->horizontal_margin != xi_style_margin_invalid_m ? style->horizontal_margin : parent->horizontal_margin;
