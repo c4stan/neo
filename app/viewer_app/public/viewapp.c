@@ -685,17 +685,19 @@ static void viewapp_boot_raster_graph ( void ) {
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssgi_ta" ) ) ),
             .workgroup_count = { std_div_ceil_u32 ( resolution_x / ssgi_scale, 8 ), std_div_ceil_u32 ( resolution_y / ssgi_scale, 8 ), 1 },
-            .samplers_count = 1,
+            .samplers_count = 2,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 5,
+            .sampled_textures_count = 6,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssgi_blur_y_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
+                xf_compute_texture_dependency_m ( .texture = prev_depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = hiz_texture ),
                 xf_compute_texture_dependency_m ( .texture = velocity_texture )
             },
