@@ -67,6 +67,7 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 #endif
 
     // RenderDoc doesn't seem to support these...
+#if defined ( std_platform_win32_m ) // TODO check for HW support
     if ( !xg_debug_capture_is_available() ) {
         xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_checkpoints, "vkGetQueueCheckpointDataNV" );
         xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_set_checkpoint, "vkCmdSetCheckpointNV" );
@@ -74,6 +75,7 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
         device->ext_api.get_checkpoints = NULL;
         device->ext_api.cmd_set_checkpoint = NULL;
     }
+#endif
 
 #undef xg_vk_instance_ext_init_pfn_m    
 }
@@ -581,8 +583,6 @@ void xg_vk_device_load ( xg_vk_device_state_t* state ) {
     VkPhysicalDevice physical_devices[xg_vk_max_devices_m];
     vkEnumeratePhysicalDevices ( xg_vk_instance(), &devices_count, physical_devices );
 
-    //std_mutex_lock ( &state->devices_mutex );
-
     // Cache properties of each device
     for ( size_t i = 0; i < devices_count; ++i ) {
         xg_vk_device_t* device = std_list_pop_m ( &state->devices_freelist );
@@ -593,8 +593,6 @@ void xg_vk_device_load ( xg_vk_device_state_t* state ) {
     }
 
     xg_vk_device_state->hardware_device_count = devices_count;
-
-    //std_mutex_unlock ( &xg_vk_device_state.devices_mutex );
 }
 
 void xg_vk_device_reload ( xg_vk_device_state_t* state ) {

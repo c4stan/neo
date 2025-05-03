@@ -48,6 +48,8 @@ xg_swapchain_h  xg_vk_swapchain_create_window ( const xg_swapchain_window_params
 xg_swapchain_h  xg_vk_swapchain_create_display ( const xg_swapchain_display_params_t* desc );
 xg_swapchain_h  xg_vk_swapchain_create_virtual ( const xg_swapchain_virtual_params_t* desc );
 
+//void             xg_vk_swapchain_get_window_capabilities ( wm_window_h window );
+
 bool            xg_vk_swapchain_resize ( xg_swapchain_h swapchain, size_t width, size_t height );
 
 bool            xg_vk_swapchain_get_info ( xg_swapchain_info_t* info, xg_swapchain_h swapchain );
@@ -58,5 +60,3 @@ xg_texture_h    xg_vk_swapchain_get_texture ( xg_swapchain_h swapchain );
 void            xg_vk_swapchain_present ( xg_swapchain_h swapchain, xg_workload_h workload );
 
 void xg_vk_swapchain_destroy ( xg_swapchain_h swapchain );
-
-

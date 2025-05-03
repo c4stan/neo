@@ -435,7 +435,7 @@ bool std_path_info ( std_path_info_t* info, const char* path ) {
     struct stat stat_info;
     int stat_result = stat ( path, &stat_info );
 
-    if ( stat_result == -1 && errno != ENOENT ) {
+    if ( stat_result == -1 ) {
         return false;
     }
 
@@ -516,6 +516,43 @@ static bool std_dir_create_recursive_from_path_buffer ( void ) {
 }
 #endif
 
+static bool std_dir_create_recursive ( const char* path ) {
+#if defined std_platform_win32_m
+    size_t len = std_to_path_buffer ( path );
+    std_verify_m ( len > 0 && len < std_path_size_m );
+    return std_dir_create_recursive_from_path_buffer();
+#elif defined std_platform_linux_m
+    char buffer[PATH_MAX];
+    std_str_copy ( buffer, PATH_MAX, path );
+
+    char* p = buffer;
+    while ( *p ) {
+        if ( *p == '\\' || *p == '/' ) {
+            *p = '\0';
+            int create_retcode = mkdir ( buffer, 0700 );
+            if ( create_retcode != 0 ) {
+                if ( errno != EEXIST ) {
+                    std_log_os_error_m();
+                    return false;
+                }
+            }
+            *p = '/';
+        }
+        ++p;
+    }
+
+    int create_retcode = mkdir ( buffer, 0700 );
+    if ( create_retcode != 0 ) {
+        if ( errno != EEXIST ) {
+            std_log_os_error_m();
+            return false;
+        }
+    }
+
+    return true;
+#endif
+}
+
 
 bool std_directory_create ( const char* path ) {
     std_assert_m ( path != NULL );
@@ -529,7 +566,7 @@ bool std_directory_create ( const char* path ) {
     if ( create_retcode == FALSE ) {
         if ( GetLastError() == ERROR_PATH_NOT_FOUND ) {
             // CreateDirectory fails if any intermediate dir level in the path is missing.
-            // In that case we yry to recursively create the entire path.
+            // In that case try to recursively create the entire path.
             if ( !std_dir_create_recursive_from_path_buffer() ) {
                 return false;
             }
@@ -544,6 +581,18 @@ bool std_directory_create ( const char* path ) {
     return true;
 #elif defined(std_platform_linux_m)
     int result = mkdir ( path, 0700 );
+    if ( result != 0 ) {
+        if ( errno == ENOENT ) {
+            if ( !std_dir_create_recursive ( path ) ) {
+                return false;
+            }
+        } else {
+            if ( errno != EEXIST ) {
+                std_log_os_error_m();
+            }
+            return false;
+        }
+    }
     return result == 0;
 #endif
 }
@@ -1123,6 +1172,7 @@ std_file_h std_file_open ( const char* path, std_file_access_t access ) {
     int fd = open ( path, flags );
 
     if ( fd == -1 ) {
+        std_log_os_error_m();
         return std_file_null_handle_m;
     }
 
@@ -1404,7 +1454,9 @@ bool std_file_info ( std_file_info_t* info, std_file_h file ) {
 #elif defined(std_platform_linux_m)
     struct stat file_info;
     int fstat_result = fstat ( ( int ) file, &file_info );
-    std_assert_m ( fstat_result == 0 );
+    if ( fstat_result != 0 ) {
+        std_log_os_error_m();
+    }
 
     info->creation_time.count = 0;
     std_filetime_to_timestamp ( file_info.st_atim, &info->last_access_time );

@@ -118,7 +118,7 @@ void wm_window_unload ( void ) {
 }
 
 static uint32_t wm_window_keycode ( uint64_t os_keycode ) {
-    #if defined ( std_platform_win32_m ) 
+#if defined ( std_platform_win32_m )
     switch ( os_keycode ) {
     case VK_BACK:
         return wm_keyboard_state_backspace_m;
@@ -257,7 +257,10 @@ static uint32_t wm_window_keycode ( uint64_t os_keycode ) {
     default:
         return wm_keyboard_state_count_m;
     }
-    #endif
+#elif defined ( std_platform_linux_m )
+    // TODO linux
+    return wm_keyboard_state_count_m;
+#endif
 }
 
 // TODO factor in flags (shift, capslock, ...)
@@ -350,6 +353,7 @@ static uint32_t wm_input_keycode_to_character ( uint32_t keycode ) {
     }
 }
 
+std_unused_static_m()
 static void wm_window_update_modifier_keydown ( wm_window_t* window, uint32_t keycode ) {
     switch ( keycode ) {
     case wm_keyboard_state_shift_left_m:
@@ -376,6 +380,7 @@ static void wm_window_update_modifier_keydown ( wm_window_t* window, uint32_t ke
     }
 }
 
+std_unused_static_m()
 static void wm_window_update_modifier_keyup ( wm_window_t* window, uint32_t keycode ) {
     switch ( keycode ) {
     case wm_keyboard_state_shift_left_m:
@@ -402,6 +407,7 @@ static void wm_window_update_modifier_keyup ( wm_window_t* window, uint32_t keyc
     }
 }
 
+#if defined ( std_platform_win32_m )
 // https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
 static WPARAM wm_window_map_left_right_key ( WPARAM vk, LPARAM lParam )
 {
@@ -428,6 +434,7 @@ static WPARAM wm_window_map_left_right_key ( WPARAM vk, LPARAM lParam )
 
     return new_vk;
 }
+#endif
 
 #if wm_enable_input_events_m
 #if defined(std_platform_win32_m)
@@ -759,6 +766,27 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
 
         return trap;
     } else {
+        int64_t on_handle;
+        int64_t on_pass;
+        wm_input_event_t* buffer_event;
+        uint64_t keycode;
+        uint64_t button = wm_mouse_state_count_m;
+        if ( x_event->type == ButtonPress || x_event->type == ButtonRelease ) {
+            if ( x_event->xbutton.button == 1 )  {
+                button = wm_mouse_state_left_m;
+            } else if ( x_event->xbutton.button == 2 ) {
+                button = wm_mouse_state_wheel_m;
+            } else if ( x_event->xbutton.button == 3 ) {
+                button = wm_mouse_state_right_m;
+            } else if ( x_event->xbutton.button == 4 ) {
+                button = wm_mouse_state_wheel_down_m;
+            } else if ( x_event->xbutton.button == 5 ) {
+                button = wm_mouse_state_wheel_up_m;
+            }
+        }
+
+        // TODO flags and callback args
+#if 0
         uint64_t flags = 0;
         uint64_t button;
 
@@ -809,6 +837,7 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 button = wm_mouse_state_wheel_up_m;
             }
         }
+#endif
 
         switch ( x_event->type ) {
             case MotionNotify:
@@ -827,6 +856,7 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 break;
 
             case KeyPress:
+#if 0
                 // TODO pass key modifier flags
                 //std_log_info_m ( "KeyPress: " std_fmt_uint_m " " std_fmt_uint_m " " std_fmt_int_m " " std_fmt_int_m,
                 //               x_event->xkey.keycode, x_event->xkey.state, x_event->xkey.x, x_event->xkey.y );
@@ -834,16 +864,32 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 args[0] = ( uint64_t ) x_event->xkey.keycode;
                 args[1] = flags;
                 break;
+#else
+                event = wm_event_key_down_m;
+                args[0] = ( uint64_t ) x_event->xkey.keycode;
+                args[1] = 0;
+
+                keycode = wm_window_keycode ( x_event->xkey.keycode );
+                if ( keycode!= wm_keyboard_state_count_m ) {
+                    buffer_event = &window->input_buffer.events[window->input_buffer.count++];
+                    buffer_event->type = event;
+                    buffer_event->args.keyboard.keycode = keycode;
+                    buffer_event->args.keyboard.character = wm_input_keycode_to_character ( keycode );
+                    buffer_event->args.keyboard.flags = window->input_flags;
+                }
+                on_handle = 0;
+                on_pass = 1;
+#endif
 
             case KeyRelease:
                 //std_log_info_m ( "KeyRelease" );
                 event = wm_event_key_up_m;
                 args[0] = ( uint64_t ) x_event->xkey.keycode;
-                args[1] = flags;
+                args[1] = 0;
                 break;
 
             case ButtonPress:
-
+#if 0
                 //std_log_info_m ( "ButtonPress: " std_fmt_uint_m " " std_fmt_uint_m " " std_fmt_int_m " " std_fmt_int_m,
                 //               x_event->xbutton.button, x_event->xbutton.state, x_event->xbutton.x, x_event->xbutton.y );
 
@@ -858,9 +904,25 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 args[2] = x_event->xbutton.y;
                 args[3] = flags;
                 break;
+#else
+                event = wm_event_mouse_down_m;
+                args[0] = button;
+                args[1] = x_event->xbutton.x;
+                args[2] = x_event->xbutton.y;
+                args[3] = 0;
+                on_handle = 0;
+                on_pass = 1;
 
+                buffer_event = &window->input_buffer.events[window->input_buffer.count++];
+                buffer_event->type = event;
+                buffer_event->args.mouse.button = button;
+                buffer_event->args.mouse.x = x_event->xbutton.x;
+                buffer_event->args.mouse.y = x_event->xbutton.y;
+                buffer_event->args.mouse.flags = 0;
+                break;
+#endif
             case ButtonRelease:
-
+#if 0
                 //std_log_info_m ( "ButtonRelease" );
 
                 if ( button == wm_mouse_state_left_m || button == wm_mouse_state_right_m || button == wm_mouse_state_wheel_m ) {
@@ -875,7 +937,16 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 args[2] = x_event->xbutton.y;
                 args[3] = flags;
                 break;
-
+#else
+                event = wm_event_mouse_up_m;
+                args[0] = button;
+                args[1] = x_event->xbutton.x;
+                args[2] = x_event->xbutton.y;
+                args[3] = 0;
+                on_handle = 0;
+                on_pass = 1;
+                break;
+#endif
             case FocusIn: {
                 event = wm_event_gain_focus_m;
                 std_mutex_t* mutex = &wm_window_state->mutex;

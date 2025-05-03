@@ -127,7 +127,9 @@ void* xg_load ( void* std_runtime ) {
 
     xg_vk_instance_load ( &state->vk.instance, xg_instance_enabled_runtime_layers_m );
     xg_vk_allocator_load ( &state->vk.allocator );
+    std_log_info_m ( "loading xg_vk_device..." );
     xg_vk_device_load ( &state->vk.device );
+    std_log_info_m ( "loading xg_vk_query..." );
     xg_vk_query_load ( &state->vk.query );
     xg_vk_event_load ( &state->vk.event );
     xg_vk_texture_load ( &state->vk.texture );

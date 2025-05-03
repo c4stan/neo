@@ -4,6 +4,8 @@
 #include <std_mutex.h>
 #include <std_byte.h>
 
+#include <xg_enum.h>
+
 #include "xg_vk.h"
 #include "xg_vk_device.h"
 #include "xg_vk_instance.h"
@@ -493,16 +495,24 @@ void xg_vk_allocator_activate_device ( xg_device_h device_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
 
+    bool shared_gpu_upload_heap = false;
+    // TODO test vk_memory_type_idx too?
+    if ( device->memory_heaps[xg_memory_type_gpu_only_m].vk_heap_idx == device->memory_heaps[xg_memory_type_upload_m].vk_heap_idx ) {
+        shared_gpu_upload_heap = true;
+    }
+
     for ( xg_memory_type_e i = 0; i < xg_memory_type_count_m; ++i ) {
         uint64_t size = device->memory_heaps[i].size;
-        
+
         switch (i) {
         case xg_memory_type_gpu_only_m:
             size = size * 0.8;
+            if ( shared_gpu_upload_heap ) size = size * 0.5;
             size = std_min_u64 ( size, 1024 * 1024 * 1024 * 2ull );
             break;
         case xg_memory_type_upload_m:
             size = size * 0.8;
+            if ( shared_gpu_upload_heap ) size = size * 0.5;
             size = std_min_u64 ( size, 1024 * 1024 * 1024 * 2ull );
             break;
         case xg_memory_type_readback_m:

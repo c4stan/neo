@@ -184,8 +184,8 @@ bool xs_database_set_output_folder ( xs_database_h db_handle, const char* input_
     xs_database_t* db = &xs_database_state->database_array[db_handle];
 
     std_path_info_t info;
-    std_path_info ( &info, input_path );
-    bool result = info.flags & std_path_is_directory_m;
+    bool result = std_path_info ( &info, input_path );
+    result &= info.flags & std_path_is_directory_m;
 
     if ( !result ) {
         result = std_directory_create ( input_path );
@@ -273,6 +273,11 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
+    const bool verbose = false;
+    if ( verbose ) {
+        std_log_info_m ( "Starting build for database " std_fmt_str_m, db->debug_name );
+    }
+
     // check headers, froce rebuild all shaders if one changed
     // TODO try to take dependencies into account and avoid rebuilding everything?
     // TODO account for xs.glsl changes
@@ -285,7 +290,12 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
         std_file_info_t info;
         std_verify_m ( std_file_path_info ( &info, header->path ) );
 
-        dirty_headers |= db->pipeline_state_headers_last_build_timestamp.count < info.last_write_time.count;
+        bool dirty = db->pipeline_state_headers_last_build_timestamp.count < info.last_write_time.count;
+        dirty_headers |= dirty;
+
+        if ( verbose && dirty ) {
+            std_log_info_m ( "Header " std_fmt_str_m " found dirty: " std_fmt_u64_m " " std_fmt_u64_m, header->path, db->pipeline_state_headers_last_build_timestamp.count, info.last_write_time.count );
+        }
     
         if ( info.last_write_time.count > most_recent_header_edit.count ) {
             most_recent_header_edit = info.last_write_time;
@@ -299,6 +309,10 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
     // check pipeline states
     for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
         xs_database_pipeline_state_t* pipeline_state = &db->pipeline_states[state_it];
+
+        if ( verbose ) {
+            std_log_info_m ( "Parsing pipeline metadata " std_fmt_str_m, pipeline_state->path );
+        }
 
         std_file_h pipeline_state_file = std_file_open ( pipeline_state->path, std_file_read_m );
         std_assert_m ( pipeline_state_file != std_file_null_handle_m );
@@ -365,6 +379,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
         }
 
         if ( !state_parse_result ) {
+            if ( verbose ) {
+                std_log_info_m ( "Pipeline " std_fmt_str_m " failed to parse", pipeline_state->path );
+            }
             ++result.failed_pipeline_states;
             continue;
         }
@@ -426,6 +443,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
         }
 
         if ( !needs_to_build ) {
+            if ( verbose ) {
+                std_log_info_m ( "Skipping pipeline " std_fmt_str_m, pipeline_state->path );
+            }
             result.skipped_shaders += shader_references->count;
             result.skipped_pipeline_states += 1;
             continue;
@@ -503,6 +523,14 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     }
                 }
 
+                if ( verbose ) {
+                    if ( skip_compile ) {
+                        std_log_info_m ( "Skipping shader " std_fmt_str_m, shader_path );
+                    } else {
+                        std_log_info_m ( "Building shader " std_fmt_str_m " to " std_fmt_str_m, shader_path, binary_path );
+                    }
+                }
+
                 // invoke compiler process
                 if ( !skip_compile ) {
                     xs_shader_compiler_params_t params;
@@ -516,6 +544,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     bool compile_result = xs_shader_compiler_compile ( &params );
 
                     if ( !compile_result ) {
+                        if ( verbose ) {
+                            std_log_info_m ( "Shader " std_fmt_str_m " failed to build", shader_path );
+                        }
                         ++shader_fail;
                         bytecode->buffer = std_null_buffer_m;
                         continue;
@@ -542,6 +573,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 }
                 fs->close_file ( bytecode_file );
                 #else
+                if ( verbose ) {
+                    std_log_info_m ( "Loading shader binary " std_fmt_str_m " from disk", shader_path, binary_path );
+                }
                 bytecode->stage = stage;
                 bytecode->buffer = std_file_read_to_virtual_heap ( binary_path );
                 #endif
@@ -618,6 +652,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 }
             }
 
+            if ( verbose ) {
+                std_log_info_m ( "Creating pipeline state " std_fmt_str_m, pipeline_state->name );
+            }
             switch ( pipeline_state->type ) {
                 case xg_pipeline_graphics_m:
                     pipeline_handle = xg->create_graphics_pipeline ( db->device, &graphics_state->params );
@@ -655,7 +692,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
         result.failed_shaders, result.successful_shaders, result.skipped_shaders );
 
     if ( result.failed_shaders || result.failed_pipeline_states ) {
-        std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed" );
+        std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed", result.failed_pipeline_states, result.failed_shaders );
     }
 
     return result;

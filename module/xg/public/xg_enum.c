@@ -1043,10 +1043,24 @@ const char* xg_memory_access_str ( xg_memory_access_bit_e access ) {
         return "memory_read";
     } else if ( access == xg_memory_access_bit_memory_write_m ) {
         return "memory_write";
-     } else {
+    } else {
         return "Unknown or composite memory access bits";
-     }
- }
+    }
+}
+
+const char* xg_memory_type_str ( xg_memory_type_e type ) {
+    if ( type == xg_memory_type_gpu_only_m ) {
+        return "gpu_only";
+    } else if ( type == xg_memory_type_gpu_mapped_m ) {
+        return "gpu_mapped";
+    } else if ( type == xg_memory_type_upload_m ) {
+        return "upload";
+    } else if ( type == xg_memory_type_readback_m ) {
+        return "readback";
+    } else {
+        return "Unknown memory type";
+    }
+}
 
 xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
     switch ( stage ) {

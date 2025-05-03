@@ -48,6 +48,7 @@ CORE_WARNING_FLAGS = (
     ' -Wno-comment'
     ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
     ' -Wno-missing-braces'                      # suggested braces warnings?
+    ' -Wno-c23-extensions'                      # TODO remove?
 )
 
 EXTENDED_WARNING_FLAGS = (
@@ -693,7 +694,8 @@ class Project:
             if value.isnumeric():
                 def_cmd += ' -Dstd_binding_' + key + '_m=' + value
             else:
-                def_cmd += ' -Dstd_binding_' + key + '_m=' + '"\\"' + value + '\\""'
+                #def_cmd += ' -Dstd_binding_' + key + '_m=' + '"\\"' + value + '\\""'
+                def_cmd += ' -Dstd_binding_' + key + '_m=' + '' + value + ''
 
         compiler_defs_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/defines')
         compiler_defs_file.write(def_cmd)

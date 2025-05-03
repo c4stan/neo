@@ -22,6 +22,7 @@ xg_cmd_bind_queue_max_wait_events_m             4
 xg_pipeline_output_max_color_targets_m          8
 
 xg_swapchain_max_textures_m                     8
+xg_swpachain_max_capability_formats             1024
 
 xg_enable_raytracing_m                          0
 

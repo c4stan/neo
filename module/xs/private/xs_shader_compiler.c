@@ -139,11 +139,10 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
         bool read_result = std_process_io_read ( stdout_output, &read_size, std_process_cmdline_max_len_m, compiler_io.stdout_handle );
         std_assert_m ( read_size <= std_process_cmdline_max_len_m );
 
-        if ( read_result ) {
+        if ( read_result && read_size > 0 ) {
             std_log_warn_m ( stdout_output );
+            result = false;
         }
-
-        result &= !read_result;
     }
 
     char stderr_output[std_process_cmdline_max_len_m];
@@ -152,11 +151,10 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
         bool read_result = std_process_io_read ( stderr_output, &read_size, std_process_cmdline_max_len_m, compiler_io.stderr_handle );
         std_assert_m ( read_size <= std_process_cmdline_max_len_m );
 
-        if ( read_result ) {
+        if ( read_result && read_size > 0 ) {
             std_log_error_m ( stderr_output );
+            result = false;
         }
-
-        result &= !read_result;
     }
 
     return result;

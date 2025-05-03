@@ -190,17 +190,17 @@ void std_platform_load_state_info ( std_platform_state_t* state ) {
             uint64_t mask = 0;
 
             for ( size_t i = first; i <= last; ++i ) {
-                std_bit_set_64 ( &mask, i );
+                mask = std_bit_set_64_m ( mask, i );
             }
 
             physical_core->logical_cores_mask = mask;
 
             while ( mask ) {
                 uint32_t logical_core_idx = std_bit_scan_64 ( mask );
-                std_bit_clear_64 ( &mask, logical_core_idx );
+                mask = std_bit_clear_64_m ( mask, logical_core_idx );
 
-                if ( !std_bit_test_64 ( state->logical_cores_mask, logical_core_idx ) ) {
-                    std_bit_set_64 ( &state->logical_cores_mask, logical_core_idx );
+                if ( !std_bit_test_64_m ( state->logical_cores_mask, logical_core_idx ) ) {
+                    std_bit_set_64_m ( state->logical_cores_mask, logical_core_idx );
                     ++state->logical_cores_count;
                 }
 

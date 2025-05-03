@@ -41,7 +41,7 @@ xg_debug_enable_measure_workload_wait_time_m    0
 ########## Vulkan Backend ##########
 
 # Resources containers
-xg_vk_max_devices_m                             1
+xg_vk_max_devices_m                             2
 xg_vk_max_swapchains_m                          128
 xg_vk_max_graphics_pipelines_m                  1024
 xg_vk_max_compute_pipelines_m                   128

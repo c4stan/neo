@@ -11,3 +11,6 @@ if win32
     includes = $assimp_include
     bindings = assimp_models
 endif
+if linux
+    libs = assimp
+endif

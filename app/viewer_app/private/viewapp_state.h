@@ -137,8 +137,8 @@ typedef struct {
     xi_section_state_t xf_textures_state;
 
     uint64_t expanded_nodes_bitset[1];
+    uint64_t expanded_entities_bitset[8];
 
-    bool debug_textures_state[64];
     xf_texture_h debug_textures_array[32];
     uint32_t debug_textures_count;
 

@@ -89,6 +89,9 @@ typedef enum {
     xi_vertical_alignment_invalid_m,
 } xi_vertical_alignment_e;
 
+// margin: minimum distance between the element and its layer's border. in between there can be other elements
+// padding: additional distance between the element and whatever (element, border) is before (TODO: and after?) to it. always applies
+// TODO rename the first to border_margin, the second to margin, add padding to mean internal margin (useful distinction in some cases like buttons)
 typedef struct {
     xi_font_h font;
     uint32_t font_height;
@@ -399,7 +402,13 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    xi_transform_mode_translation_m,
+    xi_transform_mode_rotation_m,
+} xi_transform_mode_e;
+
 typedef struct {
+    xi_transform_mode_e mode;
     float position[3];
     float rotation[4];
     xi_id_t id;
@@ -408,6 +417,7 @@ typedef struct {
 } xi_transform_state_t;
 
 #define xi_transform_state_m(...) ( xi_transform_state_t ) { \
+    .mode = xi_transform_mode_translation_m, \
     .position = { 0, 0, 0 }, \
     .rotation = { 0, 0, 0, 1 }, \
     .id = xi_line_id_m(), \

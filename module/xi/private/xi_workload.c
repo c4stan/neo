@@ -229,21 +229,6 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
                             .range = xg->write_workload_uniform ( flush_params->workload, &draw_uniforms, sizeof ( draw_uniforms ) )
                         )
                     },
-                    .texture_count = 1,
-                    .textures = {
-                        xg_texture_resource_binding_m (
-                            .shader_register = 1,
-                            .layout = xg_texture_layout_shader_read_m,
-                            .texture = mesh->texture != xg_null_handle_m ? mesh->texture : null_texture,
-                        )
-                    },
-                    .sampler_count = 1,
-                    .samplers = {
-                        xg_sampler_resource_binding_m (
-                            .shader_register = 2,
-                            .sampler = mesh->linear_sampler_filter ? linear_sampler : point_sampler,
-                        )
-                    }
                 )
             ) );
 
@@ -253,8 +238,8 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
                 .pipeline = pipeline_state,
                 .bindings[xg_shader_binding_set_dispatch_m] = group,
                 .primitive_count = mesh->idx_count / 3,
-                .vertex_buffers_count = 3,
-                .vertex_buffers = { mesh->pos_buffer, mesh->nor_buffer, mesh->uv_buffer },
+                .vertex_buffers_count = 1,
+                .vertex_buffers = { mesh->pos_buffer },
                 .index_buffer = mesh->idx_buffer
             ) );
 

@@ -161,6 +161,9 @@ void std_bitset_clear ( uint64_t* bitset, size_t idx );
 // returns false if no bit set to 1 was found
 bool std_bitset_scan ( uint64_t* out_idx, const uint64_t* bitset, size_t starting_bit_idx, size_t total_u64_count );
 bool std_bitset_scan_rev ( uint64_t* out_idx, const uint64_t* bitset, size_t starting_bit_idx );
+// shift the entire bitset
+//void std_bitset_shift_left ( uint64_t* bitset, size_t bit_idx, size_t shift_count, size_t total_u64_count );
+//void std_bitset_shift_right ( uint64_t* bitset, size_t bit_idx, size_t shift_count );
 
 bool std_bitset_set_atomic ( uint64_t* bitset, size_t idx );
 bool std_bitset_clear_atomic ( uint64_t* bitset, size_t idx );

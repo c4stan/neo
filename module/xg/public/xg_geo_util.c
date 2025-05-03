@@ -228,45 +228,57 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .upload_data = geo->pos,
     ) );
 
-    xg_buffer_h nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .device = device,
-        .size = sizeof ( float ) * geo->vertex_count * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "vbuffer_nor"
-    ), &xg_buffer_init_m (
-        .mode = xg_buffer_init_mode_upload_m,
-        .upload_data = geo->nor,
-    ) );
+    xg_buffer_h nor_buffer = xg_null_handle_m;
+    if ( geo->nor ) {
+        nor_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
+            .device = device,
+            .size = sizeof ( float ) * geo->vertex_count * 3,
+            .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
+            .debug_name = "vbuffer_nor"
+        ), &xg_buffer_init_m (
+            .mode = xg_buffer_init_mode_upload_m,
+            .upload_data = geo->nor,
+        ) );
+    }
 
-    xg_buffer_h tan_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .device = device,
-        .size = sizeof ( float ) * geo->vertex_count * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "vbuffer_tan"
-    ), &xg_buffer_init_m (
-        .mode = xg_buffer_init_mode_upload_m,
-        .upload_data = geo->tan,
-    ) );
+    xg_buffer_h tan_buffer = xg_null_handle_m;
+    if ( geo->tan ) {
+        tan_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
+            .device = device,
+            .size = sizeof ( float ) * geo->vertex_count * 3,
+            .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
+            .debug_name = "vbuffer_tan"
+        ), &xg_buffer_init_m (
+            .mode = xg_buffer_init_mode_upload_m,
+            .upload_data = geo->tan,
+        ) );
+    }
 
-    xg_buffer_h bitan_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .device = device,
-        .size = sizeof ( float ) * geo->vertex_count * 3,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "vbuffer_bitan"
-    ), &xg_buffer_init_m (
-        .mode = xg_buffer_init_mode_upload_m,
-        .upload_data = geo->bitan,
-    ) );
+    xg_buffer_h bitan_buffer = xg_null_handle_m;
+    if ( geo->bitan ) {
+        bitan_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
+            .device = device,
+            .size = sizeof ( float ) * geo->vertex_count * 3,
+            .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
+            .debug_name = "vbuffer_bitan"
+        ), &xg_buffer_init_m (
+            .mode = xg_buffer_init_mode_upload_m,
+            .upload_data = geo->bitan,
+        ) );
+    }
 
-    xg_buffer_h uv_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
-        .device = device,
-        .size = sizeof ( float ) * geo->vertex_count * 2,
-        .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
-        .debug_name = "vbuffer_uv"
-    ), &xg_buffer_init_m (
-        .mode = xg_buffer_init_mode_upload_m,
-        .upload_data = geo->uv,
-    ) );
+    xg_buffer_h uv_buffer = xg_null_handle_m;
+    if ( geo->uv ) {
+        uv_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
+            .device = device,
+            .size = sizeof ( float ) * geo->vertex_count * 2,
+            .allowed_usage = xg_buffer_usage_bit_copy_dest_m | xg_buffer_usage_bit_vertex_buffer_m | xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m,
+            .debug_name = "vbuffer_uv"
+        ), &xg_buffer_init_m (
+            .mode = xg_buffer_init_mode_upload_m,
+            .upload_data = geo->uv,
+        ) );
+    }
 
     xg_buffer_h idx_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
         .device = device,

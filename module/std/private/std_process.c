@@ -348,9 +348,7 @@ std_process_h std_process ( const char* executable, const char* process_name, co
             // why does execv take a pointer to a non-const char? can the arg be modified?
             execv ( executable, process_args );
         }
-
-        // TODO some error occured, look at errno
-        //std_log_error_m ( "Process exited with errno code " std_fmt_int_m, errno );
+        std_log_os_error_m();
     } else {
         std_assert_m ( pid > 0 );
 
@@ -511,8 +509,9 @@ bool std_process_io_read ( void* dest, size_t* out_read_size, size_t size, uint6
 
     if ( read_retcode == FALSE ) {
         DWORD error = GetLastError();
-        std_unused_m ( error );
-        std_assert_m ( error == ERROR_BROKEN_PIPE );
+        if ( error != ERROR_BROKEN_PIPE ) { // Pipe has been already closed from the other side
+            std_log_os_error_m();
+        }
 
         if ( out_read_size ) {
             *out_read_size = 0;
@@ -529,11 +528,16 @@ bool std_process_io_read ( void* dest, size_t* out_read_size, size_t size, uint6
 #elif defined(std_platform_linux_m)
     ssize_t read_retcode = read ( ( int ) pipe, dest, size );
 
+    if ( read_retcode == -1 ) {
+        std_log_os_error_m();
+        return false;
+    }
+
     if ( out_read_size ) {
         *out_read_size = ( size_t ) read_retcode;
     }
 
-    return read_retcode != 0;
+    return true;
 #endif
 }
 
@@ -629,15 +633,15 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
 
     std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
     return pipe_handle;
-
-#if 0
-    std_process_pipe_name_t pipe_name;
-    pipe_name.hash = std_hash_djb2_64 ( params->name, std_str_len ( params->name ) );
-    std_str_copy ( pipe_name.name, std_process_pipe_name_max_len_m, params->name );
-    std_map_insert ( &state->pipes_map, &pipe_name, &pipe );
-#endif
 #else
-    mkfifo ( params->name, 0666 );
+    char pipe_name[256];
+    {
+        std_stack_t stack = std_static_stack_m ( pipe_name );
+        std_stack_string_append ( &stack, "/tmp/" );
+        std_stack_string_append ( &stack, params->name );
+    }
+
+    mkfifo ( pipe_name, 0666 );
 
     int flags = 0;
 
@@ -649,7 +653,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
         flags |= O_WRONLY;
     }
 
-    if ( params->flags & std_process_pipe_flags_blocking_m == 0 ) {
+    if ( ( params->flags & std_process_pipe_flags_blocking_m ) == 0 ) {
         flags |= O_NONBLOCK;
     }
 
@@ -677,8 +681,14 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
 
     return connect_result == TRUE;
 #elif defined(std_platform_linux_m)
-    // TODO linux
-    return false;
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+
+    // linux fifos connect on open
+    if ( pipe->os_handle >= 0 ) {
+        return true;
+    } else {
+        return false;
+    }
 #endif
 }
 
@@ -737,8 +747,42 @@ std_pipe_h std_process_pipe_connect ( const char* name, std_process_pipe_flags_b
     }
 
 #elif defined(std_platform_linux_m)
-    // TODO linux
-    return std_process_null_handle_m;
+    int open_flags = 0;
+
+    if ( ( flags & std_process_pipe_flags_read_m ) && ( flags & std_process_pipe_flags_write_m ) ) {
+        open_flags |= O_RDWR;
+    } else if ( flags & std_process_pipe_flags_read_m ) {
+        open_flags |= O_RDONLY;
+    } else if ( flags & std_process_pipe_flags_write_m ) {
+        open_flags |= O_WRONLY;
+    }
+
+    if ( !( flags & std_process_pipe_flags_blocking_m ) ) {
+        open_flags |= O_NONBLOCK;
+    }
+
+    char pipe_path[256];
+    {
+        std_stack_t stack = std_static_stack_m ( pipe_path );
+        std_stack_string_append ( &stack, "/tmp/" );
+        std_stack_string_append ( &stack, name );
+    }
+
+    int fd = open ( pipe_path, open_flags );
+    if ( fd >= 0 ) {
+        std_process_pipe_t* pipe = std_list_pop_m ( &std_process_state->pipes_freelist );
+        std_assert_m ( pipe );
+        pipe->os_handle = ( uint64_t ) fd;
+        pipe->is_owner = false;
+        std_mem_zero_m ( &pipe->params );
+        std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, name );
+
+        std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
+        return pipe_handle;
+    } else {
+        std_log_os_error_m();
+        return std_process_null_handle_m;
+    }
 #endif
 }
 
@@ -763,8 +807,19 @@ bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, co
 
     return true;
 #elif defined(std_platform_linux_m)
-    // TODO linux
-    return false;
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+
+    ssize_t result = write ( pipe->os_handle, data, size );
+    if ( result == -1 ) {
+        std_log_os_error_m();
+        return false;
+    }
+
+    if ( out_write_size ) {
+        *out_write_size = result;
+    }
+
+    return true;
 #endif
 }
 
@@ -786,19 +841,30 @@ bool std_process_pipe_read ( size_t* out_read_size, void* dest, size_t capacity,
 
     return true;
 #elif defined(std_platform_linux_m)
-    // TODO linux
-    return false;
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+
+    ssize_t result = read ( pipe->os_handle, dest, capacity );
+    if ( result == -1 ) {
+        std_log_os_error_m();
+        return false;
+    }
+
+    if ( out_read_size ) {
+        *out_read_size = result;
+    }
+
+    return true;
 #endif
 }
 
 void std_process_pipe_destroy ( std_pipe_h pipe_handle ) {
 #if defined(std_platform_win32_m)
     std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
-
     CloseHandle ( ( HANDLE ) pipe->os_handle );
-
     std_list_push ( &std_process_state->pipes_freelist, pipe );
 #elif defined(std_platform_linux_m)
-    // TODO linux
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+    close ( pipe->os_handle );
+    std_list_push ( &std_process_state->pipes_freelist, pipe );
 #endif
 }

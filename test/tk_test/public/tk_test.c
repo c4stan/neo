@@ -145,6 +145,9 @@ static void test_tk() {
     tk->stop();
 
     std_module_unload_m ( tk_module_name_m );
+
+    std_virtual_heap_free ( data );
+    std_virtual_heap_free ( args );
 }
 
 void std_main ( void ) {

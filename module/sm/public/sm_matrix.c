@@ -50,17 +50,17 @@ sm_mat_4x4f_t sm_matrix_4x4f_axis_rotation ( sm_vec_3f_t axis, float radians ) {
 
     sm_mat_4x4f_t result;
     result.v0.x = c + temp.x * axis.x;
-    result.v0.y = temp.x * axis.y + s * axis.z;
-    result.v0.z = temp.x * axis.z - s * axis.y;
+    result.v0.y = temp.x * axis.y - s * axis.z;
+    result.v0.z = temp.x * axis.z + s * axis.y;
     result.v0.w = 0;
 
-    result.v1.x = temp.y * axis.x - s * axis.z;
+    result.v1.x = temp.y * axis.x + s * axis.z;
     result.v1.y = c + temp.y * axis.y;
-    result.v1.z = temp.y * axis.z + s * axis.x;
+    result.v1.z = temp.y * axis.z - s * axis.x;
     result.v1.w = 0;
 
-    result.v2.x = temp.z * axis.x + s * axis.y;
-    result.v2.y = temp.z * axis.y - s * axis.x;
+    result.v2.x = temp.z * axis.x - s * axis.y;
+    result.v2.y = temp.z * axis.y + s * axis.x;
     result.v2.z = c + temp.z * axis.z;
     result.v2.w = 0;
 

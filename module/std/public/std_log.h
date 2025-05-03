@@ -167,12 +167,7 @@ void    std_log_print              ( std_log_msg_t msg, ... ); // msg, format
 bool std_log_debugger_attached ( void );
 
 void std_log_os_error ( std_log_scope_t scope );
-
-#if defined std_platform_win32_m
-    #define std_log_os_error_m() std_log_os_error ( std_log_scope_m() )
-#else
-// TODO
-#endif
+#define std_log_os_error_m() std_log_os_error ( std_log_scope_m() )
 
 void std_log_print_callstack ( void );
 

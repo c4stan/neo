@@ -6,9 +6,9 @@
 
 #include <std_platform.h>
 
+#if defined ( std_platform_win32_m )
 #include <memoryapi.h>
 
-#if defined ( std_platform_win32_m )
 // https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples
 static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t* size ) {
@@ -69,7 +69,59 @@ exit:
     if ( view2 ) UnmapViewOfFileEx ( view2, 0 );
 }
 #elif defined ( std_platform_linux_m ) 
-    // TODO
+static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t* size ) {
+    size_t queue_size = std_pow2_round_up ( std_virtual_page_align ( *size ) );
+
+    int fd = -1;
+    int counter = 0;
+    char seg_name[1024] = "";
+
+    // Open a shared memory segment
+    while ( true ) {
+        const char* name = "std_aliased_queue";
+        snprintf ( seg_name, sizeof ( seg_name ), "/%s-%d-%d", name, getpid(), counter );
+        fd = shm_open ( seg_name, O_RDWR | O_CREAT | O_EXCL, 0600 );
+
+        if ( fd != -1 ) {
+            break;
+        }
+
+        if ( errno == EEXIST ) {
+            ++counter;
+            continue;
+        }
+
+        goto exit;
+    }
+
+    // Resize and remap the segment
+    if ( ftruncate ( fd, 2 * queue_size ) == -1 ) {
+        goto exit;
+    }
+
+    void* first_half = mmap ( 0, 2 * queue_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+    if ( base == MAP_FAILED ) {
+        goto exit;
+    }
+
+    void* second_half = mmap ( first_half + queue_size, queue_size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0 );
+    if ( second_half == MAP_FAILED ) {
+        goto exit;
+    }
+
+    // Cleanup and return
+    close ( fd );
+    shm_unlink ( seg_name );
+
+    *base = first_half;
+    *alias = second_half;
+    *size = queue_size;
+    return;
+
+exit:
+    close ( fd );
+    shm_unlink ( seg_name );
+}
 #endif
 
 //==============================================================================
@@ -93,8 +145,12 @@ std_queue_local_t std_queue_local_create ( size_t size ) {
 }
 
 void std_queue_local_destroy ( std_queue_local_t* queue ) {
+#if defined ( std_platform_win32_m )
     UnmapViewOfFile ( queue->base );
     UnmapViewOfFile ( queue->alias );
+#elif defined ( std_platform_linux_m )
+    munmap ( queue->base, 2 * ( queue->ring.mask + 1 ) );
+#endif
 }
 
 void std_queue_local_clear ( std_queue_local_t* queue ) {
@@ -401,8 +457,12 @@ std_queue_shared_t std_queue_shared_create ( size_t size ) {
 }
 
 void std_queue_shared_destroy ( std_queue_shared_t* queue ) {
+#if defined ( std_platform_win32_m )
     UnmapViewOfFile ( queue->base );
     UnmapViewOfFile ( queue->alias );
+#elif defined ( std_platform_linux_m )
+    munmap ( queue->base, 2 * ( queue->mask + 1 ) );
+#endif
 }
 
 void std_queue_shared_clear ( std_queue_shared_t* queue ) {

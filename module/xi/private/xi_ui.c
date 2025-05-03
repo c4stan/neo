@@ -1843,18 +1843,44 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     bool down = false;
 
     if ( xi_ui_state->active_id == state->id ) {
-        const rv_view_info_t* view = &xi_ui_state->update.view_info;
-        // TODO negate v
-        sm_vec_3f_t n = sm_quat_to_vec ( sm_quat ( view->transform.orientation ) );
-        //sm_vec_3f_t n = sm_vec_3f_norm ( sm_vec_3f_sub ( sm_vec_3f ( view->transform.focus_point ), sm_vec_3f ( view->transform.position ) ) );
-        float d = sm_vec_3f_dot ( sm_vec_3f_neg ( n ), p );
-        sm_vec_4f_t plane = { n.x, n.y, n.z, d };
-        float depth;
-        xi_ui_ray_plane_intersect ( &p, &depth, sm_vec_3f ( ray.origin ), sm_vec_3f ( ray.direction ), plane );
-        state->position[0] = p.x;
-        state->position[1] = p.y;
-        state->position[2] = p.z;
-        down = true;
+        if ( state->mode == xi_transform_mode_translation_m ) {
+            const rv_view_info_t* view = &xi_ui_state->update.view_info;
+            sm_vec_3f_t n = sm_quat_to_vec ( sm_quat ( view->transform.orientation ) );
+            float d = sm_vec_3f_dot ( sm_vec_3f_neg ( n ), p );
+            sm_vec_4f_t plane = { n.x, n.y, n.z, d };
+            float depth;
+            xi_ui_ray_plane_intersect ( &p, &depth, sm_vec_3f ( ray.origin ), sm_vec_3f ( ray.direction ), plane );
+            state->position[0] = p.x;
+            state->position[1] = p.y;
+            state->position[2] = p.z;
+            down = true;
+        } else if ( state->mode == xi_transform_mode_rotation_m ) {
+            float drag_scale = -1.f / 400;
+            int64_t delta_x = xi_ui_state->update.mouse_delta_x;
+            int64_t delta_y = xi_ui_state->update.mouse_delta_y;
+            sm_quat_t orientation = sm_quat ( state->rotation );
+
+            if ( delta_x != 0 ) {
+                sm_vec_3f_t up = { 0, 1, 0 };
+                sm_quat_t q = sm_quat_axis_rotation ( up, -delta_x * drag_scale );
+                orientation = sm_quat_mul ( orientation, q );
+            }
+
+            if ( delta_y != 0 ) {
+                sm_vec_3f_t up = { 0, 1, 0 };
+                sm_vec_3f_t axis = sm_vec_3f_cross ( up, sm_vec_3f ( state->position ) );
+                axis = sm_vec_3f_norm ( axis );
+                sm_quat_t q = sm_quat_axis_rotation ( axis, delta_y * drag_scale );
+                orientation = sm_quat_mul ( orientation, q );
+            }
+
+            state->rotation[0] = orientation.x;
+            state->rotation[1] = orientation.y;
+            state->rotation[2] = orientation.z;
+            state->rotation[3] = orientation.w;
+        } else {
+            std_not_implemented_m();
+        }
     } else {
         down = false;
     }
@@ -1893,7 +1919,9 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     return down;
 }
 
+#if defined ( std_platform_win32_m )
 #include <Commdlg.h>
+#endif
 
 bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir ) {
     if ( !initial_dir ) {
@@ -1924,5 +1952,6 @@ bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir ) {
     return result != 0;
 #else
     std_not_implemented_m();
+    return false;
 #endif
 }

@@ -38,6 +38,20 @@ sm_vec_3f_t sm_quat_transform_f3 ( sm_quat_t q, sm_vec_3f_t vec ) {
     return sm_vec_3f_add ( sm_vec_3f_add ( a, b ), c );
 }
 
+sm_quat_t sm_quat_axis_rotation ( sm_vec_3f_t axis, float radians ) {
+    float half_angle = radians * 0.5f;
+    float sin_half = sinf ( half_angle );
+    float cos_half = cosf ( half_angle );
+
+    sm_quat_t q = {
+        .x = axis.x * sin_half,
+        .y = axis.y * sin_half,
+        .z = axis.z * sin_half,
+        .w = cos_half,
+    };
+    return q;
+}
+
 sm_mat_4x4f_t sm_quat_to_4x4f ( sm_quat_t q ) {
     float x2 = q.x * q.x;
     float y2 = q.y * q.y;

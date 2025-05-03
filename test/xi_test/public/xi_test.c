@@ -210,58 +210,13 @@ static void xi_test ( void ) {
     wm->get_window_info ( window, &window_info );
 
     // ui
-    #if 0
-    xi_style_t window_style = xi_default_style_m;
-    {
-        window_style.font = font;
-        window_style.font_height = 14;
-        window_style.color = xi_color_black_m;//xi_color_rgba_u32_m ( 100, 100, 100, 100 );
-    }
-    xi_style_t label_style = xi_default_style_m;
-    {
-        label_style.font = font;
-    }
-    xi_style_t switch_style = xi_default_style_m;
-    {
-        switch_style.font = font;
-        switch_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
-        switch_style.color = xi_color_blue_m;
-    }
-    xi_style_t slider_style = xi_default_style_m;
-    {
-        slider_style.color = xi_color_blue_m;
-        slider_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
-    }
-    xi_style_t button_style = xi_default_style_m;
-    {
-        button_style.color = xi_color_blue_m;
-        button_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
-        button_style.font = font;
-        button_style.font_height = 14;
-    }
-    xi_style_t text_style = xi_default_style_m;
-    {
-        text_style.color = xi_color_blue_m;
-        text_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
-        text_style.font = font;
-        text_style.font_height = 14;
-    }
-    xi_style_t select_style = xi_default_style_m;
-    {
-        select_style.color = xi_color_blue_m;
-        select_style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m;
-        select_style.font = font;
-        select_style.font_height = 14;
-    }
-    #endif
-
     xi_window_state_t ui_window = xi_window_state_m (
         .title = "window",
-        .x = 50,
-        .y = 100,
-        .width = 200,
+        .x = 20,
+        .y = 20,
+        .width = 250,
         .height = 250,
-        .style = xi_style_m (
+        .style = xi_default_style_m (
             .font = font,
         ),
     );
@@ -292,10 +247,7 @@ static void xi_test ( void ) {
             .horizontal_alignment = xi_horizontal_alignment_right_to_left_m 
         ),
     );
-    //char ui_slider_label_buffer[32];
-    //{
-    //    std_f32_to_str ( 0, ui_slider_label_buffer, 32 );
-    //}
+
     xi_label_state_t ui_slider_label = xi_label_state_m (
         .text = "0",
         .height = 14,
@@ -314,22 +266,6 @@ static void xi_test ( void ) {
         .height = 14,
     );
 
-#if 0
-    char ui_text_buffer[32] = {0};
-    xi_text_state_t ui_text = xi_text_state_m (
-        ui_text.width = 100;
-        ui_text.height = 20;
-        ui_text.text = ui_text_buffer;
-        ui_text.text_capacity = 32;
-    )
-    xi_label_state_t ui_text_label = xi_default_label_state_m;
-    {
-        ui_text_label.height = 14;
-        ui_text_label.text = ui_text.text;
-    }
-#endif
-
-    //const char* ui_select_items[] = {"qwe", "asd", "zxc"};
     void* select_alloc = std_virtual_heap_alloc_m ( 128, 8 );
     {
         std_stack_t stack = std_stack ( select_alloc, 128 );
@@ -395,8 +331,10 @@ static void xi_test ( void ) {
 
     rv_i* rv = std_module_load_m ( rv_module_name_m );
     rv_view_params_t view_params = rv_view_params_m (
-        .position = { 0, 0, -8 },
-        .proj_params = rv_projection_params_m (
+        .transform = rv_view_transform_m (
+            .position = { 0, 0, -8 },
+        ),
+        .proj_params.perspective = rv_perspective_projection_params_m (
             .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
             .near_z = 0.1,
             .far_z = 1000,
@@ -452,10 +390,6 @@ static void xi_test ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        //xg->acquire_swapchain ( swapchain, workload );
-        //xg_texture_h xg_swapchain_texture = xg->get_swapchain_texture ( swapchain );
-        //xf->bind_texture ( swapchain_texture, xg_swapchain_texture );
-
         // build ui
         {
             std_f32_to_str ( ui_slider.value, ui_slider_label.text, 32 );
@@ -484,9 +418,6 @@ static void xi_test ( void ) {
             xi->begin_window ( xi_workload, &ui_window );
             xi->begin_section ( xi_workload, &ui_section );
             xi->add_label ( xi_workload, &ui_label );
-            xi->add_label ( xi_workload, &ui_label );
-            xi->newline();
-            xi->add_label ( xi_workload, &ui_label );
             xi->newline();
             xi->add_label ( xi_workload, &ui_switch_label );
             xi->add_switch ( xi_workload, &ui_switch );
@@ -496,19 +427,16 @@ static void xi_test ( void ) {
             xi->newline();
             xi->end_section ( xi_workload );
             xi->begin_section ( xi_workload, &ui_section2 );
-            xi->add_label ( xi_workload, &ui_button_label );
-            xi->add_button ( xi_workload, &ui_button );
-            xi->newline();
             xi->add_label ( xi_workload, &ui_select_label );
             xi->add_select ( xi_workload, &ui_select );
+            xi->newline();
+            xi->add_label ( xi_workload, &ui_button_label );
+            xi->add_button ( xi_workload, &ui_button );
             xi->newline();
             xi->add_property_editor ( xi_workload, &ui_property_editor_3f32 );
             xi->newline();
             xi->add_property_editor ( xi_workload, &ui_property_editor_3f32_2 );
             xi->end_section ( xi_workload );
-            //xi->newline();
-            //xi->add_label ( xi_workload, &ui_button_label, &label_style );
-            //xi->add_button ( xi_workload, &ui_button, &button_style );
             xi->end_window ( xi_workload );
 
             xi->draw_transform ( xi_workload, &xform_state );

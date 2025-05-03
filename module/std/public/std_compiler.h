@@ -94,7 +94,7 @@
     #if defined(std_platform_win32_m)
         #define std_debug_break_m()                             __debugbreak()
     #else
-        #define std_debug_break_m()                             __builtin_debugtrap()
+        #define std_debug_break_m()                             raise ( SIGTRAP )
     #endif
 
     #define std_div_ceil_m( dividend, divisor )                 ( ( (dividend) + (divisor) - 1 ) / (divisor) )
@@ -150,7 +150,7 @@
     #define std_func_name_m                                       __func__
     #define std_line_num_m                                        __LINE__
     #define std_field_size_m( type, field )                       sizeof( ( ( type * ) 0 )->field )
-    #define std_field_offset_m( type, field )                     offsetof( type, field )
+    #define std_field_offset_m( type, field )                     __builtin_offsetof( type, field )
     #define std_static_array_stride_m( a )                        sizeof ( a[0] )
     #define std_static_array_capacity_m( a )                      sizeof ( a ) / sizeof ( a[0] )
     #define std_static_array_size_m( a )                          sizeof ( a )
@@ -163,7 +163,7 @@
     #if defined(std_platform_win32_m)
         #define std_debug_break_m()                                 __debugbreak()
     #else
-        #define std_debug_break_m()                                 __builtin_trap()
+        #define std_debug_break_m()                                 raise ( SIGTRAP )
     #endif
 
     #define std_div_ceil_m( dividend, divisor )                     ( ( (dividend) + (divisor) - 1 ) / (divisor) )

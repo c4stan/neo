@@ -367,6 +367,27 @@ typedef struct {
 } xg_swapchain_info_t;
 
 typedef struct {
+    uint32_t width;
+    uint32_t height;
+} xg_swapchain_size_t;
+
+typedef struct {
+    xg_format_e format;
+    xg_color_space_e color_space;
+} xg_swapchain_image_format_t;
+
+typedef struct {
+    uint32_t min_width;
+    uint32_t min_height;
+    uint32_t max_width;
+    uint32_t max_height;
+    uint32_t min_count;
+    uint32_t max_count;
+    uint32_t image_formats_count;
+    xg_swapchain_image_format_t image_formats_array[xg_swpachain_max_capability_formats];
+} xg_swapchain_window_capabilities_t;
+
+typedef struct {
     size_t texture_count;
     xg_format_e format;
     xg_color_space_e color_space;
@@ -2446,6 +2467,7 @@ typedef struct {
     xg_swapchain_h          ( *create_display_swapchain )           ( const xg_swapchain_display_params_t* params );
     xg_swapchain_h          ( *create_virtual_swapchain )           ( const xg_swapchain_virtual_params_t* params );
     bool                    ( *resize_swapchain )                   ( xg_swapchain_h swapchain, size_t width, size_t height );
+    void                    ( *get_window_swapchain_capabilities )  ( xg_swapchain_window_capabilities_t* capabilities, xg_device_h device, wm_window_h window );
     bool                    ( *get_swapchain_info )                 ( xg_swapchain_info_t* info, xg_swapchain_h swapchain );
     // TODO have the option to acquire the swapchain texture through a resource cmd buffer?
     void                    ( *acquire_swapchain )                  ( xg_swapchain_acquire_result_t* result, xg_swapchain_h swapchain, xg_workload_h workload );

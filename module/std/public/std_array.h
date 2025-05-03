@@ -22,7 +22,7 @@
 #else
 
 // TODO waiting for Clang to support C23 improved tag compatibility (N3037)...
-#if defined(std_compiler_gcc_m)
+#if 0 && defined(std_compiler_gcc_m)
 #define std_array_type_m( type ) struct array_ ## type { type* data; uint64_t count; uint64_t capacity; }
 #else
 #define std_array_type_m( type ) struct std_pp_eval_concat_m ( array_, std_pp_eval_concat_m ( type, __LINE__ ) ) { type* data; uint64_t count; uint64_t capacity; }

@@ -325,7 +325,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .device = device,
         .debug_name = "raster_graph",
         .sort = false,
-        .alias_resources =  false,
+        //.alias_resources =  false,
         .alias_memory =     false,
     ) );
     m_state->render.raster_graph = graph;
@@ -407,21 +407,21 @@ static void viewapp_boot_raster_graph ( void ) {
         .type = xf_node_type_clear_pass_m,
         .pass.clear = xf_node_clear_pass_params_m (
             .textures = { 
-                xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
             }
         ),
         .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 5,
             .copy_texture_writes = {
+                xf_copy_texture_dependency_m ( .texture = depth_texture ),
                 xf_copy_texture_dependency_m ( .texture = color_texture ),
                 xf_copy_texture_dependency_m ( .texture = normal_texture ),
                 xf_copy_texture_dependency_m ( .texture = object_id_texture ),
                 xf_copy_texture_dependency_m ( .texture = velocity_texture ),
-                xf_copy_texture_dependency_m ( .texture = depth_texture ),
             }
         ),
     ) );
@@ -2091,8 +2091,8 @@ static void viewapp_load_scene ( uint32_t id ) {
 }
 
 static void viewapp_boot ( void ) {
-    uint32_t resolution_x = 1920;//1024;
-    uint32_t resolution_y = 1024;//768;
+    uint32_t resolution_x = 1024;//1920;
+    uint32_t resolution_y = 768;//1024;
 
     m_state->render.resolution_x = resolution_x;
     m_state->render.resolution_y = resolution_y;
@@ -2338,35 +2338,38 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             // drag
             if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
                 float drag_scale = -1.f / 400;
-                sm_vec_3f_t v = {
-                    //xform.position[0] - xform.focus_point[0],
-                    //xform.position[1] - xform.focus_point[1],
-                    //xform.position[2] - xform.focus_point[2],
-                };
+                sm_vec_3f_t v = sm_vec_3f ( xform.position );
 
                 int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
                 int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
 
                 if ( delta_x != 0 ) {
                     sm_vec_3f_t up = { 0, 1, 0 };
-                    sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( up, delta_x * drag_scale );
-
-                    v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
+                    sm_quat_t q = sm_quat_axis_rotation ( up, -delta_x * drag_scale );
+                    v = sm_quat_transform_f3 ( q, v );
                 }
 
                 if ( delta_y != 0 ) {
                     sm_vec_3f_t up = { 0, 1, 0 };
                     sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
                     axis = sm_vec_3f_norm ( axis );
-
-                    sm_mat_4x4f_t mat = sm_matrix_4x4f_axis_rotation ( axis, -delta_y * drag_scale );
-                    v = sm_matrix_4x4f_transform_f3_dir ( mat, v );
+                    sm_quat_t q = sm_quat_axis_rotation ( axis, delta_y * drag_scale );
+                    v = sm_quat_transform_f3 ( q, v );
                 }
 
                 if ( delta_x != 0 || delta_y != 0 ) {
-                    //xform.position[0] = xform.focus_point[0] + v.x;
-                    //xform.position[1] = xform.focus_point[1] + v.y;
-                    //xform.position[2] = xform.focus_point[2] + v.z;
+                    xform.position[0] = v.x;
+                    xform.position[1] = v.y;
+                    xform.position[2] = v.z;
+
+                    sm_vec_3f_t dir = sm_vec_3f ( xform.position );
+                    dir = sm_vec_3f_neg ( dir );
+                    dir = sm_vec_3f_norm ( dir );
+                    sm_quat_t q = sm_quat_from_vec ( dir );
+                    xform.orientation[0] = q.e[0];
+                    xform.orientation[1] = q.e[1];
+                    xform.orientation[2] = q.e[2];
+                    xform.orientation[3] = q.e[3];
 
                     dirty_xform = true;
                 }
@@ -2379,19 +2382,14 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                     float zoom_step = -0.1;
                     float zoom_min = 0.001;
 
-                    sm_vec_3f_t v = {
-                        //xform.position[0] - xform.focus_point[0],
-                        //xform.position[1] - xform.focus_point[1],
-                        //xform.position[2] - xform.focus_point[2],
-                    };
-
+                    sm_vec_3f_t v = sm_vec_3f ( xform.position );
                     float dist = sm_vec_3f_len ( v );
                     float new_dist = fmaxf ( zoom_min, dist + ( zoom_step * wheel ) * dist );
                     v = sm_vec_3f_mul ( v, new_dist / dist );
 
-                    //xform.position[0] = xform.focus_point[0] + v.x;
-                    //xform.position[1] = xform.focus_point[1] + v.y;
-                    //xform.position[2] = xform.focus_point[2] + v.z;
+                    xform.position[0] = v.x;
+                    xform.position[1] = v.y;
+                    xform.position[2] = v.z;
 
                     dirty_xform = true;
                 }
@@ -2508,7 +2506,65 @@ static void duplicate_selection ( void ) {
     ) );
 }
 
-static void spawn_sphere ( void ) {
+static se_entity_h spawn_plane ( void ) {
+    xs_i* xs = m_state->modules.xs;
+    se_i* se = m_state->modules.se;
+
+    xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
+    xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
+    xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
+
+    xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 1.f );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
+
+    viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+        .geo_data = geo,
+        .geo_gpu_data = gpu_data,
+        .object_id_pipeline = object_id_pipeline_state,
+        .geometry_pipeline = geometry_pipeline_state,
+        .shadow_pipeline = shadow_pipeline_state,
+        .object_id = m_state->render.next_object_id++,
+        .material = viewapp_material_data_m (
+            .base_color = {
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 250 / 255.f, 2.2 )
+            },
+            .ssr = true,
+            .roughness = 0,
+            .metalness = 0,
+            .emissive = 1,
+        )
+    );
+
+    viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        .position = { 0, 0, 0 },
+    );
+
+
+    se_entity_h entity = se->create_entity( &se_entity_params_m (
+        .debug_name = "plane",
+        .update = se_entity_update_m (
+            .component_count = 2,
+            .components = {
+                se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ),
+                se_component_update_m (
+                    .id = viewapp_transform_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &transform_component ) }
+                ),
+            }
+        )
+    ) );
+
+    viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
+    viewapp_build_mesh_raytrace_geo ( entity, mesh );
+    return entity;
+}
+
+static se_entity_h spawn_sphere ( void ) {
     xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
     rv_i* rv = m_state->modules.rv;
@@ -2602,6 +2658,7 @@ static void spawn_sphere ( void ) {
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( entity, mesh );
+    return entity;
 }
 
 static void mouse_pick ( uint32_t x, uint32_t y ) {
@@ -2801,7 +2858,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         );
         if ( xi->add_select ( xi_workload, &scene_select ) ) {
             if ( scene_select.item_idx == 2 ) {
-                xi->file_pick ( std_buffer_static_array_m ( m_state->scene.custom_scene_path ), std_binding_assimp_models_m );
+                xi->file_pick ( std_buffer_static_array_m ( m_state->scene.custom_scene_path ), NULL );
             }
             if ( scene_select.item_idx != 2 || m_state->scene.custom_scene_path[0] != '\0' ) {
                 viewapp_load_scene ( scene_select.item_idx );
@@ -3008,58 +3065,6 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     }
     xi->end_section ( xi_workload );
 
-#if 0
-    // xf textures
-    xi->begin_section ( xi_workload, &m_state->ui.xf_textures_state );
-    {
-        m_state->ui.debug_textures_count = 0;
-        xf_texture_h textures_array[64];
-        uint32_t textures_count = xf->list_textures ( textures_array, 64 );
-        
-        xf_texture_info_t info_array[65];
-        for ( uint32_t i = 0; i < textures_count; ++i ) {
-            xf->get_texture_info ( &info_array[i], textures_array[i] );
-        }
-
-        std_sort_insertion ( info_array, sizeof ( xf_texture_info_t ), textures_count, viewapp_sort_texture_info, NULL, &info_array[64] );
-
-        for ( uint32_t i = 0; i < textures_count; ++i ) {
-            xf_texture_info_t info = info_array[i];
-            xi_label_state_t label = xi_label_state_m ();
-            std_str_copy_static_m ( label.text, info.debug_name );
-            xi->add_label ( xi_workload, &label );
-            xi_switch_state_t show_switch = xi_switch_state_m (
-                .width = 14,
-                .height = 14,
-                .value = m_state->ui.debug_textures_state[i],
-                .style = xi_style_m (
-                    //.horizontal_alignment = xi_horizontal_alignment_right_to_left_m
-                ),
-            );
-            xi->add_switch ( xi_workload, &show_switch );
-
-            if ( show_switch.value ) {
-                uint32_t width = 256;
-                xi->newline();
-                xi->add_texture ( xi_workload, &xi_texture_state_m (
-                    .handle = info.xg_handle,
-                    .width = width * ( ( float ) info.width / info.height ),
-                    .height = width,
-                ) );
-                m_state->ui.debug_textures_array[m_state->ui.debug_textures_count++] = info.xg_handle;
-            }
-
-            if ( show_switch.value != m_state->ui.debug_textures_state[i] ) {
-                m_state->reload = true; // TODO only on >0 change
-            }
-
-            m_state->ui.debug_textures_state[i] = show_switch.value;
-            xi->newline();
-        }
-    }
-    xi->end_section ( xi_workload );
-#endif
-
     // se entities
     bool entity_edit = false;
     xi->begin_section ( xi_workload, &m_state->ui.entities_section_state );
@@ -3067,9 +3072,10 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         se_i* se = m_state->modules.se;
 
         se_entity_h entity_list[se_max_entities_m];
-        se_entity_h destroy_list[se_max_entities_m];
+        uint32_t destroy_list[se_max_entities_m];
         uint32_t destroy_count = 0;
         size_t entity_count = se->get_entity_list ( entity_list, se_max_entities_m );
+        std_assert_m ( entity_count < 64 * 8 ); // expanded_entities_bitset
 
         bool delete_selected = false;
         if ( !old_input_state->keyboard[wm_keyboard_state_del_m] && input_state->keyboard[wm_keyboard_state_del_m] ) {
@@ -3082,7 +3088,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             xi_color_t font_color = xi_color_invalid_m;
             if ( entity == m_state->ui.mouse_pick_entity ) {
                 if ( delete_selected ) {
-                    destroy_list[destroy_count++] = entity;
+                    destroy_list[destroy_count++] = i;
                     m_state->ui.mouse_pick_entity = se_null_handle_m;
                     continue;
                 }
@@ -3101,66 +3107,131 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             std_str_copy_static_m ( label.text, props.name );
             xi->add_label ( xi_workload, &label );
             label.style.font_color = xi_color_invalid_m;
-            
-            xi_button_state_t delete_buttom = xi_button_state_m (
-                .style = xi_style_m (
-                    .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
-                ),
-                .text = "X",
-                .width = 15,
-                .id = xi_mix_id_m ( i ),
-            );
-            if ( xi->add_button ( xi_workload, &delete_buttom ) ) {
-                destroy_list[destroy_count++] = entity;
-                continue;
+
+            // arrow
+            bool hovered = xi->test_layer_row_hover ( 14 );
+            bool expanded = std_bitset_test ( m_state->ui.expanded_entities_bitset, i );
+            bool interacted = false;
+            uint64_t arrow_id, button_id;
+            if ( hovered || expanded ) {
+                xi_arrow_state_t node_arrow = xi_arrow_state_m (
+                    .width = 14,
+                    .height = 14,
+                    .style = xi_style_m (
+                        .horizontal_padding = 8
+                    ),
+                    .expanded = expanded,
+                    .id = xi_mix_id_m ( i ),
+                );
+                arrow_id = node_arrow.id;
+                bool changed = xi->add_arrow ( xi_workload, &node_arrow );
+                if ( changed ) {
+                    if ( node_arrow.expanded ) {
+                        std_bitset_set ( m_state->ui.expanded_entities_bitset, i );
+                    } else {
+                        std_bitset_clear ( m_state->ui.expanded_entities_bitset, i );
+                    }
+                }
+                interacted |= changed;
+            }
+
+            if ( hovered ) {
+                xi_button_state_t delete_button = xi_button_state_m (
+                    .style = xi_style_m (
+                        .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+                    ),
+                    .text = "X",
+                    .width = 15,
+                    .id = xi_mix_id_m ( i ),
+                );
+                button_id = delete_button.id;
+                if ( xi->add_button ( xi_workload, &delete_button ) ) {
+                    destroy_list[destroy_count++] = i;
+                    interacted = true;
+                    continue;
+                }
+            }
+
+            uint64_t hovered_element = xi->get_hovered_element_id();
+            if ( hovered_element != arrow_id && hovered_element != button_id && hovered && input_state->mouse[wm_mouse_state_left_m] ) {
+                m_state->ui.mouse_pick_entity = entity;
             }
 
             xi->newline();
 
-            char buffer[1024];
-            std_stack_t stack = std_static_stack_m ( buffer );
+            if ( expanded ) {
+                char buffer[1024];
+                std_stack_t stack = std_static_stack_m ( buffer );
 
-            for ( uint32_t j = 0; j < props.component_count; ++j ) {
-                se_component_properties_t* component = &props.components[j];
+                for ( uint32_t j = 0; j < props.component_count; ++j ) {
+                    se_component_properties_t* component = &props.components[j];
 
-                // component label
-                std_stack_string_append ( &stack, "  " );
-                std_stack_string_append ( &stack, component->name );
-                std_str_copy_static_m ( label.text, buffer );
-                std_stack_clear ( &stack );
-                xi->add_label ( xi_workload, &label );
-                xi->newline();
-
-                for ( uint32_t k = 0; k < component->property_count; ++k ) {
-                    se_property_t* property = &component->properties[k];
-
-                    // property label
+                    // component label
                     std_stack_string_append ( &stack, "  " );
-                    std_stack_string_append ( &stack, "  " );
-                    std_stack_string_append ( &stack, property->name );
+                    std_stack_string_append ( &stack, component->name );
                     std_str_copy_static_m ( label.text, buffer );
                     std_stack_clear ( &stack );
                     xi->add_label ( xi_workload, &label );
-
-                    // property editor
-                    void* component_data = se->get_entity_component ( entity, component->id, property->stream );
-                    xi_property_e type = ( xi_property_e ) property->type; // This assumes the se and xi enums are laid out identical...
-                    xi_property_editor_state_t property_editor_state = xi_property_editor_state_m ( 
-                        .type = type,
-                        .data = component_data + property->offset,
-                        .property_width = type == xi_property_bool_m ? 14 : 64,
-                        .property_height = type == xi_property_bool_m ? 14 : 0,
-                        .id = ( ( ( uint64_t ) i ) << 32 ) + ( ( ( uint64_t ) j ) << 16 ) + ( ( uint64_t ) k + 1 ),
-                        .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
-                    );
-                    entity_edit |= xi->add_property_editor ( xi_workload, &property_editor_state );
                     xi->newline();
+
+                    for ( uint32_t k = 0; k < component->property_count; ++k ) {
+                        se_property_t* property = &component->properties[k];
+
+                        // property label
+                        std_stack_string_append ( &stack, "  " );
+                        std_stack_string_append ( &stack, "  " );
+                        std_stack_string_append ( &stack, property->name );
+                        std_str_copy_static_m ( label.text, buffer );
+                        std_stack_clear ( &stack );
+                        xi->add_label ( xi_workload, &label );
+
+                        // property editor
+                        void* component_data = se->get_entity_component ( entity, component->id, property->stream );
+                        xi_property_e type = ( xi_property_e ) property->type; // This assumes the se and xi enums are laid out identical...
+                        xi_property_editor_state_t property_editor_state = xi_property_editor_state_m (
+                            .type = type,
+                            .data = component_data + property->offset,
+                            .property_width = type == xi_property_bool_m ? 14 : 64,
+                            .property_height = type == xi_property_bool_m ? 14 : 0,
+                            .id = ( ( ( uint64_t ) i ) << 32 ) + ( ( ( uint64_t ) j ) << 16 ) + ( ( uint64_t ) k + 1 ),
+                            .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ),
+                        );
+                        entity_edit |= xi->add_property_editor ( xi_workload, &property_editor_state );
+                        xi->newline();
+                    }
                 }
             }
         }
 
+        // dispatch deletes and keep expanded entities bitset in sync
+        uint32_t remaining_entities = entity_count;
         for ( uint32_t i = 0; i < destroy_count; ++i ) {
-            se->destroy_entity ( destroy_list[i] );
+            uint32_t entity_idx = destroy_list[i];
+            se->destroy_entity ( entity_list[entity_idx] );
+            --remaining_entities;
+            for ( uint32_t i = entity_idx; i < remaining_entities; ++i ) {
+                bool next = std_bitset_test ( m_state->ui.expanded_entities_bitset, i + 1 );
+                if ( next ) {
+                    std_bitset_set ( m_state->ui.expanded_entities_bitset, i );
+                } else {
+                    std_bitset_clear ( m_state->ui.expanded_entities_bitset, i );
+                }
+            }
+        }
+
+        if ( xi->add_button ( xi_workload, &xi_button_state_m (
+            .text = "add sphere",
+        ) ) ) {
+            spawn_sphere();
+        }
+
+        if ( xi->add_button ( xi_workload, &xi_button_state_m (
+            .text = "add plane",
+            .style = xi_default_style_m (
+                .horizontal_padding = 8
+            ),
+        ) ) ) {
+            spawn_plane();
         }
     }
     xi->end_section ( xi_workload );
@@ -3180,7 +3251,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         xi_transform_state_t xform = xi_transform_state_m (
             .position = { transform->position[0], transform->position[1], transform->position[2] },
+            .rotation = { transform->orientation[0], transform->orientation[1], transform->orientation[2], transform->orientation[3] },
             .sort_order = 1,
+            .mode = input_state->keyboard[wm_keyboard_state_alt_left_m] ? xi_transform_mode_rotation_m : xi_transform_mode_translation_m,
         );
         transform_drag = xi->draw_transform ( xi_workload, &xform );
 
@@ -3196,7 +3269,12 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         transform->position[0] = xform.position[0];
         transform->position[1] = xform.position[1];
         transform->position[2] = xform.position[2];
-    
+
+        //transform->orientation[0] = xform.rotation[0];
+        //transform->orientation[1] = xform.rotation[1];
+        //transform->orientation[2] = xform.rotation[2];
+        //transform->orientation[3] = xform.rotation[3];
+
         if ( rtworld_needs_update ) {
             update_raytrace_world ( workload );
         }
@@ -3278,7 +3356,7 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
-    float target_fps = 160.f;
+    float target_fps = 8.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;
@@ -3343,6 +3421,10 @@ static std_app_state_e viewapp_update ( void ) {
     viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
+    if ( m_state->render.capture_frame ) {
+        xg->debug_capture_workload ( workload );
+        m_state->render.capture_frame = false;
+    }
 
     viewapp_update_meshes();
     viewapp_update_lights();

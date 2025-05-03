@@ -1,5 +1,6 @@
 // Header
 #include <std_mutex.h>
+#include <std_log.h>
 
 #if defined(std_platform_win32_m)
     #include <synchapi.h>
@@ -41,6 +42,7 @@ void std_mutex_deinit ( std_mutex_t* mutex ) {
 }
 
 // TODO FIBER_SAFE
+// TODO on linux pthread_rwlock is not reentrant, meaning a thread owning a write lock can't take a read lock :/ this breaks a bunch of things.
 void std_rwmutex_init ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
     InitializeSRWLock ( &mutex->os );
@@ -61,6 +63,7 @@ void std_rwmutex_lock_read ( std_rwmutex_t* mutex ) {
 
     AcquireSRWLockShared ( &mutex->os );
 #elif defined(std_platform_linux_m)
+    std_log_info_m ( "lock read" );
     pthread_rwlock_rdlock ( &mutex->os );
 #endif
 }
@@ -79,6 +82,7 @@ void std_rwmutex_lock_write ( std_rwmutex_t* mutex ) {
     mutex->write_thread = thread;
     mutex->write_thread_count = 1;
 #elif defined(std_platform_linux_m)
+    std_log_info_m ( "lock write" );
     pthread_rwlock_wrlock ( &mutex->os );
 #endif
 }
@@ -93,6 +97,7 @@ void std_rwmutex_unlock_read ( std_rwmutex_t* mutex ) {
     
     ReleaseSRWLockShared ( &mutex->os );
 #elif defined(std_platform_linux_m)
+    std_log_info_m ( "unlock read" );
     pthread_rwlock_unlock ( &mutex->os );
 #endif
 }
@@ -107,6 +112,7 @@ void std_rwmutex_unlock_write ( std_rwmutex_t* mutex ) {
 
     ReleaseSRWLockExclusive ( &mutex->os );
 #elif defined(std_platform_linux_m)
+    std_log_info_m ( "unlock write" );
     pthread_rwlock_unlock ( &mutex->os );
 #endif
 }

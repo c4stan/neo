@@ -71,7 +71,7 @@ size_t wm_display_get ( wm_display_h* displays, size_t cap ) {
 
     return display_count;
 #elif defined(std_platform_linux_m)
-    std_not_implemented_m();
+    // TODO linux
     std_unused_m ( displays );
     std_unused_m ( cap );
     return 0;

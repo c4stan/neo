@@ -5,6 +5,7 @@
 #include <std_mutex.h>
 #include <std_string.h>
 #include <std_array.h>
+#include <std_file.h>
 
 #include "std_state.h"
 
@@ -59,7 +60,7 @@ static std_module_state_t* std_module_state;
 #ifdef std_module_enable_fake_loading_m
 void std_module_fakeload_api ( const char* name, void* api ) {
     // Lock, pop freelist, write to buffer
-    std_rwmutex_lock ( &std_module_state->modules_mutex );
+    //std_rwmutex_lock ( &std_module_state->modules_mutex );
     std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
     module->api = api;
     module->name.hash = std_hash_string_64_m ( name );
@@ -68,7 +69,7 @@ void std_module_fakeload_api ( const char* name, void* api ) {
     module->handle = 0;
 #endif
     std_hash_map_insert ( &std_module_state->modules_api_map, ( uint64_t ) api, ( uint64_t ) module );
-    std_rwmutex_unlock ( &std_module_state->modules_mutex );
+    //std_rwmutex_unlock ( &std_module_state->modules_mutex );
 }
 #endif
 
@@ -126,9 +127,9 @@ static bool std_module_entrypoint_name ( const char* name, const char* entrypoin
 
     return true;
 }
-#include <std_file.h>
+
 static std_module_t* std_module_load_internal ( const char* name ) {
-    std_log_info_m ( "Requested module " std_fmt_str_m " is not currently loaded. Looking up the modules library...", name );
+    //std_log_info_m ( "Requested module " std_fmt_str_m " is not currently loaded. Looking up the modules library...", name );
     // Build file and entrypoint name
     char module_file_name[std_module_name_max_len_m];
     char module_entrypoint_name[std_module_name_max_len_m];
@@ -235,29 +236,25 @@ static std_module_t* std_module_load_internal ( const char* name ) {
 }
 
 void* std_module_load ( const char* name ) {
-    std_rwmutex_lock_write ( &std_module_state->modules_mutex );
+    //std_rwmutex_lock_write ( &std_module_state->modules_mutex );
 
     std_module_t* module = std_module_lookup ( name );
-
     if ( module ) {
         std_log_error_m ( "Trying to load already loaded module " std_fmt_str_m, name );
-        std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
+        //std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
         return module->api;
     }
 
     module = std_module_load_internal ( name );
 
-    std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
-
+    //std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
     return module->api;
 }
 
 void* std_module_get ( const char* name ) {
-    std_rwmutex_lock_read ( &std_module_state->modules_mutex );
-
+    //std_rwmutex_lock_read ( &std_module_state->modules_mutex );
     std_module_t* module = std_module_lookup ( name );
-
-    std_rwmutex_unlock_read ( &std_module_state->modules_mutex );
+    //std_rwmutex_unlock_read ( &std_module_state->modules_mutex );
 
     if ( !module ) {
         std_log_error_m ( "Trying to get non loaded module " std_fmt_str_m, name );
@@ -321,19 +318,17 @@ static void std_module_unload_internal ( std_module_t* module ) {
 }
 
 void std_module_unload ( const char* name ) {
-    std_rwmutex_lock_write ( &std_module_state->modules_mutex );
+    //std_rwmutex_lock_write ( &std_module_state->modules_mutex );
 
-     std_module_t* module = std_module_lookup ( name );
-
-     if ( !module ) {
+    std_module_t* module = std_module_lookup ( name );
+    if ( !module ) {
         std_log_error_m ( "Trying to unload module " std_fmt_str_m " that is not currently loaded", name );
-        std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
+        //std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
         return;
     }
-
     std_module_unload_internal ( module );
- 
-    std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
+
+    //std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
 }
 
 size_t std_module_build ( const char* solution_name, void* output, size_t output_size ) {
@@ -427,7 +422,7 @@ void std_module_reload ( const char* solution_name ) {
         const char* p = buffer;
 
         // Lock
-        std_rwmutex_lock_write ( &std_module_state->modules_mutex );
+        //std_rwmutex_lock_write ( &std_module_state->modules_mutex );
 
         for ( int32_t i = 0; i < updated_modules_count; ++i ) {
 
@@ -520,7 +515,7 @@ void std_module_reload ( const char* solution_name ) {
         }
 
         // Unlock, return
-        std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
+        //std_rwmutex_unlock_write ( &std_module_state->modules_mutex );
 
     } else if ( updated_modules_count == 0 ) {
         std_log_info_m ( "Module reload skipped, nothing changed." );
@@ -558,7 +553,7 @@ void std_module_init ( std_module_state_t* state ) {
         );
     #else
     state->modules_name_map = std_hash_map ( state->modules_name_map_keys, state->modules_name_map_payloads, std_module_map_slots_m );
-state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
+    state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
     #endif
     std_rwmutex_init ( &state->modules_mutex );
 }

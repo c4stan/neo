@@ -455,12 +455,13 @@ def fixup_debug_app(name, flags):
     config = 'debug'
     if ('-o' in flags):
         config = 'release'
+
     if platform.system() == 'Linux':
         if makedef['output'] == ['app']:
             program_path = 'build/' + config + '/output/std_launcher.exe'
             args = name
         else:
-            program_path = 'build/debug/output/' + name + '.exe'
+            program_path = 'build/' + config + '/output/' + name + '.exe'
             args = ''
 
         launch_json = '{'\
@@ -470,7 +471,7 @@ def fixup_debug_app(name, flags):
             '"name": "(gdb) Launch",'\
             '"type": "cppdbg",'\
             '"request": "launch",'\
-            '"program": "' + program_path + '",'\
+            '"program": "${workspaceRoot}/' + program_path + '",'\
             '"args": ["' + args + '"],'\
             '"stopAtEntry": false,'\
             '"cwd": "${workspaceFolder}",'\
@@ -483,6 +484,16 @@ def fixup_debug_app(name, flags):
                     '"text": "-enable-pretty-printing",'\
                     '"ignoreFailures": true'\
                 '}'\
+                '{'\
+                    '"description": "In this mode GDB will be attached to both processes after a call to fork() or vfork().",'\
+                    '"text": "-gdb-set detach-on-fork on",'\
+                    '"ignoreFailures": true'\
+              '},'\
+              '{'\
+                    '"description": "The new process is debugged after a fork. The parent process runs unimpeded.",'\
+                    '"text": "-gdb-set follow-fork-mode parent",'\
+                    '"ignoreFailures": true'\
+              '}'\
             ']'\
         '}'\
     ']'\
@@ -493,17 +504,7 @@ def fixup_debug_app(name, flags):
         launch_json_file = open('.vscode/launch.json', 'w')
         launch_json_file.write(launch_json)
         launch_json_file.close()
-        '''filename = '.vscode/launch.json'
-        data = ''
-        with open(filename, 'r') as f:
-            for line in f:
-                data += line.split("//")[0]
-        object = json.loads(data)
-        object['configurations'][0]['program'] = '${workspaceRoot}/output/debug/' + name + '.exe'
-        object['configurations'][0]['cwd'] = '${workspaceRoot}'
-        os.remove(filename)
-        with open(filename, 'w') as f:
-            json.dump(object, f, indent = 4)'''
+
     pop_path()
 
 def create_local_workspace(root, name):
@@ -583,13 +584,22 @@ def git_status():
 
 def show_committed_version(workspace, filename):
     path = get_workspace_path(workspace)
-    base = '\\neo\\'
-    offset = path.find(base) + len(base)
-    path = path[offset:]
     if platform.system() == 'Windows':
+        base = '\\neo\\'
+        offset = path.find(base) + len(base)
+        path = path[offset:]
         path += '/' + filename
         path = path.replace('\\', '/')
-    os.system('git show HEAD:' + path + ' | subl.exe -')
+    elif platform.system() == 'Linux':
+        base = '/neo/'
+        offset = path.find(base) + len(base)
+        path = path[offset:]
+        path += '/' + filename
+
+    if platform.system() == 'Windows':
+        os.system('git show HEAD:' + path + ' | subl.exe -')
+    elif platform.system() == 'Linux':
+        os.system('git show HEAD:' + path + ' | subl -')
 
 def show_stash_version(workspace, filename):
     path = get_workspace_path(workspace)
@@ -599,7 +609,10 @@ def show_stash_version(workspace, filename):
     if platform.system() == 'Windows':
         path += '/' + filename
         path = path.replace('\\', '/')
-    os.system('git show stash@{0}:' + path + ' | subl.exe -')
+    if platform.system() == 'Windows':
+        os.system('git show stash@{0}:' + path + ' | subl.exe -')
+    elif platform.system() == 'Linux':
+        os.system('git show stash@{0}:' + path + ' | subl -')
 
 def make_title(words):
     title = format_title_string(words)

@@ -124,6 +124,7 @@ typedef struct {
     // geo
     xg_device_h device;
     xi_ui_geometry_t transform_geo;
+    xi_ui_geometry_t transform_axis[3];
 } xi_ui_state_t;
 
 void xi_ui_load ( xi_ui_state_t* state );
