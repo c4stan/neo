@@ -50,11 +50,10 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     graph->params = *params;
     graph->heap.memory_handle = xg_null_memory_handle_m;
     graph->export_node = xf_null_handle_m;
-
     graph->query_contexts_ring = std_ring ( std_static_array_capacity_m ( graph->query_contexts_array ) );
-
     graph->resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
     graph->physical_resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * 2 * xf_resource_max_mip_levels_m ) );
+    graph->node_user_arg_allocator = std_virtual_stack_create ( 128 * xf_graph_max_nodes_m );
 
     xf_graph_h handle = ( xf_graph_h ) ( graph - xf_graph_state->graphs_array );
     std_bitset_set ( xf_graph_state->graphs_bitset, handle );
@@ -73,10 +72,10 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     node->renderpass = xg_null_handle_m;
     node->renderpass_params.render_textures = xg_render_textures_layout_m();
 
-    if ( node->params.type == xf_node_type_custom_pass_m) {
+    if ( node->params.type == xf_node_type_custom_pass_m ) {
         xf_node_custom_pass_params_t* pass = &node->params.pass.custom;
         if ( pass->copy_args && pass->user_args.base ) {
-            void* alloc = std_virtual_heap_alloc_m ( pass->user_args.size, 16 ); // TODO some kind of linear allocator
+            void* alloc = std_virtual_stack_alloc_align ( &graph->node_user_arg_allocator, pass->user_args.size, 16 );
             std_mem_copy ( alloc, pass->user_args.base, pass->user_args.size );
             node->user_alloc = alloc;
         } else {
@@ -85,7 +84,7 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     } else if ( node->params.type == xf_node_type_compute_pass_m ) {
         xf_node_compute_pass_params_t* pass = &node->params.pass.compute;
         if ( pass->copy_uniform_data && pass->uniform_data.base ) {
-            void* alloc = std_virtual_heap_alloc_m ( pass->uniform_data.size, 16 ); // TODO some kind of linear allocator
+            void* alloc = std_virtual_stack_alloc_align ( &graph->node_user_arg_allocator, pass->uniform_data.size, 16 );
             std_mem_copy ( alloc, pass->uniform_data.base, pass->uniform_data.size );
             node->user_alloc = alloc;
         } else {
@@ -2502,18 +2501,6 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
     for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
         xf_node_t* node = &graph->nodes_array[i];
 
-        if ( node->params.type == xf_node_type_custom_pass_m) {
-            xf_node_custom_pass_params_t* pass = &node->params.pass.custom;
-            if ( pass->copy_args && pass->user_args.base ) {
-                std_virtual_heap_free ( node->user_alloc );
-            }
-        } else if ( node->params.type == xf_node_type_compute_pass_m ) {
-            xf_node_compute_pass_params_t* pass = &node->params.pass.compute;
-            if ( pass->copy_uniform_data && pass->uniform_data.base ) {
-                std_virtual_heap_free ( node->user_alloc );
-            }
-        }
-
         // Renderpass
         if ( node->renderpass != xg_null_handle_m ) {
             xg->cmd_destroy_renderpass ( resource_cmd_buffer, node->renderpass, xg_resource_cmd_buffer_time_workload_complete_m );
@@ -2551,6 +2538,7 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
 
     std_virtual_stack_destroy ( &graph->resource_dependencies_allocator );
     std_virtual_stack_destroy ( &graph->physical_resource_dependencies_allocator );
+    std_virtual_stack_destroy ( &graph->node_user_arg_allocator );
 
     std_list_push ( &xf_graph_state->graphs_freelist, graph );
     std_bitset_clear ( xf_graph_state->graphs_bitset, graph_handle );
