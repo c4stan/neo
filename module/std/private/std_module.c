@@ -353,18 +353,23 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
     }
 
     // The builder will send back the build results to this process through this pipe
-    std_process_pipe_params_t pipe_params;
-    pipe_params.name = "std_module_update_pipe";
-    pipe_params.flags = std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m;
-    pipe_params.write_capacity = output_size;
-    pipe_params.read_capacity = output_size;
+    std_process_pipe_params_t pipe_params = {
+        .name = "std_module_update_pipe",
+        .flags = std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m,
+        .write_capacity = output_size,
+        .read_capacity = output_size,
+    };
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
     std_assert_m ( pipe != std_process_null_handle_m );
 
     // Invoke the builder process and wait for it to finish
     std_log_info_m ( "Running build command for workspace " std_fmt_str_m "...\n", solution_name );
-    std_process_h compiler = std_process ( "python", "python", argv, 4, std_process_type_default_m, std_process_io_default_m );
-
+#if defined ( std_platform_win32_m )
+    char* python_path = "python";
+#elif defined ( std_platform_linux_m )
+    char* python_path = "python3";
+#endif
+    std_process_h compiler = std_process ( python_path, "python", argv, 4, std_process_type_default_m, std_process_io_default_m );
     std_process_pipe_wait_for_connection ( pipe );
 
     size_t read_size = 0;

@@ -190,16 +190,14 @@ typedef struct {
 
 typedef struct {
     float position[3];
-    float orientation[3];
-    float up[3];
     float scale;
+    float orientation[4];
 } viewapp_transform_component_t;
 
 #define viewapp_transform_component_m( ... ) { \
     .position = { 0, 0, 0 }, \
-    .orientation = { 0, 0, 1 }, \
-    .up = { 0, 1, 0 }, \
     .scale = 1, \
+    .orientation = { 0, 0, 0, 1 }, \
     ##__VA_ARGS__ \
 }
 

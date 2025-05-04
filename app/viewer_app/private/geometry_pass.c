@@ -6,6 +6,7 @@
 #include <se.inl>
 #include <rv.h>
 #include <sm_matrix.h>
+#include <sm_quat.h>
 
 #include <viewapp_state.h>
 
@@ -47,10 +48,11 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
         viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-        sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
-        sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
-        dir = sm_vec_3f_norm ( dir );
-        sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+        //sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
+        //sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
+        //dir = sm_vec_3f_norm ( dir );
+        //sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+        sm_mat_4x4f_t rot = sm_quat_to_4x4f ( sm_quat ( transform_component->orientation ) );
         float scale = transform_component->scale;
         sm_mat_4x4f_t trans = {
             .r0[0] = scale,
@@ -62,10 +64,11 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
             .r2[3] = transform_component->position[2],
         };
 
-        sm_vec_3f_t prev_up = sm_vec_3f ( mesh_component->prev_transform.up );
-        sm_vec_3f_t prev_dir = sm_vec_3f ( mesh_component->prev_transform.orientation );
-        prev_dir = sm_vec_3f_norm ( prev_dir );
-        sm_mat_4x4f_t prev_rot = sm_matrix_4x4f_dir_rotation ( prev_dir, prev_up );
+        //sm_vec_3f_t prev_up = sm_vec_3f ( mesh_component->prev_transform.up );
+        //sm_vec_3f_t prev_dir = sm_vec_3f ( mesh_component->prev_transform.orientation );
+        //prev_dir = sm_vec_3f_norm ( prev_dir );
+        //sm_mat_4x4f_t prev_rot = sm_matrix_4x4f_dir_rotation ( prev_dir, prev_up );
+        sm_mat_4x4f_t prev_rot = sm_quat_to_4x4f ( sm_quat ( mesh_component->prev_transform.orientation ) );
         float prev_scale = mesh_component->prev_transform.scale;
         sm_mat_4x4f_t prev_trans = {
             .r0[0] = prev_scale,
@@ -227,20 +230,21 @@ static void object_id_pass ( const xf_node_execute_args_t* node_args, void* user
 
         viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-        sm_vec_3f_t up = {
-            .x = transform_component->up[0],
-            .y = transform_component->up[1],
-            .z = transform_component->up[2],
-        };
+        //sm_vec_3f_t up = {
+        //    .x = transform_component->up[0],
+        //    .y = transform_component->up[1],
+        //    .z = transform_component->up[2],
+        //};
 
-        sm_vec_3f_t dir = {
-            .x = transform_component->orientation[0],
-            .y = transform_component->orientation[1],
-            .z = transform_component->orientation[2],
-        };
-        dir = sm_vec_3f_norm ( dir );
+        //sm_vec_3f_t dir = {
+        //    .x = transform_component->orientation[0],
+        //    .y = transform_component->orientation[1],
+        //    .z = transform_component->orientation[2],
+        //};
+        //dir = sm_vec_3f_norm ( dir );
         
-        sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+        //sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+        sm_mat_4x4f_t rot = sm_quat_to_4x4f ( sm_quat ( transform_component->orientation ) );
 
         sm_mat_4x4f_t trans = {
             .r0[0] = transform_component->scale,

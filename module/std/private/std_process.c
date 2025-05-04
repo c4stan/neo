@@ -331,7 +331,7 @@ std_process_h std_process ( const char* executable, const char* process_name, co
                 process_args[arg_idx++] = ( char* ) executable;
 
             } else {
-                process_args[arg_idx++] = ( char* ) process_name;
+                process_args[arg_idx++] = ( char* ) executable;
             }
 
             for ( size_t i = 0; i < args_count; ++i ) {
@@ -343,10 +343,10 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
         if ( type == std_process_type_console_m ) {
             // Note: trying to do this using gnome-terminal won't work, a new process gets spawned that the parent is unable to wait on
-            execv ( "/usr/bin/xterm", process_args );
+            execvp ( "/usr/bin/xterm", process_args );
         } else {
             // why does execv take a pointer to a non-const char? can the arg be modified?
-            execv ( executable, process_args );
+            execvp ( executable, process_args );
         }
         std_log_os_error_m();
     } else {
@@ -641,8 +641,27 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
         std_stack_string_append ( &stack, params->name );
     }
 
-    mkfifo ( pipe_name, 0666 );
+    // Remove any pre-existing
+    struct stat st;
+    if ( stat ( pipe_name, &st ) == 0 ) {
+        if ( !S_ISFIFO ( st.st_mode ) ) {
+            std_log_error_m ( "Pipe name " std_fmt_str_m " already exists as path" );
+            return std_process_null_handle_m;
+        }
+        if ( unlink ( pipe_name ) != 0 ) {
+            std_log_os_error_m();
+        }
+    } else if ( errno != ENOENT ) {
+        std_log_os_error_m();
+    }
 
+    if ( mkfifo ( pipe_name, 0666 ) != 0 ) {
+        if ( errno != EEXIST ) {
+            std_log_os_error_m();
+        }
+    }
+
+#if 0
     int flags = 0;
 
     if ( ( params->flags & std_process_pipe_flags_read_m ) && ( params->flags & std_process_pipe_flags_write_m ) ) {
@@ -657,15 +676,18 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
         flags |= O_NONBLOCK;
     }
 
-    int fd = open ( params->name, flags );
+    int fd = open ( pipe_name, flags );
+    if ( fd == -1 ) {
+        std_log_os_error_m();
+    }
+#endif
 
     // TODO lock/unlock a mutex
     std_process_pipe_t* pipe = std_list_pop_m ( &std_process_state->pipes_freelist );
     std_assert_m ( pipe );
-    pipe->os_handle = ( uint64_t ) fd;
+    pipe->os_handle = std_process_null_handle_m;//( uint64_t ) fd;
     pipe->is_owner = true;
     pipe->params = *params;
-    pipe->params.name = NULL;
     std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, params->name );
 
     std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
@@ -683,12 +705,34 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
 #elif defined(std_platform_linux_m)
     std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
 
-    // linux fifos connect on open
-    if ( pipe->os_handle >= 0 ) {
-        return true;
-    } else {
-        return false;
+    char pipe_name[256];
+    {
+        std_stack_t stack = std_static_stack_m ( pipe_name );
+        std_stack_string_append ( &stack, "/tmp/" );
+        std_stack_string_append ( &stack, pipe->params.name );
     }
+
+    int flags = 0;
+
+    if ( ( pipe->params.flags & std_process_pipe_flags_read_m ) && ( pipe->params.flags & std_process_pipe_flags_write_m ) ) {
+        flags |= O_RDWR;
+    } else if ( pipe->params.flags & std_process_pipe_flags_read_m ) {
+        flags |= O_RDONLY;
+    } else if ( pipe->params.flags & std_process_pipe_flags_write_m ) {
+        flags |= O_WRONLY;
+    }
+
+    if ( ( pipe->params.flags & std_process_pipe_flags_blocking_m ) == 0 ) {
+        flags |= O_NONBLOCK;
+    }
+
+    int fd = open ( pipe_name, flags );
+    if ( fd == -1 ) {
+        std_log_os_error_m();
+    }
+
+    pipe->os_handle = fd;
+    return true;
 #endif
 }
 

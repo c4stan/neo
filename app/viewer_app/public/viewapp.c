@@ -9,8 +9,7 @@
 #include <viewapp.h>
 
 #include <math.h>
-#include <sm_matrix.h>
-#include <sm_quat.h>
+#include <sm.h>
 
 #include <geometry_pass.h>
 #include <lighting_pass.h>
@@ -302,15 +301,6 @@ static void viewapp_boot_raytrace_graph ( void ) {
 #endif
 }
 
-#if 0
-static int viewapp_sort_texture_info ( const void* a, const void* b, const void* arg ) {
-    std_unused_m ( arg );
-    std_auto_m i1 = ( xf_texture_info_t* ) a;
-    std_auto_m i2 = ( xf_texture_info_t* ) b;
-    return std_str_cmp ( i1->debug_name, i2->debug_name );
-}
-#endif
-
 static void viewapp_boot_raster_graph ( void ) {
     xg_device_h device = m_state->render.device;    
     xg_swapchain_h swapchain = m_state->render.swapchain;    
@@ -354,7 +344,6 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // shadows
-    // TODO support more than one shadow...
     add_shadow_pass ( graph, shadow_texture );
 
     // gbuffer laydown
@@ -438,7 +427,6 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "lighting_texture",
     ) );
 
-#if 1
     // TODO rename these buffers more appropriately both here and in shader code
     xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = viewapp_max_lights_m * uniform_light_size(),
@@ -507,7 +495,6 @@ static void viewapp_boot_raster_graph ( void ) {
             }
         )
     ) );
-#endif
 
     struct {
         uint32_t grid_size[3];
@@ -1199,20 +1186,12 @@ static void viewapp_boot_scene_cornell_box ( void ) {
         { 0, -2.5, 0 }
     };
 
-    float plane_dir[5][3] = {
-        { 0, 1, 0 },
-        { 0, 1, 0 },
-        { 0, 1, 0 },
-        { 0, 0, 1 },
-        { 0, 0, 1 }
-    };
-
-    float plane_up[5][3] = {
-        { 0, 0, -1 },
-        { -1, 0, 0 },
-        { 1, 0, 0 },
-        { 0, -1, 0 },
-        { 0, 1, 0 },
+    sm_quat_t plane_rot[5] = {
+        sm_quat_axis_rotation ( sm_vec_3f_set ( 1, 0, 0 ), -sm_rad_quad_m ),
+        sm_quat_axis_rotation ( sm_vec_3f_set ( 0, 0, 1 ), sm_rad_quad_m ),
+        sm_quat_axis_rotation ( sm_vec_3f_set ( 0, 0, 1 ), -sm_rad_quad_m ),
+        sm_quat_axis_rotation ( sm_vec_3f_set ( 0, 0, 1 ), sm_rad_semi_m ),
+        sm_quat_identity(),
     };
 
     float plane_col[5][3] = {
@@ -1253,14 +1232,10 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 plane_pos[i][2],
             },
             .orientation = {
-                plane_dir[i][0],
-                plane_dir[i][1],
-                plane_dir[i][2],
-            },
-            .up = {
-                plane_up[i][0],
-                plane_up[i][1],
-                plane_up[i][2],
+                plane_rot[i].e[0],
+                plane_rot[i].e[1],
+                plane_rot[i].e[2],
+                plane_rot[i].e[3],
             },
         );
 
@@ -1453,10 +1428,12 @@ static void viewapp_boot_scene_field ( void ) {
             )
         );
 
+        sm_quat_t rot = sm_quat_from_vec ( sm_vec_3f_set ( 0, 1, 0 ) );
         viewapp_transform_component_t transform_component = viewapp_transform_component_m (
             .position = { x, 5, 0 },
-            .orientation = { 0, 1, 0 },
-            .up = { 0, 0, -1 },
+            .orientation = { rot.x, rot.y, rot.z, rot.w }
+            //.orientation = { 0, 1, 0 },
+            //.up = { 0, 0, -1 },
         );
 
         se->create_entity ( &se_entity_params_m (
@@ -1673,7 +1650,7 @@ static void viewapp_create_cameras ( void ) {
     // cameras
     viewapp_camera_component_t arcball_camera_component = viewapp_camera_component_m (
         .view = rv->create_view ( &view_params ),
-        .enabled = false,
+        .enabled = true,
         .type = viewapp_camera_type_arcball_m
     );
 
@@ -2167,11 +2144,11 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_transform_component_id_m, "Transform", &se_component_properties_params_m (
-        .count = 4,
+        .count = 3,
         .properties = {
             se_field_property_m ( 0, viewapp_transform_component_t, position, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_transform_component_t, orientation, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_transform_component_t, up, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, orientation, se_property_4f32_m ),
+            //se_field_property_m ( 0, viewapp_transform_component_t, up, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_transform_component_t, scale, se_property_f32_m ),
         }
     ) );
@@ -3247,36 +3224,40 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     bool transform_drag = false;
     if ( m_state->ui.mouse_pick_entity != se_null_handle_m ) {
         viewapp_transform_component_t* transform = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_transform_component_id_m, 0 );
-        std_assert_m ( transform );
+        if ( transform ) {
+            xi_transform_state_t xform = xi_transform_state_m (
+                .position = { transform->position[0], transform->position[1], transform->position[2] },
+                .rotation = { transform->orientation[0], transform->orientation[1], transform->orientation[2], transform->orientation[3] },
+                .sort_order = 1,
+                .mode = input_state->keyboard[wm_keyboard_state_alt_left_m] ? xi_transform_mode_rotation_m : xi_transform_mode_translation_m,
+            );
+            transform_drag = xi->draw_transform ( xi_workload, &xform );
 
-        xi_transform_state_t xform = xi_transform_state_m (
-            .position = { transform->position[0], transform->position[1], transform->position[2] },
-            .rotation = { transform->orientation[0], transform->orientation[1], transform->orientation[2], transform->orientation[3] },
-            .sort_order = 1,
-            .mode = input_state->keyboard[wm_keyboard_state_alt_left_m] ? xi_transform_mode_rotation_m : xi_transform_mode_translation_m,
-        );
-        transform_drag = xi->draw_transform ( xi_workload, &xform );
+            bool rtworld_needs_update = false;
+            if ( ( transform->position[0] != xform.position[0]
+                || transform->position[1] != xform.position[1]
+                || transform->position[2] != xform.position[2]
+                || transform->orientation[0] != xform.rotation[0]
+                || transform->orientation[1] != xform.rotation[1]
+                || transform->orientation[2] != xform.rotation[2]
+                || transform->orientation[3] != xform.rotation[3]
+                )
+                && m_state->render.active_graph == m_state->render.raytrace_graph )
+            {
+                rtworld_needs_update = true;
+            }
 
-        bool rtworld_needs_update = false;
-        if ( ( transform->position[0] != xform.position[0] 
-            || transform->position[1] != xform.position[1] 
-            || transform->position[2] != xform.position[2] )
-            && m_state->render.active_graph == m_state->render.raytrace_graph )
-        {
-            rtworld_needs_update = true;
-        }
+            transform->position[0] = xform.position[0];
+            transform->position[1] = xform.position[1];
+            transform->position[2] = xform.position[2];
+            transform->orientation[0] = xform.rotation[0];
+            transform->orientation[1] = xform.rotation[1];
+            transform->orientation[2] = xform.rotation[2];
+            transform->orientation[3] = xform.rotation[3];
 
-        transform->position[0] = xform.position[0];
-        transform->position[1] = xform.position[1];
-        transform->position[2] = xform.position[2];
-
-        //transform->orientation[0] = xform.rotation[0];
-        //transform->orientation[1] = xform.rotation[1];
-        //transform->orientation[2] = xform.rotation[2];
-        //transform->orientation[3] = xform.rotation[3];
-
-        if ( rtworld_needs_update ) {
-            update_raytrace_world ( workload );
+            if ( rtworld_needs_update ) {
+                update_raytrace_world ( workload );
+            }
         }
     }
 

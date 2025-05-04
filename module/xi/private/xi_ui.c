@@ -568,8 +568,8 @@ void xi_ui_update_begin ( const wm_window_info_t* window_info, const wm_input_st
 
     xi_ui_state->update.current_tick = now;
 
-    xi_ui_state->update.mouse_delta_x = input_state->cursor_x - xi_ui_state->update.input_state.cursor_x;
-    xi_ui_state->update.mouse_delta_y = input_state->cursor_y - xi_ui_state->update.input_state.cursor_y;
+    xi_ui_state->update.mouse_delta_x = ( int64_t ) input_state->cursor_x - ( int64_t ) xi_ui_state->update.input_state.cursor_x;
+    xi_ui_state->update.mouse_delta_y = ( int64_t ) input_state->cursor_y - ( int64_t ) xi_ui_state->update.input_state.cursor_y;
 
     if ( input_state->mouse[wm_mouse_state_left_m] && !xi_ui_state->update.mouse_down ) {
         xi_ui_state->update.mouse_down_tick = now;
@@ -1663,7 +1663,12 @@ static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_edit
 
 bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t* state ) {
     bool edited = false;
-    if ( state->type == xi_property_3f32_m ) {
+    if ( state->type == xi_property_4f32_m ) {
+        edited |= xi_ui_property_editor_f32 ( workload, state, 12, xi_line_id_m(), 3 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
+        edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
+    } else if ( state->type == xi_property_3f32_m ) {
         edited |= xi_ui_property_editor_f32 ( workload, state, 8, xi_line_id_m(), 2 );
         edited |= xi_ui_property_editor_f32 ( workload, state, 4, xi_line_id_m(), 1 );
         edited |= xi_ui_property_editor_f32 ( workload, state, 0, xi_line_id_m(), 0 );
@@ -1841,8 +1846,12 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     }
 
     bool down = false;
-
     if ( xi_ui_state->active_id == state->id ) {
+        down = true;
+        if ( !xi_ui_state->update.mouse_down ) {
+            xi_ui_release_active ( state->id );
+        }
+
         if ( state->mode == xi_transform_mode_translation_m ) {
             const rv_view_info_t* view = &xi_ui_state->update.view_info;
             sm_vec_3f_t n = sm_quat_to_vec ( sm_quat ( view->transform.orientation ) );
@@ -1853,7 +1862,6 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
             state->position[0] = p.x;
             state->position[1] = p.y;
             state->position[2] = p.z;
-            down = true;
         } else if ( state->mode == xi_transform_mode_rotation_m ) {
             float drag_scale = -1.f / 400;
             int64_t delta_x = xi_ui_state->update.mouse_delta_x;
@@ -1862,16 +1870,18 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
 
             if ( delta_x != 0 ) {
                 sm_vec_3f_t up = { 0, 1, 0 };
-                sm_quat_t q = sm_quat_axis_rotation ( up, -delta_x * drag_scale );
-                orientation = sm_quat_mul ( orientation, q );
+                //sm_vec_3f_t up = sm_quat_transform_f3 ( sm_quat ( state->rotation ), sm_vec_3f_set ( 0, 1, 0) );
+                sm_quat_t q = sm_quat_axis_rotation ( up, delta_x * drag_scale );
+                orientation = sm_quat_mul ( q, orientation );
             }
 
             if ( delta_y != 0 ) {
-                sm_vec_3f_t up = { 0, 1, 0 };
-                sm_vec_3f_t axis = sm_vec_3f_cross ( up, sm_vec_3f ( state->position ) );
-                axis = sm_vec_3f_norm ( axis );
-                sm_quat_t q = sm_quat_axis_rotation ( axis, delta_y * drag_scale );
-                orientation = sm_quat_mul ( orientation, q );
+                //sm_vec_3f_t up = { 0, 1, 0 };
+                //sm_vec_3f_t axis = sm_vec_3f_cross ( up, sm_vec_3f ( state->position ) );
+                //axis = sm_vec_3f_norm ( axis );
+                sm_vec_3f_t right = { 1, 0, 0 };
+                sm_quat_t q = sm_quat_axis_rotation ( right, delta_y * drag_scale );
+                orientation = sm_quat_mul ( q, orientation );
             }
 
             state->rotation[0] = orientation.x;

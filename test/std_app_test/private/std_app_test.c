@@ -101,7 +101,7 @@ void* std_app_test_load ( void* std_runtime ) {
 
     std_module_load_m ( wm_module_name_m );
 
-    std_auto_m state = std_virtual_heap_alloc_m ( std_app_test_state_t );
+    std_auto_m state = std_virtual_heap_alloc_struct_m ( std_app_test_state_t );
     state->boot = true;
     state->first_print = true;
     state->window = wm_null_handle_m;

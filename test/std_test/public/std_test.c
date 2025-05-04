@@ -232,12 +232,10 @@ static void test_platform ( void ) {
     std_platform_logical_core_info_t logical_cores_info[32];
     std_platform_physical_core_info_t physical_cores_info[32];
     std_platform_cache_info_t caches_info[32];
-    std_platform_memory_info_t memory_info;
-
+    std_platform_memory_info_t memory_info = std_platform_memory_info();
     size_t physical_cores_count = std_platform_physical_cores_info ( physical_cores_info, 32 );
     size_t logical_cores_count = std_platform_logical_cores_info ( logical_cores_info, 32 );
     size_t caches_count = std_platform_caches_info ( caches_info, 32 );
-    memory_info = std_platform_memory_info();
 
     {
         char ram_size[32];
@@ -252,7 +250,7 @@ static void test_platform ( void ) {
     for ( size_t i = 0; i < physical_cores_count; ++i ) {
         char mask[65];
         std_u64_to_bin ( physical_cores_info[i].logical_cores_mask, mask );
-        std_log_info_m ( "Physical core " std_fmt_size_m": logical cores mask " std_fmt_str_m, i, mask );
+        std_log_info_m ( "Physical core " std_fmt_size_m": logical cores mask " std_fmt_str_m, i, mask + 64 - logical_cores_count );
     }
 
     for ( size_t i = 0; i < logical_cores_count; ++i ) {
@@ -349,29 +347,33 @@ static void test_process ( void ) {
 #endif
     }
 
-#if defined ( std_platform_win32_m )
+//#if defined ( std_platform_win32_m )
     // TODO linux
     // create named pipe
-    std_process_pipe_params_t pipe_params;
-    pipe_params.name = "std_test_pipe";
-    pipe_params.flags = std_process_pipe_flags_read_m | std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m;
-    pipe_params.write_capacity = 1024;
-    pipe_params.read_capacity = 1024;
+    std_process_pipe_params_t pipe_params = {
+        .name = "std_test_pipe",
+        .flags = std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m,
+        .write_capacity = 1024,
+        .read_capacity = 1024,
+    };
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
     std_assert_m ( pipe != std_process_null_handle_m );
-#endif
+//#endif
 
     // create child process
     const char* process_arg = CHILD_PROCESS_MAGIC_NUMBER;
     const char* process_path = info.executable_path;
     std_process_h process = std_process ( process_path, "std_test", &process_arg, 1, std_process_type_default_m, std_process_io_capture_m );
 
-#if defined ( std_platform_win32_m )
+//#if defined ( std_platform_win32_m )
     // wait for child to connect to pipe and write to it
     std_process_pipe_wait_for_connection ( pipe );
     char* write_buffer = "pipe_write_data";
     bool write_result = std_process_pipe_write ( NULL, pipe, write_buffer, std_str_len ( write_buffer ) + 1 );
     std_assert_m ( write_result );
+
+    std_process_pipe_destroy ( pipe );
+    pipe = std_process_pipe_connect ( pipe_params.name, std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
     // read echo from pipe
     {
@@ -384,7 +386,7 @@ static void test_process ( void ) {
     }
 
     std_process_pipe_destroy ( pipe );
-#endif
+//#endif
 
     std_process_io_t io = std_process_get_io ( process );
     // write to child stdin
@@ -418,17 +420,19 @@ static void test_process ( void ) {
 }
 
 static void test_process_child ( void ) {
-    std_pipe_h pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_read_m | std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m );
+    std_pipe_h pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
     char buffer[64];
     size_t data_size = 0;
 
-#if defined ( std_platform_win32_m )
+//#if defined ( std_platform_win32_m )
     // TODO linux
     std_process_pipe_read ( &data_size, buffer, sizeof ( buffer ), pipe );
+    std_process_pipe_destroy ( pipe );
+    pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m );
     std_process_pipe_write ( NULL, pipe, buffer, data_size  );
     std_process_pipe_destroy ( pipe );
-#endif
+//#endif
 
     std_process_io_t io = std_process_get_io ( std_process_this() );
 

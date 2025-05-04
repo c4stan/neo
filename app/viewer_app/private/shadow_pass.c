@@ -3,6 +3,7 @@
 #include <viewapp_state.h>
 
 #include <sm_matrix.h>
+#include <sm_quat.h>
 #include <se.inl>
 
 typedef struct {
@@ -121,10 +122,11 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
 
                 viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-                sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
-                sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
-                dir = sm_vec_3f_norm ( dir );
-                sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+                //sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
+                //sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
+                //dir = sm_vec_3f_norm ( dir );
+                //sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+                sm_mat_4x4f_t rot = sm_quat_to_4x4f ( sm_quat ( transform_component->orientation ) );
                 float scale = transform_component->scale;
                 sm_mat_4x4f_t trans = {
                     .r0[0] = scale,

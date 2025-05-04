@@ -449,14 +449,14 @@ def fixup_debug_app(name, flags):
     path = get_workspace_path(name)
     push_path(path)
 
-    makedef_path = makegen.normpath(path + '/' + 'makedef')
-    makedef = makegen.parse_makedef(makedef_path, None)
-
-    config = 'debug'
-    if ('-o' in flags):
-        config = 'release'
-
     if platform.system() == 'Linux':
+        makedef_path = makegen.normpath(path + '/' + 'makedef')
+        makedef = makegen.parse_makedef(makedef_path, None)
+
+        config = 'debug'
+        if ('-o' in flags):
+            config = 'release'
+
         if makedef['output'] == ['app']:
             program_path = 'build/' + config + '/output/std_launcher.exe'
             args = name
@@ -486,7 +486,7 @@ def fixup_debug_app(name, flags):
                 '}'\
                 '{'\
                     '"description": "In this mode GDB will be attached to both processes after a call to fork() or vfork().",'\
-                    '"text": "-gdb-set detach-on-fork on",'\
+                    '"text": "-gdb-set detach-on-fork true",'\
                     '"ignoreFailures": true'\
               '},'\
               '{'\

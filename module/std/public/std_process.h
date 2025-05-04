@@ -37,7 +37,7 @@ typedef enum {
 } std_process_pipe_flags_b;
 
 typedef struct {
-    const char* name;
+    char name[std_process_pipe_name_max_len_m];
     std_process_pipe_flags_b flags;
     size_t write_capacity;
     size_t read_capacity;
@@ -70,6 +70,10 @@ std_no_return_m                   std_process_this_exit ( std_process_exit_code_
 bool                            std_process_io_read ( void* dest, size_t* read_size, size_t cap, uint64_t handle );
 bool                            std_process_io_write ( uint64_t handle, size_t* write_size, const void* source, size_t size );
 
+// TODO standardize pipes better across win32/linux
+//      avoid read-write access (on linux can't block, self-consumes)
+//      avoid wait_for_connection (on linux doesn't exist)
+//      auto connect inside create (only supported behavior on linux)
 std_pipe_h                      std_process_pipe_create ( const std_process_pipe_params_t* params );
 bool                            std_process_pipe_wait_for_connection ( std_pipe_h pipe );
 std_pipe_h                      std_process_pipe_connect ( const char* name, std_process_pipe_flags_b flags );

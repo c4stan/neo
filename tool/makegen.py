@@ -1109,16 +1109,26 @@ class Solution:
         for module in changelist:
             message = message + module
             message = message + '\0'
-        pipe = win32file.CreateFile('\\\\.\\pipe\\' + BUILD_CHANGES_OUTPUT_PIPE_NAME, win32file.GENERIC_WRITE, 0, None, win32file.OPEN_EXISTING, 0, None)
-        #win32pipe.SetNamedPipeHandleState(pipe, win32pipe.PIPE_READMODE_BYTE, None, None)
-        win32file.WriteFile(pipe, message.encode(), None)
-        pipe.close()
+        if platform.system() == 'Windows':
+            pipe = win32file.CreateFile('\\\\.\\pipe\\' + BUILD_CHANGES_OUTPUT_PIPE_NAME, win32file.GENERIC_WRITE, 0, None, win32file.OPEN_EXISTING, 0, None)
+            #win32pipe.SetNamedPipeHandleState(pipe, win32pipe.PIPE_READMODE_BYTE, None, None)
+            win32file.WriteFile(pipe, message.encode(), None)
+            pipe.close()
+        elif platform.system() == 'Linux':
+            pipe = os.open('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME, os.O_WRONLY)
+            os.write(pipe, message.encode())
+            os.close(pipe)
 
     def output_build_error(self):
-        message = '-1' + '\0'
-        pipe = win32file.CreateFile('\\\\.\\pipe\\' + BUILD_CHANGES_OUTPUT_PIPE_NAME, win32file.GENERIC_WRITE, 0, None, win32file.OPEN_EXISTING, 0, None)
-        win32file.WriteFile(pipe, message.encode(), None)
-        pipe.close()
+        if platform.system() == 'Windows':
+            message = '-1' + '\0'
+            pipe = win32file.CreateFile('\\\\.\\pipe\\' + BUILD_CHANGES_OUTPUT_PIPE_NAME, win32file.GENERIC_WRITE, 0, None, win32file.OPEN_EXISTING, 0, None)
+            win32file.WriteFile(pipe, message.encode(), None)
+            pipe.close()
+        elif platform.system() == 'Linux':
+            pipe = os.open('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME, os.O_WRONLY)
+            os.write(pipe, message.encode())
+            os.close(pipe)
 
     def get_build_path(self):
         config_path = config_str(self.config)
