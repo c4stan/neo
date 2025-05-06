@@ -75,7 +75,7 @@ BUILD_FLAGS = BUILD_FLAG_NONE
 
 # -- Config
 CONFIG_DEBUG = 1    # default
-CONFIG_RELEASE = 2  # -opt
+CONFIG_RELEASE = 2  # optimized (-o)
 
 # -- Make targets
 TARGET_ALL = 1

@@ -224,7 +224,90 @@ static bool xf_graph_queue_supports_stage ( xg_cmd_queue_e queue, xg_pipeline_st
     return false;
 }
 
-static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_handle ) {
+static void xf_graph_add_queue_ownership_transitions ( xf_graph_h graph_handle, xf_node_h node_handle, uint32_t node_resource_idx, xf_texture_execution_state_t* state ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    xf_node_t* node = &graph->nodes_array[node_handle];
+    xg_cmd_queue_e node_queue = node->enabled ? node->params.queue : xg_cmd_queue_graphics_m;
+    xf_node_resource_t* resource = &node->resources_array[node_resource_idx];
+    xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
+    xf_graph_physical_texture_t* graph_physical_texture = &graph->physical_textures_array[graph_texture->physical_texture_handle];
+    xf_texture_h texture_handle = graph_texture->handle;
+
+    xg_texture_view_t view = resource->texture.view;
+    uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? graph_texture->dependencies.subresource_count - view.mip_base : view.mip_count;
+    for ( uint32_t i = 0; i < mip_count; ++i ) {
+        uint32_t mip_idx = i + view.mip_base;
+        xf_resource_access_t* access = xf_graph_get_subresource_node_access ( &graph_physical_texture->dependencies.subresources[mip_idx], node_handle );
+
+        // Look at the previous access, if any
+        if ( access > graph_physical_texture->dependencies.subresources[mip_idx].array ) {
+            xf_resource_access_t* prev_access = access - 1;
+            xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
+            xg_cmd_queue_e prev_node_queue = prev_node->enabled ? prev_node->params.queue : xg_cmd_queue_graphics_m;
+
+            // Transition out of prev queue into this node's queue
+            if ( prev_node_queue != node_queue ) {
+                std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
+                std_auto_m texture_acquires_array = std_static_array_m ( xf_graph_texture_transition_t, node->texture_acquires.array );
+                texture_releases_array.count = prev_node->texture_releases.count;
+                texture_acquires_array.count = node->texture_acquires.count;
+
+                xf_node_resource_t* prev_resource = &prev_node->resources_array[prev_access->resource_idx];
+                xg_pipeline_stage_bit_e src_stage = prev_resource->stage;
+                xg_pipeline_stage_bit_e dst_stage = resource->stage;
+                xg_cmd_queue_e src_queue = prev_node_queue;
+                xg_cmd_queue_e dst_queue = node_queue;
+
+                xf_texture_execution_state_t prev_state = xf_texture_execution_state_m (
+                    .layout = prev_resource->texture.layout,
+                    .stage = src_stage,
+                    .access = xf_graph_memory_access_from_resource_access ( prev_resource->access ),
+                );
+
+                if ( xf_graph_queue_supports_stage ( src_queue, dst_stage ) ) {
+                    // Layout transition on source queue
+#if 1
+                    // TODO removing this one extra barrier on the source queue causes the validation layer to complain
+                    // about the texture not being in the destination format on the destination queue. Why?
+                    std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
+                        .state = *state,
+                        .state.queue = src_queue,
+                        .texture = texture_handle,
+                        .view = resource->texture.view
+                    ) );
+
+                    std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
+                        .state = *state,
+                        .texture = texture_handle,
+                        .view = resource->texture.view
+                    ) );
+#else
+                    std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
+                        .state = prev_state,
+                        .state.queue = dst_queue,
+                        .texture = texture_handle,
+                        .view = resource->texture.view
+                    ) );
+#endif
+                } else {
+                    std_assert_m ( xf_graph_queue_supports_stage ( dst_queue, src_stage ) );
+                    // Layout transition on dest queue
+                    std_array_push_m ( &texture_releases_array, xf_graph_texture_transition_m (
+                        .state = prev_state,
+                        .state.queue = dst_queue,
+                        .texture = texture_handle,
+                        .view = resource->texture.view
+                    ) );
+                }
+
+                prev_node->texture_releases.count = texture_releases_array.count;
+                node->texture_acquires.count = texture_acquires_array.count;
+            }
+        }
+    }
+}
+
+static void xf_graph_compute_resource_transitions ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
     for ( uint32_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
@@ -239,7 +322,7 @@ static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_ha
             uint32_t resource_idx = node->textures_array[tex_it];
             xf_node_resource_t* resource = &node->resources_array[resource_idx];
             xf_graph_texture_t* graph_texture = &graph->textures_array[resource->texture.graph_handle];
-            xf_graph_physical_texture_t* graph_physical_texture = &graph->physical_textures_array[graph_texture->physical_texture_handle];
+            //xf_graph_physical_texture_t* graph_physical_texture = &graph->physical_textures_array[graph_texture->physical_texture_handle];
             xf_texture_h texture_handle = graph_texture->handle;
 
             xf_texture_execution_state_t state = xf_texture_execution_state_m (
@@ -255,17 +338,20 @@ static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_ha
                 .view = resource->texture.view
             ) );
 
+#if 0
             xg_texture_view_t view = resource->texture.view;
             uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? graph_texture->dependencies.subresource_count - view.mip_base : view.mip_count;
             for ( uint32_t i = 0; i < mip_count; ++i ) {
                 uint32_t mip_idx = i + view.mip_base;
                 xf_resource_access_t* access = xf_graph_get_subresource_node_access ( &graph_physical_texture->dependencies.subresources[mip_idx], node_handle );
+
                 // Look at the previous access, if any
                 if ( access > graph_physical_texture->dependencies.subresources[mip_idx].array ) {
                     xf_resource_access_t* prev_access = access - 1;
                     xf_node_t* prev_node = &graph->nodes_array[prev_access->node];
                     xg_cmd_queue_e prev_node_queue = prev_node->enabled ? prev_node->params.queue : xg_cmd_queue_graphics_m;
-                    // Transition out of prev access queue into this node's queue
+
+                    // Transition out of prev queue into this node's queue
                     if ( prev_node_queue != node_queue ) {
                         std_auto_m texture_releases_array = std_static_array_m ( xf_graph_texture_transition_t, prev_node->texture_releases.array );
                         std_auto_m texture_acquires_array = std_static_array_m ( xf_graph_texture_transition_t, node->texture_acquires.array );
@@ -325,6 +411,9 @@ static void xf_graph_compute_physical_resource_transitions ( xf_graph_h graph_ha
                     }
                 }
             }
+#else
+            xf_graph_add_queue_ownership_transitions ( graph_handle, node_handle, resource_idx, &state );
+#endif
         }
         node->texture_transitions.count = texture_transitions_array.count;
     }
@@ -2135,17 +2224,6 @@ void xf_graph_print ( xf_graph_h graph_handle ) {
     std_log_info_m ( std_fmt_str_m, stack_buffer );
 }
 
-#if 0
-static void xf_graph_compute_release_barriers ( xf_graph_h graph_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-
-    for ( uint32_t i = 0; i < graph->textures_count; ++i ) {
-        xf_graph_texture_t* texture = &graph->textures_array[i];
-
-    }
-}
-#endif
-
 void xf_graph_invalidate ( xf_graph_h graph_handle, xg_workload_h workload ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xg_i* xg = std_module_get_m ( xg_module_name_m );
@@ -2328,7 +2406,7 @@ static uint64_t xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg
     xf_graph_clear_physical_resources ( graph_handle );
     xf_graph_scan_physical_textures ( graph_handle );
     xf_graph_accumulate_physical_resources_dependencies ( graph_handle );
-    xf_graph_compute_physical_resource_transitions ( graph_handle );
+    xf_graph_compute_resource_transitions ( graph_handle );
 
     xf_graph_remap_upload_buffers ( graph_handle, xg, resource_cmd_buffer );
 
