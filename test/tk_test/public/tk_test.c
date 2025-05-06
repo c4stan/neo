@@ -126,7 +126,6 @@ static void test_tk() {
 #if PARALLEL
     tk_workload_h workload = tk->schedule_work ( tasks, TASKS_T1 );
     tk->acquire_this_thread ( tk_release_condition_all_workloads_done_m, NULL );
-    //tk->wait_for_workload_idle ( workload );
 #endif
 
     uint64_t sum = 0;

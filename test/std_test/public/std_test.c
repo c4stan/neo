@@ -304,7 +304,6 @@ static void  test_allocator ( void ) {
         void* b = std_stack_alloc_align ( &stack, 1024 * 8, 16 );
         void* c = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
         void* d = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
-        //std_verify_m ( arena.used_size == arena.buffer.size );
         std_virtual_heap_free ( buffer );
     }
     #if 0
@@ -347,8 +346,6 @@ static void test_process ( void ) {
 #endif
     }
 
-//#if defined ( std_platform_win32_m )
-    // TODO linux
     // create named pipe
     std_process_pipe_params_t pipe_params = {
         .name = "std_test_pipe",
@@ -358,14 +355,12 @@ static void test_process ( void ) {
     };
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
     std_assert_m ( pipe != std_process_null_handle_m );
-//#endif
 
     // create child process
     const char* process_arg = CHILD_PROCESS_MAGIC_NUMBER;
     const char* process_path = info.executable_path;
     std_process_h process = std_process ( process_path, "std_test", &process_arg, 1, std_process_type_default_m, std_process_io_capture_m );
 
-//#if defined ( std_platform_win32_m )
     // wait for child to connect to pipe and write to it
     std_process_pipe_wait_for_connection ( pipe );
     char* write_buffer = "pipe_write_data";
@@ -386,7 +381,6 @@ static void test_process ( void ) {
     }
 
     std_process_pipe_destroy ( pipe );
-//#endif
 
     std_process_io_t io = std_process_get_io ( process );
     // write to child stdin
@@ -399,7 +393,6 @@ static void test_process ( void ) {
     // read echo from child stdout
     {
         char buffer[64];
-        //DWORD read_size;
         std_process_io_read ( buffer, NULL, sizeof ( PARENT_PROCESS_MESSAGE ), io.stdout_handle ) ;
         bool match = std_str_cmp ( buffer, PARENT_PROCESS_MESSAGE ) == 0;
         std_assert_m ( match );
@@ -408,7 +401,6 @@ static void test_process ( void ) {
     // read msg from child stdout
     {
         char buffer[64];
-        //DWORD read_size;
         std_process_io_read ( buffer, NULL, sizeof ( CHILD_PROCESS_OUTPUT ), io.stdout_handle );
         bool match = std_str_cmp ( buffer, CHILD_PROCESS_OUTPUT ) == 0;
         std_assert_m ( match );
@@ -425,14 +417,11 @@ static void test_process_child ( void ) {
     char buffer[64];
     size_t data_size = 0;
 
-//#if defined ( std_platform_win32_m )
-    // TODO linux
     std_process_pipe_read ( &data_size, buffer, sizeof ( buffer ), pipe );
     std_process_pipe_destroy ( pipe );
     pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m );
     std_process_pipe_write ( NULL, pipe, buffer, data_size  );
     std_process_pipe_destroy ( pipe );
-//#endif
 
     std_process_io_t io = std_process_get_io ( std_process_this() );
 
@@ -470,8 +459,6 @@ static void test_thread ( void ) {
         uint32_t flag = false;
         std_thread_h thread = std_thread ( test_thread_body, &flag, "test_thread", std_thread_core_mask_any_m );
         bool result;
-        //result = std_thread_alive ( thread );
-        //std_assert_m ( result );
         result = std_thread_join ( thread );
         std_assert_m ( result );
         std_assert_m ( flag );
@@ -483,8 +470,6 @@ static void test_thread ( void ) {
         uint32_t flag = false;
         std_thread_h thread = std_thread ( test_thread_body, &flag, "test_thread", std_thread_core_mask_any_m );
         bool result;
-        //result = std_thread_alive ( thread );
-        //std_assert_m ( result );
         result = std_thread_join ( thread );
         std_assert_m ( result );
         std_assert_m ( flag );

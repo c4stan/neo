@@ -187,15 +187,15 @@ static void xi_ui_layer_align ( int32_t* x, int32_t* y, uint32_t width, uint32_t
 
     int32_t rx = 0, ry = 0;
 
-    uint32_t horizontal_padding = 0;
-    if ( style->horizontal_padding != xi_style_padding_invalid_m ) {
-        horizontal_padding = style->horizontal_padding;
+    uint32_t horizontal_margin = 0;
+    if ( style->horizontal_margin != xi_style_margin_invalid_m ) {
+        horizontal_margin = style->horizontal_margin;
     }
 
     if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
-        rx = layer->line_offset + layer->line_padding_x + horizontal_padding;
+        rx = layer->line_offset + layer->line_padding_x + horizontal_margin;
     } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
-        rx = layer->width - layer->line_offset_rev - layer->line_padding_x - width - horizontal_padding;
+        rx = layer->width - layer->line_offset_rev - layer->line_padding_x - width - horizontal_margin;
     }
 
     if ( style->vertical_alignment != xi_vertical_alignment_unaligned_m ) {
@@ -246,11 +246,11 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
     //width += layer->line_padding_x * 2;
     //height += layer->line_padding_y * 2;
 
-    if ( style->horizontal_margin != xi_style_margin_invalid_m ) {
+    if ( style->horizontal_border_margin != xi_style_border_margin_invalid_m ) {
         if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
-            layer->line_offset = std_max_u32 ( layer->line_offset, style->horizontal_margin );
+            layer->line_offset = std_max_u32 ( layer->line_offset, style->horizontal_border_margin );
         } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
-            layer->line_offset_rev = std_max_u32 ( layer->line_offset_rev, style->horizontal_margin );
+            layer->line_offset_rev = std_max_u32 ( layer->line_offset_rev, style->horizontal_border_margin );
         }
     }
 
@@ -271,16 +271,16 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
         layer->line_height = height;
     }
 
-    uint32_t horizontal_padding = 0;
-    if ( style->horizontal_padding != xi_style_padding_invalid_m ) {
-        horizontal_padding = style->horizontal_padding;
+    uint32_t horizontal_margin = 0;
+    if ( style->horizontal_margin != xi_style_margin_invalid_m ) {
+        horizontal_margin = style->horizontal_margin;
     }
 
     // update horizontal layer offset
     if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
-        layer->line_offset += width + horizontal_padding;
+        layer->line_offset += width + horizontal_margin;
     } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
-        layer->line_offset_rev += width + horizontal_padding;
+        layer->line_offset_rev += width + horizontal_margin;
     }
 
     if ( layer->line_y + height < 0 ) {
@@ -440,7 +440,7 @@ static void xi_ui_draw_tri ( xi_workload_h workload, xi_color_t color, int32_t x
     xi_workload_cmd_draw_tri ( workload, &tri, 1 );
 }
 
-static uint32_t xi_ui_draw_string2 ( xi_workload_h workload, xi_font_h font, xi_color_t color, const char* text, uint32_t x, uint32_t y, uint64_t sort_order ) {
+static uint32_t xi_ui_draw_string ( xi_workload_h workload, xi_font_h font, xi_color_t color, const char* text, uint32_t x, uint32_t y, uint64_t sort_order ) {
     size_t len = std_str_len ( text );
     // TODO assert on len
 
@@ -465,52 +465,6 @@ static uint32_t xi_ui_draw_string2 ( xi_workload_h workload, xi_font_h font, xi_
         rect.width = box.xy1[0] - box.xy0[0];
         rect.height = box.xy1[1] - box.xy0[1];
         rect.color = color;
-        rect.texture = xi_font_atlas_get ( font );
-        rect.linear_sampler_filter = false;
-        rect.uv0[0] = box.uv0[0];
-        rect.uv0[1] = box.uv0[1];
-        rect.uv1[0] = box.uv1[0];
-        rect.uv1[1] = box.uv1[1];
-        rect.sort_order = sort_order;
-        rect.scissor = xi_ui_state->active_scissor;
-
-        x_offset += box.width * scale;
-
-        xi_workload_cmd_draw ( workload, &rect, 1 ); // TODO batch? change the api to only take 1?
-    }
-
-    uint32_t width = fx - x;
-
-    //xi_ui_draw_rect ( workload, xi_color_red_m, x, y, width, font_info.pixel_height, 0 );
-
-    return width;
-}
-
-static uint32_t xi_ui_draw_string ( xi_workload_h workload, xi_font_h font, const char* text, uint32_t x, uint32_t y, uint64_t sort_order ) {
-    size_t len = std_str_len ( text );
-    // TODO assert on len
-
-    xi_font_info_t font_info;
-    xi_font_get_info ( &font_info, font );
-    float scale = 0.5;//( float ) height / font_info.pixel_height;
-
-    uint32_t x_offset = 0;
-    float fx = x;
-    float fy = y + font_info.pixel_height + font_info.descent;
-
-    for ( uint32_t i = 0; i < len; ++i ) {
-        xi_font_char_box_t box = xi_font_char_box_get ( &fx, &fy, font, text[i] );
-
-        xi_draw_rect_t rect = xi_draw_rect_m();
-        //rect.x = x + x_offset;
-        //rect.y = y + ( font_info.pixel_height - box.height ) * scale;
-        //rect.width = box.width * scale;
-        //rect.height = box.height * scale;
-        rect.x = box.xy0[0];
-        rect.y = box.xy0[1];
-        rect.width = box.xy1[0] - box.xy0[0];
-        rect.height = box.xy1[1] - box.xy0[1];
-        rect.color = xi_color_white_m;
         rect.texture = xi_font_atlas_get ( font );
         rect.linear_sampler_filter = false;
         rect.uv0[0] = box.uv0[0];
@@ -657,6 +611,7 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
     result.font_color = style->font_color.u32 != xi_color_invalid_m.u32 ? style->font_color : parent->font_color;
     result.horizontal_alignment = style->horizontal_alignment != xi_horizontal_alignment_invalid_m ? style->horizontal_alignment : parent->horizontal_alignment;
     result.vertical_alignment = style->vertical_alignment != xi_vertical_alignment_invalid_m ? style->vertical_alignment : parent->vertical_alignment;
+    result.horizontal_border_margin = style->horizontal_border_margin != xi_style_border_margin_invalid_m ? style->horizontal_border_margin : parent->horizontal_border_margin;
     result.horizontal_margin = style->horizontal_margin != xi_style_margin_invalid_m ? style->horizontal_margin : parent->horizontal_margin;
     result.horizontal_padding = style->horizontal_padding != xi_style_padding_invalid_m ? style->horizontal_padding : parent->horizontal_padding;
 
@@ -890,7 +845,7 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     }
 
     //  title text
-    xi_ui_draw_string ( workload, style.font, state->title, layer->x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
+    xi_ui_draw_string ( workload, style.font, style.font_color, state->title, layer->x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
 
     // scroll bar
     if ( state->scrollable && !state->minimized ) {
@@ -1048,7 +1003,7 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
         }
 
         //  title text
-        xi_ui_draw_string ( workload, style.font, state->title, layer->x + x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
+        xi_ui_draw_string ( workload, style.font, style.font_color, state->title, layer->x + x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
     }
 
     // new layer
@@ -1095,7 +1050,7 @@ void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state ) {
         return;
     }
 
-    xi_ui_draw_string2 ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
+    xi_ui_draw_string ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
 
     if ( xi_ui_cursor_test ( x, y, width, height ) ) {
         xi_ui_acquire_hovered ( state->id, 0 );
@@ -1193,7 +1148,13 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
     // draw
     float color_scale = xi_ui_state->keyboard_id == state->id ? 0.35f : 0.5f;
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, color_scale ), x, y, width, height, state->sort_order );
-    xi_ui_draw_string ( workload, style.font, buffer, x + ( width - text_width ) / 2, y, state->sort_order );
+    uint32_t string_offset = 0;
+    if ( state->text_alignment == xi_horizontal_alignment_centered_m ) {
+        string_offset = ( width - text_width ) / 2;
+    } else if ( state->text_alignment == xi_horizontal_alignment_right_to_left_m ) {
+        string_offset = width - ( text_width + style.font_height ); // add some space for the trailing _
+    }
+    xi_ui_draw_string ( workload, style.font, style.font_color, buffer, x + string_offset, y, state->sort_order );
 
     return result;
 }
@@ -1398,6 +1359,7 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
 
     uint32_t text_width = xi_ui_string_width ( state->text, style.font );
     uint32_t width = std_max_u32 ( text_width, state->width );
+    width += 2 * style.horizontal_padding;
     uint32_t height = std_max_u32 ( font_info.pixel_height, state->height );
 
     int32_t x, y;
@@ -1445,7 +1407,7 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     // draw
     float color_scale = xi_ui_state->active_id == state->id ? 0.35f : 0.5f;
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, color_scale ), x, y, width, height, state->sort_order );
-    xi_ui_draw_string ( workload, style.font, state->text, x + ( width - text_width ) / 2, y, state->sort_order );
+    xi_ui_draw_string ( workload, style.font, style.font_color, state->text, x + ( width - text_width ) / 2, y, state->sort_order );
 
     return pressed;
 }
@@ -1502,7 +1464,7 @@ bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
 
     xi_ui_draw_rect ( workload, style.color, x, y, width, height, state->sort_order );
     uint32_t text_width = xi_ui_string_width ( state->items[state->item_idx], style.font );
-    xi_ui_draw_string ( workload, style.font, state->items[state->item_idx], x + ( width - text_width ) / 2, y + ( height - font_info.pixel_height ) / 3, state->sort_order );
+    xi_ui_draw_string ( workload, style.font, style.font_color, state->items[state->item_idx], x + ( width - text_width ) / 2, y + ( height - font_info.pixel_height ) / 3, state->sort_order );
 
     if ( xi_ui_state->active_id == state->id ) {
         xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.5f ), x, y + height, width, height * state->item_count, state->sort_order );
@@ -1517,7 +1479,7 @@ bool xi_ui_select ( xi_workload_h workload, xi_select_state_t* state ) {
             }
 
             uint32_t text_width = xi_ui_string_width ( state->items[i], style.font );
-            xi_ui_draw_string ( workload, style.font, state->items[i], x + ( width - text_width ) / 2, y + height * ( i + 1 ), state->sort_order );
+            xi_ui_draw_string ( workload, style.font, style.font_color, state->items[i], x + ( width - text_width ) / 2, y + height * ( i + 1 ), state->sort_order );
         }
     }
 

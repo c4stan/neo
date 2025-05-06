@@ -130,8 +130,8 @@ vec3 view_from_depth ( vec2 screen_uv, float depth ) {
     return view_pos;
 }
 
-vec3 screen_from_view ( vec3 view ) {
-    vec4 proj = frame_uniforms.proj_from_view * vec4 ( view, 1 );
+vec3 screen_from_view ( mat4 proj_from_view, vec3 view ) {
+    vec4 proj = proj_from_view * vec4 ( view, 1 );
     proj /= proj.w;
     vec3 screen = vec3 ( proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, proj.z );
     return screen;
@@ -352,9 +352,9 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     // :: go into screen space ::
     //
     vec3 view_ray_start = view_pos;
-    vec3 screen_ray_start = screen_from_view ( view_ray_start );
+    vec3 screen_ray_start = screen_from_view ( frame_uniforms.jittered_proj_from_view, view_ray_start );
     //screen_ray_start.y += 1.f / frame_uniforms.resolution_f32.y;
-    vec3 screen_ray_hemisphere_sample = screen_from_view ( view_ray_start + hemisphere_normal );
+    vec3 screen_ray_hemisphere_sample = screen_from_view ( frame_uniforms.jittered_proj_from_view, view_ray_start + hemisphere_normal );
     vec3 screen_ray_dir = normalize ( screen_ray_hemisphere_sample - screen_ray_start );
 
     //
@@ -555,8 +555,8 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
 bool trace_screen_space_ray_linear ( out vec3 out_screen_pos, out float out_depth, vec3 view_pos, vec3 hemisphere_normal, texture2D tex_depth, sampler sampler_point, uint max_sample_count, uint step_size ) {
     // go into screen space
     vec3 view_ray_start = view_pos;
-    vec3 screen_ray_start = screen_from_view ( view_ray_start );
-    vec3 screen_ray_hemisphere_sample = screen_from_view ( view_ray_start + hemisphere_normal );
+    vec3 screen_ray_start = screen_from_view ( frame_uniforms.jittered_proj_from_view, view_ray_start );
+    vec3 screen_ray_hemisphere_sample = screen_from_view ( frame_uniforms.jittered_proj_from_view, view_ray_start + hemisphere_normal );
     vec3 screen_ray_dir = normalize ( screen_ray_hemisphere_sample - screen_ray_start );
 
     // find screen space ray end and length

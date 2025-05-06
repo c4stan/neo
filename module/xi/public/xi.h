@@ -70,6 +70,7 @@ typedef struct {
 
 // Style
 
+#define xi_style_border_margin_invalid_m 0xffffffff
 #define xi_style_margin_invalid_m 0xffffffff
 #define xi_style_padding_invalid_m 0xffffffff
 
@@ -89,9 +90,9 @@ typedef enum {
     xi_vertical_alignment_invalid_m,
 } xi_vertical_alignment_e;
 
-// margin: minimum distance between the element and its layer's border. in between there can be other elements
-// padding: additional distance between the element and whatever (element, border) is before (TODO: and after?) to it. always applies
-// TODO rename the first to border_margin, the second to margin, add padding to mean internal margin (useful distinction in some cases like buttons)
+// border margin: minimum distance between the element and its layer's borders. the distance can be filled by other elements.
+// margin: additional spacing between the element and whatever (element, border) is before (TODO: and after) to it.
+// padding: additional internal spacing required by the user and optionally handled by the element in its layout logic.
 typedef struct {
     xi_font_h font;
     uint32_t font_height;
@@ -99,6 +100,7 @@ typedef struct {
     xi_color_t font_color;
     xi_horizontal_alignment_e horizontal_alignment;
     xi_vertical_alignment_e vertical_alignment;
+    uint32_t horizontal_border_margin;
     uint32_t horizontal_margin;
     uint32_t horizontal_padding;
 } xi_style_t;
@@ -110,6 +112,9 @@ typedef struct {
     .font_color = xi_color_invalid_m, \
     .horizontal_alignment = xi_horizontal_alignment_invalid_m, \
     .vertical_alignment = xi_vertical_alignment_invalid_m, \
+    .horizontal_border_margin = xi_style_border_margin_invalid_m, \
+    .horizontal_margin = xi_style_margin_invalid_m, \
+    .horizontal_padding = xi_style_padding_invalid_m, \
     ##__VA_ARGS__ \
 }
 
@@ -267,6 +272,7 @@ typedef struct {
     xi_font_h font;
     uint32_t width;
     uint32_t height;
+    xi_horizontal_alignment_e text_alignment;
     xi_id_t id;
     uint64_t sort_order;
     xi_style_t style;
@@ -275,6 +281,7 @@ typedef struct {
 #define xi_textfield_state_m( ... ) ( xi_textfield_state_t ) { \
     .text = "", \
     .font = xi_null_handle_m, \
+    .text_alignment = xi_horizontal_alignment_centered_m, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \

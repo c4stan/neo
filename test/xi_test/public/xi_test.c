@@ -299,6 +299,15 @@ static void xi_test ( void ) {
         .height = 14,
     );
 
+    xi_textfield_state_t ui_textfield = xi_textfield_state_m (
+        .width = 128,
+        .text = "text",
+        .text_alignment = xi_horizontal_alignment_right_to_left_m,
+        .style = xi_style_m (
+            .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
+        ),
+    );
+
     xi_section_state_t ui_section = xi_section_state_m (
         .title = "section1",
         .font = font,
@@ -432,6 +441,8 @@ static void xi_test ( void ) {
             xi->newline();
             xi->add_label ( xi_workload, &ui_button_label );
             xi->add_button ( xi_workload, &ui_button );
+            xi->newline();
+            xi->add_textfield ( xi_workload, &ui_textfield );
             xi->newline();
             xi->add_property_editor ( xi_workload, &ui_property_editor_3f32 );
             xi->newline();

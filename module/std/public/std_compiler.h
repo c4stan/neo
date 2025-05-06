@@ -74,7 +74,6 @@
     #define std_pp_eval_string_m( x )                             std_pp_string_m ( x )
     #define std_pp_concat_m(A, B)                                 A ## B
     #define std_pp_eval_concat_m(A, B)                            std_pp_concat_m(A, B)
-    #define std_pp_eval_m( x )                                    x
     // use std_file_name_m instead
     //#define std_file_path_m                                       __FILE__
     #define std_func_name_m                                       __func__
@@ -144,7 +143,6 @@
     #define std_pp_eval_string_m( x )                             std_pp_string_m ( x )
     #define std_pp_concat_m(A, B)                                 A ## B
     #define std_pp_eval_concat_m(A, B)                            std_pp_concat_m(A, B)
-    #define std_pp_eval_m( x )                                    x
     // use std_file_name_m instead
     //#define std_file_path_m                                       __FILE__
     #define std_func_name_m                                       __func__

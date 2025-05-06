@@ -11,7 +11,6 @@
 #endif
 
 // ------------------------------------------------------------------------------------------------
-// Declarations
 
 static void tk_fiber_thread_entry_point ( void* arg );
 static void tk_fiber_entry_point ( void* arg );
@@ -19,9 +18,8 @@ static void tk_fiber_entry_point ( void* arg );
 static void tk_fiber_create ( tk_fiber_context_t* context, void ( routine ) ( void* ) );
 static void tk_fiber_destroy ( tk_fiber_context_t* context );
 static void tk_fiber_switch ( tk_fiber_context_t* old_fiber, tk_fiber_context_t* new_fiber );
-//static tk_fiber_h tk_fiber_this ( void );
 static void tk_fiber_enter_from_thread ( tk_fiber_context_t* main_context );
-static void tk_fiber_exit_to_thread ( void );
+static void tk_fiber_exit_to_thread ( tk_fiber_context_t* main_context );
 
 static tk_fiber_thread_context_t* tk_fiber_thread_context ( void );
 
@@ -114,8 +112,9 @@ static void tk_fiber_thread_entry_point ( void* arg ) {
     // ..
     // ..
     // <--- return
+    tk_fiber_switch ( context->current_fiber, &context->main_fiber );
     tk_fiber_pool_context ( context->current_fiber );
-    tk_fiber_exit_to_thread();
+    tk_fiber_exit_to_thread ( &context->main_fiber );
 }
 
 static void tk_fiber_entry_point ( void* arg ) {
@@ -150,7 +149,7 @@ static void tk_fiber_entry_point ( void* arg ) {
 
         // try running a task that has become ready
         if  ( std_queue_mpmc_pop_move_32 ( &tk_fiber_state->ready_fiber_contexts, &ready_context_idx ) ) {
-            tk_fiber_yield_to ( &tk_fiber_state->fiber_contexts[ready_context_idx] );
+            tk_fiber_yield_to ( &tk_fiber_state->fiber_contexts_array[ready_context_idx] );
             // try running a new task
         } else if ( std_queue_mpmc_pop_m ( &tk_fiber_state->dispatch_queue, &dispatch ) ) {
             dispatch.task.routine ( dispatch.task.arg );
@@ -215,18 +214,13 @@ static void tk_fiber_enter_from_thread ( tk_fiber_context_t* context ) {
 #endif
 }
 
-static void tk_fiber_exit_to_thread ( void ) {
+static void tk_fiber_exit_to_thread ( tk_fiber_context_t* context ) {
 #if defined(std_platform_win32_m)
+    std_unused_m ( context );
     ConvertFiberToThread();
 #elif defined(std_platform_linux_m)
-    tk_fiber_thread_context_t* thread_context = tk_fiber_thread_context();
-
-    // TODO when to do this? not here
-    //std_virtual_heap_free ( thread_context->main_fiber.stack );
-
-    if ( thread_context->current_fiber ) {
-        tk_fiber_switch ( thread_context->current_fiber, &thread_context->main_fiber );
-    }
+    std_log_info_m ( std_fmt_ptr_m, context->stack );
+    std_virtual_heap_free ( context->stack );
 #endif
 }
 
@@ -237,9 +231,7 @@ void tk_fiber_wake_up ( tk_fiber_context_t* context ) {
     uint32_t idx = ( uint32_t ) ( context - tk_fiber_state->fiber_contexts_array );
 
     for ( ;; ) {
-        // TODO refactor?
         bool retval = std_queue_mpmc_push_32 ( &tk_fiber_state->ready_fiber_contexts, &idx );
-
         if ( retval ) {
             break;
         }
@@ -410,7 +402,7 @@ tk_fiber_context_t* tk_fiber_pop_context ( void ) {
         }
 
         // TODO check pool sizes
-        //rose_thread_yield();
+        //std_thread_this_yield();
     }
 
     return fiber;
@@ -423,8 +415,7 @@ static tk_fiber_workload_h tk_fiber_schedule_tasks ( const tk_task_t* tasks, uin
     uint32_t i;
 
     while ( !std_queue_mpmc_pop_move_32 ( &tk_fiber_state->free_workloads, &i )  ) {
-        //ROSE_ERROR(&logger, "Not enough resources left for a new job group!");
-        //rose_thread_yield();
+        //std_thread_this_yield();
     }
 
     tk_fiber_workload_h workload_handle;
@@ -439,7 +430,7 @@ static tk_fiber_workload_h tk_fiber_schedule_tasks ( const tk_task_t* tasks, uin
         dispatch.task = tasks[j];
 
         while ( !std_queue_mpmc_push_m ( &tk_fiber_state->dispatch_queue, &dispatch ) ) {
-            //rose_thread_yield();
+            //std_thread_this_yield();
         }
     }
 
@@ -556,7 +547,6 @@ static void acquired_threads_on_all_workloads_done () {
     for ( size_t i = 0; i < tk_max_threads_m; ++i ) {
         tk_acquired_thread_t* acquired_thread = &tk_fiber_state->acquired_threads_array[i];
 
-        // TODO ensure this is always valid
         if ( acquired_thread->thread_handle != std_thread_null_handle_m && ( acquired_thread->release_condition & tk_release_condition_all_workloads_done_m ) ) {
             release_acquired_thread ( acquired_thread, tk_release_condition_all_workloads_done_m );
         }
@@ -582,7 +572,6 @@ void tk_fiber_thread_release_all ( void ) {
     for ( size_t i = 0; i < tk_max_threads_m; ++i ) {
         tk_acquired_thread_t* acquired_thread = &tk_fiber_state->acquired_threads_array[i];
 
-        // TODO ensure this is always valid
         if ( acquired_thread->thread_handle != std_thread_null_handle_m ) {
             release_acquired_thread ( acquired_thread, tk_release_condition_user_request_m );
         }

@@ -138,11 +138,8 @@ void main ( void ) {
         float light_emissive = light.emissive;
         vec3 light_color = light.color;
 
-        // TODO refactor screen_from_view to take in a proj_from_view matrix and use that
-        vec4 shadow_proj = light.view_from_world * world_geo_pos;
-        shadow_proj = light.proj_from_view * shadow_proj;
-        shadow_proj /= shadow_proj.w;
-        vec3 shadow_screen = vec3 ( shadow_proj.xy * vec2 ( 0.5, -0.5 ) + 0.5, shadow_proj.z );
+        vec4 shadow_view = light.view_from_world * world_geo_pos;
+        vec3 shadow_screen = screen_from_view ( light.proj_from_view, shadow_view );
         vec2 shadow_texel = light.shadow_tile.xy + shadow_screen.xy * light.shadow_tile.z;
 
         float shadow = 0;
@@ -165,7 +162,7 @@ void main ( void ) {
                 float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_linear ), shadow_uv ).x;
 
                 float shadow_bias = 0.0001;
-                float shadow_contribution = shadow_proj.z - shadow_bias > shadow_depth ? 1.f : 0.f;
+                float shadow_contribution = shadow_screen.z - shadow_bias > shadow_depth ? 1.f : 0.f;
 
                 if ( shadow_screen.z > 1.f ) {
                     shadow_contribution = 0;
@@ -183,22 +180,22 @@ void main ( void ) {
         vec2 shadow_uv = shadow_texel + vec2 (-1.0, -1.0 );
         shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
         shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_proj.z - shadow_bias );
+        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
         
         shadow_uv = ( shadow_texel + vec2 ( +1.0, -1.0 ) );
         shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
         shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_proj.z - shadow_bias );
+        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
         
         shadow_uv = ( shadow_texel + vec2 ( -1.0, +1.0 ) );
         shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
         shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_proj.z - shadow_bias );
+        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
         
         shadow_uv = ( shadow_texel + vec2 ( +1.0, +1.0 ) );
         shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
         shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_proj.z - shadow_bias );
+        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
 
         shadow /= 16.0;
 #endif

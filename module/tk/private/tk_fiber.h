@@ -238,22 +238,21 @@ typedef struct {
 } tk_acquired_thread_t;
 
 typedef struct {
-    // Arrays
     std_thread_h*               threads_array;
     tk_fiber_thread_context_t*  thread_contexts_array;
     size_t                      thread_count;
     tk_fiber_context_t*         fiber_contexts_array;
     tk_fiber_workload_t*        workload_array;
-    // Acquired threads pool
+
     tk_acquired_thread_t*       acquired_threads_array;
     tk_acquired_thread_t*       acquired_threads_freelist;
     std_mutex_t                 acquired_threads_mutex;
-    // Queues
+
     std_queue_shared_t          dispatch_queue;         // tk_fiber_dispatched_task_t
     std_queue_shared_t          ready_fiber_contexts;   // uint32_t to fiber_contexts
     std_queue_shared_t          free_fiber_contexts;    // uint32_t to fiber_contexts
     std_queue_shared_t          free_workloads;         // uint32_t to workloads
-    // Global flag to join all threads. Is used along with the one in thread_context.
+
     bool                        join_flag;
 } tk_fiber_state_t;
 

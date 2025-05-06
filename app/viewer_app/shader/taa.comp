@@ -42,8 +42,8 @@ void main ( void ) {
     vec2 screen_offset = prev_screen.xy - screen_uv;
     vec2 reprojected_uv = screen_uv + screen_offset;
 #else
-    vec2 jitter = vec2 ( frame_uniforms.jittered_proj_from_view[2][0], frame_uniforms.jittered_proj_from_view[2][1] );
-    vec2 reprojected_uv = screen_uv - velocity - jitter / 2;
+    //vec2 jitter = vec2 ( frame_uniforms.jittered_proj_from_view[2][0], frame_uniforms.jittered_proj_from_view[2][1] );
+    vec2 reprojected_uv = screen_uv - velocity;// - jitter / 2;
 #endif
 
 #if 1
@@ -146,5 +146,5 @@ void main ( void ) {
     // Blend
     vec3 blend = mix ( history, color, blend_factor );
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( blend, 1 ) );
-    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( velocity, 0, 1 ) );
+    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( length (velocity)> 0 ? 1 : 0, 0, 0, 1 ) );
 }

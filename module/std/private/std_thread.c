@@ -63,7 +63,7 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
     thread->routine = NULL;
     thread->arg = NULL;
     thread->idx = ( size_t ) ( thread - state->threads_array );
-    std_str_copy ( thread->name, std_thread_name_max_len_m, std_thread_main_thread_name_m );
+    std_str_copy ( thread->name, std_thread_name_max_len_m, std_pp_eval_string_m ( std_thread_main_thread_name_m ) );
 
 #if defined(std_platform_win32_m)
     ULONG_PTR stack_high;

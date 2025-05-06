@@ -11,7 +11,7 @@ std_thread_max_threads_m                    128
 #std_thread_main_thread_core_sharing_m      std_thread_core_sharing_default_m
 #std_thread_main_thread_wake_priority_m     std_thread_wake_priority_default_m
 std_thread_main_thread_core_mask_m          std_thread_core_mask_any_m
-std_thread_main_thread_name_m               "MAIN_THREAD"
+std_thread_main_thread_name_m               MAIN_THREAD
 
 # std_process
 std_process_max_processes_m                 16

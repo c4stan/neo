@@ -258,8 +258,170 @@ static uint32_t wm_window_keycode ( uint64_t os_keycode ) {
         return wm_keyboard_state_count_m;
     }
 #elif defined ( std_platform_linux_m )
-    // TODO linux
-    return wm_keyboard_state_count_m;
+    switch ( os_keycode ) {
+    case XK_BackSpace:
+        return wm_keyboard_state_backspace_m;
+    case XK_Return:
+        return wm_keyboard_state_enter_m;
+    case XK_period:
+        return wm_keyboard_state_period_m;
+    case XK_plus:
+        return wm_keyboard_state_plus_m;
+    case XK_minus:
+        return wm_keyboard_state_minus_m;
+    case XK_Tab:
+        return wm_keyboard_state_tab_m;
+    case XK_Shift_L:
+        return wm_keyboard_state_shift_left_m;
+    case XK_Shift_R:
+        return wm_keyboard_state_shift_right_m;
+    case XK_Control_L:
+        return wm_keyboard_state_ctrl_left_m;
+    case XK_Control_R:
+        return wm_keyboard_state_ctrl_right_m;
+    case XK_Alt_L:
+        return wm_keyboard_state_alt_left_m;
+    case XK_Alt_R:
+        return wm_keyboard_state_alt_right_m;
+    case XK_space:
+        return wm_keyboard_state_space_m;
+    case XK_Left:
+        return wm_keyboard_state_left_m;
+    case XK_Up:
+        return wm_keyboard_state_up_m;
+    case XK_Right:
+        return wm_keyboard_state_right_m;
+    case XK_Down:
+        return wm_keyboard_state_down_m;
+    case XK_0:
+        return wm_keyboard_state_0_m;
+    case XK_1:
+        return wm_keyboard_state_1_m;
+    case XK_2:
+        return wm_keyboard_state_2_m;
+    case XK_3:
+        return wm_keyboard_state_3_m;
+    case XK_4:
+        return wm_keyboard_state_4_m;
+    case XK_5:
+        return wm_keyboard_state_5_m;
+    case XK_6:
+        return wm_keyboard_state_6_m;
+    case XK_7:
+        return wm_keyboard_state_7_m;
+    case XK_8:
+        return wm_keyboard_state_8_m;
+    case XK_9:
+        return wm_keyboard_state_9_m;
+    case XK_A:
+    case XK_a:
+        return wm_keyboard_state_a_m;
+    case XK_B:
+    case XK_b:
+        return wm_keyboard_state_b_m;
+    case XK_C:
+    case XK_c:
+        return wm_keyboard_state_c_m;
+    case XK_D:
+    case XK_d:
+        return wm_keyboard_state_d_m;
+    case XK_E:
+    case XK_e:
+        return wm_keyboard_state_e_m;
+    case XK_F:
+    case XK_f:
+        return wm_keyboard_state_f_m;
+    case XK_G:
+    case XK_g:
+        return wm_keyboard_state_g_m;
+    case XK_H:
+    case XK_h:
+        return wm_keyboard_state_h_m;
+    case XK_I:
+    case XK_i:
+        return wm_keyboard_state_i_m;
+    case XK_J:
+    case XK_j:
+        return wm_keyboard_state_j_m;
+    case XK_K:
+    case XK_k:
+        return wm_keyboard_state_k_m;
+    case XK_L:
+    case XK_l:
+        return wm_keyboard_state_l_m;
+    case XK_M:
+    case XK_m:
+        return wm_keyboard_state_m_m;
+    case XK_N:
+    case XK_n:
+        return wm_keyboard_state_n_m;
+    case XK_O:
+    case XK_o:
+        return wm_keyboard_state_o_m;
+    case XK_P:
+    case XK_p:
+        return wm_keyboard_state_p_m;
+    case XK_Q:
+    case XK_q:
+        return wm_keyboard_state_q_m;
+    case XK_R:
+    case XK_r:
+        return wm_keyboard_state_r_m;
+    case XK_S:
+    case XK_s:
+        return wm_keyboard_state_s_m;
+    case XK_T:
+    case XK_t:
+        return wm_keyboard_state_t_m;
+    case XK_U:
+    case XK_u:
+        return wm_keyboard_state_u_m;
+    case XK_V:
+    case XK_v:
+        return wm_keyboard_state_v_m;
+    case XK_W:
+    case XK_w:
+        return wm_keyboard_state_w_m;
+    case XK_X:
+    case XK_x:
+        return wm_keyboard_state_x_m;
+    case XK_Y:
+    case XK_y:
+        return wm_keyboard_state_y_m;
+    case XK_Z:
+    case XK_z:
+        return wm_keyboard_state_z_m;
+    case XK_F1:
+        return wm_keyboard_state_f1_m;
+    case XK_F2:
+        return wm_keyboard_state_f2_m;
+    case XK_F3:
+        return wm_keyboard_state_f3_m;
+    case XK_F4:
+        return wm_keyboard_state_f4_m;
+    case XK_F5:
+        return wm_keyboard_state_f5_m;
+    case XK_F6:
+        return wm_keyboard_state_f6_m;
+    case XK_F7:
+        return wm_keyboard_state_f7_m;
+    case XK_F8:
+        return wm_keyboard_state_f8_m;
+    case XK_F9:
+        return wm_keyboard_state_f9_m;
+    case XK_F10:
+        return wm_keyboard_state_f10_m;
+    case XK_F11:
+        return wm_keyboard_state_f11_m;
+    case XK_F12:
+        return wm_keyboard_state_f12_m;
+    case XK_Caps_Lock:
+        return wm_keyboard_state_capslock_m;
+    case XK_Delete:
+        return wm_keyboard_state_del_m;
+    default:
+        return wm_keyboard_state_count_m;
+    }
 #endif
 }
 
@@ -846,9 +1008,6 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 break;
 
             case Expose:
-
-                //std_log_info_m ( "Expose: " std_fmt_int_m, x_event->xexpose.count );
-
                 if ( x_event->xexpose.count == 0 ) {
                     XClearWindow ( ( Display* ) window->info.os_handle.root, ( Window ) window->info.os_handle.window );
                 }
@@ -856,20 +1015,12 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 break;
 
             case KeyPress:
-#if 0
-                // TODO pass key modifier flags
-                //std_log_info_m ( "KeyPress: " std_fmt_uint_m " " std_fmt_uint_m " " std_fmt_int_m " " std_fmt_int_m,
-                //               x_event->xkey.keycode, x_event->xkey.state, x_event->xkey.x, x_event->xkey.y );
-                event = wm_event_key_down_m;
-                args[0] = ( uint64_t ) x_event->xkey.keycode;
-                args[1] = flags;
-                break;
-#else
                 event = wm_event_key_down_m;
                 args[0] = ( uint64_t ) x_event->xkey.keycode;
                 args[1] = 0;
 
-                keycode = wm_window_keycode ( x_event->xkey.keycode );
+                keycode = wm_window_keycode ( XLookupKeysym ( &x_event->xkey, 0 ) );
+                wm_window_update_modifier_keydown ( window, keycode );
                 if ( keycode!= wm_keyboard_state_count_m ) {
                     buffer_event = &window->input_buffer.events[window->input_buffer.count++];
                     buffer_event->type = event;
@@ -879,32 +1030,18 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 }
                 on_handle = 0;
                 on_pass = 1;
-#endif
+                break;
 
             case KeyRelease:
-                //std_log_info_m ( "KeyRelease" );
                 event = wm_event_key_up_m;
                 args[0] = ( uint64_t ) x_event->xkey.keycode;
                 args[1] = 0;
+
+                keycode = wm_window_keycode ( XLookupKeysym ( &x_event->xkey, 0 ) );
+                wm_window_update_modifier_keyup ( window, keycode );
                 break;
 
             case ButtonPress:
-#if 0
-                //std_log_info_m ( "ButtonPress: " std_fmt_uint_m " " std_fmt_uint_m " " std_fmt_int_m " " std_fmt_int_m,
-                //               x_event->xbutton.button, x_event->xbutton.state, x_event->xbutton.x, x_event->xbutton.y );
-
-                if ( button == wm_mouse_state_left_m || button == wm_mouse_state_right_m || button == wm_mouse_state_wheel_m ) {
-                    event = wm_event_mouse_down_m;
-                } else {
-                    event = wm_event_mouse_wheel_m;
-                }
-
-                args[0] = button;
-                args[1] = x_event->xbutton.x;
-                args[2] = x_event->xbutton.y;
-                args[3] = flags;
-                break;
-#else
                 event = wm_event_mouse_down_m;
                 args[0] = button;
                 args[1] = x_event->xbutton.x;
@@ -920,24 +1057,8 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 buffer_event->args.mouse.y = x_event->xbutton.y;
                 buffer_event->args.mouse.flags = 0;
                 break;
-#endif
+
             case ButtonRelease:
-#if 0
-                //std_log_info_m ( "ButtonRelease" );
-
-                if ( button == wm_mouse_state_left_m || button == wm_mouse_state_right_m || button == wm_mouse_state_wheel_m ) {
-                    event = wm_event_mouse_up_m;
-                } else {
-                    // Wheel scroll causes both a ButtonPress and a ButtonRelease, so propagate the first and skip the second
-                    return false;
-                }
-
-                args[0] = button;
-                args[1] = x_event->xbutton.x;
-                args[2] = x_event->xbutton.y;
-                args[3] = flags;
-                break;
-#else
                 event = wm_event_mouse_up_m;
                 args[0] = button;
                 args[1] = x_event->xbutton.x;
@@ -946,7 +1067,7 @@ static bool wm_process_input_event ( wm_window_h handle, wm_window_t* window, XE
                 on_handle = 0;
                 on_pass = 1;
                 break;
-#endif
+
             case FocusIn: {
                 event = wm_event_gain_focus_m;
                 std_mutex_t* mutex = &wm_window_state->mutex;

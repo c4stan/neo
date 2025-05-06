@@ -2897,7 +2897,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     .width = 14,
                     .height = 14,
                     .style = xi_style_m (
-                        .horizontal_padding = 8
+                        .horizontal_margin = 8
                     ),
                     .expanded = expanded,
                 );
@@ -2940,7 +2940,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             xi_label_state_t time_label = xi_label_state_m (
                 .style = xi_style_m (
                     .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
-                    .horizontal_margin = 25,
+                    .horizontal_border_margin = 25,
                 )
             );
             std_str_copy_static_m ( time_label.text, buffer );
@@ -2957,7 +2957,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         xf->get_texture_info ( &texture_info, texture_handle );
                         xi_label_state_t texture_label = xi_label_state_m (
                             .style = xi_style_m (
-                                .horizontal_padding = 16,
+                                .horizontal_margin = 16,
                             )
                         );
                         std_str_copy_static_m ( texture_label.text, texture_info.debug_name );
@@ -2969,7 +2969,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                             .value = m_state->render.exported_id == id,
                             .id = id,
                             .style = xi_style_m (
-                                .horizontal_padding = 8,
+                                .horizontal_margin = 8,
                             )
                         );
                         xi->add_switch ( xi_workload, &export_switch );
@@ -3002,7 +3002,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             xi_label_state_t time_label = xi_label_state_m (
                 .style = xi_style_m (
                     .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
-                    .horizontal_margin = 25,
+                    .horizontal_border_margin = 25,
                 )
             );
             std_str_copy_static_m ( time_label.text, buffer );
@@ -3076,14 +3076,13 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             se->get_entity_properties ( &props, entity );
 
             // entity label
-            xi_label_state_t label = xi_label_state_m(
+            xi_label_state_t name_label = xi_label_state_m(
                 .style = xi_style_m (
                     .font_color = font_color
                 )
             );
-            std_str_copy_static_m ( label.text, props.name );
-            xi->add_label ( xi_workload, &label );
-            label.style.font_color = xi_color_invalid_m;
+            std_str_copy_static_m ( name_label.text, props.name );
+            xi->add_label ( xi_workload, &name_label );
 
             // arrow
             bool hovered = xi->test_layer_row_hover ( 14 );
@@ -3095,7 +3094,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     .width = 14,
                     .height = 14,
                     .style = xi_style_m (
-                        .horizontal_padding = 8
+                        .horizontal_margin = 8
                     ),
                     .expanded = expanded,
                     .id = xi_mix_id_m ( i ),
@@ -3144,6 +3143,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     se_component_properties_t* component = &props.components[j];
 
                     // component label
+                    xi_label_state_t label;
                     std_stack_string_append ( &stack, "  " );
                     std_stack_string_append ( &stack, component->name );
                     std_str_copy_static_m ( label.text, buffer );
@@ -3197,15 +3197,18 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
-            .text = "add sphere",
+            .text = "+sphere",
+            .style = xi_default_style_m (
+                .horizontal_padding = 8,
+            ),
         ) ) ) {
             spawn_sphere();
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
-            .text = "add plane",
+            .text = "+plane",
             .style = xi_default_style_m (
-                .horizontal_padding = 8
+                .horizontal_padding = 8,
             ),
         ) ) ) {
             spawn_plane();
@@ -3228,7 +3231,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             xi_transform_state_t xform = xi_transform_state_m (
                 .position = { transform->position[0], transform->position[1], transform->position[2] },
                 .rotation = { transform->orientation[0], transform->orientation[1], transform->orientation[2], transform->orientation[3] },
-                .sort_order = 1,
+                .sort_order = 0,
                 .mode = input_state->keyboard[wm_keyboard_state_alt_left_m] ? xi_transform_mode_rotation_m : xi_transform_mode_translation_m,
             );
             transform_drag = xi->draw_transform ( xi_workload, &xform );
@@ -3337,7 +3340,7 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
-    float target_fps = 8.f;
+    float target_fps = 16.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;
