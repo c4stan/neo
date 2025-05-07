@@ -238,3 +238,11 @@ uint64_t std_atomic_fetch_add_u64 ( uint64_t* atomic, uint64_t value_to_add ) {
     return ( uint64_t ) __sync_fetch_and_add_8 ( ( int64_t* ) atomic, ( int64_t ) value_to_add );
 #endif
 }
+
+uint64_t std_atomic_fetch_sub_u64 ( uint64_t* atomic, uint64_t value_to_sub ) {
+#if defined(std_platform_win32_m)
+    return ( uint64_t ) _InterlockedExchangeSub64 ( ( LONG64* ) atomic, ( LONG64 ) value_to_sub );
+#elif defined(std_platform_linux_m)
+    return ( uint64_t ) __sync_fetch_and_sub_8 ( ( int64_t* ) atomic, ( int64_t ) value_to_sub );
+#endif
+}

@@ -148,34 +148,6 @@ static const char* std_path_next_token ( const char* path, const char* cursor ) 
     return cursor;
 }
 
-// unused
-#if 0
-static const char* std_path_prev_token ( const char* path, const char* cursor ) {
-    std_assert_m ( path != NULL );
-    std_assert_m ( cursor != NULL );
-
-    while ( cursor > path && *cursor != '/' && *cursor != '\\' ) {
-        --cursor;
-    }
-
-    if ( cursor == path ) {
-        return NULL;
-    }
-
-    --cursor;
-
-    while ( cursor > path && *cursor != '/' && *cursor != '\\' ) {
-        --cursor;
-    }
-
-    if ( *cursor == '/' || *cursor == '\\' ) {
-        ++cursor;
-    }
-
-    return cursor;
-}
-#endif
-
 static size_t std_path_token_len ( const char* path, const char* cursor ) {
     std_assert_m ( path != NULL );
     std_assert_m ( cursor != NULL );
@@ -201,34 +173,11 @@ static size_t std_path_token_len ( const char* path, const char* cursor ) {
     return ( size_t ) ( cursor - start );
 }
 
-// unused
-#if 0
-static bool std_path_token_is_folder ( const char* path, const char* cursor ) {
-    std_unused_m ( path );
-
-    while ( *cursor != '/' && *cursor != '\\' && *cursor != '\0' ) {
-        ++cursor;
-    }
-
-    if ( *cursor == '\0' ) {
-        return false;
-    }
-
-    return true;
-}
-#endif
-
 // appends to path first n characters from append, adds a / if necessary
 static size_t std_path_append_n ( char* path, size_t cap, const char* append, size_t n ) {
-    // Algo:
-    // assume that path either ends with a / (meaning it's a dir path) or it's empty -- removed
-    // assume append is a valid path (meaning it does not start with a /)
-    // copy append after path, assume there's enough space
-    // assume append ends with / if it's a dir and doesn't if it's a file (cannot know, cannot check/do it automatically)
     std_assert_m ( path != NULL );
     std_assert_m ( append != NULL );
     size_t path_len = std_str_len ( path );
-    //std_assert_m ( path_len == 0 || path[path_len - 1] == '/' );
     size_t extra = 0;
 
     if ( path_len > 0 && path[path_len - 1] != '/' && append[0] != '/' && path_len + 1 < cap ) {
@@ -244,9 +193,6 @@ static size_t std_path_append_n ( char* path, size_t cap, const char* append, si
     path[new_path_len] = '\0';
     return new_path_len;
 }
-
-
-// PATH API
 
 size_t std_path_append ( char* path, size_t cap, const char* append ) {
     // compute append length
@@ -331,9 +277,6 @@ size_t std_path_normalize ( char* dest, size_t cap, const char* path ) {
             if ( * ( token + token_len ) != '\0' ) {
                 len = std_path_append ( dest, cap, "/" );
             }
-
-            //if ( std_path_token_is_folder ( path, token ) ) {
-            //}
         }
 
         token = std_path_next_token ( path, token );
@@ -351,11 +294,8 @@ bool std_path_is_drive ( const char* path ) {
     std_str_copy ( parent, std_path_size_m, path );
     size_t parent_len = std_path_pop ( parent );
 
-    // redundant {} here because otherwise AStyle formatter goes crazy...
-    {
-        if ( parent_len == 0 ) {
-            return true;
-        }
+    if ( parent_len == 0 ) {
+        return true;
     }
 
     struct stat path_stat;

@@ -2763,7 +2763,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     xi->begin_section ( xi_workload, &m_state->ui.xg_alloc_section_state );
     {
         std_allocator_info_t cpu_info;
-        std_virtual_heap_allocator_info ( &cpu_info );
+        std_allocator_info ( &cpu_info );
         std_platform_memory_info_t memory_info = std_platform_memory_info();
         xi->add_label ( xi_workload, &xi_label_state_m ( .text = "cpu" ) );
         xi_label_state_t size_label = xi_label_state_m ( 
@@ -2771,10 +2771,10 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         );
         std_stack_t stack = std_static_stack_m ( size_label.text );
         char buffer[32];
-        std_size_to_str_approx ( buffer, 32, cpu_info.allocated_size );
+        std_size_to_str_approx ( buffer, 32, cpu_info.allocated_heap_size );
         std_stack_string_append ( &stack, buffer );
         std_stack_string_append ( &stack, "/" );
-        std_size_to_str_approx ( buffer, 32, cpu_info.reserved_size );
+        std_size_to_str_approx ( buffer, 32, cpu_info.reserved_heap_size );
         std_stack_string_append ( &stack, buffer );
         std_stack_string_append ( &stack, "/" );
         std_size_to_str_approx ( buffer, 32, memory_info.total_ram_size );

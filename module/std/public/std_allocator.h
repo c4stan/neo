@@ -49,11 +49,14 @@ void*   std_virtual_heap_alloc ( size_t size, size_t align );
 bool    std_virtual_heap_free ( void* ptr );
 
 typedef struct {
-    uint64_t allocated_size;
+    // TODO these are not accurate, need to find a way to query OS for these numbers
     uint64_t reserved_size;
+    uint64_t mapped_size;
+    uint64_t used_heap_size;
+    uint64_t total_heap_size;
 } std_allocator_info_t;
 
-void std_virtual_heap_allocator_info ( std_allocator_info_t* info );
+void std_allocator_info ( std_allocator_info_t* info );
 
 typedef struct {
     uint64_t allocated_size;
@@ -112,7 +115,7 @@ uint64_t    std_stack_used_size ( const std_stack_t* stack );
 #define std_stack_write_array_m( stack, base, count ) std_stack_write ( stack, base, sizeof ( *base ) * count )
 #define std_stack_array_count_m( stack, type ) ( ( (stack)->top - (stack)->begin ) / sizeof ( type ) )
 
-// Linear allocator based on virtual memory. The mapped segment will grow until the whore reserved range is full. It will not grow further.
+// Linear allocator based on virtual memory. The mapped segment will grow until the whole reserved range is full. It will not grow further.
 typedef struct {
     union {
         std_stack_t mapped;

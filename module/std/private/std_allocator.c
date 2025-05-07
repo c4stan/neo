@@ -30,59 +30,7 @@ size_t std_virtual_page_align ( size_t size ) {
     return std_align ( size, std_allocator_state->virtual_page_size );
 }
 
-#if 0
-std_virtual_buffer_t std_virtual_buffer ( void* base, size_t mapped, size_t reserved ) {
-    std_virtual_buffer_t buffer;
-    buffer.base = base;
-    buffer.mapped_size = mapped;
-    buffer.reserved_size = reserved;
-    return buffer;
-}
-#endif
-
-static bool std_virtual_map_address ( void* base, size_t size ) {
-    std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
-    std_assert_m ( base != NULL );
-    std_assert_m ( std_align_test_ptr ( base, std_allocator_state->virtual_page_size ) );
-
-    bool result = false;
-#ifdef std_platform_win32_m
-    result = VirtualAlloc ( base, size, MEM_COMMIT, PAGE_READWRITE ) == ( void* ) base;
-#elif defined(std_platform_linux_m)
-    result = mprotect ( base, size, PROT_READ | PROT_WRITE ) == 0;
-#endif
-    return result;
-}
-
-static bool std_virtual_unmap_address ( void* base, size_t size ) {
-    std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
-    std_assert_m ( base != NULL );
-    std_assert_m ( std_align_test_ptr ( base, std_allocator_state->virtual_page_size ) );
-
-    bool result;
-#ifdef std_platform_win32_m
-    result = VirtualFree ( base, size, MEM_DECOMMIT ) == TRUE;
-#elif defined(std_platform_linux_m)
-    result = mprotect ( base, size, PROT_NONE ) == 0;
-#endif
-    return result;
-}
-
-static bool std_virtual_free_address ( void* base, size_t size ) {
-    std_assert_m ( base != NULL );
-    std_assert_m ( std_align_test_ptr ( base, std_allocator_state->virtual_page_size ) );
-
-    bool result;
-#ifdef std_platform_win32_m
-    std_unused_m ( size );
-    result = VirtualFree ( base, 0, MEM_RELEASE ) == TRUE;
-#elif defined(std_platform_linux_m)
-    result = munmap ( base, size ) == 0;
-#endif
-    return result;
-}
-
-static void* std_virtual_reserve_address ( size_t size ) {
+void* std_virtual_reserve ( size_t size ) {
     std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
 
     char* base;
@@ -92,80 +40,66 @@ static void* std_virtual_reserve_address ( size_t size ) {
     base = ( char* ) mmap ( NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
 #endif
     std_assert_m ( base != NULL );
+
+    std_atomic_fetch_add_u64 ( &std_allocator_state->virtual_reserved_size, size );
 
     return base;
 }
 
-#if 0
-std_virtual_buffer_t std_virtual_alloc ( size_t size ) {
-    std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
-
-    char* base;
-#ifdef std_platform_win32_m
-    base = ( char* ) VirtualAlloc ( NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_NOACCESS );
-#elif defined(std_platform_linux_m)
-    base = ( char* ) mmap ( NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
-#endif
-    std_assert_m ( base != NULL );
-    return std_virtual_buffer ( base, size, size );
-}
-
-std_virtual_buffer_t std_virtual_reserve ( size_t size ) {
-    std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
-
-    char* base;
-#ifdef std_platform_win32_m
-    base = ( char* ) VirtualAlloc ( NULL, size, MEM_RESERVE, PAGE_NOACCESS );
-#elif defined(std_platform_linux_m)
-    base = ( char* ) mmap ( NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
-#endif
-    std_assert_m ( base != NULL );
-    return std_virtual_buffer ( base, 0, size );
-}
-
-bool std_virtual_map ( std_virtual_buffer_t* buffer, size_t size ) {
-    bool result = std_virtual_map_address ( buffer->base + buffer->mapped_size, size );
-    
-    if ( result ) {
-        buffer->mapped_size += size;
-    }
-
-    return result;
-}
-
-bool std_virtual_unmap ( std_virtual_buffer_t* buffer, size_t size ) {
-    size_t old_size = buffer->mapped_size;
-    size_t new_size = old_size > size ? old_size - size : 0;
-
-    bool result = std_virtual_unmap_address ( buffer->base + new_size, size );
-
-    if ( result ) {
-        buffer->mapped_size = new_size;
-    }
-
-    return result;
-}
-
-bool std_virtual_free ( const std_virtual_buffer_t* buffer ) {
-    return std_virtual_free_address ( buffer->base, buffer->reserved_size ) ;
-}
-#else
-void* std_virtual_reserve ( size_t size ) {
-    return std_virtual_reserve_address ( size );
-}
-
 bool std_virtual_map ( void* from, void* to ) {
-    return std_virtual_map_address ( from, to - from );
+    uint64_t size = to - from;
+    std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
+    std_assert_m ( from != NULL );
+    std_assert_m ( std_align_test_ptr ( from, std_allocator_state->virtual_page_size ) );
+
+    bool result = false;
+#ifdef std_platform_win32_m
+    result = VirtualAlloc ( from, size, MEM_COMMIT, PAGE_READWRITE ) == ( void* ) from;
+#elif defined(std_platform_linux_m)
+    result = mprotect ( from, size, PROT_READ | PROT_WRITE ) == 0;
+#endif
+
+    // TODO this is not guaranteed to be correct, map can be correctly called multiple times on already mapped memory
+    std_atomic_fetch_add_u64 ( &std_allocator_state->virtual_mapped_size, size );
+
+    return result;
 }
 
 bool std_virtual_unmap ( void* from, void* to ) {
-    return std_virtual_unmap_address ( from, to - from );
+    uint64_t size = to - from;
+    std_assert_m ( std_align_test ( size, std_allocator_state->virtual_page_size ) );
+    std_assert_m ( from != NULL );
+    std_assert_m ( std_align_test_ptr ( from, std_allocator_state->virtual_page_size ) );
+
+    bool result;
+#ifdef std_platform_win32_m
+    result = VirtualFree ( from, size, MEM_DECOMMIT ) == TRUE;
+#elif defined(std_platform_linux_m)
+    result = mprotect ( from, size, PROT_NONE ) == 0;
+#endif
+
+    // TODO see above
+    std_atomic_fetch_sub_u64 ( &std_allocator_state->virtual_mapped_size, size );
+
+    return result;
 }
 
 bool std_virtual_free ( void* from, void* to ) {
-    return std_virtual_free_address ( from, to - from );
-}
+    uint64_t size = to - from;
+    std_assert_m ( from != NULL );
+    std_assert_m ( std_align_test_ptr ( from, std_allocator_state->virtual_page_size ) );
+
+    bool result;
+#ifdef std_platform_win32_m
+    std_unused_m ( size );
+    result = VirtualFree ( from, 0, MEM_RELEASE ) == TRUE;
+#elif defined(std_platform_linux_m)
+    result = munmap ( from, size ) == 0;
 #endif
+
+    std_atomic_fetch_sub_u64 ( &std_allocator_state->virtual_reserved_size, size );
+
+    return result;}
 
 //==============================================================================
 
@@ -1534,9 +1468,11 @@ void std_allocator_tlsf_heap_deinit ( std_allocator_tlsf_heap_t* heap ) {
     std_virtual_stack_destroy ( &heap->stack );
 }
 
-void std_virtual_heap_allocator_info ( std_allocator_info_t* info ) {
-    info->allocated_size = std_allocator_state->tlsf_heap.allocated_size;
-    info->reserved_size = std_allocator_state->tlsf_heap.total_size;
+void std_allocator_info ( std_allocator_info_t* info ) {
+    info->reserved_size = std_allocator_state->virtual_reserved_size;
+    info->mapped_size = std_allocator_state->virtual_mapped_size;
+    info->used_heap_size = std_allocator_state->tlsf_heap.allocated_size;
+    info->total_heap_size = std_allocator_state->tlsf_heap.total_size;
 }
 
 //==============================================================================
@@ -1583,6 +1519,9 @@ bool std_virtual_heap_free ( void* address ) {
 void std_allocator_boot ( void ) {
     std_assert_m ( std_allocator_state == NULL );
     static std_allocator_state_t state;
+
+    state.virtual_reserved_size = 0;
+    state.virtual_mapped_size = 0;
 
     // Get virtual page size
     {

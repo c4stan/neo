@@ -129,6 +129,9 @@ typedef struct {
     std_allocator_tagged_heap_t     tagged_heap;
     size_t                          tagged_page_size;
     std_allocator_tlsf_heap_t       tlsf_heap;
+
+    size_t virtual_reserved_size;
+    size_t virtual_mapped_size;
 } std_allocator_state_t;
 
 //==============================================================================

@@ -36,3 +36,6 @@ int32_t                         std_atomic_fetch_add_i32 ( int32_t* atomic, int3
 int64_t                         std_atomic_fetch_add_i64 ( int64_t* atomic, int64_t value_to_add );
 uint32_t                        std_atomic_fetch_add_u32 ( uint32_t* atomic, uint32_t value_to_add );
 uint64_t                        std_atomic_fetch_add_u64 ( uint64_t* atomic, uint64_t value_to_add );
+// TOOD sub?
+
+uint64_t                        std_atomic_fetch_sub_u64 ( uint64_t* atomic, uint64_t value_to_sub );

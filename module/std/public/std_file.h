@@ -79,7 +79,12 @@ typedef void ( std_directory_iterator_callback_f ) ( const char* name, std_path_
 
 #define std_file_read_error_m UINT64_MAX
 
-// TODO define what a "normalized" path is and which functions expect their input paths to be normalized
+// normalized path: either start with a drive or a /
+//                  always end with a / if folder path, without if not
+//                      cannot be reliably enforced when appending to path -> never end with a /
+//                  remove all ./ and ../
+//                  TODO make this be the case everywhere
+
 size_t      std_path_append     ( char* path, size_t cap, const char* append );
 size_t      std_path_pop        ( char* path );
 size_t      std_path_normalize  ( char* dest, size_t cap, const char* path );

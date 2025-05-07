@@ -324,6 +324,23 @@ static void  test_allocator ( void ) {
         std_virtual_heap_free ( alloc );
     }
 
+    {
+        char reserved_size[16];
+        char mapped_size[16];
+        char used_heap_size[16];
+        char total_heap_size[16];
+        std_allocator_info_t info;
+        std_allocator_info ( &info );
+        std_size_to_str_approx ( reserved_size, 16, info.reserved_size );
+        std_size_to_str_approx ( mapped_size, 16, info.mapped_size );
+        std_size_to_str_approx ( used_heap_size, 16, info.used_heap_size );
+        std_size_to_str_approx ( total_heap_size, 16, info.total_heap_size );
+        std_log_info_m ( "Reserved: " std_fmt_str_m, reserved_size );
+        std_log_info_m ( "Mapped: " std_fmt_str_m, mapped_size );
+        std_log_info_m ( "Used heap: " std_fmt_str_m, used_heap_size );
+        std_log_info_m ( "Total heap: " std_fmt_str_m, total_heap_size );
+    }
+
     std_log_info_m ( "std_allocator test complete." );
 }
 
