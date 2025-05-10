@@ -50,6 +50,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->get_pipeline_resource_layout = xg_vk_pipeline_resource_binding_set_layout_get;
     xg->create_resource_layout = xg_vk_pipeline_resource_bindings_layout_create;
     xg->destroy_resource_layout = xg_vk_pipeline_resource_bindings_layout_destroy;
+    xg->get_pipeline_info = xg_vk_pipeline_get_info;
     // Workload
     xg->create_workload = xg_workload_create;
     xg->create_cmd_buffer = xg_workload_add_cmd_buffer;

@@ -203,6 +203,7 @@ typedef struct {
     bool down;
     bool pressed;
     bool disabled;
+    bool toggle;
     xi_id_t id;
     uint64_t sort_order;
     xi_style_t style;

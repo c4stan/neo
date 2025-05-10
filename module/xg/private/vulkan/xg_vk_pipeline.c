@@ -879,6 +879,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         xg_vk_pipeline->common.hash = pipeline_hash;
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
+        xg_vk_pipeline->common.type = xg_pipeline_raytrace_m;
 
         std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->raytrace_pipelines_map, pipeline_hash, xg_vk_pipeline_handle ) );
     }
@@ -1043,6 +1044,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         xg_vk_pipeline->common.hash = pipeline_hash;
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
+        xg_vk_pipeline->common.type = xg_pipeline_compute_m;
 
         std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline_hash, xg_vk_pipeline_handle ) );
     }
@@ -1637,6 +1639,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         xg_vk_pipeline->common.hash = pipeline_hash;
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
+        xg_vk_pipeline->common.type = xg_pipeline_graphics_m;
 
         std_hash_map_insert ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline_hash, xg_vk_pipeline_handle );
     } else {
@@ -1952,4 +1955,10 @@ const xg_vk_resource_bindings_t* xg_vk_pipeline_resource_group_get ( xg_device_h
     xg_vk_pipeline_device_context_t* context = &xg_vk_pipeline_state->device_contexts[device_idx];
     xg_vk_resource_bindings_t* group = &context->groups_array[group_handle];
     return group;
+}
+
+void xg_vk_pipeline_get_info ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline_handle ) {
+    xg_vk_pipeline_common_t* common_pipeline = xg_vk_common_pipeline_get ( pipeline_handle );
+    info->type = common_pipeline->type;
+    info->debug_name = common_pipeline->debug_name;
 }

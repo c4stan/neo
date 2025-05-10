@@ -1382,6 +1382,7 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
         xi_ui_release_hovered ( state->id );
     }
 
+    // state update
     bool pressed = false;
 
     if ( !xi_ui_state->update.mouse_down && xi_ui_state->active_id == state->id ) {
@@ -1398,14 +1399,24 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
 
     state->pressed = pressed;
 
-    if ( xi_ui_state->active_id == state->id ) {
-        state->down = true;
+    if ( !state->toggle ) {
+        if ( xi_ui_state->active_id == state->id ) {
+            state->down = true;
+        } else {
+            state->down = false;
+        }
     } else {
-        state->down = false;
+        if ( xi_ui_state->active_id == state->id && xi_ui_state->update.mouse_down ) {
+            if ( xi_ui_state->hovered_id == state->id ) {
+                state->down = ! ( state->down );
+            }
+
+            xi_ui_release_active ( state->id );
+        }
     }
 
     // draw
-    float color_scale = xi_ui_state->active_id == state->id ? 0.35f : 0.5f;
+    float color_scale = state->down ? 0.35f : 0.5f;
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, color_scale ), x, y, width, height, state->sort_order );
     xi_ui_draw_string ( workload, style.font, style.font_color, state->text, x + ( width - text_width ) / 2, y, state->sort_order );
 

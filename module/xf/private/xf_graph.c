@@ -333,57 +333,6 @@ static void xf_graph_add_queue_ownership_transitions ( xf_graph_h graph_handle, 
     }
 }
 
-#if 0
-        if ( graph->export_node == node_idx ) {
-            xg_texture_memory_barrier_t export_barriers[3];
-            std_stack_t export_barriers_stack = std_static_stack_m ( export_barriers );
-
-            xf_texture_execution_state_t state = xf_resource_texture_get_state ( graph->export_source, xg_texture_view_m() );
-
-            // TODO proper views
-            // TODO can't properly handle scheduling (queue transitions) here, instead trigger a reschedule via invalidate
-            //      when setting the export texture and properly handle it there
-            {
-                xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_source, xg_texture_view_m(), &xf_texture_execution_state_m (
-                    .layout = xg_texture_layout_copy_source_m,
-                    .stage = xg_pipeline_stage_bit_transfer_m,
-                    .access = xg_memory_access_bit_transfer_read_m,
-                    .queue = xg_cmd_queue_graphics_m,
-                ) );
-
-                xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_dest, xg_texture_view_m(), &xf_texture_execution_state_m (
-                    .layout = xg_texture_layout_copy_dest_m,
-                    .stage = xg_pipeline_stage_bit_transfer_m,
-                    .access = xg_memory_access_bit_transfer_write_m,
-                    .queue = xg_cmd_queue_graphics_m,
-                ) );
-
-                xg_barrier_set_t barrier_set = xg_barrier_set_m(
-                    .texture_memory_barriers = export_barriers,
-                    .texture_memory_barriers_count = 2,
-                );
-                xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
-            }
-
-            xf_physical_texture_t* export_source = xf_resource_texture_get_physical_texture ( graph->export_source );
-            xf_physical_texture_t* export_dest = xf_resource_texture_get_physical_texture ( graph->export_dest );
-
-            xg->cmd_copy_texture ( cmd_buffer, sort_key++, &xg_texture_copy_params_m (
-                .source = export_source->handle,
-                .destination = export_dest->handle,
-            ) );
-
-            std_stack_clear ( &export_barriers_stack );
-
-            xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_source, xg_texture_view_m(), &state );
-            xg_barrier_set_t barrier_set = xg_barrier_set_m(
-                .texture_memory_barriers = export_barriers,
-                .texture_memory_barriers_count = 1,
-            );
-            xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
-        }
-#endif
-
 static void xf_graph_compute_resource_transitions ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
@@ -1043,7 +992,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m ( 
                         .handle = resource->texture, 
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1066,7 +1014,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m ( 
                         .handle = resource->texture,
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1089,7 +1036,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m ( 
                         .handle = resource->texture,
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1112,7 +1058,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m ( 
                         .handle = resource->texture,
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1135,7 +1080,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m ( 
                         .handle = resource->texture,
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1158,7 +1102,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m (
                         .handle = resource->texture,
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1180,7 +1123,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                 if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( params->depth_stencil_target ), graph_texture_idx ) ) {
                     std_array_push_m ( &graph_textures_array, xf_graph_texture_m (
                         .handle = params->depth_stencil_target,
-                        //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, params->depth_stencil_target, xg_texture_view_m() ) 
                     ) );
                 }
                 xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, xg_texture_view_m() );
@@ -1206,7 +1148,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                         std_array_push_m ( &graph_textures_array, xf_graph_texture_m (
                             .handle = resource->texture,
-                            //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                         ) );
                     }
                     xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1231,7 +1172,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                         if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( copy_source->texture ), graph_texture_idx ) ) {
                             std_array_push_m ( &graph_textures_array, xf_graph_texture_m (
                                 .handle = copy_source->texture,
-                                //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, copy_source->texture, copy_source->view ) 
                             ) );
                         }
                         xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1258,7 +1198,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                     if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( resource->texture ), graph_texture_idx ) ) {
                         std_array_push_m ( &graph_textures_array, xf_graph_texture_m (
                             .handle = resource->texture,
-                            //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, resource->texture, resource->view ) 
                         ) );
                     }
                     xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1283,7 +1222,6 @@ static void xf_graph_scan_textures ( xf_graph_h graph_handle ) {
                         if ( std_hash_map_try_insert ( &graph_texture_idx, &graph_textures_map, std_hash_64_m ( copy_source->texture ), graph_texture_idx ) ) {
                             std_array_push_m ( &graph_textures_array, xf_graph_texture_m (
                                 .handle = copy_source->texture,
-                                //.dependencies = xf_graph_alloc_texture_resource_dependencies ( graph_handle, copy_source->texture, copy_source->view ) 
                             ) );
                         }
                         xf_graph_texture_accumulate_subresources ( graph_handle, graph_texture_idx, resource->view );
@@ -1470,25 +1408,34 @@ static void xf_graph_update_export_node ( xf_graph_h graph_handle ) {
 
     xf_node_h export_source_node = graph->export_source_node;
     if ( export_source_node != xf_null_handle_m ) {
-#if 0
+#if 1
         xg_i* xg = std_module_get_m ( xg_module_name_m );
 
         xf_texture_info_t info;
         xf_resource_texture_get_info ( &info, graph->export_dest );
 
         xf_graph_export_data_t uniform_data = {
-            .remap = { 0 },
+            .remap[0] = graph->export_channels[0],
+            .remap[1] = graph->export_channels[1],
+            .remap[2] = graph->export_channels[2],
+            .remap[3] = graph->export_channels[3],
         };
 
-        xf_node_h export_node = xf_graph_node_create ( graph_handle, &xf_node_params_m (
+        xs_i* xs = std_module_get_m ( xs_module_name_m );
+        xg_pipeline_state_h pipeline = xs->get_pipeline_state ( xf_graph_state->export_pipeline );
+        xg_pipeline_info_t pipe_info;
+        xg->get_pipeline_info ( &pipe_info, pipeline );
+        std_log_info_m ( pipe_info.debug_name );
+
+        xf_node_h export_node_handle = xf_graph_node_create ( graph_handle, &xf_node_params_m (
             .debug_name = "export",
             .type = xf_node_type_compute_pass_m,
             .pass.compute = xf_node_compute_pass_params_m (
-                .pipeline = xf_graph_state->export_pipeline,
+                .pipeline = pipeline,
                 .workgroup_count = { std_div_ceil_u32 ( info.width, 8 ), std_div_ceil_u32 ( info.height, 8 ), 1 },
-                .uniform_data = std_buffer_m ( &uniform_data ),
                 .samplers_count = 1,
                 .samplers = { xg->get_default_sampler ( graph->params.device, xg_default_sampler_linear_clamp_m ) },
+                .uniform_data = std_buffer_m ( &uniform_data ),
             ),
             .resources = xf_node_resource_params_m (
                 .sampled_textures_count = 1,
@@ -2210,13 +2157,11 @@ static void xf_graph_compute_segments ( xf_graph_h graph_handle ) {
     uint32_t segments_count = 0;
     xf_graph_segment_t segment = xf_graph_segment_m( .begin = 0 );
 
-#if 1
     for ( uint32_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
         uint32_t node_idx = graph->nodes_execution_order[node_it];
         xf_node_t* node = &graph->nodes_array[node_idx];
         xg_cmd_queue_e node_queue = node->enabled ? node->params.queue : xg_cmd_queue_graphics_m;
 
-        // TODO do better
         bool cross_queue_dep = false;
         for ( xg_cmd_queue_e queue_it = 0; queue_it < xg_cmd_queue_count_m; ++queue_it ) {
             if ( queue_it != node_queue && graph->cross_queue_node_deps[node_it][queue_it] != -1 ) {
@@ -2235,45 +2180,6 @@ static void xf_graph_compute_segments ( xf_graph_h graph_handle ) {
 
         node->segment = segments_count;
     }
-#else
-    int32_t last_dep_idx = -1;
-
-    for ( uint32_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
-        uint32_t node_idx = graph->nodes_execution_order[node_it];
-        xf_node_t* node = &graph->nodes_array[node_idx];
-        xg_cmd_queue_e node_queue = node->enabled ? node->params.queue : xg_cmd_queue_graphics_m;
-
-        int32_t this_dep_idx = -1;
-        for ( xg_cmd_queue_e queue_it = 0; queue_it < xg_cmd_queue_count_m; ++queue_it ) {
-            int32_t dep_idx = graph->cross_queue_node_deps[node_it][queue_it];
-            this_dep_idx = std_max_i32 ( this_dep_idx, dep_idx );
-        }
-
-        bool new_segment = false;
-        if ( node_it == 0 ) {
-            segment = xf_graph_segment_m ( .begin = node_it, .queue = node_queue );
-        } else if ( node_queue != segment.queue ) {
-            new_segment = true;
-        } else if ( last_dep_idx != -1 && this_dep_idx != -1 ) {
-            xf_node_h last_dep_handle = graph->nodes_execution_order[last_dep_idx];
-            xf_node_t* last_dep_node = &graph->nodes_array[last_dep_handle];
-            xf_node_h this_dep_handle = graph->nodes_execution_order[this_dep_idx];
-            xf_node_t* this_dep_node = &graph->nodes_array[this_dep_handle];
-            if ( last_dep_node->segment < this_dep_node->segment ) {
-                //new_segment = true;
-            }
-        }
-
-        if ( new_segment ) {
-            segment.end = node_it - 1;
-            segments_array[segments_count++] = segment;
-            segment = xf_graph_segment_m ( .begin = node_it, .queue = node_queue );
-        }
-
-        last_dep_idx = std_max_i32 ( last_dep_idx, this_dep_idx );
-        node->segment = segments_count;
-    }
-#endif
 
     segment.end = graph->nodes_count - 1;
     segments_array[segments_count++] = segment;
@@ -2290,7 +2196,6 @@ static void xf_graph_compute_segments ( xf_graph_h graph_handle ) {
                     uint32_t prev_idx = graph->nodes_execution_order[prev];
                     xf_node_t* prev_node = &graph->nodes_array[prev_idx];
                     if ( prev_node->segment != i ) {
-                        // TODO give segments one sem per queue? otherwise can't have 2 different queues (segments) wait on the same sem (segment)
                         xf_graph_segment_t* prev_segment = &graph->segments_array[prev_node->segment];
                         if ( !prev_segment->is_depended[segment->queue] ) {
                             segment->deps[segment->deps_count++] = prev_node->segment;
@@ -3383,57 +3288,6 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             }
         }
 
-#if 0
-        if ( graph->export_source_node == node_idx ) {
-            xg_texture_memory_barrier_t export_barriers[3];
-            std_stack_t export_barriers_stack = std_static_stack_m ( export_barriers );
-
-            xf_texture_execution_state_t state = xf_resource_texture_get_state ( graph->export_source, xg_texture_view_m() );
-
-            // TODO proper views
-            // TODO can't properly handle scheduling (queue transitions) here, instead trigger a reschedule via invalidate
-            //      when setting the export texture and properly handle it there
-            {
-                xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_source, xg_texture_view_m(), &xf_texture_execution_state_m (
-                    .layout = xg_texture_layout_copy_source_m,
-                    .stage = xg_pipeline_stage_bit_transfer_m,
-                    .access = xg_memory_access_bit_transfer_read_m,
-                    .queue = xg_cmd_queue_graphics_m,
-                ) );
-
-                xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_dest, xg_texture_view_m(), &xf_texture_execution_state_m (
-                    .layout = xg_texture_layout_copy_dest_m,
-                    .stage = xg_pipeline_stage_bit_transfer_m,
-                    .access = xg_memory_access_bit_transfer_write_m,
-                    .queue = xg_cmd_queue_graphics_m,
-                ) );
-
-                xg_barrier_set_t barrier_set = xg_barrier_set_m(
-                    .texture_memory_barriers = export_barriers,
-                    .texture_memory_barriers_count = 2,
-                );
-                xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
-            }
-
-            xf_physical_texture_t* export_source = xf_resource_texture_get_physical_texture ( graph->export_source );
-            xf_physical_texture_t* export_dest = xf_resource_texture_get_physical_texture ( graph->export_dest );
-
-            xg->cmd_copy_texture ( cmd_buffer, sort_key++, &xg_texture_copy_params_m (
-                .source = export_source->handle,
-                .destination = export_dest->handle,
-            ) );
-
-            std_stack_clear ( &export_barriers_stack );
-
-            xf_resource_texture_state_barrier ( &export_barriers_stack, graph->export_source, xg_texture_view_m(), &state );
-            xg_barrier_set_t barrier_set = xg_barrier_set_m(
-                .texture_memory_barriers = export_barriers,
-                .texture_memory_barriers_count = 1,
-            );
-            xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
-        }
-#endif
-
         if ( node->texture_releases.count ) {
             std_stack_clear ( &texture_barriers_stack );
             std_stack_clear ( &buffer_barriers_stack );
@@ -3551,9 +3405,13 @@ void xf_graph_node_disable ( xf_graph_h graph_handle, xf_node_h node_handle ) {
     }
 }
 
-void xf_graph_set_texture_export ( xf_graph_h graph_handle, xf_node_h node, xf_texture_h texture, xf_texture_h dest ) {
+void xf_graph_set_texture_export ( xf_graph_h graph_handle, xf_node_h node, xf_texture_h texture, xf_texture_h dest, xf_export_channel_e channel_remap[4] ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     graph->export_source_node = node;
     graph->export_source = texture;
     graph->export_dest = dest;
+    graph->export_channels[0] = channel_remap[0];
+    graph->export_channels[1] = channel_remap[1];
+    graph->export_channels[2] = channel_remap[2];
+    graph->export_channels[3] = channel_remap[3];
 }

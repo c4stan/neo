@@ -1324,7 +1324,12 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 vkCmdBindPipeline ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->common.vk_handle );
 
                 VkDescriptorSet vk_sets[xg_shader_binding_set_count_m] = { [0 ... xg_shader_binding_set_count_m - 1] = VK_NULL_HANDLE };
-                vk_sets[0] = global_set;
+                if ( global_set ) {
+                    const xg_vk_resource_bindings_t* global_bindings = xg_vk_pipeline_resource_group_get ( device_handle, workload->global_bindings );
+                    if ( pipeline->common.resource_layouts[0] == global_bindings->layout ) {
+                        vk_sets[0] = global_set;
+                    }
+                }
                 
                 for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
                     xg_resource_bindings_h group_handle = args->bindings[i];
@@ -1369,7 +1374,12 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 vkCmdBindPipeline ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline->common.vk_handle );
 
                 VkDescriptorSet vk_sets[xg_shader_binding_set_count_m] = { [0 ... xg_shader_binding_set_count_m - 1] = VK_NULL_HANDLE };
-                vk_sets[0] = global_set;
+                if ( global_set ) {
+                    const xg_vk_resource_bindings_t* global_bindings = xg_vk_pipeline_resource_group_get ( device_handle, workload->global_bindings );
+                    if ( pipeline->common.resource_layouts[0] == global_bindings->layout ) {
+                        vk_sets[0] = global_set;
+                    }
+                }
                 
                 for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
                     xg_resource_bindings_h group_handle = args->bindings[i];

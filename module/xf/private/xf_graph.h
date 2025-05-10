@@ -373,6 +373,7 @@ typedef struct {
     xf_texture_h export_source;
     xf_texture_h export_dest;
     xf_node_h export_node;
+    xf_export_channel_e export_channels[4];
 } xf_graph_t;
 
 typedef struct {
@@ -409,5 +410,4 @@ void xf_graph_node_disable ( xf_graph_h graph, xf_node_h node );
 
 const uint64_t* xf_graph_get_timings ( xf_graph_h graph );
 
-void xf_graph_set_texture_export ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest );
-
+void xf_graph_set_texture_export ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest, xf_export_channel_e channel_remap[4] );

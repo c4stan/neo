@@ -424,6 +424,14 @@ bool std_bitset_clear_atomic ( uint64_t* blocks, size_t idx ) {
     return std_compare_and_swap_u64 ( block, &old_block, new_block );
 }
 
+void std_bitset_write ( uint64_t* blocks, size_t idx, uint32_t value ) {
+    uint64_t block_idx = idx >> 6;
+    uint64_t bit_idx = idx & 0x3f;
+    uint64_t block = blocks[block_idx];
+    block = std_bit_write_64_m ( block, idx, value );
+    blocks[block_idx] = block;
+}
+
 bool std_bitset_scan ( uint64_t* result_bit_idx, const uint64_t* blocks, size_t starting_bit_idx, size_t u64_blocks_count ) {
     uint64_t block_idx = starting_bit_idx >> 6;
     uint64_t bit_idx = starting_bit_idx & 0x3f;

@@ -581,6 +581,15 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+typedef enum {
+    xf_export_channel_r,
+    xf_export_channel_g,
+    xf_export_channel_b,
+    xf_export_channel_a,
+    xf_export_channel_1,
+    xf_export_channel_0,
+} xf_export_channel_e;
+
 typedef struct {
     void ( *load_shaders ) ( xg_device_h device );
 
@@ -624,5 +633,5 @@ typedef struct {
     const uint64_t* ( *get_graph_timings ) ( xf_graph_h graph );
 
     uint32_t ( *list_textures ) ( xf_texture_h* textures, uint32_t capacity );
-    void ( *set_graph_texture_export ) ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest );
+    void ( *set_graph_texture_export ) ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest, xf_export_channel_e channel_remap[4] );
 } xf_i;

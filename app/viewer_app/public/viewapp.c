@@ -637,6 +637,7 @@ static void viewapp_boot_raster_graph ( void ) {
     add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, lighting_texture, hiz_texture );
 
     // ssgi blur
+#if 0
     xf_texture_h ssgi_blur_x_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x / ssgi_scale,
         .height = resolution_y / ssgi_scale,
@@ -652,6 +653,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "ssgi_blur_y_texture",
     ) );
     add_bilateral_blur_pass ( graph, ssgi_blur_y_texture, ssgi_blur_x_texture, normal_texture, depth_texture, 5, 3, blur_pass_direction_vertical_m, "ssgi_blur_y" );
+#endif
 
     // ssgi temporal accumulation
     xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -680,7 +682,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
             .sampled_textures_count = 6,
             .sampled_textures = { 
-                xf_compute_texture_dependency_m ( .texture = ssgi_blur_y_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssgi_raymarch_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = prev_depth_texture ), 
@@ -690,7 +692,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssgi_blur_y_texture ) ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssgi_raymarch_texture ) ) }
         )
     ) );
 
@@ -771,6 +773,7 @@ static void viewapp_boot_raster_graph ( void ) {
     add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, normal_texture, lighting_texture, hiz_texture );
 
     // ssr blur
+#if 0
     xf_texture_h ssr_blur_x_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
@@ -786,6 +789,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "ssr_blur_y_texture",
     ) );
     add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_vertical_m, "ssr_blur_y" );
+#endif
 
     // ssr ta
     xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
@@ -814,7 +818,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssr_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
             .sampled_textures_count = 8,
             .sampled_textures = { 
-                xf_compute_texture_dependency_m ( .texture = ssr_blur_y_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssr_raymarch_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssr_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = prev_depth_texture ), 
@@ -826,7 +830,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssr_blur_y_texture ) ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssr_raymarch_texture ) ) }
         )
     ) );
 
@@ -1150,7 +1154,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0,
+                .roughness = 0.01,
                 .metalness = 0,
             )
         );
@@ -1220,7 +1224,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     plane_col[i][2],
                 },
                 .ssr = true,
-                .roughness = 0,
+                .roughness = 0.01,
                 .metalness = 0,
             ),
         );
@@ -1280,7 +1284,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0,
+                .roughness = 0.01,
                 .metalness = 0,
                 .emissive = 1,
             )
@@ -1379,7 +1383,7 @@ static void viewapp_boot_scene_field ( void ) {
                     powf ( 250 / 255.f, 2.2 ) 
                 },
                 .ssr = true,
-                .roughness = 0,
+                .roughness = 0.01,
             ),          
         );
 
@@ -1476,7 +1480,7 @@ static void viewapp_boot_scene_field ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0.1,
+                .roughness = 0.01,
                 .metalness = 0,
                 .emissive = 1,
             )
@@ -1559,7 +1563,7 @@ static void viewapp_boot_scene_field ( void ) {
                     powf ( 250 / 255.f, 2.2 )
                 },
                 .ssr = true,
-                .roughness = 0,
+                .roughness = 0.01,
                 .metalness = 0,
                 .emissive = 1,
             )
@@ -1915,7 +1919,8 @@ static void viewapp_import_scene ( const char* input_path ) {
                     viewapp_texture_t material_texture = viewapp_import_texture ( scene, texture_path );
                     
                     for ( uint32_t i = 0; i < material_texture.width * material_texture.height; ++i ) {
-                        char metalness = material_texture.data[i * 4 + 0];
+                        // Following the glTF spec for metallicRoughnessTexture
+                        char metalness = material_texture.data[i * 4 + 2];
                         char roughness = material_texture.data[i * 4 + 1];
 
                         if ( color_texture.data ) {
@@ -2250,6 +2255,9 @@ static void viewapp_boot ( void ) {
         m_state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
     }
 
+    xf_i* xf = m_state->modules.xf;
+    xf->load_shaders ( device );
+
     viewapp_boot_workload_resources_layout();
 
     viewapp_load_scene ( m_state->scene.active_scene );
@@ -2508,7 +2516,7 @@ static se_entity_h spawn_plane ( void ) {
                 powf ( 250 / 255.f, 2.2 )
             },
             .ssr = true,
-            .roughness = 0,
+            .roughness = 0.01,
             .metalness = 0,
             .emissive = 1,
         )
@@ -2567,7 +2575,7 @@ static se_entity_h spawn_sphere ( void ) {
                 powf ( 250 / 255.f, 2.2 )
             },
             .ssr = true,
-            .roughness = 0,
+            .roughness = 0.01,
             .metalness = 0,
             .emissive = 1,
         )
@@ -2969,17 +2977,65 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         std_str_copy_static_m ( texture_label.text, texture_info.debug_name );
                         xi->add_label ( xi_workload, &texture_label );
                         uint64_t id = xi_mix_id_m ( j );
-                        bool exported = m_state->render.exported_id == id;
                         xi_switch_state_t export_switch = xi_switch_state_m (
                             .width = 14,
                             .height = 14,
-                            .value = exported,
+                            .value = m_state->render.exported_id == id,
                             .id = id,
                             .style = xi_style_m (
                                 .horizontal_margin = 8,
                             )
                         );
                         xi->add_switch ( xi_workload, &export_switch );
+
+                        bool export_changed = export_switch.value != ( m_state->render.exported_id == id );
+
+                        const char* channel_select_items[] = { "r", "g", "b", "a", "1", "0" };
+                        xi_select_state_t channel_select_0 = xi_select_state_m (
+                            .items = channel_select_items,
+                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_idx = m_state->ui.export_channels[0],
+                            .width = 20,
+                            .sort_order = node_info.texture_count - j,
+                            .id = xi_mix_id_m ( j ),
+                        );
+                        xi_select_state_t channel_select_1 = xi_select_state_m (
+                            .items = channel_select_items,
+                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_idx = m_state->ui.export_channels[1],
+                            .width = 20,
+                            .sort_order = node_info.texture_count - j,
+                            .id = xi_mix_id_m ( j ),
+                        );
+                        xi_select_state_t channel_select_2 = xi_select_state_m (
+                            .items = channel_select_items,
+                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_idx = m_state->ui.export_channels[2],
+                            .width = 20,
+                            .sort_order = node_info.texture_count - j,
+                            .id = xi_mix_id_m ( j ),
+                        );
+                        xi_select_state_t channel_select_3 = xi_select_state_m (
+                            .items = channel_select_items,
+                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_idx = m_state->ui.export_channels[3],
+                            .width = 20,
+                            .sort_order = node_info.texture_count - j,
+                            .id = xi_mix_id_m ( j ),
+                        );
+                        xi->add_select ( xi_workload, &channel_select_0 );
+                        xi->add_select ( xi_workload, &channel_select_1 );
+                        xi->add_select ( xi_workload, &channel_select_2 );
+                        xi->add_select ( xi_workload, &channel_select_3 );
+                        export_changed |= m_state->ui.export_channels[0] != channel_select_0.item_idx;
+                        export_changed |= m_state->ui.export_channels[1] != channel_select_1.item_idx;
+                        export_changed |= m_state->ui.export_channels[2] != channel_select_2.item_idx;
+                        export_changed |= m_state->ui.export_channels[3] != channel_select_3.item_idx;
+                        m_state->ui.export_channels[0] = channel_select_0.item_idx;
+                        m_state->ui.export_channels[1] = channel_select_1.item_idx;
+                        m_state->ui.export_channels[2] = channel_select_2.item_idx;
+                        m_state->ui.export_channels[3] = channel_select_3.item_idx;
+
                         if ( export_switch.value ) {
                             m_state->render.exported_id = id;
                             m_state->render.exported_texture = texture_handle;
@@ -2990,9 +3046,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                             m_state->render.exported_node = xf_null_handle_m;
                         }
 
-                        if ( export_switch.value != exported ) {
+                        if ( export_changed ) {
                             xf->invalidate_graph ( m_state->render.active_graph, workload );
-                            xf->set_graph_texture_export ( m_state->render.active_graph, m_state->render.exported_node, m_state->render.exported_texture, m_state->render.xf_export_texture );
+                            xf->set_graph_texture_export ( m_state->render.active_graph, m_state->render.exported_node, m_state->render.exported_texture, m_state->render.xf_export_texture, m_state->ui.export_channels );
                         }
 
                         xi->newline();

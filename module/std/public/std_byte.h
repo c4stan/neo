@@ -156,6 +156,7 @@ uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_si
 void std_bitset_set ( uint64_t* bitset, size_t idx );
 bool std_bitset_test ( const uint64_t* bitset, size_t idx );
 void std_bitset_clear ( uint64_t* bitset, size_t idx );
+void std_bitset_write ( uint64_t* bitset, size_t idx, uint32_t value );
 // scans for the first bit set to 1. the bit at location starting_bit_idx is included in the scan
 // u64_blocks_count is to always be specified relative to the very beginning of the bitset, not from the given starting bit
 // returns false if no bit set to 1 was found

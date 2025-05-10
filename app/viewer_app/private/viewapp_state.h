@@ -139,8 +139,7 @@ typedef struct {
     uint64_t expanded_nodes_bitset[1];
     uint64_t expanded_entities_bitset[8];
 
-    xf_texture_h debug_textures_array[32];
-    uint32_t debug_textures_count;
+    xf_export_channel_e export_channels[4];
 
     se_entity_h mouse_pick_entity;
 } viewapp_ui_state_t;
@@ -153,7 +152,7 @@ typedef struct {
     .xg_alloc_section_state = xi_section_state_m(), \
     .xf_graph_section_state = xi_section_state_m(), \
     .entities_section_state = xi_section_state_m(), \
-    .debug_textures_count = 0, \
+    .export_channels = { xf_export_channel_r, xf_export_channel_g, xf_export_channel_b, xf_export_channel_a }, \
     .mouse_pick_entity = se_null_handle_m, \
     ##__VA_ARGS__ \
 }

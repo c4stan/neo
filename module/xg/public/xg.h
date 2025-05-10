@@ -1326,6 +1326,11 @@ typedef enum {
     xg_pipeline_raytrace_m,
 } xg_pipeline_e;
 
+typedef struct {
+    xg_pipeline_e type;
+    const char* debug_name;
+} xg_pipeline_info_t;
+
 // -- Renderpass --
 
 typedef struct {
@@ -2605,6 +2610,8 @@ typedef struct {
     void                    ( *destroy_graphics_pipeline )          ( xg_graphics_pipeline_state_h pipeline );
     void                    ( *destroy_compute_pipeline )           ( xg_compute_pipeline_state_h pipeline );
     void                    ( *destroy_raytrace_pipeline )          ( xg_raytrace_pipeline_state_h pipeline );
+
+    void                    ( *get_pipeline_info )                  ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline );
 
     void                    ( *get_allocator_info )                 ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
 

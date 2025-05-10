@@ -1459,9 +1459,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                         buffer.type = xs_parser_buffer_type_storage_m;
                     } else {
                         xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
-                        if ( stage != xg_shading_stage_bit_none_m ) {
-                            buffer.stages |= stage;
-                        }
+                        buffer.stages |= stage;
                     }
                 }
 
@@ -1501,9 +1499,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                         texture.type = xs_parser_texture_type_storage_m;
                     } else {
                         xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
-                        if ( stage != xg_shading_stage_bit_none_m ) {
-                            texture.stages |= stage;
-                        }
+                        texture.stages |= stage;
                     }
                 }
 
@@ -1532,9 +1528,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                     len = std_str_len ( token );
                 } else {
                     xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
-                    if ( stage != xg_shading_stage_bit_none_m ) {
-                        sampler.stages |= stage;
-                    }
+                    sampler.stages |= stage;
                 }
 
                 xs_parser_skip_spaces ( context );
