@@ -139,7 +139,7 @@ void main ( void ) {
         vec3 light_color = light.color;
 
         vec4 shadow_view = light.view_from_world * world_geo_pos;
-        vec3 shadow_screen = screen_from_view ( light.proj_from_view, shadow_view );
+        vec3 shadow_screen = screen_from_view ( light.proj_from_view, shadow_view.xyz );
         vec2 shadow_texel = light.shadow_tile.xy + shadow_screen.xy * light.shadow_tile.z;
 
         float shadow = 0;

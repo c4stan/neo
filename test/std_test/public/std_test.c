@@ -385,7 +385,7 @@ static void test_process ( void ) {
     std_assert_m ( write_result );
 
     std_process_pipe_destroy ( pipe );
-    pipe = std_process_pipe_connect ( pipe_params.name, std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
+    pipe = std_process_pipe_connect ( "std_test_pipe_2", std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
     // read echo from pipe
     {
@@ -436,7 +436,16 @@ static void test_process_child ( void ) {
 
     std_process_pipe_read ( &data_size, buffer, sizeof ( buffer ), pipe );
     std_process_pipe_destroy ( pipe );
-    pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m );
+
+    std_process_pipe_params_t pipe_params = {
+        .name = "std_test_pipe_2",
+        .flags = std_process_pipe_flags_write_m | std_process_pipe_flags_blocking_m,
+        .write_capacity = 1024,
+        .read_capacity = 1024,
+    };
+    pipe = std_process_pipe_create ( &pipe_params );
+    std_assert_m ( pipe != std_process_null_handle_m );
+    std_process_pipe_wait_for_connection ( pipe );
     std_process_pipe_write ( NULL, pipe, buffer, data_size  );
     std_process_pipe_destroy ( pipe );
 

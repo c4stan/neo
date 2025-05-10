@@ -6,8 +6,6 @@
 
 #include "std_string.h"
 
-static xs_database_h xi_sdb = xs_null_handle_m;
-
 static void xi_load_shaders ( xg_device_h device ) {
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
@@ -22,7 +20,7 @@ static void xi_load_shaders ( xg_device_h device ) {
     xi_workload_load_shaders ( xs, sdb );
     xi_font_load_shaders ( xs, sdb );
     xs->build_database ( sdb );
-    xi_sdb = sdb;
+    xi_state_set_sdb ( sdb );
 }
 
 static void xi_api_init ( xi_i* xi ) {
@@ -63,17 +61,17 @@ static void xi_api_init ( xi_i* xi ) {
 
     xi->test_layer_row_hover = xi_ui_layer_row_hover_test;
 
-    xi->show_fullwindow_texture = xi_ui_show_fullwindow_texture;
+    xi->draw_overlay_texture = xi_ui_overlay_texture;
 }
 
 void* xi_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
 
     xi_state_t* state = xi_state_alloc();
+    xi_state_set_sdb ( xs_null_handle_m );
 
     xi_workload_load ( &state->workload );
     xi_ui_load ( &state->ui );
-    //xi_geo_load ( &state->geo );
     xi_font_load ( &state->font );
 
     xi_api_init ( &state->api );
@@ -88,18 +86,22 @@ void xi_reload ( void* std_runtime, void* api ) {
 
     xi_workload_reload ( &state->workload );
     xi_ui_reload ( &state->ui );
-    //xi_geo_reload ( &state->geo );
     xi_font_reload ( &state->font );
 
     xi_api_init ( &state->api );
-    xi_state_bind ( state );
 }
 
 void xi_unload ( void ) {
     xi_workload_unload();
     xi_ui_unload();
-    //xi_geo_unload();
     xi_font_unload();
+
+    xs_database_h sdb = xi_state_get_sdb();
+    if ( sdb != xs_null_handle_m ) {
+        xs_i* xs = std_module_get_m ( xs_module_name_m );
+        xs->destroy_database ( sdb );
+        xi_state_set_sdb ( xs_null_handle_m );
+    }
 
     xi_state_free();
 }

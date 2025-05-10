@@ -119,7 +119,7 @@ void NAME##_state_free ( void ); \
 void NAME##_state_bind ( NAME##_state_t* state );
 
 #define std_module_implement_state_m( NAME ) \
-    static NAME##_state_t* NAME##_state; \
+    static NAME##_state_t* NAME##_state = NULL; \
 \
 NAME##_state_t* NAME##_state_alloc ( void ) { \
     std_assert_m ( ! NAME##_state ); \

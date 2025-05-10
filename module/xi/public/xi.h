@@ -505,6 +505,19 @@ typedef struct {
     xg_render_target_binding_t render_target_binding;
 } xi_flush_params_t;
 
+typedef struct {
+    xg_texture_h handle;
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+} xi_overlay_texture_state_t;
+
+#define xi_overlay_texture_state_m( ... ) ( xi_overlay_texture_state_t ) { \
+    .handle = xg_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
 // Api
 
 typedef struct {
@@ -562,5 +575,5 @@ typedef struct {
 
     bool ( *test_layer_row_hover ) ( uint32_t height );
 
-    void ( *show_fullwindow_texture ) ( xi_workload_h workload, xg_texture_h texture );
+    void ( *draw_overlay_texture ) ( xi_workload_h workload, xi_overlay_texture_state_t* state );
 } xi_i;

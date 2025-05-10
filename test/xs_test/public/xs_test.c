@@ -65,7 +65,8 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
     xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
         .queue = xg_cmd_queue_graphics_m,
-        .signal_event = events[0],
+        .signal_events = { events[0] },
+        .signal_count = 1,
     ) );
 
     // transition to copy_dest
@@ -129,7 +130,8 @@ static void xs_test_frame ( xs_test_frame_params_t frame ) {
 
         xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
             .queue = xg_cmd_queue_compute_m,
-            .signal_event = events[1],
+            .signal_count = 1,
+            .signal_events = { events[1] },
             .wait_count = 1,
             .wait_events = { events[0] },
             .wait_stages = { xg_pipeline_stage_bit_top_of_pipe_m }

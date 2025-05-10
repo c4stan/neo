@@ -56,6 +56,31 @@ void* std_freelist ( void* base, size_t stride, size_t capacity );
 #define std_freelist_m( array, count ) std_array_typecast_m ( array ) std_freelist ( array, std_static_array_stride_m( array ), count )
 #define std_static_freelist_m( array ) std_array_typecast_m ( array ) std_freelist ( array, std_static_array_stride_m( array ), std_static_array_capacity_m( array ) )
 
+// Graph
+#if 0
+typedef struct {
+    void* next;
+    std_graph_node_t* node;
+} std_graph_adj_list_t;
+
+typedef struct std_dag_node_t {
+    void* payload;
+    std_graph_adj_list_t* incoming_edges_list;
+    std_graph_adj_list_t* outgoing_edges_list;
+    uint32_t incoming_edges_count;
+    uint32_t outgoing_edges_count;
+} std_graph_node_t;
+
+typedef struct {
+    std_node_t* nodes_array;
+    uint32_t nodes_count;
+    uint32_t nodes_capacity;
+    std_graph_adj_list_t* adjacency_array;
+    std_graph_adj_list_t* adjacency_freelist;
+    uint32_t adjacency_capacity;
+} std_graph_t;
+#endif
+
 // Freelist array
 // When pooling back, only the fist n bytes (where n is pointer size) are overwritten on the item, the rest is untouched.
 // std_pool_pop takes an unused available item from the pool. std_pool_push pools back an item into the pool.

@@ -26,15 +26,6 @@ static void ui_pass_routine ( const xf_node_execute_args_t* node_args, void* use
 
     ui_pass_args_t* args = ( ui_pass_args_t* ) user_args;
 
-    //xg_i* xg = std_module_get_m ( xg_module_name_m );
-    // Bind swapchain texture as render target
-    //xg_render_textures_binding_t render_textures = {
-    //    .render_targets_count = 1,
-    //    .render_targets = { xf_render_target_binding_m ( node_args->io->render_targets[0] ) },
-    //    .depth_stencil.texture = xg_null_handle_m,
-    //};
-    //xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-
     xi_i* xi = std_module_get_m ( xi_module_name_m );
     xi_flush_params_t params = {
         .device = args->device,

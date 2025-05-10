@@ -1904,16 +1904,15 @@ typedef struct {
 
 typedef struct {
     xg_cmd_queue_e queue;
-    xg_queue_event_h signal_event;
+    xg_queue_event_h signal_events[xg_cmd_bind_queue_max_signal_events_m];
     xg_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
     xg_pipeline_stage_bit_e wait_stages[xg_cmd_bind_queue_max_wait_events_m];
     uint32_t wait_count;
+    uint32_t signal_count;
 } xg_cmd_bind_queue_params_t;
 
 #define xg_cmd_bind_queue_params_m( ... ) ( xg_cmd_bind_queue_params_t ) { \
     .queue = xg_cmd_queue_invalid_m, \
-    .signal_event = xg_null_handle_m, \
-    .wait_count = 0, \
     ##__VA_ARGS__ \
 }
 

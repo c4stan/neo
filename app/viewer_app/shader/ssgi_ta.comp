@@ -6,7 +6,7 @@
 
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 0 ) uniform texture2D tex_color;
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 1 ) uniform texture2D tex_history;
-layout ( set = xs_shader_binding_set_dispatch_m, binding = 2 ) uniform texture2D tex_depth;     // TODO try using object id instead
+layout ( set = xs_shader_binding_set_dispatch_m, binding = 2 ) uniform texture2D tex_depth;
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 3 ) uniform texture2D tex_prev_depth;
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 4 ) uniform texture2D tex_id;
 layout ( set = xs_shader_binding_set_dispatch_m, binding = 5 ) uniform texture2D tex_velocity;
@@ -23,7 +23,7 @@ vec4 clip_aabb ( vec4 color, float p, vec3 minimum, vec3 maximum ) {
     vec3 center  = 0.5 * ( maximum + minimum );
     vec3 extents = 0.5 * ( maximum - minimum );
 
-    // This is actually `distance`, however the keyword is reserved
+// This is actually `distance`, however the keyword is reserved
     vec4 offset = color - vec4 ( center, p );
     vec3 repeat = abs ( offset.xyz / extents );
 

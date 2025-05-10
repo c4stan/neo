@@ -241,13 +241,15 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     //      rebind same descriptor with new offset instead of re-allocating a new descriptor 
     //      and/or writing to it )
     for ( uint32_t i = 0; i < xg_vk_workload_max_uniform_buffers_m; ++i ) {
-        xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
+        xg_buffer_params_t params = xg_buffer_params_m (
             .memory_type = xg_memory_type_gpu_mapped_m,
             .device = device_handle,
             .size = xg_workload_uniform_buffer_size_m,
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
-            .debug_name = "workload_uniform_buffer"
-        ) );
+        );
+        std_stack_t stack = std_static_stack_m ( params.debug_name );
+        std_stack_string_append_format ( &stack, "workload_uniform_buffer(" std_fmt_u32_m ")", i );
+        xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &params );
         xg_buffer_info_t uniform_buffer_info;
         xg_buffer_get_info ( &uniform_buffer_info, uniform_buffer_handle );
         xg_vk_workload_buffer_t* buffer = &device_context->uniform_buffers_array[i];
@@ -258,13 +260,15 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     }
 
     for ( uint32_t i = 0; i < xg_vk_workload_max_staging_buffers_m; ++i ) {
-        xg_buffer_h staging_buffer_handle = xg_buffer_create ( &xg_buffer_params_m (
+        xg_buffer_params_t params = xg_buffer_params_m (
             .memory_type = xg_memory_type_upload_m,
             .device = device_handle,
             .size = xg_workload_staging_buffer_size_m,
             .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-            .debug_name = "workload_staging_buffer",
-        ) );
+        );
+        std_stack_t stack = std_static_stack_m ( params.debug_name );
+        std_stack_string_append_format ( &stack, "workload_staging_buffer(" std_fmt_u32_m ")", i );
+        xg_buffer_h staging_buffer_handle = xg_buffer_create ( &params );
         xg_buffer_info_t staging_buffer_info;
         xg_buffer_get_info ( &staging_buffer_info, staging_buffer_handle );
         xg_vk_workload_buffer_t* buffer = &device_context->staging_buffers_array[i];
@@ -863,9 +867,10 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
             queue_chunk = xg_vk_workload_queue_chunk_m ( 
                 .begin = cmd_chunks_count,
                 .queue = args->queue,
-                .signal_event = args->signal_event,
+                .signal_count = args->signal_count,
                 .wait_count = args->wait_count,
             );
+            std_mem_copy_static_array_m ( queue_chunk.signal_events, args->signal_events );
             std_mem_copy_static_array_m ( queue_chunk.wait_events, args->wait_events );
             std_mem_copy_static_array_m ( queue_chunk.wait_stages, args->wait_stages );
             cmd_chunk = xg_vk_workload_cmd_chunk_m ( .queue = queue_chunk.queue );
@@ -953,11 +958,13 @@ static void xg_vk_workload_debug_print_cmd_headers ( const xg_cmd_header_t* cmd_
             std_auto_m args = ( xg_cmd_bind_queue_params_t* ) header->args;
             std_log_info_m ( "bind_queue " std_fmt_str_m, xg_cmd_queue_str ( args->queue ) );
 
-            if ( args->signal_event != xg_null_handle_m ) {
-                const xg_vk_gpu_queue_event_t* signal = xg_vk_gpu_queue_event_get ( args->signal_event );
-                std_log_info_m ( "SIGNAL:" std_fmt_str_m " " std_fmt_u64_m, signal->params.debug_name, signal->vk_semaphore );
-            } else {
+            if ( !args->signal_count ) {
                 std_log_info_m ( "SIGNAL:-" );
+            } else {
+                for ( uint32_t i = 0; i < args->signal_count; ++i ) {
+                    const xg_vk_gpu_queue_event_t* signal = xg_vk_gpu_queue_event_get ( args->signal_events[i] );
+                    std_log_info_m ( "SIGNAL:" std_fmt_str_m " " std_fmt_u64_m, signal->params.debug_name, signal->vk_semaphore );
+                }
             }
 
             if ( !args->wait_count ) {
@@ -1933,15 +1940,15 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
 
         uint32_t submit_buffers_count = queue_chunk.end - queue_chunk.begin;
         
-        VkSemaphore signal_semaphores[2];
-        uint32_t signal_count = 0;
-        signal_semaphores[signal_count++] = chunk_complete_event->vk_semaphore;
+        VkSemaphore signal_semaphores[xg_cmd_bind_queue_max_signal_events_m + 1];
+        uint32_t signal_count = queue_chunk.signal_count;
         xg_gpu_queue_event_log_signal ( chunk_complete_event_handle );
-        if ( queue_chunk.signal_event != xg_null_handle_m ) {
-            const xg_vk_gpu_queue_event_t* event = xg_vk_gpu_queue_event_get ( queue_chunk.signal_event );
-            signal_semaphores[signal_count++] = event->vk_semaphore;
-            xg_gpu_queue_event_log_signal ( queue_chunk.signal_event );
+        for ( uint32_t i = 0; i < signal_count; ++i ) {
+            const xg_vk_gpu_queue_event_t* event = xg_vk_gpu_queue_event_get ( queue_chunk.signal_events[i] );
+            signal_semaphores[i] = event->vk_semaphore;
+            xg_gpu_queue_event_log_signal ( queue_chunk.signal_events[i] );
         }
+        signal_semaphores[signal_count++] = chunk_complete_event->vk_semaphore;
 
         VkSubmitInfo submit_info = {
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,

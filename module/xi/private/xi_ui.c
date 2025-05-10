@@ -1341,13 +1341,13 @@ void xi_ui_texture ( xi_workload_h workload, xi_texture_state_t* state ) {
     xi_ui_draw_rect_textured ( workload, xi_color_rgba_u32_m ( 255, 255, 255, 255 ), x, y, width, height, state->sort_order, state->handle );
 }
 
-void xi_ui_show_fullwindow_texture ( xi_workload_h workload, xg_texture_h texture ) {
+void xi_ui_overlay_texture ( xi_workload_h workload, xi_overlay_texture_state_t* state ) {
     uint32_t width = xi_ui_state->update.os_window_width;
     uint32_t height = xi_ui_state->update.os_window_height;
     xi_scissor_h active_scissor = xi_ui_state->active_scissor;
     xi_ui_state->active_scissor = xi_null_scissor_m;
     // TODO sort order as param?
-    xi_ui_draw_rect_textured ( workload, xi_color_rgba_u32_m ( 255, 255, 255, 255 ), 0, 0, width, height, 0, texture );
+    xi_ui_draw_rect_textured ( workload, xi_color_rgba_u32_m ( 255, 255, 255, 255 ), 0, 0, width, height, 0, state->handle );
     xi_ui_state->active_scissor = active_scissor;
 }
 

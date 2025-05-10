@@ -3,6 +3,7 @@
 #include <std_module.h>
 
 #include <xg.h>
+#include <xs.h>
 
 #define xf_module_name_m xf
 std_module_export_m void* xf_load ( void* );
@@ -557,24 +558,32 @@ typedef struct {
     uint32_t texture_count;
 } xf_node_info_t;
 
+typedef enum {
+    xf_graph_flag_sort_m                        = 1 << 0,
+    xf_graph_flag_alias_resources_m             = 1 << 1,
+    xf_graph_flag_alias_memory_m                = 1 << 2,
+    xf_graph_flag_print_node_deps_m             = 1 << 3,
+    xf_graph_flag_print_resource_lifespan_m     = 1 << 4,
+    xf_graph_flag_print_resource_alias_m        = 1 << 5,
+    xf_graph_flag_print_execution_order_m       = 1 << 6,
+} xf_graph_flags_e;
+
 typedef struct {
     xg_device_h device;
-    bool sort;
-    bool alias_resources;
-    bool alias_memory;
+    xf_graph_flags_e flags;
     char debug_name[xf_debug_name_size_m];
 } xf_graph_params_t;
 
 #define xf_graph_params_m( ... ) ( xf_graph_params_t ) { \
     .device = xg_null_handle_m, \
-    .sort = true, \
-    .alias_resources = true, \
-    .alias_memory = true, \
+    .flags = xf_graph_flag_alias_resources_m | xf_graph_flag_alias_memory_m, \
     .debug_name = "", \
     ##__VA_ARGS__ \
 }
 
 typedef struct {
+    void ( *load_shaders ) ( xg_device_h device );
+
     xf_texture_h ( *create_texture ) ( const xf_texture_params_t* params );
     xf_buffer_h ( *create_buffer ) ( const xf_buffer_params_t* params );
     xf_texture_h ( *create_multi_texture ) ( const xf_multi_texture_params_t* params );

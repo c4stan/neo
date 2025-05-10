@@ -2,7 +2,25 @@
 
 #include "xf_state.h"
 
+static void xf_load_shaders ( xg_device_h device ) {
+    xs_i* xs = std_module_get_m ( xs_module_name_m );
+
+    char path[std_process_path_max_len_m];
+    std_stack_t stack = std_static_stack_m ( path );
+    std_stack_string_append ( &stack, std_module_path_m );
+    std_stack_string_append ( &stack, "shader/");
+    
+    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "xf_sdb" ) );
+    xs->add_database_folder ( sdb, path );
+    xs->set_output_folder ( sdb, "output/shader/" );
+    xf_graph_load_shaders ( xs, sdb );
+    xs->build_database ( sdb );
+    xf_state_set_sdb ( sdb );
+}
+
 static void xf_api_init ( xf_i* xf ) {
+    xf->load_shaders = xf_load_shaders;
+
     xf->create_texture = xf_resource_texture_create;
     xf->create_buffer = xf_resource_buffer_create;
     xf->create_graph = xf_graph_create;
@@ -50,6 +68,7 @@ void* xf_load ( void* std_runtime ) {
     std_runtime_bind ( std_runtime );
 
     xf_state_t* state = xf_state_alloc();
+    xf_state_set_sdb ( xf_null_handle_m );
 
     xf_resource_load ( &state->resource );
     xf_graph_load ( &state->graph );
@@ -77,6 +96,13 @@ void xf_unload ( void ) {
     
     xf_graph_unload();
     xf_resource_unload();
+
+    xs_database_h sdb = xf_state_get_sdb();
+    if ( sdb != xf_null_handle_m ) {
+        xs_i* xs = std_module_get_m ( xs_module_name_m );
+        xs->destroy_database ( sdb );
+        xf_state_set_sdb ( xf_null_handle_m );
+    }
 
     xf_state_free();
 }

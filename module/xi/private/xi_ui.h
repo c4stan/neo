@@ -166,4 +166,4 @@ bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir );
 
 bool xi_ui_layer_row_hover_test ( uint32_t height );
 
-void xi_ui_show_fullwindow_texture ( xi_workload_h workload, xg_texture_h texture );
+void xi_ui_overlay_texture ( xi_workload_h workload, xi_overlay_texture_state_t* state );

@@ -29,7 +29,8 @@ static void xg_test2_frame ( xg_device_h device, xg_swapchain_h swapchain, bool 
 
     xg->cmd_bind_queue ( cmd_buffer, 0, &xg_cmd_bind_queue_params_m (
         .queue = xg_cmd_queue_graphics_m,
-        .signal_event = event,
+        .signal_events =  { event },
+        .signal_count = 1,
     ) );
 
     xg->cmd_begin_debug_region ( cmd_buffer, 0, "Test region", xg_debug_region_color_yellow_m );

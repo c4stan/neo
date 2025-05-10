@@ -591,10 +591,6 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
 
     DWORD pipe_mode = PIPE_TYPE_BYTE;
 
-    if ( params->flags & std_process_pipe_flags_read_m ) {
-        pipe_mode |= PIPE_READMODE_BYTE;
-    }
-
     if ( params->flags & std_process_pipe_flags_blocking_m ) {
         pipe_mode |= PIPE_WAIT;
     } else {
@@ -628,7 +624,6 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     pipe->os_handle = ( uint64_t ) handle;
     pipe->is_owner = true;
     pipe->params = *params;
-    pipe->params.name = NULL;
     std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, params->name );
 
     std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
@@ -700,8 +695,16 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
     std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
 
     BOOL connect_result = ConnectNamedPipe ( ( HANDLE ) pipe->os_handle, NULL );
+    if ( !connect_result ) {
+        if ( GetLastError() == ERROR_PIPE_CONNECTED ) {
+            return true;
+        } else {
+            std_log_os_error_m();
+            return false;
+        }
+    }
 
-    return connect_result == TRUE;
+    return true;
 #elif defined(std_platform_linux_m)
     std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
 
@@ -727,11 +730,13 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
     }
 
     int fd = open ( pipe_name, flags );
+    pipe->os_handle = fd;
+
     if ( fd == -1 ) {
         std_log_os_error_m();
+        return false;
     }
 
-    pipe->os_handle = fd;
     return true;
 #endif
 }
@@ -748,16 +753,20 @@ std_pipe_h std_process_pipe_connect ( const char* name, std_process_pipe_flags_b
         access |= GENERIC_WRITE;
     }
 
-    if ( flags & std_process_pipe_flags_blocking_m ) {
-        WaitNamedPipe ( name, NMPWAIT_WAIT_FOREVER );
-    }
-
     char pipe_name[256];
     {
         const char* win32_pipe_prefix = "\\\\.\\pipe\\";
         std_stack_t stack  = std_static_stack_m ( pipe_name );
         std_stack_string_append ( &stack, win32_pipe_prefix );
         std_stack_string_append ( &stack, name );
+    }
+
+    if ( flags & std_process_pipe_flags_blocking_m ) {
+        BOOL result = WaitNamedPipe ( pipe_name, NMPWAIT_WAIT_FOREVER );
+        if ( !result ) {
+            std_log_os_error_m();
+            return std_process_null_handle_m;
+        }
     }
 
     HANDLE handle = CreateFile ( pipe_name, access, 0, NULL, OPEN_EXISTING, 0, NULL );
@@ -770,23 +779,10 @@ std_pipe_h std_process_pipe_connect ( const char* name, std_process_pipe_flags_b
         std_mem_zero_m ( &pipe->params );
         std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, name );
 
-        DWORD mode = PIPE_READMODE_BYTE;
-
-        if ( flags & std_process_pipe_flags_blocking_m ) {
-            mode |= PIPE_WAIT;
-        } else {
-            mode |= PIPE_NOWAIT;
-        }
-
-        BOOL set_state_result = SetNamedPipeHandleState ( handle, &mode, NULL, NULL );
-
-        if ( set_state_result == FALSE ) {
-            std_log_error_m ( "Connection to pipe " std_fmt_str_m " failed to set pipe state.", name );
-        }
-
         std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
         return pipe_handle;
     } else {
+        std_log_os_error_m();
         return std_process_null_handle_m;
     }
 
@@ -839,9 +835,7 @@ bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, co
     BOOL write_result = WriteFile ( ( HANDLE ) pipe->os_handle, data, data_size, &write_size, NULL );
 
     if ( write_result == FALSE ) {
-        DWORD error = GetLastError();
-        std_unused_m ( error );
-        std_log_error_m ( "Pipe write failed with error code " std_fmt_int_m, error );
+        std_log_os_error_m();
         return false;
     }
 

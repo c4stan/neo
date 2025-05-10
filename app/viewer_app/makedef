@@ -9,7 +9,6 @@ if win32
     dlls = $assimp_dll
     libs = $assimp_lib
     includes = $assimp_include
-    bindings = assimp_models
 endif
 if linux
     libs = assimp

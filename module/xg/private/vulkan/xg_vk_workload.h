@@ -122,20 +122,20 @@ typedef struct {
     uint32_t begin;
     uint32_t end;
     xg_cmd_queue_e queue;
-    xg_queue_event_h signal_event;
+    xg_queue_event_h signal_events[xg_cmd_bind_queue_max_signal_events_m];
     xg_queue_event_h wait_events[xg_cmd_bind_queue_max_wait_events_m];
     xg_pipeline_stage_bit_e wait_stages[xg_cmd_bind_queue_max_wait_events_m];
     uint32_t wait_count;
+    uint32_t signal_count;
 } xg_vk_workload_queue_chunk_t;
 
 #define xg_vk_workload_queue_chunk_m( ... ) ( xg_vk_workload_queue_chunk_t ) { \
     .begin = -1, \
     .end = -1, \
     .queue = xg_cmd_queue_graphics_m, \
-    .signal_event = xg_null_handle_m, \
+    .signal_events = { [0 ... xg_cmd_bind_queue_max_signal_events_m-1] = xg_null_handle_m }, \
     .wait_events = { [0 ... xg_cmd_bind_queue_max_wait_events_m-1] = xg_null_handle_m }, \
     .wait_stages = { [0 ... xg_cmd_bind_queue_max_wait_events_m-1] = xg_pipeline_stage_bit_none_m }, \
-    .wait_count = 0, \
     ##__VA_ARGS__ \
 }
 

@@ -3,7 +3,7 @@ compute_shader ssr_ta.comp
 include common.xsi
 
 begin bindings
-    texture sampled[7]
+    texture sampled[8]
     texture storage
-    sampler
+    sampler[2]
 end

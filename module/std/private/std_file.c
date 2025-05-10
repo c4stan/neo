@@ -456,6 +456,7 @@ static bool std_dir_create_recursive_from_path_buffer ( void ) {
 }
 #endif
 
+std_unused_static_m()
 static bool std_dir_create_recursive ( const char* path ) {
 #if defined std_platform_win32_m
     size_t len = std_to_path_buffer ( path );

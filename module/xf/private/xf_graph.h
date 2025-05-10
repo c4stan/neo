@@ -135,6 +135,7 @@ typedef struct {
     //    xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
     //    // TODO external hash table to support dynamic view access
     //} deps;
+    uint64_t subresources_bitset;
     xf_graph_resource_dependencies_t dependencies;
     // cached from underlying texture
 } xf_graph_texture_t;
@@ -177,19 +178,19 @@ typedef struct {
     uint32_t begin; // indexes nodes_execution_order
     uint32_t end;
     xg_cmd_queue_e queue;
-    xg_queue_event_h event;
+    bool is_depended[xg_cmd_queue_count_m]; // Flagged on queue q if a segment running on queue q needs to wait for this segment to finish.
+    xg_queue_event_h events[xg_cmd_queue_count_m]; // Valid if is_depended[q] is True
     uint32_t deps[xf_graph_max_nodes_m]; // indexes other segments. list of segments that need to execute directly before this one.
     uint32_t deps_count;
-    bool is_depended; // flagged if some other segment depends on this one. means it needs a valid event
 } xf_graph_segment_t;
 
 #define xf_graph_segment_m( ... ) ( xf_graph_segment_t ) { \
     .begin = -1, \
     .end = -1, \
     .queue = xg_cmd_queue_invalid_m, \
-    .event = xg_null_handle_m, \
+    .events = { [0 ... xg_cmd_queue_count_m-1] = xg_null_handle_m }, \
     .deps_count = 0, \
-    .is_depended = false, \
+    .is_depended = { [0 ... xg_cmd_queue_count_m-1] = false }, \
     ##__VA_ARGS__ \
 }
 
@@ -277,7 +278,7 @@ typedef struct {
     uint32_t idx;
 } xf_graph_buffer_transitions_t;
 
-typedef struct xf_node_t {
+typedef struct {
     xf_node_params_t params;
     xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
     uint32_t edge_count;
@@ -294,6 +295,7 @@ typedef struct xf_node_t {
     uint32_t next_nodes_count;
     xf_node_h prev_nodes[xf_graph_max_nodes_m]; // nodes that have an arc ending on this node. must be executed before this node
     uint32_t prev_nodes_count;
+    uint32_t declaration_order; // indexes graph nodes_declaration_order
     uint32_t execution_order; // indexes graph nodes_execution_order
     uint32_t segment; // indexes graph segments_array
 
@@ -314,13 +316,16 @@ typedef struct xf_node_t {
 typedef struct {
     xg_query_pool_h pool;
     xg_workload_h workload;
+    size_t size;
 } xf_graph_query_context_t;
 
 typedef struct {
     xf_graph_params_t params;
 
     xf_node_t nodes_array[xf_graph_max_nodes_m];
+    xf_node_t* nodes_freelist;
     uint32_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
+    uint32_t nodes_declaration_order[xf_graph_max_nodes_m]; // indexes nodes
     uint32_t nodes_count;
     bool is_finalized;
     bool is_built;
@@ -364,20 +369,25 @@ typedef struct {
     std_ring_t query_contexts_ring;
     uint64_t latest_timings[xf_graph_max_nodes_m];
 
-    xf_node_h export_node;
+    xf_node_h export_source_node;
     xf_texture_h export_source;
     xf_texture_h export_dest;
+    xf_node_h export_node;
 } xf_graph_t;
 
 typedef struct {
     xf_graph_t* graphs_array;
     xf_graph_t* graphs_freelist;
     uint64_t* graphs_bitset;
+
+    xs_database_pipeline_h export_pipeline;
 } xf_graph_state_t;
 
 void xf_graph_load ( xf_graph_state_t* state );
 void xf_graph_reload ( xf_graph_state_t* state );
 void xf_graph_unload ( void );
+
+void xf_graph_load_shaders ( xs_i* xs, xs_database_h sdb );
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
