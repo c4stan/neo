@@ -65,7 +65,7 @@ std_process_h                   std_process_this ( void );
     const char*                     std_process_this_file_path ( void );
     const char*                     std_process_this_working_path ( void );
 #endif
-std_no_return_m                   std_process_this_exit ( std_process_exit_code_e exit_code );
+void                            std_process_this_exit ( std_process_exit_code_e exit_code );
 
 bool                            std_process_io_read ( void* dest, size_t* read_size, size_t cap, uint64_t handle );
 bool                            std_process_io_write ( uint64_t handle, size_t* write_size, const void* source, size_t size );

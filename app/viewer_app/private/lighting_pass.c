@@ -35,14 +35,6 @@ typedef struct {
 
 typedef struct {
     uint32_t light_count;
-    uint32_t _pad0;
-    uint32_t _pad1;
-    uint32_t _pad2;
-    uniform_light_data_t lights[viewapp_max_lights_m];
-} lighting_uniforms_t;
-
-typedef struct {
-    uint32_t light_count;
     uint32_t _pad0[3];
     uniform_light_data_t lights[];
 } light_buffer_t;
@@ -55,11 +47,7 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     se_i* se = state->modules.se;
     rv_i* rv = state->modules.rv;
 
-    xg_buffer_h upload_buffer = node_args->io->copy_buffer_reads[0];
     xg_buffer_h light_buffer = node_args->io->copy_buffer_writes[0];
-
-    xg_buffer_info_t upload_buffer_info;
-    xg->get_buffer_info ( &upload_buffer_info, upload_buffer );
 
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( 
@@ -71,7 +59,8 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     uint64_t light_count = light_query_result.entity_count;
     light_count = std_min ( light_count, viewapp_max_lights_m );
 
-    std_auto_m light_data = ( light_buffer_t* ) upload_buffer_info.allocation.mapped_address;
+    size_t light_data_size = sizeof ( light_buffer_t ) + sizeof ( uniform_light_data_t ) * ( light_count + 1 ) * 6;
+    std_auto_m light_data = ( light_buffer_t* ) std_virtual_heap_alloc_m ( light_data_size, 16 );
     std_assert_m ( light_data );
 
     uint32_t light_view_count = 0;
@@ -104,6 +93,7 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
                     light_component->shadow_tiles[view_it].y,
                     light_component->shadow_tiles[view_it].size
                 },
+                .type = 0,
             };
         }
     }
@@ -114,10 +104,19 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     light_data->light_count = light_view_count;
     std_assert_m ( light_view_count <= viewapp_max_lights_m );
 
-    xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( .source = upload_buffer, .destination = light_buffer ) );
+    xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, light_data, light_data_size );
+
+    std_virtual_heap_free ( light_data );
+
+    xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
+        .destination = light_buffer, 
+        .source = range.handle,
+        .source_offset = range.offset,
+        .size = range.size,
+    ) );
 }
 
-xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h upload_buffer, xf_buffer_h light_buffer ) {
+xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h light_buffer ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
 
@@ -128,8 +127,6 @@ xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h upload_buffer, x
             .routine = light_update_pass,
         ),
         .resources = xf_node_resource_params_m (
-            .copy_buffer_reads_count = 1,
-            .copy_buffer_reads = { upload_buffer },
             .copy_buffer_writes_count = 1,
             .copy_buffer_writes = { light_buffer },
         )
@@ -137,8 +134,8 @@ xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h upload_buffer, x
     return node;
 }
 
-uint32_t uniform_light_size ( void ) {
-    return sizeof ( uniform_light_data_t );
+uint32_t light_data_size ( void ) {
+    return sizeof ( light_buffer_t ) + sizeof ( uniform_light_data_t ) * viewapp_max_lights_m;
 }
 
 void get_light_uniform_scale_bias ( float* scale, float* bias ) {

@@ -16,4 +16,5 @@ struct light_t {
     mat4 proj_from_view;
     mat4 view_from_world;
     vec3 shadow_tile; // x y size
+    uint type; // unused
 };

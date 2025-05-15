@@ -177,6 +177,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     xf_texture_info_t texture_info;
     xf->get_texture_info ( &texture_info, target );
 
+    // TODO this remains un-referenced and gets destroyed only by the xg unload cleanup. do better
     xg_resource_bindings_layout_h pass_layout = xg->create_resource_layout ( &xg_resource_bindings_layout_params_m (
         .device = graph_info.device,
         .resource_count = 1,

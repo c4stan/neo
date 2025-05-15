@@ -1425,7 +1425,6 @@ static void xf_graph_update_export_node ( xf_graph_h graph_handle ) {
         xg_pipeline_state_h pipeline = xs->get_pipeline_state ( xf_graph_state->export_pipeline );
         xg_pipeline_info_t pipe_info;
         xg->get_pipeline_info ( &pipe_info, pipeline );
-        std_log_info_m ( pipe_info.debug_name );
 
         xf_node_h export_node_handle = xf_graph_node_create ( graph_handle, &xf_node_params_m (
             .debug_name = "export",
@@ -2671,6 +2670,18 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
             xg->cmd_destroy_renderpass ( resource_cmd_buffer, node->renderpass, xg_resource_cmd_buffer_time_workload_complete_m );
         }
     }
+
+    //xg->wait_all_workload_complete();
+    size_t query_contexts_count = std_ring_count ( &graph->query_contexts_ring );
+    while ( query_contexts_count > 0 ) {
+        xf_graph_query_context_t* context = &graph->query_contexts_array[std_ring_bot_idx ( &graph->query_contexts_ring )];
+        xg->wait_for_workload ( context->workload );
+        std_assert_m ( xg->is_workload_complete ( context->workload ) );
+        xg->destroy_query_pool ( context->pool );
+        std_ring_pop ( &graph->query_contexts_ring, 1 );
+        query_contexts_count = std_ring_count ( &graph->query_contexts_ring );
+    }
+
 
     if ( !xg_memory_handle_is_null_m ( graph->heap.memory_handle ) ) {
         for ( uint32_t i = 0; i < graph->heap.textures_count; ++i ) {

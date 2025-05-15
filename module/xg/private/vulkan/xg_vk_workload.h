@@ -62,7 +62,7 @@ typedef struct {
     xg_queue_event_h swapchain_texture_acquired_event;
     // signal at the very end of the workload. part of VkSubmitInfo
     xg_queue_event_h execution_complete_gpu_event;
-    // for cpu to check workload completion. TODO currently never used
+    // for cpu to check workload completion.
     xg_cpu_queue_event_h execution_complete_cpu_event;
 
     bool stop_debug_capture_on_present;
@@ -233,6 +233,7 @@ void xg_vk_workload_activate_device ( xg_device_h device );
 void xg_vk_workload_deactivate_device ( xg_device_h device );
 
 void xg_workload_wait_all_workload_complete ( void );
+void xg_workload_wait_for_workload ( xg_workload_h workload );
 
 typedef struct {
     xg_workload_h workload;

@@ -1062,6 +1062,20 @@ const char* xg_memory_type_str ( xg_memory_type_e type ) {
     }
 }
 
+const char* xg_shader_binding_set_str ( xg_shader_binding_set_e set ) {
+    if ( set == xg_shader_binding_set_workload_m ) {
+        return "workload";
+    } else if ( set == xg_shader_binding_set_pass_m ) {
+        return "pass";
+    } else if ( set == xg_shader_binding_set_material_m ) {
+        return "material";
+    } else if ( set == xg_shader_binding_set_dispatch_m ) {
+        return "dispatch";
+    } else {
+        return "Unkown";
+    }
+}
+
 xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
     switch ( stage ) {
         case xg_shading_stage_vertex_m:

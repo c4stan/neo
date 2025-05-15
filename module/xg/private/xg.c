@@ -61,6 +61,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->wait_all_workload_complete = xg_workload_wait_all_workload_complete;
     xg->set_workload_global_bindings = xg_workload_set_global_resource_group;
     xg->debug_capture_workload = xg_vk_workload_enable_debug_capture;
+    xg->wait_for_workload = xg_workload_wait_for_workload;
     // Raytrace
     xg->create_raytrace_geometry = xg_vk_raytrace_geometry_create;
     xg->create_raytrace_world = xg_vk_raytrace_world_create;

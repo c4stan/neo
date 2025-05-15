@@ -3,6 +3,8 @@
 #include "xs_shader_compiler.h"
 #include "xs_parser.h"
 
+#include <xg_enum.h>
+
 #include <std_allocator.h>
 #include <std_list.h>
 #include <std_string.h>
@@ -138,7 +140,7 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
     } else {
         xs_database_pipeline_state_t* pipeline_state = &params->db->pipeline_states[params->db->pipeline_states_count++];
         pipeline_state->path = dest;
-        pipeline_state->name = std_path_name_ptr ( dest );
+        pipeline_state->name = std_path_name_ptr ( dest ); // TODO alloc separate string and remove .xss ext?
         pipeline_state->type = type;
         pipeline_state->pipeline_handle = xg_null_handle_m;
         pipeline_state->old_pipeline_handle = xg_null_handle_m;
@@ -633,9 +635,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 std_stack_t stack = std_static_stack_m ( layout_params->debug_name );
                 std_stack_string_append ( &stack, pipeline_state->name );
                 std_stack_string_append ( &stack, "-" );
-                char buffer[8];
-                std_u32_to_str ( buffer, 8, i, 0 );
-                std_stack_string_append ( &stack, buffer );
+                std_stack_string_append ( &stack, xg_shader_binding_set_str ( i ) );
                 xg_resource_bindings_layout_h resource_layout = xg->create_resource_layout ( layout_params );
                 pipeline_state->resource_layouts[i] = resource_layout;
 

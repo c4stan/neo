@@ -23,8 +23,8 @@ void xg_vk_query_reload ( xg_vk_query_state_t* state ) {
 void xg_vk_query_unload ( void ) {
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, xg_vk_query_state->pools_bitset, idx, std_bitset_u64_count_m ( xg_vk_max_query_pools_m ) ) ) {
-        //xg_vk_query_pool_t* pool = &xg_vk_query_state->pools_array[idx];
-        //std_log_info_m ( "Destroying query pool " std_fmt_u64_m ": " std_fmt_str_m, idx, pool->params.debug_name );
+        xg_vk_query_pool_t* pool = &xg_vk_query_state->pools_array[idx];
+        std_log_info_m ( "Destroying query pool " std_fmt_u64_m ": " std_fmt_str_m, idx, pool->params.debug_name );
         xg_vk_query_pool_destroy ( idx );
         ++idx;
     }

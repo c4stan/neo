@@ -348,6 +348,7 @@ typedef enum {
     xg_present_mode_mailbox_m,          // wait for vblank, single slot fifo
     xg_present_mode_fifo_m,             // wait for vblank, queue to prev requests
     xg_present_mode_fifo_relaxed_m,     // wait for vblank, tear if prev vblank was missed
+    xg_present_mode_fifo_latest_m,      // same as fifo, but vblank can pop multiple from fifo (always present latest)
 } xg_present_mode_e;
 
 typedef struct {
@@ -2226,12 +2227,12 @@ typedef struct {
     xg_buffer_h source;
     uint64_t source_offset;
     xg_buffer_h destination;
+    uint64_t destination_offset;
     uint64_t size;
 } xg_buffer_copy_params_t;
 
 #define xg_buffer_copy_params_m( ... ) ( xg_buffer_copy_params_t ) { \
     .source = xg_null_handle_m, \
-    .source_offset = 0, \
     .destination = xg_null_handle_m, \
     .size = xg_buffer_whole_size_m, \
     ##__VA_ARGS__ \
@@ -2617,10 +2618,10 @@ typedef struct {
 
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
     xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size ); // TODO take in a std_buffer_t ?
-
     xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, void* data, size_t size );
 
     void                    ( *wait_all_workload_complete )         ( void );
+    void                    ( *wait_for_workload )                  ( xg_workload_h workload );
 
 #if xg_debug_enable_simple_frame_test_m
     void                    ( *debug_simple_frame )                 ( xg_device_h device, wm_window_h window );

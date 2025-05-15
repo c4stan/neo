@@ -426,7 +426,6 @@ bool std_bitset_clear_atomic ( uint64_t* blocks, size_t idx ) {
 
 void std_bitset_write ( uint64_t* blocks, size_t idx, uint32_t value ) {
     uint64_t block_idx = idx >> 6;
-    uint64_t bit_idx = idx & 0x3f;
     uint64_t block = blocks[block_idx];
     block = std_bit_write_64_m ( block, idx, value );
     blocks[block_idx] = block;
@@ -484,4 +483,55 @@ bool std_bitset_scan_rev ( uint64_t* result_bit_idx, const uint64_t* blocks, siz
     }
 
     return false;
+}
+
+void std_bitset_shift_left ( uint64_t* bitset, size_t starting_bit_idx, size_t shift_count, size_t total_u64_count ) {
+    uint64_t start_block_idx = starting_bit_idx >> 6;
+    uint64_t start_bit_idx = starting_bit_idx & 0x3f;
+
+    uint64_t ending_bit_idx = total_u64_count * 64 - 1;
+    uint64_t end_block_idx = ending_bit_idx >> 6;
+
+    uint64_t block_it = end_block_idx;
+    uint64_t prev = 0;
+    for ( ;; ) {
+        uint64_t block = bitset[block_it];
+        if ( block_it == start_block_idx ) {
+            uint64_t mask = std_bit_mask_ms_64_m ( start_bit_idx + 1 );
+            uint64_t unchanged = block & mask;
+            block = ( block << shift_count ) | prev;
+            block = std_bit_clear_ms_64_m ( block, 64 - start_bit_idx ) | unchanged;
+            bitset[block_it] = block;
+            break;
+        } else {
+            uint64_t next = std_bit_read_ms_64_m ( block, shift_count );
+            block = ( block << shift_count ) | prev;
+            prev = next;
+            bitset[block_it] = block;
+            --block_it;
+        }
+    }
+}
+
+void std_bitset_shift_right ( uint64_t* bitset, size_t starting_bit_idx, size_t shift_count, size_t total_u64_count ) {
+    uint64_t start_block_idx = starting_bit_idx >> 6;
+    uint64_t start_bit_idx = starting_bit_idx & 0x3f;
+
+    uint64_t prev = 0;
+    for ( uint64_t block_it = start_block_idx; block_it < total_u64_count; ++block_it ) {
+        uint64_t block = bitset[block_it];
+        if ( block_it == start_block_idx ) {
+            uint64_t mask = std_bit_mask_ms_64_m ( start_bit_idx + 1 );
+            uint64_t unchanged = block & mask;
+            prev = std_bit_read_ls_64_m ( block, shift_count ) << ( 64 - shift_count );
+            block = block >> shift_count;
+            block = std_bit_clear_ms_64_m ( block, 64 - start_bit_idx ) | unchanged;
+            bitset[block_it] = block;
+        } else {
+            uint64_t next = std_bit_read_ls_64_m ( block, shift_count ) << ( 64 - shift_count );
+            block = ( block >> shift_count ) | prev;
+            prev = next;
+            bitset[block_it] = block;
+        }
+    }
 }

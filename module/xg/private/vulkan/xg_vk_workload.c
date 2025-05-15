@@ -294,15 +294,6 @@ void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
         std_virtual_heap_free ( workload_context->sort.result );
         std_virtual_heap_free ( workload_context->sort.temp );
 
-        //if ( submit_context->is_submitted ) {
-        //    const xg_vk_workload_t* workload = xg_vk_workload_get ( submit_context->workload );
-        //    const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
-        //    vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, UINT64_MAX );
-        //}
-
-        // Call this to process on workload complete events like resource destruction
-        //xg_vk_workload_recycle_submission_contexts ( context, UINT64_MAX );
-
         // TODO
         vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_graphics_m].vk_cmd_pool, NULL );
         vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_compute_m].vk_cmd_pool, NULL );
@@ -1431,7 +1422,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 
                 VkBufferCopy copy;
                 copy.srcOffset = args->source_offset;
-                copy.dstOffset = 0;
+                copy.dstOffset = args->destination_offset;
                 copy.size = size;
 
                 vkCmdCopyBuffer ( vk_cmd_buffer, source->vk_handle, dest->vk_handle, 1, &copy );
@@ -2230,7 +2221,7 @@ static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg
     }
 }
 
-static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_context_t* device_context, uint64_t timeout ) {
+static void xg_vk_workload_wait ( xg_vk_workload_device_context_t* device_context, xg_workload_h wait_for_workload, uint64_t timeout ) {
     xg_device_h device_handle = device_context->device_handle;
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
     
@@ -2249,7 +2240,8 @@ static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_c
         }
 
         //uint64_t timeout = 0;
-        const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_context->workload );
+        xg_workload_h workload_handle = workload_context->workload;
+        const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
 #if xg_debug_enable_measure_workload_wait_time_m
         std_tick_t wait_start_tick = 0;
 #endif
@@ -2296,22 +2288,31 @@ static void xg_vk_workload_recycle_submission_contexts ( xg_vk_workload_device_c
             xg_gpu_queue_event_destroy ( workload_context->submit.events_array[i] );
         }
 
-        xg_vk_workload_destroy_resources ( workload_context->workload, xg_resource_cmd_buffer_time_workload_complete_m );
-        xg_workload_destroy ( workload_context->workload );
+        xg_vk_workload_destroy_resources ( workload_handle, xg_resource_cmd_buffer_time_workload_complete_m );
+        xg_workload_destroy ( workload_handle );
         workload_context->workload = xg_null_handle_m;
 
         std_ring_pop ( &device_context->workload_contexts_ring, 1 );
 
         count = std_ring_count ( &device_context->workload_contexts_ring );
+        if ( workload_handle == wait_for_workload ) {
+            break;
+        }
     }
 
 #if xg_debug_enable_measure_workload_wait_time_m
-
     if ( initial_count > 0 && count == 0 ) {
         std_log_warn_m ( "All GPU worloads were found completed when trying to recycle some. Is the GPU being left idle waiting?" );
     }
-
 #endif
+}
+
+void xg_workload_wait_for_workload ( xg_workload_h workload_handle ) {
+    const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
+    if ( !workload ) return;
+    uint64_t device_idx = xg_vk_device_get_idx ( workload->device );
+    xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
+    xg_vk_workload_wait ( device_context, workload_handle, UINT64_MAX );
 }
 
 #if 1
@@ -2323,7 +2324,7 @@ xg_vk_workload_context_inline_t xg_vk_workload_context_create_inline ( xg_device
     xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
     std_assert_m ( device_context->device_handle != xg_null_handle_m );
 
-    xg_vk_workload_recycle_submission_contexts ( device_context, 0 );
+    xg_vk_workload_wait ( device_context, xg_null_handle_m, 0 );
 
     xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[std_ring_top_idx ( &device_context->workload_contexts_ring )];
     std_ring_push ( &device_context->workload_contexts_ring, 1 );
@@ -2375,8 +2376,7 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     std_assert_m ( device_context->device_handle != xg_null_handle_m );
 
     // allocate submission context
-    // TODO offer some way to call this (and thus trigger end-of-workload resource destruction) without having to submit a new workload after this one is complete.
-    xg_vk_workload_recycle_submission_contexts ( device_context, 0 );
+    xg_vk_workload_wait ( device_context, xg_null_handle_m, 0 );
 
     xg_vk_workload_create_resources ( workload_handle );
     xg_vk_workload_allocate_resource_groups ( workload_handle );
@@ -2462,7 +2462,7 @@ void xg_workload_wait_all_workload_complete ( void ) {
         }
 
         // Wait for all workloads to complete and process on complete events like resource destruction
-        xg_vk_workload_recycle_submission_contexts ( device_context, UINT64_MAX );
+        xg_vk_workload_wait ( device_context, xg_null_handle_m, UINT64_MAX );
     }
 }
 

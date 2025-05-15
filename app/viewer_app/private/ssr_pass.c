@@ -13,7 +13,7 @@ typedef struct {
     uint32_t hiz_mip_count;
 } ssr_draw_data_t;
 
-xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, xf_texture_h normals, xf_texture_h color, xf_texture_h hiz ) {
+xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, xf_texture_h ssr_intersect_dist, xf_texture_h normals, xf_texture_h color, xf_texture_h hiz ) {
     viewapp_state_t* state = viewapp_state_get ();
     xf_i* xf = state->modules.xf;
     xs_i* xs = state->modules.xs;
@@ -51,9 +51,10 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
                 xf_compute_texture_dependency_m ( .texture = color, .view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ),
                 xf_compute_texture_dependency_m ( .texture = hiz ),
             },
-            .storage_texture_writes_count = 1,
+            .storage_texture_writes_count = 2,
             .storage_texture_writes = {
-                xf_shader_texture_dependency_m ( .texture = ssr_raymarch, .stage = xg_pipeline_stage_bit_compute_shader_m )
+                xf_shader_texture_dependency_m ( .texture = ssr_raymarch, .stage = xg_pipeline_stage_bit_compute_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = ssr_intersect_dist, .stage = xg_pipeline_stage_bit_compute_shader_m )
             },
         ),
         .passthrough = xf_node_passthrough_params_m (

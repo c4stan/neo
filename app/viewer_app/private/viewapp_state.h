@@ -87,11 +87,7 @@ typedef struct {
     bool graph_reload;
     bool allow_graph_aliasing;
 
-    xg_texture_h xg_export_texture;
-    xf_texture_h xf_export_texture;
-    xf_texture_h exported_texture;
-    xf_node_h exported_node;
-    uint64_t exported_id;
+    xf_texture_h export_dest;
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
@@ -116,9 +112,7 @@ typedef struct {
     .input_state = {}, \
     .frame_tick = 0, \
     .allow_graph_aliasing = true, \
-    .xg_export_texture = xg_null_handle_m, \
-    .xf_export_texture = xf_null_handle_m, \
-    .exported_texture = xf_null_handle_m, \
+    .export_dest = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
 
@@ -139,6 +133,12 @@ typedef struct {
     uint64_t expanded_nodes_bitset[1];
     uint64_t expanded_entities_bitset[8];
 
+    xg_texture_h export_texture;
+    xf_texture_h export_source;
+    uint64_t export_id;
+    uint64_t export_node_id;
+    uint64_t export_tex_id;
+    xf_node_h export_node;
     xf_export_channel_e export_channels[4];
 
     se_entity_h mouse_pick_entity;
@@ -152,7 +152,10 @@ typedef struct {
     .xg_alloc_section_state = xi_section_state_m(), \
     .xf_graph_section_state = xi_section_state_m(), \
     .entities_section_state = xi_section_state_m(), \
+    .export_texture = xg_null_handle_m, \
     .export_channels = { xf_export_channel_r, xf_export_channel_g, xf_export_channel_b, xf_export_channel_a }, \
+    .export_node_id = -1, \
+    .export_tex_id = -1, \
     .mouse_pick_entity = se_null_handle_m, \
     ##__VA_ARGS__ \
 }

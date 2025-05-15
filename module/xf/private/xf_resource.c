@@ -666,19 +666,19 @@ void xf_resource_buffer_remove_ref ( xf_buffer_h handle ) {
     if ( is_multi ) {
         xf_multi_buffer_t* multi_buffer = xf_resource_multi_buffer_get ( handle );
         uint32_t ref_count = multi_buffer->ref_count;
-        if ( ref_count > 1 ) {
+        if ( ref_count >= 1 ) {
             multi_buffer->ref_count = ref_count - 1;
-        } else {
-            xf_resource_buffer_destroy ( handle );
+        //} else {
+            //xf_resource_buffer_destroy ( handle );
         }
     } else {
         xf_buffer_t* buffer = xf_resource_buffer_get ( handle );
         uint32_t ref_count = buffer->ref_count;
-        if ( ref_count > 1 ) {
+        if ( ref_count >= 1 ) {
             std_assert_m ( !buffer->is_multi );
             buffer->ref_count = ref_count - 1;
-        } else {
-            xf_resource_buffer_destroy ( handle );
+        //} else {
+        //    xf_resource_buffer_destroy ( handle );
         }
     }
 }
@@ -905,6 +905,9 @@ void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resou
     while ( std_bitset_scan ( &idx, xf_resource_state->buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_buffers_m ) ) ) {
         xf_buffer_t* buffer = &xf_resource_state->buffers_array[idx];
         if ( buffer->ref_count == 0 ) {
+            if ( buffer->xg_handle != xg_null_handle_m ) {
+                xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, time );
+            }
             xf_resource_buffer_destroy ( idx );
         }
         ++idx;

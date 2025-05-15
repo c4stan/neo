@@ -41,6 +41,7 @@ static uint64_t xg_vk_device_id_next ( void ) {
 static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
     xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
 
+#define xg_vk_device_ext_init_pfn_optional_m(ptr, name) { *(ptr) = ( std_typeof_m ( *(ptr) ) ) ( vkGetDeviceProcAddr ( device->vk_handle, name ) ); }
 #define xg_vk_device_ext_init_pfn_m(ptr, name) { *(ptr) = ( std_typeof_m ( *(ptr) ) ) ( vkGetDeviceProcAddr ( device->vk_handle, name ) ); std_assert_m ( *ptr ); }
 
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_begin_debug_region, "vkCmdBeginDebugUtilsLabelEXT" );
@@ -55,11 +56,11 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_build_acceleration_structures, "vkCmdBuildAccelerationStructuresKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_acceleration_structure_device_address, "vkGetAccelerationStructureDeviceAddressKHR" );
-    xg_vk_device_ext_init_pfn_m ( &device->ext_api.trace_rays, "vkCmdTraceRaysKHR" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.trace_rays, "vkCmdTraceRaysKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.destroy_acceleration_structure, "vkDestroyAccelerationStructureKHR" );
 #if xg_vk_enable_nv_raytracing_ext_m
-    xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesNV" );
-    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNV" );
 #else
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNK" );

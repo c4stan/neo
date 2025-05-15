@@ -56,6 +56,7 @@ int32_t std_str_to_i32 ( const char* str );
 int64_t std_str_to_i64 ( const char* str );
 float std_str_to_f32 ( const char* str );
 
+// TODO add _str_ somewhere in the functions name
 void std_u32_to_bin ( uint32_t u32, char* str );
 void std_u64_to_bin ( uint64_t u64, char* str );
 

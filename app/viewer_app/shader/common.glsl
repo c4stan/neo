@@ -573,13 +573,14 @@ bool trace_screen_space_ray_linear ( out vec3 out_screen_pos, out float out_dept
     ivec2 tex_ray_length = tex_ray_end - tex_ray_start;
     uint tex_ray_max_dist = max ( abs ( tex_ray_length.x ), abs ( tex_ray_length.y ) );
     vec3 screen_ray_step = screen_ray_length / tex_ray_max_dist;
+    uint max_tex_samples = tex_ray_max_dist / step_size;
 
     // trace the ray
     uint sample_steps = step_size;
     vec3 screen_ray_sample = screen_ray_start + screen_ray_step * sample_steps;
     float depth_threshold = 0.0001 * sample_steps;
 
-    for ( uint sample_it = 0; sample_it < tex_ray_max_dist && sample_it < max_sample_count; ++sample_it ) {
+    for ( uint sample_it = 0; sample_it < max_tex_samples && sample_it < max_sample_count; ++sample_it ) {
         float sample_depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_ray_sample.xy ).x;
 
         float depth_delta = sample_depth - screen_ray_sample.z;

@@ -582,6 +582,9 @@ xg_present_mode_e xg_present_mode_from_vk ( VkPresentModeKHR mode ) {
         case VK_PRESENT_MODE_FIFO_RELAXED_KHR:
             return xg_present_mode_fifo_relaxed_m;
 
+        case VK_PRESENT_MODE_FIFO_LATEST_READY_EXT:
+            return xg_present_mode_fifo_latest_m;
+
         default:
             std_log_error_m ( "Present mode not supported" );
             return 0;

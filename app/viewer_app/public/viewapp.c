@@ -314,7 +314,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
         .device = device,
         .debug_name = "raster_graph",
-        .flags = xf_graph_flag_alias_memory_m | xf_graph_flag_alias_resources_m | xf_graph_flag_print_execution_order_m | xf_graph_flag_print_node_deps_m,
+        .flags = xf_graph_flag_alias_memory_m | xf_graph_flag_alias_resources_m,// | xf_graph_flag_print_execution_order_m | xf_graph_flag_print_node_deps_m,
     ) );
     m_state->render.raster_graph = graph;
 
@@ -427,14 +427,8 @@ static void viewapp_boot_raster_graph ( void ) {
 
     // TODO rename these buffers more appropriately both here and in shader code
     xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
-        .size = viewapp_max_lights_m * uniform_light_size(),
-        .debug_name = "lights",
-    ) );
-
-    xf_buffer_h light_upload_buffer = xf->create_buffer ( &xf_buffer_params_m (
-        .size = viewapp_max_lights_m * uniform_light_size(),
-        .debug_name = "lights_upload",
-        .upload = true,
+        .size = light_data_size(),
+        .debug_name = "light_data",
     ) );
 
     xf_buffer_h light_list_buffer = xf->create_buffer ( &xf_buffer_params_m (
@@ -452,7 +446,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "light_clusters"
     ) );
 
-    xf_node_h light_update_node = add_light_update_pass ( graph, light_upload_buffer, light_buffer );
+    xf_node_h light_update_node = add_light_update_pass ( graph, light_buffer );
 
     xf->add_node ( graph, &xf_node_params_m (
         .debug_name = "light_cluster_build",
@@ -770,7 +764,13 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_raymarch_texture",
     ) );
-    add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, normal_texture, lighting_texture, hiz_texture );
+    xf_texture_h ssr_intersection_distance = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r16_sfloat_m,
+        .debug_name = "ssr_intersect_distance",
+    ) );
+    add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, ssr_intersection_distance, normal_texture, lighting_texture, hiz_texture );
 
     // ssr blur
 #if 0
@@ -816,7 +816,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssr_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 8,
+            .sampled_textures_count = 9,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssr_raymarch_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssr_history_texture ), 
@@ -825,7 +825,8 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_texture_dependency_m ( .texture = normal_texture ), 
                 xf_compute_texture_dependency_m ( .texture = object_id_texture ), 
                 xf_compute_texture_dependency_m ( .texture = prev_object_id_texture ),
-                xf_compute_texture_dependency_m ( .texture = velocity_texture )
+                xf_compute_texture_dependency_m ( .texture = velocity_texture ),
+                xf_compute_texture_dependency_m ( .texture = ssr_intersection_distance ),
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
@@ -941,25 +942,8 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // ui
-    xg_texture_h xg_export_texture = xg->create_texture ( &xg_texture_params_m (
-        .device = device,
-        .width = resolution_x,
-        .height = resolution_y,
-        .format = xg_format_r8g8b8a8_unorm_m,
-        .allowed_usage = xg_texture_usage_bit_storage_m | xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_copy_dest_m,
-        .debug_name = "export",
-    ) );
-    xf_texture_h xf_export_texture = xf->create_texture_from_external ( xg_export_texture );
-    //xf_texture_h export_texture = xf->create_texture ( &xf_texture_params_m (
-    //    .width = resolution_x,
-    //    .height = resolution_y,
-    //    .format = xg_format_r8g8b8a8_unorm_m,
-    //    .debug_name = "export",
-    //) );
-    add_ui_pass ( graph, tonemap_texture, xf_export_texture );
-    // TODO cleanup previous export texture...
-    m_state->render.xg_export_texture = xg_export_texture;
-    m_state->render.xf_export_texture = xf_export_texture;
+    m_state->render.export_dest = xf->create_texture_from_external ( m_state->ui.export_texture );
+    add_ui_pass ( graph, tonemap_texture, m_state->render.export_dest );
 
     // present
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
@@ -1051,8 +1035,10 @@ static void viewapp_build_raytrace_world ( void ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-        sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
-        sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
+        sm_vec_3f_t up = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 1, 0 ) );
+        sm_vec_3f_t dir = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 0, 1 ) );
+        //sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
+        //m_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
         dir = sm_vec_3f_norm ( dir );
         sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
         float scale = transform_component->scale;
@@ -2153,7 +2139,6 @@ static void viewapp_boot ( void ) {
         .properties = {
             se_field_property_m ( 0, viewapp_transform_component_t, position, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_transform_component_t, orientation, se_property_4f32_m ),
-            //se_field_property_m ( 0, viewapp_transform_component_t, up, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_transform_component_t, scale, se_property_f32_m ),
         }
     ) );
@@ -2208,7 +2193,8 @@ static void viewapp_boot ( void ) {
     m_state->render.sdb = sdb;
     xs->add_database_folder ( sdb, "shader/" );
     xs->set_output_folder ( sdb, "output/shader/" );
-    xs->build_database ( sdb );
+    xs_database_build_result_t build_result = xs->build_database ( sdb );
+    std_assert_m ( build_result.failed_pipeline_states == 0 );
 
     xi_i* xi = m_state->modules.xi;
     xi->load_shaders ( device );
@@ -2253,6 +2239,15 @@ static void viewapp_boot ( void ) {
         m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
         m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
         m_state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
+    
+        m_state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
+            .device = device,
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_r8g8b8a8_unorm_m,
+            .allowed_usage = xg_texture_usage_bit_storage_m | xg_texture_usage_bit_sampled_m,
+            .debug_name = "export",
+        ) );
     }
 
     xf_i* xf = m_state->modules.xf;
@@ -2733,9 +2728,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     ) );
 
     // export
-    if ( m_state->render.exported_texture != xf_null_handle_m ) {
+    if ( m_state->ui.export_source != xf_null_handle_m ) {
         xi->draw_overlay_texture ( xi_workload, &xi_overlay_texture_state_m ( 
-            .handle = m_state->render.xg_export_texture,
+            .handle = m_state->ui.export_texture,
             .width = m_state->render.resolution_x,
             .height = m_state->render.resolution_y,
         ) );
@@ -2892,9 +2887,15 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         const uint64_t* timings = xf->get_graph_timings ( m_state->render.active_graph );
 
         uint64_t timestamp_sum = 0;
-        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
+        for ( uint32_t i = 0, node_id = -1; i < graph_info.node_count; ++i ) {
             xf_node_info_t node_info;
             xf->get_node_info ( &node_info, m_state->render.active_graph, graph_info.nodes[i] );
+
+            if ( std_str_cmp ( node_info.debug_name, "export" ) == 0 ) {
+                continue;
+            }
+
+            ++node_id;
 
             xi_label_state_t node_label = xi_label_state_m (
                 .id = xi_mix_id_m ( i ),
@@ -2904,7 +2905,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
             bool any_resource = node_info.resources.render_targets_count + node_info.resources.storage_texture_writes_count + node_info.resources.copy_texture_writes_count > 0;
             bool hover = xi->test_layer_row_hover ( 14 );
-            bool expanded = std_bitset_test ( m_state->ui.expanded_nodes_bitset, i );
+            bool expanded = std_bitset_test ( m_state->ui.expanded_nodes_bitset, node_id );
             if ( any_resource && ( hover || expanded ) ) {
                 xi_arrow_state_t node_arrow = xi_arrow_state_m (
                     .width = 14,
@@ -2917,9 +2918,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 bool changed = xi->add_arrow ( xi_workload, &node_arrow );
                 if ( changed ) {
                     if ( node_arrow.expanded ) {
-                        std_bitset_set ( m_state->ui.expanded_nodes_bitset, i );
+                        std_bitset_set ( m_state->ui.expanded_nodes_bitset, node_id );
                     } else {
-                        std_bitset_clear ( m_state->ui.expanded_nodes_bitset, i );
+                        std_bitset_clear ( m_state->ui.expanded_nodes_bitset, node_id );
                     }
                 }
             }
@@ -2935,7 +2936,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     .style = xi_style_m (
                         .horizontal_alignment = xi_horizontal_alignment_right_to_left_m
                     ),
-                    .id = xi_mix_id_m ( i ),
+                    .id = xi_mix_id_m ( node_id ),
                 );
                 xi->add_switch ( xi_workload, &node_switch );
 
@@ -2980,7 +2981,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         xi_switch_state_t export_switch = xi_switch_state_m (
                             .width = 14,
                             .height = 14,
-                            .value = m_state->render.exported_id == id,
+                            .value = m_state->ui.export_id == id,
                             .id = id,
                             .style = xi_style_m (
                                 .horizontal_margin = 8,
@@ -2988,7 +2989,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         );
                         xi->add_switch ( xi_workload, &export_switch );
 
-                        bool export_changed = export_switch.value != ( m_state->render.exported_id == id );
+                        bool switch_change = export_switch.value != ( m_state->ui.export_id == id );
 
                         const char* channel_select_items[] = { "r", "g", "b", "a", "1", "0" };
                         xi_select_state_t channel_select_0 = xi_select_state_m (
@@ -3027,28 +3028,37 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         xi->add_select ( xi_workload, &channel_select_1 );
                         xi->add_select ( xi_workload, &channel_select_2 );
                         xi->add_select ( xi_workload, &channel_select_3 );
-                        export_changed |= m_state->ui.export_channels[0] != channel_select_0.item_idx;
-                        export_changed |= m_state->ui.export_channels[1] != channel_select_1.item_idx;
-                        export_changed |= m_state->ui.export_channels[2] != channel_select_2.item_idx;
-                        export_changed |= m_state->ui.export_channels[3] != channel_select_3.item_idx;
-                        m_state->ui.export_channels[0] = channel_select_0.item_idx;
-                        m_state->ui.export_channels[1] = channel_select_1.item_idx;
-                        m_state->ui.export_channels[2] = channel_select_2.item_idx;
-                        m_state->ui.export_channels[3] = channel_select_3.item_idx;
+                        bool channel_change = false;
+                        channel_change |= m_state->ui.export_channels[0] != channel_select_0.item_idx;
+                        channel_change |= m_state->ui.export_channels[1] != channel_select_1.item_idx;
+                        channel_change |= m_state->ui.export_channels[2] != channel_select_2.item_idx;
+                        channel_change |= m_state->ui.export_channels[3] != channel_select_3.item_idx;
+                        bool reload = m_state->render.graph_reload && m_state->ui.export_node_id == node_id && m_state->ui.export_tex_id == j;
 
-                        if ( export_switch.value ) {
-                            m_state->render.exported_id = id;
-                            m_state->render.exported_texture = texture_handle;
-                            m_state->render.exported_node = graph_info.nodes[i];
-                        } else if ( !export_switch.value && m_state->render.exported_id == id ) {
-                            m_state->render.exported_id = 0;
-                            m_state->render.exported_texture = xf_null_handle_m;
-                            m_state->render.exported_node = xf_null_handle_m;
-                        }
+                        if ( switch_change || channel_change || reload ) {
+                            m_state->ui.export_channels[0] = channel_select_0.item_idx;
+                            m_state->ui.export_channels[1] = channel_select_1.item_idx;
+                            m_state->ui.export_channels[2] = channel_select_2.item_idx;
+                            m_state->ui.export_channels[3] = channel_select_3.item_idx;
 
-                        if ( export_changed ) {
+                            if ( switch_change || reload ) {
+                                if ( export_switch.value ) {
+                                    m_state->ui.export_source = texture_handle;
+                                    m_state->ui.export_node_id = node_id;
+                                    m_state->ui.export_tex_id = j;
+                                    m_state->ui.export_id = id;
+                                    m_state->ui.export_node = graph_info.nodes[i];
+                                } else {
+                                    m_state->ui.export_source = xf_null_handle_m;
+                                    m_state->ui.export_node_id = -1;
+                                    m_state->ui.export_tex_id = -1;
+                                    m_state->ui.export_id = 0;
+                                    m_state->ui.export_node = xf_null_handle_m;
+                                }
+                            }
+
                             xf->invalidate_graph ( m_state->render.active_graph, workload );
-                            xf->set_graph_texture_export ( m_state->render.active_graph, m_state->render.exported_node, m_state->render.exported_texture, m_state->render.xf_export_texture, m_state->ui.export_channels );
+                            xf->set_graph_texture_export ( m_state->render.active_graph, m_state->ui.export_node, m_state->ui.export_source, m_state->render.export_dest, m_state->ui.export_channels );
                         }
 
                         xi->newline();
@@ -3259,6 +3269,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             uint32_t entity_idx = destroy_list[i];
             se->destroy_entity ( entity_list[entity_idx] );
             --remaining_entities;
+            #if 0
             for ( uint32_t i = entity_idx; i < remaining_entities; ++i ) {
                 bool next = std_bitset_test ( m_state->ui.expanded_entities_bitset, i + 1 );
                 if ( next ) {
@@ -3267,6 +3278,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     std_bitset_clear ( m_state->ui.expanded_entities_bitset, i );
                 }
             }
+            #else
+            std_bitset_shift_left ( m_state->ui.expanded_entities_bitset, entity_idx, 1, std_static_array_capacity_m ( m_state->ui.expanded_entities_bitset ) );
+            #endif
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
@@ -3413,7 +3427,7 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
-    float target_fps = 60.f;
+    float target_fps = 120.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;
@@ -3422,9 +3436,8 @@ static std_app_state_e viewapp_update ( void ) {
     float delta_ms = std_tick_to_milli_f32 ( new_tick - frame_tick );
 
     if ( delta_ms < target_frame_period ) {
-        //std_log_info_m ( "pass" );
         //std_thread_yield();
-        std_thread_this_sleep( 1 );
+        std_thread_this_sleep( 0 );
         return std_app_state_tick_m;
     }
 
@@ -3472,23 +3485,11 @@ static std_app_state_e viewapp_update ( void ) {
 
     m_state->render.frame_id += 1;
 
-    wm_window_info_t new_window_info;
-    wm->get_window_info ( window, &new_window_info );
-
-    viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
-
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
     if ( m_state->render.capture_frame ) {
         xg->debug_capture_workload ( workload );
         m_state->render.capture_frame = false;
     }
-
-    viewapp_update_meshes();
-    viewapp_update_lights();
-    viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
-
-    m_state->render.window_info = new_window_info;
-    m_state->render.input_state = new_input_state;
 
     if ( m_state->reload ) {
         bool enabled[xf_graph_max_nodes_m] = {};
@@ -3511,8 +3512,6 @@ static std_app_state_e viewapp_update ( void ) {
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg->cmd_destroy_texture ( resource_cmd_buffer, m_state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_complete_m );
  
-       //xf->destroy_unreferenced_resources ( xg, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
-
         viewapp_boot_raster_graph();
         viewapp_boot_raytrace_graph();
         viewapp_boot_mouse_pick_graph();
@@ -3535,6 +3534,18 @@ static std_app_state_e viewapp_update ( void ) {
         m_state->reload = false;
         m_state->render.graph_reload = true;
     }
+
+    wm_window_info_t new_window_info;
+    wm->get_window_info ( window, &new_window_info );
+
+    viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
+
+    viewapp_update_meshes();
+    viewapp_update_lights();
+    viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
+
+    m_state->render.window_info = new_window_info;
+    m_state->render.input_state = new_input_state;
 
     viewapp_update_workload_uniforms ( workload );
 
@@ -3607,6 +3618,8 @@ void viewer_app_unload ( void ) {
     }
 
     xg->submit_workload ( workload );
+
+    xg->destroy_resource_layout ( m_state->render.workload_bindings_layout );
 
     std_module_unload_m ( xi_module_name_m );
     std_module_unload_m ( rv_module_name_m );

@@ -476,10 +476,11 @@ std_process_h std_process_this ( void ) {
     return std_process_null_handle_m;
 }
 
-std_no_return_m std_process_this_exit ( std_process_exit_code_e exit_code ) {
+void std_process_this_exit ( std_process_exit_code_e exit_code ) {
 #if defined(std_platform_win32_m)
     uint32_t exit_code_value = exit_code == std_process_exit_code_completed_m ? 0 : 1;
-    ExitProcess ( exit_code_value );
+    //ExitProcess ( exit_code_value );
+    TerminateProcess ( GetCurrentProcess(), exit_code_value );
 #elif defined(std_platform_linux_m)
     int32_t exit_code_value = exit_code == std_process_exit_code_completed_m ? 0 : 1;
     exit ( exit_code_value );
@@ -762,10 +763,18 @@ std_pipe_h std_process_pipe_connect ( const char* name, std_process_pipe_flags_b
     }
 
     if ( flags & std_process_pipe_flags_blocking_m ) {
+wait_for_pipe_creation:
         BOOL result = WaitNamedPipe ( pipe_name, NMPWAIT_WAIT_FOREVER );
         if ( !result ) {
-            std_log_os_error_m();
-            return std_process_null_handle_m;
+            // wait for creation
+            DWORD error = GetLastError();
+            if ( error == ERROR_FILE_NOT_FOUND ) {
+                std_thread_this_sleep ( 0 );
+                goto wait_for_pipe_creation;
+            } else {
+                std_log_os_error_m();
+                return std_process_null_handle_m;
+            }
         }
     }
 
