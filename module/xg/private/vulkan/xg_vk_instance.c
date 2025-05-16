@@ -150,7 +150,7 @@ static void xg_vk_instance_load_ext_api ( void ) {
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.set_debug_callback, "vkCreateDebugUtilsMessengerEXT" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.destroy_debug_callback, "vkDestroyDebugUtilsMessengerEXT" );
 
-#if xg_enable_raytracing_m
+#if 0//xg_enable_raytracing_m
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_build_sizes, "vkGetAccelerationStructureBuildSizesKHR" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureKHR" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.build_acceleration_structures, "vkBuildAccelerationStructuresKHR" );

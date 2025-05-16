@@ -19,10 +19,11 @@ size_t      xg_vk_device_get_displays_info ( xg_display_info_t* displays, size_t
 
 // ---- Public xg_vk API ----
 typedef enum {
-    xg_vk_device_existing_m                   = 1 << 0,
-    xg_vk_device_active_m                     = 1 << 1,
-    xg_vk_device_dedicated_compute_queue_m    = 1 << 3,
-    xg_vk_device_dedicated_copy_queue_m       = 1 << 4,
+    xg_vk_device_existing_m                 = 1 << 0,
+    xg_vk_device_active_m                   = 1 << 1,
+    xg_vk_device_dedicated_compute_queue_m  = 1 << 3,
+    xg_vk_device_dedicated_copy_queue_m     = 1 << 4,
+    xg_vk_device_supports_raytrace_m        = 1 << 5,
 } xg_vk_device_f;
 
 typedef struct {
@@ -48,7 +49,87 @@ typedef struct {
     void ( *cmd_sync2_pipeline_barrier ) ( VkCommandBuffer, const VkDependencyInfoKHR* );
 #endif
 
-//#if xg_enable_raytracing_m
+#if xg_vk_enable_nv_raytracing_ext_m
+    // vkCreateAccelerationStructureNV
+    VkResult ( *create_acceleration_structure ) (
+        VkDevice                                    device,
+        const VkAccelerationStructureCreateInfoNV*  pCreateInfo,
+        const VkAllocationCallbacks*                pAllocator,
+        VkAccelerationStructureNV*                  pAccelerationStructure );
+
+    // vkCmdBuildAccelerationStructureNV
+    void ( *cmd_build_acceleration_structure ) (
+        VkCommandBuffer                             commandBuffer,
+        const VkAccelerationStructureInfoNV*        pInfo,
+        VkBuffer                                    instanceData,
+        VkDeviceSize                                instanceOffset,
+        VkBool32                                    update,
+        VkAccelerationStructureNV                   dst,
+        VkAccelerationStructureNV                   src,
+        VkBuffer                                    scratch,
+        VkDeviceSize                                scratchOffset );
+
+    // vkCmdTraceRaysNV
+    void ( *trace_rays ) (
+        VkCommandBuffer                             commandBuffer,
+        VkBuffer                                    raygenShaderBindingTableBuffer,
+        VkDeviceSize                                raygenShaderBindingOffset,
+        VkBuffer                                    missShaderBindingTableBuffer,
+        VkDeviceSize                                missShaderBindingOffset,
+        VkDeviceSize                                missShaderBindingStride,
+        VkBuffer                                    hitShaderBindingTableBuffer,
+        VkDeviceSize                                hitShaderBindingOffset,
+        VkDeviceSize                                hitShaderBindingStride,
+        VkBuffer                                    callableShaderBindingTableBuffer,
+        VkDeviceSize                                callableShaderBindingOffset,
+        VkDeviceSize                                callableShaderBindingStride,
+        uint32_t                                    width,
+        uint32_t                                    height,
+        uint32_t                                    depth);
+
+    // vkDestroyAccelerationStructureNV
+    void ( *destroy_acceleration_structure ) (
+        VkDevice                                    device,
+        VkAccelerationStructureNV                   accelerationStructure,
+        const VkAllocationCallbacks*                pAllocator );
+
+    // vkGetAccelerationStructureMemoryRequirementsNV
+    void ( *get_acceleration_structure_memory_requirements )(
+        VkDevice                                    device,
+        const VkAccelerationStructureMemoryRequirementsInfoNV* pInfo,
+        VkMemoryRequirements2KHR*                   pMemoryRequirements);
+
+    // vkBindAccelerationStructureMemoryNV
+    VkResult ( *bind_acceleration_structure_memory ) (
+        VkDevice                                    device,
+        uint32_t                                    bindInfoCount,
+        const VkBindAccelerationStructureMemoryInfoNV* pBindInfos);
+
+    // vkCreateRayTracingPipelinesNV
+    VkResult ( *create_raytrace_pipelines ) (
+        VkDevice                                    device,
+        VkPipelineCache                             pipelineCache,
+        uint32_t                                    createInfoCount,
+        const VkRayTracingPipelineCreateInfoNV*     pCreateInfos,
+        const VkAllocationCallbacks*                pAllocator,
+        VkPipeline*                                 pPipelines );
+
+    // vkGetRayTracingShaderGroupHandlesNV
+    VkResult ( *get_shader_group_handles ) (
+        VkDevice                                    device,
+        VkPipeline                                  pipeline,
+        uint32_t                                    firstGroup,
+        uint32_t                                    groupCount,
+        size_t                                      dataSize,
+        void*                                       pData );
+
+    // vkGetAccelerationStructureHandleNV
+    VkResult ( *get_acceleration_structure_reference ) (
+        VkDevice                                    device,
+        VkAccelerationStructureNV                   accelerationStructure,
+        size_t                                      dataSize,
+        void*                                       pData);
+#else
     // vkGetAccelerationStructureBuildSizesKHR
     void ( *get_acceleration_structure_build_sizes ) ( 
         VkDevice, 
@@ -75,16 +156,6 @@ typedef struct {
         VkDevice, 
         const VkAccelerationStructureDeviceAddressInfoKHR* );
 
-#if xg_vk_enable_nv_raytracing_ext_m
-    // vkCreateRayTracingPipelinesNV
-    VkResult ( *create_raytrace_pipelines ) (
-        VkDevice                                    device,
-        VkPipelineCache                             pipelineCache,
-        uint32_t                                    createInfoCount,
-        const VkRayTracingPipelineCreateInfoNV*     pCreateInfos,
-        const VkAllocationCallbacks*                pAllocator,
-        VkPipeline*                                 pPipelines );
-#else
     // vkCreateRayTracingPipelinesKHR
     VkResult ( *create_raytrace_pipelines ) (
         VkDevice                                    device,
@@ -94,7 +165,6 @@ typedef struct {
         const VkRayTracingPipelineCreateInfoKHR*    pCreateInfos,
         const VkAllocationCallbacks*                pAllocator,
         VkPipeline*                                 pPipelines );
-#endif
 
     // vkGetRayTracingShaderGroupHandlesKHR
     VkResult ( *get_shader_group_handles ) (
@@ -121,6 +191,7 @@ typedef struct {
         VkDevice                                    device,
         VkAccelerationStructureKHR                  accelerationStructure,
         const VkAllocationCallbacks*                pAllocator );
+#endif
 
     // TODO non-nvda
     // vkGetQueueCheckpointDataNV
@@ -134,62 +205,37 @@ typedef struct {
         VkCommandBuffer                             commandBuffer,
         const void*                                 pCheckpointMarker);
 
-//#endif
 } xg_vk_device_ext_api_i;
 
 typedef struct {
-    uint64_t                            id;
-    xg_vk_device_f                      flags;
+    uint64_t id;
+    xg_vk_device_f flags;
     // Handles
-    VkPhysicalDevice                    vk_physical_handle;
-    VkDevice                            vk_handle;
+    VkPhysicalDevice vk_physical_handle;
+    VkDevice vk_handle;
     // Properties
-    VkPhysicalDeviceProperties          generic_properties;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceProperties.html
-    VkPhysicalDeviceFeatures            supported_features;               // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
+    VkPhysicalDeviceProperties generic_properties; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceProperties.html
+    VkPhysicalDeviceFeatures supported_features; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
     
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR     raytrace_properties; //
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR  acceleration_structure_properties;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR raytrace_properties; //
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties;
     
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR       supported_raytrace_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRayTracingPipelineFeaturesKHR.html
-    VkPhysicalDeviceBufferDeviceAddressFeatures         supported_device_address_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR    supported_acceleration_structure_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR supported_raytrace_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceRayTracingPipelineFeaturesKHR.html
+    VkPhysicalDeviceBufferDeviceAddressFeatures supported_device_address_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR supported_acceleration_structure_features; // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
     
-    VkPhysicalDeviceMemoryProperties    memory_properties;                // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
+    VkPhysicalDeviceMemoryProperties memory_properties; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
     
     VkQueueFamilyCheckpointPropertiesNV queue_checkpoint_properties[16];
-    VkQueueFamilyProperties             queue_family_properties[16];   // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
+    VkQueueFamilyProperties             queue_family_properties[16]; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
     uint32_t                            queue_family_count;
-    VkDeviceQueueCreateInfo             queue_create_info[16 * 3];  // We determine these when we cache vulkan properties, use them when we create the device (on activation)
+    VkDeviceQueueCreateInfo             queue_create_info[16 * 3]; // Determined when caching vulkan properties, used when creating the device (on activation)
     uint32_t                            queue_create_info_count;
-    // Main queues
-    //VkQueue                             graphics_queue;
-    //uint32_t                            graphics_queue_family_index;
-    //VkQueue                             compute_queue;
-    //uint32_t                            compute_queue_family_index;
-    //VkQueue                             copy_queue;
-    //uint32_t                            copy_queue_family_index;
-    // Command queues
     xg_vk_device_cmd_queue_t            queues[xg_cmd_queue_count_m];
-    //xg_vk_device_cmd_queue_t            graphics_queue;
-    //xg_vk_device_cmd_queue_t            compute_queue;
-    //xg_vk_device_cmd_queue_t            copy_queue;
-    // Memory heaps
     xg_vk_device_memory_heap_t          memory_heaps[xg_memory_type_count_m];
-    //xg_vk_device_memory_heap_t          device_memory_heap;
-    //xg_vk_device_memory_heap_t          device_mapped_memory_heap;
-    //xg_vk_device_memory_heap_t          host_cached_memory_heap;
-    //xg_vk_device_memory_heap_t          host_uncached_memory_heap;
-    // Memory indexes (indexes into memory_properties.memoryTypes)
-    //uint32_t                            device_memory_index;
-    //uint32_t                            device_mapped_memory_index;
-    //uint32_t                            staging_cached_memory_index;
-    //uint32_t                            staging_uncached_memory_index;
-    // Cmd pools
-    // TODO remove these
-    //VkCommandPool                       graphics_cmd_pool;
-    //VkCommandPool                       compute_cmd_pool;
-    //VkCommandPool                       copy_cmd_pool;
     xg_vk_device_ext_api_i              ext_api;
+
+    bool supports_raytrace;
 } xg_vk_device_t;
 
 typedef struct {

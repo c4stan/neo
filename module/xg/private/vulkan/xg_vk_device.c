@@ -52,16 +52,23 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 #endif
 
 #if xg_enable_raytracing_m
+#if xg_vk_enable_nv_raytracing_ext_m
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.get_acceleration_structure_reference, "vkGetAccelerationStructureHandleNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.bind_acceleration_structure_memory, "vkBindAccelerationStructureMemoryNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.cmd_build_acceleration_structure, "vkCmdBuildAccelerationStructureNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.trace_rays, "vkCmdTraceRaysNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.destroy_acceleration_structure, "vkDestroyAccelerationStructureNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNV" );
+    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.get_acceleration_structure_memory_requirements, "vkGetAccelerationStructureMemoryRequirementsNV" );
+#else
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_acceleration_structure_build_sizes, "vkGetAccelerationStructureBuildSizesKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_build_acceleration_structures, "vkCmdBuildAccelerationStructuresKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_acceleration_structure_device_address, "vkGetAccelerationStructureDeviceAddressKHR" );
     xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.trace_rays, "vkCmdTraceRaysKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.destroy_acceleration_structure, "vkDestroyAccelerationStructureKHR" );
-#if xg_vk_enable_nv_raytracing_ext_m
-    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesNV" );
-    xg_vk_device_ext_init_pfn_optional_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNV" );
-#else
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.create_raytrace_pipelines, "vkCreateRayTracingPipelinesKHR" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_shader_group_handles, "vkGetRayTracingShaderGroupHandlesNK" );
 #endif
@@ -848,12 +855,12 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 #if xg_enable_raytracing_m
         "VK_KHR_acceleration_structure",
         "VK_KHR_ray_tracing_pipeline",
+        "VK_KHR_deferred_host_operations",
 #if xg_vk_enable_nv_raytracing_ext_m
         "VK_NV_ray_tracing",
 #else
         "VK_KHR_ray_query",
 #endif
-        "VK_KHR_deferred_host_operations",
 #endif
         // debugPrintfEXT - TODO enable in debug only?
         //"VK_KHR_shader_non_semantic_info",
@@ -863,6 +870,11 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     size_t required_extensions_count = std_static_array_capacity_m ( required_extensions );
 
     const bool fail_on_missing_extension = false;
+#if xg_enable_raytracing_m
+    bool supports_raytrace = true;
+#else
+    bool supports_raytrace = false;
+#endif
 
     for ( size_t i = 0; i < required_extensions_count; ++i ) {
         std_log_info_m ( "Validating requested device extension "std_fmt_str_m"...", required_extensions[i] );
@@ -877,13 +889,32 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         }
 
         if ( !found ) {
-            std_log_warn_m ( "Unable to activate device extension "std_fmt_str_m" !"std_fmt_newline_m, required_extensions[i] );
+            std_log_warn_m ( "Unable to activate device extension "std_fmt_str_m, required_extensions[i] );
+
+            bool raytrace_extension = 
+                std_str_cmp ( required_extensions[i], "VK_KHR_acceleration_structure" ) == 0
+                || std_str_cmp ( required_extensions[i], "VK_KHR_ray_tracing_pipeline" ) == 0
+                || std_str_cmp ( required_extensions[i], "VK_KHR_deferred_host_operations" ) == 0
+#if xg_vk_enable_nv_raytracing_ext_m
+                || std_str_cmp ( required_extensions[i], "VK_NV_ray_tracing" ) == 0
+#else
+                || std_str_cmp ( required_extensions[i], "VK_KHR_ray_query" ) == 0
+#endif
+                ;
+
+            if ( raytrace_extension ) {
+                supports_raytrace = false;
+            }
 
             if ( fail_on_missing_extension ) {
                 std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
                 return false;
             }
         }
+    }
+
+    if ( supports_raytrace ) {
+        device->flags |= xg_vk_device_supports_raytrace_m;
     }
 
     // Fill queue info
@@ -1069,12 +1100,9 @@ bool xg_vk_device_get_info ( xg_device_info_t* info, xg_device_h device_handle )
     std_str_copy ( info->name, xg_device_name_size_m, device->generic_properties.deviceName );
     info->dedicated_compute_queue = device->flags & xg_vk_device_dedicated_compute_queue_m;
     info->dedicated_copy_queue = device->flags & xg_vk_device_dedicated_copy_queue_m;
+    info->supports_raytrace = device->flags & xg_vk_device_supports_raytrace_m;
 
     info->uniform_buffer_alignment = ( uint64_t ) device->generic_properties.limits.minUniformBufferOffsetAlignment;
-
-    // TODO
-    // check xg_vk_enable_raytracing and success on extension activation/device features available
-    info->supports_raytrace = false;
 
     std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
 

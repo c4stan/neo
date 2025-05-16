@@ -5,6 +5,7 @@ import subprocess
 import json
 import platform
 import configparser
+import psutil
 
 import importlib
 import makegen
@@ -400,12 +401,16 @@ def run_app(name, flags, params):
     if ('-rd' in flags):
         env_vars["ENABLE_VULKAN_RENDERDOC_CAPTURE"] = "1"
 
+    process_flags = 0
+    if ('-a' in flags):
+        process_flags = 4 # CREATE_SUSPENDED
+
     if makedef['output'] == ['app']:
         cmd = './build/' + config + '/output/std_launcher.exe'
-        SUBPROCESS = subprocess.Popen([cmd, name], env = env_vars)
+        SUBPROCESS = subprocess.Popen([cmd, name], env = env_vars, creationflags = process_flags)
     else:
         cmd = './build/' + config + '/output/' + name + '.exe'
-        SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars)
+        SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars, creationflags = process_flags)
 
     if ('-a' in flags):
         debug_process()
@@ -413,8 +418,13 @@ def run_app(name, flags, params):
     pop_path()
 
 def debug_process():
+    global SUBPROCESS
     cmd = 'vsjitdebugger -p ' + str(SUBPROCESS.pid)
     os.system(cmd)
+
+def resume_subprocess():
+    global SUBPROCESS
+    psutil.Process(SUBPROCESS.pid).resume()
 
 def debug_app(name, flags, params):
     if not validate_workspace(name):
@@ -672,6 +682,8 @@ def parse(string):
                 flags = args[0:]
                 params = []
             debug_app(tokens[1], flags, params)
+    elif cmd == 'resume':
+        resume_subprocess()
     elif cmd == 'create':
         create_local_workspace(tokens[1], tokens[2])
     elif cmd == 'gitpush':

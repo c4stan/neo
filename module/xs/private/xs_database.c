@@ -667,7 +667,9 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     break;
             }
 
-            std_assert_m ( pipeline_handle != xg_null_handle_m );
+            if ( pipeline_handle == xg_null_handle_m ) {
+                std_log_warn_m ( "Pipeline state " std_fmt_str_m " creation failed", pipeline_state->name );
+            }
 
             // TODO add these pipelines to a separate list, to avoid having to iterate all pipelines in update_pipelines
             // Also, right now the case where it creates a new pipeline and there's already a new pipeline pending is broken!

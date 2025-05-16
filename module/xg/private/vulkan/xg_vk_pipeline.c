@@ -1,4 +1,4 @@
-#include "xg_enum.h"
+#include <xg_enum.h>
 
 #include "xg_vk_pipeline.h"
 #include "xg_vk_instance.h"
@@ -554,6 +554,10 @@ VkPipelineLayout xg_vk_pipeline_create_pipeline_layout_vk ( xg_device_h device_h
 xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device_handle, const xg_raytrace_pipeline_params_t* params ) {
 #if xg_enable_raytracing_m
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
+    if ( !( device->flags & xg_vk_device_supports_raytrace_m ) ) {
+        return xg_null_handle_m;
+    }
+
     char state_buffer[sizeof ( params->state ) + sizeof ( uint64_t ) * xg_shader_binding_set_count_m];
     std_stack_t hash_allocator = std_static_stack_m ( state_buffer );
 
@@ -647,17 +651,17 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         {
 #if xg_vk_enable_nv_raytracing_ext_m
             // TODO have a separate define for max_groups
-            VkRayTracingShaderGroupCreateInfoNV groups[xg_raytrace_shader_state_max_shaders_m];
+            VkRayTracingShaderGroupCreateInfoNV groups[xg_raytrace_shader_state_max_shaders_m] = {};
 
             for ( uint32_t i = 0; i < params->state.shader_state.gen_shader_count; ++i ) {
                 groups[group_count++] = ( VkRayTracingShaderGroupCreateInfoNV ) {
                     .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
                     .pNext = NULL,
-                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV,
                     .generalShader = params->state.shader_state.gen_shaders[i].shader,
-                    .closestHitShader = VK_SHADER_UNUSED_KHR,
-                    .anyHitShader = VK_SHADER_UNUSED_KHR,
-                    .intersectionShader = VK_SHADER_UNUSED_KHR,
+                    .closestHitShader = VK_SHADER_UNUSED_NV,
+                    .anyHitShader = VK_SHADER_UNUSED_NV,
+                    .intersectionShader = VK_SHADER_UNUSED_NV,
                 };
             }
 
@@ -665,11 +669,11 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 groups[group_count++] = ( VkRayTracingShaderGroupCreateInfoNV ) {
                     .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
                     .pNext = NULL,
-                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV,
                     .generalShader = params->state.shader_state.miss_shaders[i].shader,
-                    .closestHitShader = VK_SHADER_UNUSED_KHR,
-                    .anyHitShader = VK_SHADER_UNUSED_KHR,
-                    .intersectionShader = VK_SHADER_UNUSED_KHR,
+                    .closestHitShader = VK_SHADER_UNUSED_NV,
+                    .anyHitShader = VK_SHADER_UNUSED_NV,
+                    .intersectionShader = VK_SHADER_UNUSED_NV,
                 };
             }
 
@@ -677,45 +681,13 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 groups[group_count++] = ( VkRayTracingShaderGroupCreateInfoNV ) {
                     .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
                     .pNext = NULL,
-                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
-                    .generalShader = VK_SHADER_UNUSED_KHR,
+                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV,
+                    .generalShader = VK_SHADER_UNUSED_NV,
                     .closestHitShader = params->state.shader_state.hit_groups[i].closest_shader,
-                    .anyHitShader = params->state.shader_state.hit_groups[i].any_shader != -1 ? params->state.shader_state.hit_groups[i].any_shader : VK_SHADER_UNUSED_KHR,
-                    .intersectionShader = params->state.shader_state.hit_groups[i].intersection_shader != -1 ? params->state.shader_state.hit_groups[i].intersection_shader : VK_SHADER_UNUSED_KHR,
+                    .anyHitShader = params->state.shader_state.hit_groups[i].any_shader != -1 ? params->state.shader_state.hit_groups[i].any_shader : VK_SHADER_UNUSED_NV,
+                    .intersectionShader = params->state.shader_state.hit_groups[i].intersection_shader != -1 ? params->state.shader_state.hit_groups[i].intersection_shader : VK_SHADER_UNUSED_NV,
                 };
             }
-
-#if 0
-            VkRayTracingShaderGroupCreateInfoNV groups[] = {
-                {
-                    .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
-                    .pNext = NULL,
-                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
-                    .generalShader = 0,
-                    .closestHitShader = VK_SHADER_UNUSED_KHR,
-                    .anyHitShader = VK_SHADER_UNUSED_KHR,
-                    .intersectionShader = VK_SHADER_UNUSED_KHR,
-                },
-                {
-                    .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
-                    .pNext = NULL,
-                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
-                    .generalShader = 1,
-                    .closestHitShader = VK_SHADER_UNUSED_KHR,
-                    .anyHitShader = VK_SHADER_UNUSED_KHR,
-                    .intersectionShader = VK_SHADER_UNUSED_KHR,
-                },
-                {
-                    .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV,
-                    .pNext = NULL,
-                    .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
-                    .generalShader = VK_SHADER_UNUSED_KHR,
-                    .closestHitShader = 2,
-                    .anyHitShader = VK_SHADER_UNUSED_KHR,
-                    .intersectionShader = VK_SHADER_UNUSED_KHR,
-                }
-            };
-#endif
 
             VkRayTracingPipelineCreateInfoNV info = {
                 .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV,
@@ -730,7 +702,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = 0,
             };
-            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
+            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
 #else
             // TODO
             VkRayTracingPipelineCreateInfoKHR info = {

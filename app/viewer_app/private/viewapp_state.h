@@ -72,6 +72,7 @@ typedef struct {
     xg_swapchain_h swapchain;
 
     xs_database_h sdb;
+    bool supports_raytrace;
 
     xf_graph_h raster_graph;
     xf_graph_h raytrace_graph;

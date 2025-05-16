@@ -263,22 +263,8 @@ static void viewapp_boot_raytrace_graph ( void ) {
     add_raytrace_pass ( graph, color_texture );
 
     // ui
-    //xg_texture_h xg_export_texture = xg->create_texture ( &xg_texture_params_m (
-    //    .width = resolution_x,
-    //    .height = resolution_y,
-    //    .format = xg_format_r8g8b8a8_unorm_m,
-    //    .debug_name = "export",
-    //) );
-    //xf_texture_h xf_export_texture = xf->create_texture_from_external ( xg_export_texture );
-    ////xf_texture_h export_texture = xf->create_texture ( &xf_texture_params_m (
-    ////    .width = resolution_x,
-    ////    .height = resolution_y,
-    ////    .format = xg_format_r8g8b8a8_unorm_m,
-    ////    .debug_name = "export",
-    ////) );
-    add_ui_pass ( graph, color_texture, xf_null_handle_m );
-    //m_state->render.xg_export_texture = xg_export_texture;
-    //m_state->render.xf_export_texture = xf_export_texture;
+    m_state->render.export_dest = xf->create_texture_from_external ( m_state->ui.export_texture );
+    add_ui_pass ( graph, color_texture, m_state->render.export_dest );
 
     // present
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
@@ -2054,8 +2040,10 @@ static void viewapp_load_scene ( uint32_t id ) {
 
     m_state->scene.active_scene = id;
 
-    viewapp_build_raytrace_geo();
-    viewapp_build_raytrace_world();
+    if ( m_state->render.supports_raytrace ) {
+        viewapp_build_raytrace_geo();
+        viewapp_build_raytrace_world();
+    }
 }
 
 static void viewapp_boot ( void ) {
@@ -2085,6 +2073,7 @@ static void viewapp_boot ( void ) {
     wm->get_window_input_state ( window, &m_state->render.input_state );
 
     xg_device_h device;
+    xg_device_info_t device_info;
     xg_i* xg = m_state->modules.xg;
     {
         size_t device_count = xg->get_devices_count();
@@ -2094,7 +2083,6 @@ static void viewapp_boot ( void ) {
         device = devices[0];
         bool activate_result = xg->activate_device ( device );
         std_assert_m ( activate_result );
-        xg_device_info_t device_info;
         xg->get_device_info ( &device_info, device );
         std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
     }
@@ -2253,12 +2241,16 @@ static void viewapp_boot ( void ) {
     xf_i* xf = m_state->modules.xf;
     xf->load_shaders ( device );
 
+    m_state->render.supports_raytrace = device_info.supports_raytrace;
+
     viewapp_boot_workload_resources_layout();
 
     viewapp_load_scene ( m_state->scene.active_scene );
 
     viewapp_boot_raster_graph();
-    viewapp_boot_raytrace_graph();
+    if ( m_state->render.supports_raytrace ) {
+        viewapp_boot_raytrace_graph();
+    }
     viewapp_boot_mouse_pick_graph();
 
     m_state->render.active_graph = m_state->render.raster_graph;

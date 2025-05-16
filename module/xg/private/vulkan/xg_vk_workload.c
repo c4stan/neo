@@ -597,12 +597,12 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         uint32_t binding_idx = resource_bindings_layout->shader_register_to_descriptor_idx[binding->shader_register];
                         const xg_vk_raytrace_world_t* world = xg_vk_raytrace_world_get ( binding->world );
 
-#if 0//xg_vk_enable_nv_raytracing_ext_m
+#if xg_vk_enable_nv_raytracing_ext_m
                         VkWriteDescriptorSetAccelerationStructureNV as_info = {
                             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV,
                             .pNext = NULL,
                             .accelerationStructureCount = 1,
-                            .pAccelerationStructures = ( const VkAccelerationStructureNV* ) &world->vk_handle,
+                            .pAccelerationStructures = &world->vk_handle,
                         };
 
                         VkWriteDescriptorSet* write = &writes_array[writes_count++];
@@ -1403,9 +1403,13 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                     i = j;
                 }
 
+#if xg_vk_enable_nv_raytracing_ext_m
+                const xg_vk_buffer_t* sbt_buffer = xg_vk_buffer_get ( pipeline->sbt_buffer );
+                xg_vk_device_ext_api ( device_handle )->trace_rays ( vk_cmd_buffer, sbt_buffer->vk_handle, pipeline->sbt_gen_offset, sbt_buffer->vk_handle, pipeline->sbt_miss_offset, pipeline->sbt_miss_stride, sbt_buffer->vk_handle, pipeline->sbt_hit_offset, pipeline->sbt_hit_stride, VK_NULL_HANDLE, 0, 0, args->ray_count_x, args->ray_count_y, args->ray_count_z );
+#else
                 VkStridedDeviceAddressRegionKHR callable_region = { 0 };
-                xg_vk_device_ext_api ( device_handle )->trace_rays ( vk_cmd_buffer, &pipeline->sbt_gen_region, &pipeline->sbt_miss_region, &pipeline->sbt_hit_region, &callable_region,
-                        args->ray_count_x, args->ray_count_y, args->ray_count_z );
+                xg_vk_device_ext_api ( device_handle )->trace_rays ( vk_cmd_buffer, &pipeline->sbt_gen_region, &pipeline->sbt_miss_region, &pipeline->sbt_hit_region, &callable_region, args->ray_count_x, args->ray_count_y, args->ray_count_z );
+#endif
             }
             break;
             case xg_cmd_copy_buffer_m: {
