@@ -69,10 +69,13 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color, xf_texture_h expor
         .resources = xf_node_resource_params_m (
             .render_targets_count = 1,
             .render_targets = { xf_render_target_dependency_m ( .texture = color ) },
-            .sampled_textures_count = 1,
-            .sampled_textures = { xf_shader_texture_dependency_m ( .texture = export, .stage = xg_pipeline_stage_bit_fragment_shader_m ) }
         ),
     );
+
+    if ( export != xf_null_handle_m ) {
+        params.resources.sampled_textures_count = 1;
+        params.resources.sampled_textures[0] = xf_shader_texture_dependency_m ( .texture = export, .stage = xg_pipeline_stage_bit_fragment_shader_m );
+    }
 
     xf_node_h ui_node = xf->add_node ( graph, &params );
     return ui_node;

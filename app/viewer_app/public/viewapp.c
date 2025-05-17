@@ -263,8 +263,9 @@ static void viewapp_boot_raytrace_graph ( void ) {
     add_raytrace_pass ( graph, color_texture );
 
     // ui
-    m_state->render.export_dest = xf->create_texture_from_external ( m_state->ui.export_texture );
-    add_ui_pass ( graph, color_texture, m_state->render.export_dest );
+    //m_state->render.export_dest = xf->create_texture_from_external ( m_state->ui.export_texture );
+    //add_ui_pass ( graph, color_texture, m_state->render.export_dest );
+    add_ui_pass ( graph, color_texture, xf_null_handle_m );
 
     // present
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
@@ -345,6 +346,20 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "normal_texture",
     ) );
 
+    xf_texture_h material_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "material_texture"
+    ) );
+
+    xf_texture_h radiosity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "radiosity_texture"
+    ) );
+
     xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
@@ -357,6 +372,13 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
 
+    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r16g16_sfloat_m,
+        .debug_name = "velocity_texture",
+    ) );
+
     xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
@@ -366,13 +388,6 @@ static void viewapp_boot_raster_graph ( void ) {
             .clear_on_create = true,
             .clear.depth_stencil = xg_depth_stencil_clear_m ()
         ),
-    ) );
-
-    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
-        .width = resolution_x,
-        .height = resolution_y,
-        .format = xg_format_r16g16_sfloat_m,
-        .debug_name = "velocity_texture",
     ) );
 
     xf->add_node ( graph, &xf_node_params_m (
@@ -385,21 +400,25 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
             }
         ),
         .resources = xf_node_resource_params_m (
-            .copy_texture_writes_count = 5,
+            .copy_texture_writes_count = 7,
             .copy_texture_writes = {
                 xf_copy_texture_dependency_m ( .texture = depth_texture ),
                 xf_copy_texture_dependency_m ( .texture = color_texture ),
                 xf_copy_texture_dependency_m ( .texture = normal_texture ),
+                xf_copy_texture_dependency_m ( .texture = material_texture ),
+                xf_copy_texture_dependency_m ( .texture = radiosity_texture ),
                 xf_copy_texture_dependency_m ( .texture = object_id_texture ),
                 xf_copy_texture_dependency_m ( .texture = velocity_texture ),
             }
         ),
     ) );
 
-    add_geometry_node ( graph, color_texture, normal_texture, object_id_texture, velocity_texture, depth_texture );
+    add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
 
     // lighting
     uint32_t light_grid_size[3] = { 16, 8, 24 };
@@ -506,10 +525,12 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_buffer_dependency_m ( .buffer = light_list_buffer ), 
                 xf_compute_buffer_dependency_m ( .buffer = light_grid_buffer ) 
             },
-            .sampled_textures_count = 4,
+            .sampled_textures_count = 6,
             .sampled_textures = {
                 xf_compute_texture_dependency_m ( .texture = color_texture ),
                 xf_compute_texture_dependency_m ( .texture = normal_texture ),
+                xf_compute_texture_dependency_m ( .texture = material_texture ),
+                xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
             },
@@ -756,7 +777,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_r16_sfloat_m,
         .debug_name = "ssr_intersect_distance",
     ) );
-    add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, ssr_intersection_distance, normal_texture, lighting_texture, hiz_texture );
+    add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, ssr_intersection_distance, normal_texture, material_texture, lighting_texture, hiz_texture );
 
     // ssr blur
 #if 0
@@ -952,6 +973,10 @@ static void viewapp_boot_raster_graph ( void ) {
 }
 
 static void viewapp_build_mesh_raytrace_geo ( se_entity_h entity, viewapp_mesh_component_t* mesh ) {
+    if ( !m_state->render.supports_raytrace ) {
+        return;
+    }
+
     xg_i* xg = m_state->modules.xg;
     se_i* se = m_state->modules.se;
 
@@ -979,6 +1004,10 @@ static void viewapp_build_mesh_raytrace_geo ( se_entity_h entity, viewapp_mesh_c
 }
 
 static void viewapp_build_raytrace_geo ( void ) {
+    if ( !m_state->render.supports_raytrace ) {
+        return;
+    }
+
     se_i* se = m_state->modules.se;
 
     se_query_result_t mesh_query_result;
@@ -997,6 +1026,10 @@ static void viewapp_build_raytrace_geo ( void ) {
 
 static void viewapp_build_raytrace_world ( void ) {
 #if xg_enable_raytracing_m
+    if ( !m_state->render.supports_raytrace ) {
+        return;
+    }
+
     xg_device_h device = m_state->render.device;
     xg_i* xg = m_state->modules.xg;
     xs_i* xs = m_state->modules.xs;
@@ -1215,10 +1248,6 @@ static void viewapp_boot_scene_cornell_box ( void ) {
             },
         );
 
-        if ( i == 3 ) { // top plane
-            mesh_component.material.emissive = 1;
-        }
-
         se->create_entity ( &se_entity_params_m (
             .debug_name = "plane",
             .update = se_entity_update_m ( 
@@ -1255,10 +1284,10 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                     powf ( 240 / 255.f, 2.2 ),
                     powf ( 250 / 255.f, 2.2 )
                 },
-                .ssr = true,
+                .ssr = false,
                 .roughness = 0.01,
                 .metalness = 0,
-                .emissive = 1,
+                .emissive = { 1, 1, 1 },
             )
         );
 
@@ -1294,7 +1323,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
                 .proj_params.perspective = rv_perspective_projection_params_m (
                     .aspect_ratio = 1,
                     .near_z = 0.01,
-                    .far_z = 100,
+                    .far_z = 1000,
                 ),
             );
             light_component.views[i] = rv->create_view ( &view_params );
@@ -1451,10 +1480,10 @@ static void viewapp_boot_scene_field ( void ) {
                     powf ( 240 / 255.f, 2.2 ),
                     powf ( 250 / 255.f, 2.2 )
                 },
-                .ssr = true,
+                .ssr = false,
                 .roughness = 0.01,
                 .metalness = 0,
-                .emissive = 1,
+                .emissive = { 1, 1, 1 },
             )
         );
 
@@ -1467,6 +1496,7 @@ static void viewapp_boot_scene_field ( void ) {
             .intensity = 20,
             .color = { 1, 1, 1 },
             .shadow_casting = true,
+            .view_count = viewapp_light_max_views_m,
         );
         for ( uint32_t i = 0; i < viewapp_light_max_views_m; ++i ) {
             sm_quat_t orientation = sm_quat_from_vec ( viewapp_light_view_dir ( i ) );
@@ -1534,10 +1564,10 @@ static void viewapp_boot_scene_field ( void ) {
                     powf ( 240 / 255.f, 2.2 ),
                     powf ( 250 / 255.f, 2.2 )
                 },
-                .ssr = true,
+                .ssr = false,
                 .roughness = 0.01,
                 .metalness = 0,
-                .emissive = 1,
+                .emissive = { 1, 1, 1 },
             )
         );
 
@@ -1845,7 +1875,7 @@ static void viewapp_import_scene ( const char* input_path ) {
                 },
                 .roughness = 1,
                 .metalness = 0,
-                .ssr = true,
+                .ssr = false,
             );
 
             uint32_t mat_idx = mesh->mMaterialIndex;
@@ -1987,6 +2017,17 @@ static void viewapp_import_scene ( const char* input_path ) {
     std_log_info_m ( "Scene imported in " std_fmt_f32_dec_m(3) "s", time_ms / 1000.f );
 }
 
+static void update_raytrace_world ( xg_workload_h workload ) {
+#if xg_enable_raytracing_m
+    xg_i* xg = m_state->modules.xg;
+    xf_i* xf = m_state->modules.xf;
+    xg->wait_all_workload_complete();
+    viewapp_build_raytrace_world();
+    xf->destroy_graph ( m_state->render.raytrace_graph, workload );
+    viewapp_boot_raytrace_graph();
+#endif
+}
+
 static void viewapp_load_scene ( uint32_t id ) {
     xg_i* xg = m_state->modules.xg;
 
@@ -2040,10 +2081,8 @@ static void viewapp_load_scene ( uint32_t id ) {
 
     m_state->scene.active_scene = id;
 
-    if ( m_state->render.supports_raytrace ) {
-        viewapp_build_raytrace_geo();
-        viewapp_build_raytrace_world();
-    }
+    viewapp_build_raytrace_geo();
+    viewapp_build_raytrace_world();
 }
 
 static void viewapp_boot ( void ) {
@@ -2132,9 +2171,10 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh", &se_component_properties_params_m (
-        .count = 4,
+        .count = 5,
         .properties = {
             se_field_property_m ( 0, viewapp_mesh_component_t, material.base_color, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.emissive, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, material.roughness, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, material.metalness, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_mesh_component_t, material.ssr, se_property_bool_m ),
@@ -2142,11 +2182,12 @@ static void viewapp_boot ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_light_component_id_m, "Light", &se_component_properties_params_m (
-        .count = 4,
+        .count = 5,
         .properties = {
             se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, intensity, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, color, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, radius, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, shadow_casting, se_property_bool_m ),
         }
     ) );
@@ -2371,11 +2412,11 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
             bool speed_down_press = new_input_state->keyboard[wm_keyboard_state_q_m];
             float speed = camera_component->move_speed;
             if ( speed_up_press ) {
-                speed *= 1.2f;
+                speed *= 1.1f;
                 camera_component->move_speed = speed;
             }
             if ( speed_down_press ) {
-                speed *= 0.8f;
+                speed *= 0.9f;
                 camera_component->move_speed = speed;
             }
 
@@ -2455,10 +2496,14 @@ static void duplicate_selection ( void ) {
     }
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
+    viewapp_transform_component_t* transform = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_transform_component_id_m, 0 );
 
     viewapp_mesh_component_t new_mesh = *mesh;
     new_mesh.object_id = m_state->render.next_object_id++;
-    viewapp_transform_component_t new_transform = viewapp_transform_component_m();
+    viewapp_transform_component_t new_transform = *transform;
+    new_transform.position[0] = 0;
+    new_transform.position[1] = 0;
+    new_transform.position[2] = 0;
 
     se->create_entity( &se_entity_params_m (
         .debug_name = "duplicate mesh", // TODO
@@ -2502,10 +2547,10 @@ static se_entity_h spawn_plane ( void ) {
                 powf ( 240 / 255.f, 2.2 ),
                 powf ( 250 / 255.f, 2.2 )
             },
-            .ssr = true,
+            .ssr = false,
             .roughness = 0.01,
             .metalness = 0,
-            .emissive = 1,
+            .emissive = { 1, 1, 1 },
         )
     );
 
@@ -2536,7 +2581,7 @@ static se_entity_h spawn_plane ( void ) {
     return entity;
 }
 
-static se_entity_h spawn_sphere ( void ) {
+static se_entity_h spawn_light ( void ) {
     xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
     rv_i* rv = m_state->modules.rv;
@@ -2561,10 +2606,10 @@ static se_entity_h spawn_sphere ( void ) {
                 powf ( 240 / 255.f, 2.2 ),
                 powf ( 250 / 255.f, 2.2 )
             },
-            .ssr = true,
+            .ssr = false,
             .roughness = 0.01,
             .metalness = 0,
-            .emissive = 1,
+            .emissive = { 1, 1, 1 },
         )
     );
 
@@ -2630,6 +2675,8 @@ static se_entity_h spawn_sphere ( void ) {
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( entity, mesh );
+    // TODO need a workload to call this
+    //update_raytrace_world();
     return entity;
 }
 
@@ -2678,18 +2725,6 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
     }
  
     m_state->ui.mouse_pick_entity = se_null_handle_m;
-}
-
-// TODO
-static void update_raytrace_world ( xg_workload_h workload ) {
-#if xg_enable_raytracing_m
-    xg_i* xg = m_state->modules.xg;
-    xf_i* xf = m_state->modules.xf;
-    xg->wait_all_workload_complete();
-    viewapp_build_raytrace_world();
-    xf->destroy_graph ( m_state->render.raytrace_graph, workload );
-    viewapp_boot_raytrace_graph();
-#endif
 }
 
 static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state, xg_workload_h workload ) {
@@ -3276,16 +3311,16 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
-            .text = "+sphere",
+            .text = "Add light",
             .style = xi_default_style_m (
                 .horizontal_padding = 8,
             ),
         ) ) ) {
-            spawn_sphere();
+            spawn_light();
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
-            .text = "+plane",
+            .text = "Add plane",
             .style = xi_default_style_m (
                 .horizontal_padding = 8,
             ),
@@ -3472,7 +3507,7 @@ static std_app_state_e viewapp_update ( void ) {
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f6_m] && new_input_state.keyboard[wm_keyboard_state_f6_m] ) {
-        spawn_sphere();
+        spawn_light();
     }
 
     m_state->render.frame_id += 1;
@@ -3507,6 +3542,8 @@ static std_app_state_e viewapp_update ( void ) {
         viewapp_boot_raster_graph();
         viewapp_boot_raytrace_graph();
         viewapp_boot_mouse_pick_graph();
+
+        viewapp_build_raytrace_world();
 
         if ( active_graph[0] ) m_state->render.active_graph = m_state->render.raster_graph;
         if ( active_graph[1] ) m_state->render.active_graph = m_state->render.raytrace_graph;

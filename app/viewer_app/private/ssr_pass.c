@@ -13,7 +13,7 @@ typedef struct {
     uint32_t hiz_mip_count;
 } ssr_draw_data_t;
 
-xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, xf_texture_h ssr_intersect_dist, xf_texture_h normals, xf_texture_h color, xf_texture_h hiz ) {
+xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, xf_texture_h ssr_intersect_dist, xf_texture_h normal, xf_texture_h material, xf_texture_h lighting, xf_texture_h hiz ) {
     viewapp_state_t* state = viewapp_state_get ();
     xf_i* xf = state->modules.xf;
     xs_i* xs = state->modules.xs;
@@ -45,10 +45,11 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
             .samplers = { xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ) }
         ),
         .resources = xf_node_resource_params_m (
-            .sampled_textures_count = 3,
+            .sampled_textures_count = 4,
             .sampled_textures = {
-                xf_compute_texture_dependency_m ( .texture = normals ),
-                xf_compute_texture_dependency_m ( .texture = color, .view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ),
+                xf_compute_texture_dependency_m ( .texture = normal ),
+                xf_compute_texture_dependency_m ( .texture = material ),
+                xf_compute_texture_dependency_m ( .texture = lighting, .view = xg_texture_view_m ( .mip_base = 0, .mip_count = 1 ) ),
                 xf_compute_texture_dependency_m ( .texture = hiz ),
             },
             .storage_texture_writes_count = 2,

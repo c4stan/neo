@@ -37,7 +37,7 @@ struct ray_payload_t {
     vec3 color;
     float distance;
     vec3 normal;
-    float emissive;
+    vec3 emissive;
 };
 
 struct shadow_ray_payload_t {
@@ -73,6 +73,12 @@ mat3 tnb_from_normal ( vec3 n ) {
     vec3 t = tangent_from_normal ( n );
     vec3 b = cross ( n, t );
     return mat3 ( t, n, b );
+}
+
+mat3 tbn_from_normal ( vec3 n ) {
+    vec3 t = tangent_from_normal ( n );
+    vec3 b = cross ( n, t );
+    return mat3 ( t, b, n );
 }
 
 bool proj_depth_cmp_ge ( float a, float b ) {
@@ -248,6 +254,10 @@ vec4 sample_catmull_rom ( texture2D tex2d, sampler sampler_linear, vec2 uv, vec2
 // ======================================================================================= //
 
 // https://blog.demofox.org/2020/05/
+struct rng_wang_state_t {
+    uint v;
+};
+
 float wang_hash ( inout uint seed ) {
     seed = uint ( seed ^ uint ( 61 ) ) ^ uint ( seed >> uint ( 16 ) );
     seed *= uint ( 9 );
@@ -257,12 +267,15 @@ float wang_hash ( inout uint seed ) {
     return seed;
 }
 
-float rng_wang ( inout uint state ) {
-    return float ( wang_hash ( state ) ) / 4294967296.0;
+float rng_wang ( inout rng_wang_state_t state ) {
+    return float ( wang_hash ( state.v ) ) / 4294967296.0;
 }
 
-uint rng_wang_init ( vec2 tex_coord ) {
-    return uint ( uint ( tex_coord.x ) * uint ( 1973 ) + uint ( tex_coord.y ) * uint ( 9277 ) + uint ( frame_uniforms.frame_id ) * uint ( 26699 ) ) | uint ( 1 );
+rng_wang_state_t rng_wang_init ( vec2 tex_coord ) {
+    uint v = uint ( uint ( tex_coord.x ) * uint ( 1973 ) + uint ( tex_coord.y ) * uint ( 9277 ) + uint ( frame_uniforms.frame_id ) * uint ( 26699 ) ) | uint ( 1 );
+    rng_wang_state_t state;
+    state.v = v;
+    return state;
 }
 
 // https://mathworld.wolfram.com/SpherePointPicking.html

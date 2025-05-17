@@ -11,5 +11,5 @@ void main ( void ) {
     ray_payload.color = vec3 ( 0.0, 0.0, 0.0 );
     ray_payload.distance = -1;
     ray_payload.normal = vec3(0);
-    ray_payload.emissive = 0;
+    ray_payload.emissive = vec3(0);
 }

@@ -6,9 +6,11 @@
 
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     vec3 color;
-    uint object_id;
     float roughness;
+    vec3 emissive;
     float metalness;
+    uint object_id;
+    uint mat_id;
 } draw_uniforms;
 
 layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D color_texture;
@@ -28,8 +30,10 @@ layout ( location = 7 ) in vec4 in_prev_clip_pos;
 
 layout ( location = 0 ) out vec4 out_color;
 layout ( location = 1 ) out vec4 out_nor;
-layout ( location = 2 ) out uvec4 out_id;
-layout ( location = 3 ) out vec2 out_vel;
+layout ( location = 2 ) out vec4 out_mat;
+layout ( location = 3 ) out vec3 out_rad;
+layout ( location = 4 ) out uvec4 out_id;
+layout ( location = 5 ) out vec2 out_vel;
 
 void main() {
     // color
@@ -37,7 +41,7 @@ void main() {
     out_color = vec4 ( draw_uniforms.color * color_sample.xyz, draw_uniforms.metalness * color_sample.w );
     
     // normals
-#if 1
+#if 0
     float backface_flip = gl_FrontFacing ? 1.f : -1.f;
     out_nor = vec4 ( vec3 ( in_nor * 0.5 * backface_flip + 0.5 ), draw_uniforms.roughness );
 #else
@@ -48,6 +52,14 @@ void main() {
     normal = normalize ( ( frame_uniforms.view_from_world * vec4 ( normal, 0 ) ).xyz );
     out_nor = vec4 ( normal * 0.5 + 0.5, draw_uniforms.roughness * normal_sample.w );
 #endif
+
+    // material
+    float mat_id = draw_uniforms.mat_id;
+    vec3 mat_data = vec3 ( 0, 0, 0 );
+    out_mat = vec4 ( mat_id, mat_data );
+
+    // radiosity
+    out_rad = draw_uniforms.emissive;
 
     // obj id
     uint tri_id = gl_PrimitiveID;

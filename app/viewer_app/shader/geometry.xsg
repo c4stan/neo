@@ -12,11 +12,19 @@ begin render_target 1 // xyz: normals, w: roughness
     format R8G8B8A8_UNORM
 end
 
-begin render_target 2 // x: object id, yz: triangle id
+begin render_target 2 // x: matId, yzw: material data
+    format R8G8B8A8_UNORM
+end
+
+begin render_target 3 // xyz: radiosity
+    format B10G11R11_UFLOAT
+end
+
+begin render_target 4 // xy: object id, zw: triangle id
     format R8G8B8A8_UINT
 end
 
-begin render_target 3 // xy: velocity
+begin render_target 5 // xy: velocity
     format R16G16_FLOAT
 end
 

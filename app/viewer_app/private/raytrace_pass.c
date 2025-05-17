@@ -15,7 +15,7 @@ typedef struct {
     uint64_t pos_buffer;
     uint64_t nor_buffer;
     float albedo[3];
-    float emissive;
+    float emissive[3];
 } raytrace_shader_instance_t;
 
 static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -67,7 +67,9 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
         instances[i].albedo[1] = mesh_component->material.base_color[1];
         instances[i].albedo[2] = mesh_component->material.base_color[2];
 
-        instances[i].emissive = mesh_component->material.emissive;
+        instances[i].emissive[0] = mesh_component->material.emissive[0];
+        instances[i].emissive[1] = mesh_component->material.emissive[1];
+        instances[i].emissive[2] = mesh_component->material.emissive[2];
     }
 
     xg_pipeline_state_h pipeline = xs->get_pipeline_state ( pass_args->pipeline );

@@ -12,13 +12,14 @@ layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_unif
 } draw_uniforms;
 
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
-layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
-layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_hiz;
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_hiz;
 
-layout ( binding = 4, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
-layout ( binding = 5, set = xs_shader_binding_set_dispatch_m, r16f ) uniform writeonly image2D img_intersect_dist;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m, r16f ) uniform writeonly image2D img_intersect_dist;
 
-layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
@@ -34,6 +35,39 @@ vec3 ggx_sample ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
     return wi;
 }
 
+// Heitz
+// http://jcgt.org/published/0007/04/01/paper.pdf
+vec3 sampleGGXVNDF(vec3 Ve, float alpha_x, float alpha_y, float U1, float U2)
+{
+    // Section 3.2: transforming the view direction to the hemisphere configuration
+    vec3 Vh = normalize(vec3(alpha_x * Ve.x, alpha_y * Ve.y, Ve.z));
+    // Section 4.1: orthonormal basis (with special case if cross product is zero)
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    vec3 T1 = lensq > 0 ? vec3(-Vh.y, Vh.x, 0) / sqrt (lensq) : vec3(1,0,0);
+    vec3 T2 = cross(Vh, T1);
+    // Section 4.2: parameterization of the projected area
+    float r = sqrt(U1);
+    float phi = 2.0 * PI * U2;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s)*sqrt(1.0 - t1*t1) + s*t2;
+    // Section 4.3: reprojection onto hemisphere
+    vec3 Nh = t1*T1 + t2*T2 + sqrt(max(0.0, 1.0 - t1*t1 - t2*t2))*Vh;
+    // Section 3.4: transforming the normal back to the ellipsoid configuration
+    vec3 Ne = normalize(vec3(alpha_x * Nh.x, alpha_y * Nh.y, max(0.0, Nh.z)));
+    return Ne;
+}
+
+vec3 ggx_sample_vndf ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
+    mat3 tbn = tbn_from_normal ( normal );
+    vec3 view_tangent = normalize ( transpose ( tbn ) * wo );
+    vec3 h = sampleGGXVNDF ( view_tangent, roughness, roughness, e.x, e.y );
+    h = normalize ( tbn * h );
+    vec3 wi = ( h * dot ( wo, h ) * 2 ) - wo;
+    return wi;
+}
+
 // ---
 // TODO: try: downsample depth & normals -> raytrace in half-resolution -> upsample result back using a bi-filter (read half res depth and normals)
 void main ( void ) {
@@ -45,25 +79,24 @@ void main ( void ) {
     // TODO pass prev frame camera data and account for movement when sampling prev frame textures
     //vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
     vec4 norm_rough_sample = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv );
-    vec3 view_normal = norm_rough_sample.xyz * 2 - 1;
+    vec3 view_normal = normalize ( norm_rough_sample.xyz * 2 - 1 );
     float roughness = norm_rough_sample.w;
+    vec4 mat_sample = texture ( sampler2D ( tex_material, sampler_point ), screen_uv );
     float depth = textureLod ( sampler2D ( tex_hiz, sampler_point ), screen_uv, 0 ).x;
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
     vec3 view_pos = view_from_depth ( screen_uv, depth );
 
     // Trace
-    vec3 view_ray_dir = reflect ( normalize ( view_pos ), view_normal );
+    //vec3 view_ray_dir = reflect ( normalize ( view_pos ), view_normal );
 
-    uint rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
+    rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
     float ex = rng_wang ( rng_state );
     float ey = rng_wang ( rng_state );
     vec2 e2 = vec2 ( ex, ey );
     vec3 wo = normalize ( -view_pos );
-    vec3 wi = ggx_sample ( e2, wo, view_normal, roughness );
-    //float p = ggx_pdf ( wi, wo, view_normal, roughness );
-    view_ray_dir = wi;
-    //view_ray_dir = normalize ( view_ray_dir + wi );
-
+    vec3 wi = ggx_sample_vndf ( e2, wo, view_normal, roughness );
+    
+    vec3 view_ray_dir = wi;
     vec3 sample_color = vec3 ( 0, 0, 0 );
     float sample_distance = 1;
 
@@ -78,8 +111,8 @@ void main ( void ) {
 
     float hit_distance = 0;
 
-    // TODO SSR flag
-    if ( depth < 1 && roughness < 1 ) {
+    bool ssr_enabled = mat_sample.x == 1;
+    if ( ssr_enabled && depth < 1 ) {
         vec3 hit_screen_pos;
         float hit_depth;
         bool hit;

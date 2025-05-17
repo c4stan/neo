@@ -15,7 +15,7 @@ struct instance_t {
     uint64_t pos_buffer;
     uint64_t nor_buffer;
     float albedo[3];
-    float emissive;
+    float emissive[3];
 };
 
 layout ( buffer_reference, scalar ) buffer float3_buffer_t { float[3] data[]; };
@@ -64,7 +64,7 @@ void main ( void ) {
     world_normal = normalize ( world_normal );
 
     vec3 base_color = load_vec3 ( instance.albedo );
-    float emissive = instance.emissive;
+    vec3 emissive = load_vec3 ( instance.emissive );
 
     ray_payload.color = base_color;
     ray_payload.distance = gl_HitTNV;

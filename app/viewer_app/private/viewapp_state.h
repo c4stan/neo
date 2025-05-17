@@ -173,7 +173,7 @@ typedef struct {
     bool ssr;
     float roughness;
     float metalness;
-    float emissive;
+    float emissive[3];
     xf_texture_h color_texture;
     xf_texture_h normal_texture;
     xf_texture_h metalness_roughness_texture;
@@ -181,7 +181,7 @@ typedef struct {
 
 #define viewapp_material_data_m( ... ) ( viewapp_material_data_t ) { \
     .base_color = { 1, 1, 1 }, \
-    .emissive = 0, \
+    .emissive = { 0, 0, 0 }, \
     .ssr = false, \
     .roughness = 0.5, \
     .metalness = 0, \

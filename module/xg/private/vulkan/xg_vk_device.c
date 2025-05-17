@@ -857,6 +857,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         "VK_KHR_ray_tracing_pipeline",
         "VK_KHR_deferred_host_operations",
 #if xg_vk_enable_nv_raytracing_ext_m
+        // https://registry.khronos.org/vulkan/specs/latest/man/html/VK_NV_ray_tracing.html
         "VK_NV_ray_tracing",
 #else
         "VK_KHR_ray_query",
