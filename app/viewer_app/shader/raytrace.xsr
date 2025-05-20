@@ -12,23 +12,9 @@ end
 
 include common.xsi
 
-begin ray_world
-    register 0
-    stage ray_gen
-    stage ray_hit_closest
-    update dispatch
-end
-
-begin texture
-    register 1
-    stage ray_gen
-    access write
-    update dispatch
-end
-
-begin buffer
-    register 2
-    stage ray_hit_closest
-    update dispatch
-    access write
+begin bindings
+    ray_world ray_gen ray_hit_closest
+    texture storage ray_gen
+    buffer storage ray_hit_closest
+    buffer[2] storage ray_gen
 end

@@ -151,7 +151,7 @@ typedef struct {
 } xf_multi_buffer_t;
 
 #define xf_multi_buffer_m( ... ) ( xf_multi_buffer_t ) { \
-    .params = xf_multi_buffer_params_t(), \
+    .params = xf_multi_buffer_params_m(), \
     .index = 0, \
     .alias = xf_null_handle_m, \
     .ref_count = 0, \
@@ -232,6 +232,7 @@ void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
 xf_texture_t* xf_resource_texture_get ( xf_texture_h texture );
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
 xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer );
+xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer );
 xf_physical_texture_t* xf_resource_texture_get_physical_texture ( xf_texture_h texture );
 xf_physical_texture_t* xf_resource_physical_texture_get ( xf_physical_texture_h texture );
 
@@ -270,13 +271,16 @@ void xf_resource_texture_update_external ( xf_texture_h texture );
 */
 xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params );
 xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain );
-
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
 void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture, uint32_t index );
-
 xg_swapchain_h xf_resource_multi_texture_get_swapchain ( xf_texture_h texture );
 xf_texture_h xf_resource_multi_texture_get_texture ( xf_texture_h multi_texture, int32_t offset );
 xf_texture_h xf_resource_multi_texture_get_default ( xf_texture_h multi_texture );
+
+xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* params );
+void xf_resource_multi_buffer_advance ( xf_buffer_h multi_buffer );
+xf_buffer_h xf_resource_multi_buffer_get_buffer ( xf_buffer_h multi_buffer, int32_t offset );
+xf_buffer_h xf_resource_multi_buffer_get_default ( xf_buffer_h multi_buffer );
 
 bool xf_resource_texture_is_multi ( xf_texture_h texture );
 bool xf_resource_buffer_is_multi ( xf_buffer_h buffer );

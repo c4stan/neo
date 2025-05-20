@@ -52,6 +52,9 @@ typedef struct {
 }
 
 // Render
+// Keep in sync with lighting.frag!
+#define viewapp_max_lights_m 1024
+
 typedef struct {
     uint32_t resolution_x;
     uint32_t resolution_y;
@@ -87,6 +90,7 @@ typedef struct {
 
     bool graph_reload;
     bool allow_graph_aliasing;
+    bool raytrace_world_update;
 
     xf_texture_h export_dest;
 } viewapp_render_state_t;
@@ -214,7 +218,6 @@ typedef struct {
     uint32_t object_id;
     viewapp_material_data_t material;
     xg_raytrace_geometry_h rt_geo;
-    uint32_t rt_instance_id;
 } viewapp_mesh_component_t;
 
 #define viewapp_mesh_component_m( ... ) ( viewapp_mesh_component_t ) { \
@@ -227,7 +230,6 @@ typedef struct {
     .object_id = 0, \
     .material = viewapp_material_data_m(), \
     .rt_geo = xg_null_handle_m, \
-    .rt_instance_id = 0 ,\
     ##__VA_ARGS__ \
 }
 

@@ -188,6 +188,10 @@ static size_t xs_parser_read_i32 ( xs_parser_parsing_context_t* context, int32_t
 }
 std_warnings_restore_state_m()
 
+static const char* xs_parser_peek ( xs_parser_parsing_context_t* context ) {
+    return context->head;
+}
+
 // TODO fail if the string can't fit the buffer instead of doing a silent truncate
 static size_t xs_parser_read_word ( xs_parser_parsing_context_t* context, char* dest, size_t cap ) {
     const char* begin = context->head;
@@ -1294,14 +1298,27 @@ static void xs_parser_parse_ray_hit_shader_group ( xs_parser_parsing_context_t* 
     hit_group->intersection_shader = intersection_idx;
 }
 
+typedef struct {
+    xg_shading_stage_bit_e stages;
+    xg_shader_binding_set_e set;
+    uint32_t shader_register;
+} xs_parser_ray_world_t;
+
+static void xs_parser_add_ray_world ( xs_parser_parsing_context_t* context, const xs_parser_ray_world_t* world ) {
+    std_assert_m ( world->stages != 0 );
+    std_assert_m ( world->set < xg_shader_binding_set_count_m );
+    std_assert_m ( world->shader_register != UINT32_MAX );
+    std_assert_m ( context->pipeline_type == xg_pipeline_raytrace_m );
+
+    xg_resource_binding_layout_t* binding_point = &context->resource_layouts[world->set].resources[context->resource_layouts[world->set].resource_count++];
+    binding_point->shader_register = world->shader_register;
+    binding_point->type = xg_resource_binding_raytrace_world_m;
+    binding_point->stages = world->stages;
+}
+
 static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
-
-    struct {
-        xg_shading_stage_bit_e stages;
-        xg_shader_binding_set_e set;
-        uint32_t shader_register;
-    } ray_world;
+    xs_parser_ray_world_t ray_world;
 
     while ( context->head < context->eof ) {
         xs_parser_skip_to_text ( context );
@@ -1328,17 +1345,7 @@ static void xs_parser_parse_ray_world ( xs_parser_parsing_context_t* context ) {
         }
     }
 
-    std_assert_m ( ray_world.stages != 0 );
-    std_assert_m ( ray_world.set < xg_shader_binding_set_count_m );
-    std_assert_m ( ray_world.shader_register != UINT32_MAX );
-
-    std_assert_m ( context->pipeline_type == xg_pipeline_raytrace_m );
-    //xg_resource_binding_layout_t* binding_point = &context->resource_layouts[ray_world.set].raytrace_worlds[context->resource_layouts[ray_world.set].raytrace_world_count++];
-    xg_resource_binding_layout_t* binding_point = &context->resource_layouts[ray_world.set].resources[context->resource_layouts[ray_world.set].resource_count++];
-
-    binding_point->shader_register = ray_world.shader_register;
-    binding_point->type = xg_resource_binding_raytrace_world_m;
-    binding_point->stages = ray_world.stages;
+    xs_parser_add_ray_world ( context, &ray_world );
 }
 
 typedef struct {
@@ -1410,6 +1417,12 @@ static size_t xs_parser_extract_token_array ( char* token, size_t len ) {
     return array_size;
 }
 
+/*
+Format:
+    begin bindings
+        <buffer/texture/sampler/ray_world> <optional:[n]> <optional: uniform/sampled/storage/vertex/fragment/compute/...>
+    end bindings
+*/
 static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
     char token[xs_shader_parser_max_token_size_m];
 
@@ -1427,40 +1440,38 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
         len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len > 0 );
 
-        uint32_t array_size = 1;
-
-        if ( token[len - 1] == ']' ) {
-            array_size = xs_parser_extract_token_array ( token, len );
-            len = std_str_len ( token );
-        }
-
         // TODO instead of always defaulting to default_shading_stage try to parse an optional additional stage somewhere?
-        if ( std_str_cmp ( token , "buffer" ) == 0 ) {
+        if ( std_str_starts_with ( token , "buffer" ) ) {
             xs_parser_buffer_t buffer = {
-                .stages = xg_shading_stage_bit_none_m,
                 .set = binding_set,
                 .type = xs_parser_buffer_type_uniform_m,
-                .shader_register = binding_register,
             };
+
+            // try to parse array size
+            uint32_t array_size = 1;
+            if ( token[len - 1] == ']' ) {
+                array_size = xs_parser_extract_token_array ( token, len );
+                len = std_str_len ( token );
+            } else {
+                xs_parser_skip_spaces ( context );
+                if ( *xs_parser_peek ( context ) == '[' ) {
+                    len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+                    array_size = xs_parser_extract_token_array ( token, len );
+                }
+            }
 
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
 
-            while ( len > 0) {                
-                if ( token[len - 1] == ']' ) {
-                    array_size = xs_parser_extract_token_array ( token, len );
-                    len = std_str_len ( token );
-                }
-
-                if ( len > 0 ) {
-                    if ( std_str_cmp ( token, "uniform" ) == 0 ) { 
-                        buffer.type = xs_parser_buffer_type_uniform_m;
-                    } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
-                        buffer.type = xs_parser_buffer_type_storage_m;
-                    } else {
-                        xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
-                        buffer.stages |= stage;
-                    }
+            while ( len > 0) {
+                if ( std_str_cmp ( token, "uniform" ) == 0 ) { 
+                    buffer.type = xs_parser_buffer_type_uniform_m;
+                } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
+                    buffer.type = xs_parser_buffer_type_storage_m;
+                } else {
+                    xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                    std_assert_m ( stage != xg_shading_stage_bit_none_m );
+                    buffer.stages |= stage;
                 }
 
                 xs_parser_skip_spaces ( context );
@@ -1472,35 +1483,40 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
             }
 
             for ( uint32_t i = 0; i < array_size; ++i ) {
+                buffer.shader_register = binding_register++;
                 xs_parser_add_buffer ( context, &buffer );
-                buffer.shader_register = ++binding_register;
             }
-        } else if ( std_str_cmp ( token, "texture" ) == 0 ) {
+        } else if ( std_str_starts_with ( token, "texture" ) ) {
             xs_parser_texture_t texture = {
-                .stages = xg_shading_stage_bit_none_m,
                 .set = binding_set,
                 .type = xs_parser_texture_type_sampled_m,
-                .shader_register = binding_register,
             };
+
+            // try to parse array size
+            uint32_t array_size = 1;
+            if ( token[len - 1] == ']' ) {
+                array_size = xs_parser_extract_token_array ( token, len );
+                len = std_str_len ( token );
+            } else {
+                xs_parser_skip_spaces ( context );
+                if ( *xs_parser_peek ( context ) == '[' ) {
+                    len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+                    array_size = xs_parser_extract_token_array ( token, len );
+                }
+            }
 
             xs_parser_skip_spaces ( context );
             len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
 
             while ( len > 0 ) {
-                if ( token[len - 1] == ']' ) {
-                    array_size = xs_parser_extract_token_array ( token, len );
-                    len = std_str_len ( token );
-                }
-
-                if ( len > 0 ) {
-                    if ( std_str_cmp ( token, "sampled" ) == 0 ) { 
-                        texture.type = xs_parser_texture_type_sampled_m;
-                    } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
-                        texture.type = xs_parser_texture_type_storage_m;
-                    } else {
-                        xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
-                        texture.stages |= stage;
-                    }
+                if ( std_str_cmp ( token, "sampled" ) == 0 ) { 
+                    texture.type = xs_parser_texture_type_sampled_m;
+                } else if ( std_str_cmp ( token, "storage" ) == 0 ) {
+                    texture.type = xs_parser_texture_type_storage_m;
+                } else {
+                    xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                std_assert_m ( stage != xg_shading_stage_bit_none_m );
+                    texture.stages |= stage;
                 }
 
                 xs_parser_skip_spaces ( context );
@@ -1512,15 +1528,29 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
             }
 
             for ( uint32_t i = 0; i < array_size; ++i ) {
+                texture.shader_register = binding_register++;
                 xs_parser_add_texture ( context, &texture );
-                texture.shader_register = ++binding_register;
             }
-        } else if (std_str_cmp ( token, "sampler" ) == 0 ) {
+        } else if ( std_str_starts_with ( token, "sampler" ) ) {
             xs_parser_sampler_t sampler = {
-                .stages = xg_shading_stage_bit_none_m,
                 .set = binding_set,
-                .shader_register = binding_register,
             };
+
+            // try to parse array size
+            uint32_t array_size = 1;
+            if ( token[len - 1] == ']' ) {
+                array_size = xs_parser_extract_token_array ( token, len );
+                len = std_str_len ( token );
+            } else {
+                xs_parser_skip_spaces ( context );
+                if ( *xs_parser_peek ( context ) == '[' ) {
+                    len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+                    array_size = xs_parser_extract_token_array ( token, len );
+                }
+            }
+
+            xs_parser_skip_spaces ( context );
+            len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
 
             while ( len > 0 ) {
                 if ( token[len - 1] == ']' ) {
@@ -1528,6 +1558,7 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
                     len = std_str_len ( token );
                 } else {
                     xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                    std_assert_m ( stage != xg_shading_stage_bit_none_m );
                     sampler.stages |= stage;
                 }
 
@@ -1540,8 +1571,51 @@ static void xs_parser_parse_bindings ( xs_parser_parsing_context_t* context ) {
             }
 
             for ( uint32_t i = 0; i < array_size; ++i ) {
+                sampler.shader_register = binding_register++;
                 xs_parser_add_sampler ( context, &sampler );
-                sampler.shader_register = ++binding_register;
+            }
+        } else if ( std_str_starts_with ( token, "ray_world" ) ) {
+            xs_parser_ray_world_t world = {
+                .set = binding_set,
+            };
+
+            // try to parse array size
+            uint32_t array_size = 1;
+            if ( token[len - 1] == ']' ) {
+                array_size = xs_parser_extract_token_array ( token, len );
+                len = std_str_len ( token );
+            } else {
+                xs_parser_skip_spaces ( context );
+                if ( *xs_parser_peek ( context ) == '[' ) {
+                    len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+                    array_size = xs_parser_extract_token_array ( token, len );
+                }
+            }
+
+            xs_parser_skip_spaces ( context );
+            len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+
+            while ( len > 0 ) {
+                if ( token[len - 1] == ']' ) {
+                    array_size = xs_parser_extract_token_array ( token, len );
+                    len = std_str_len ( token );
+                } else {
+                    xg_shading_stage_bit_e stage = xs_parser_shading_stage_to_bit ( token );
+                    std_assert_m ( stage != xg_shading_stage_bit_none_m );
+                    world.stages |= stage;
+                }
+
+                xs_parser_skip_spaces ( context );
+                len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
+            }
+
+            if ( world.stages == xg_shading_stage_bit_none_m ) {
+                world.stages = xs_parser_default_shading_stage ( context );
+            }
+
+            for ( uint32_t i = 0; i < array_size; ++i ) {
+                world.shader_register = binding_register++;
+                xs_parser_add_ray_world ( context, &world );
             }
         } else {
             std_assert_m ( std_str_cmp ( token, "end" ) == 0 );
@@ -1786,6 +1860,8 @@ static void xs_parser_parse_raytrace_pipeline_state ( xs_parser_parsing_context_
                 xs_parser_parse_sampler ( context );
             } else if ( std_str_cmp ( token, "constant" ) == 0 ) {
                 xs_parser_parse_constant ( context );
+            } else if ( std_str_cmp ( token, "bindings" ) == 0 ) {
+                xs_parser_parse_bindings ( context );
             } else if ( std_str_cmp ( token, "ray_world" ) == 0 ) {
                 xs_parser_parse_ray_world ( context );
             } else if ( std_str_cmp ( token, "ray_gen" ) == 0 ) {
@@ -1797,16 +1873,6 @@ static void xs_parser_parse_raytrace_pipeline_state ( xs_parser_parsing_context_
             } else {
                 xs_parser_log_bad_token ( context, token );
             }
-        //} else if ( std_str_cmp ( token, "ray_gen_shader" ) == 0 ) {
-        //    xs_parser_parse_ray_gen_shader ( context );
-        //} else if ( std_str_cmp ( token, "ray_miss_shader" ) == 0 ) {
-        //    xs_parser_parse_ray_miss_shader ( context );
-        //} else if ( std_str_cmp ( token, "ray_gen_shader" ) == 0 ) {
-        //    xs_parser_parse_shader ( context, xg_shading_stage_ray_gen_m );
-        //} else if ( std_str_cmp ( token, "ray_hit_closest_shader" ) == 0 ) {
-        //    xs_parser_parse_shader ( context, xg_shading_stage_ray_hit_closest_m );
-        //} else if ( std_str_cmp ( token, "ray_miss_shader" ) == 0 ) {
-        //    xs_parser_parse_shader ( context, xg_shading_stage_ray_miss_m );
         } else if ( std_str_cmp ( token, "include" ) == 0 ) {
             xs_parser_parse_include ( context );
         } else if ( std_str_cmp ( token, "define" ) == 0 ) {

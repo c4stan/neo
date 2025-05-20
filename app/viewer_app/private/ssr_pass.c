@@ -34,7 +34,7 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
         .hiz_mip_count = ( uint32_t ) hiz_info.mip_levels,
     };
 
-    xf_node_h ssr_trace_node = xf->add_node ( graph, &xf_node_params_m (
+    xf_node_h ssr_trace_node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "ssr",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (

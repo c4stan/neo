@@ -203,6 +203,8 @@ uint32_t xg_texture_max_mip_levels ( uint32_t width, uint32_t height ) {
     return floor ( log2 ( std_max_u32 ( width, height ) ) ) + 1;
 }
 
+// TODO move VkImage create in here (like for buffers)? Why is it even split in two exactly other than potential memory "savings"?
+//      buffer creation was moved into reserve because of raytrace geometry creation taking VK handles and storing VkGeometryNV arrays... should that be avoided? 
 xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
     xg_vk_texture_t* texture = std_list_pop_m ( &xg_vk_texture_state->textures_freelist );

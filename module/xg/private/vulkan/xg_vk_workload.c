@@ -356,35 +356,19 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     uint64_t workload_idx = ( uint64_t ) ( workload - xg_vk_workload_state->workload_array );
     xg_workload_h workload_handle = workload->gen << xg_workload_handle_idx_bits_m | workload_idx;
 
-    workload->id = xg_vk_workload_state->workloads_uid++;
-    workload->device = device_handle;
+    // Keep old gen, increased on destroy
+    uint64_t gen = workload->gen;
+    *workload = xg_vk_workload_m (
+        .gen = gen,
+        .id = xg_vk_workload_state->workloads_uid++,
+        .device = device_handle,
+        .execution_complete_cpu_event = xg_cpu_queue_event_create ( device_handle ),
+    );
 
-    workload->cmd_buffers_count = 0;
-    workload->resource_cmd_buffers_count = 0;
-
-    workload->desc_allocators_count = 0;
-    workload->desc_layouts_count = 0;
+    // These need to happen outside of the init because they modify the workload state...
     workload->desc_allocator = xg_vk_desc_allocator_pop ( device_handle, workload_handle );
-
-    workload->uniform_buffers_count = 0;
     workload->uniform_buffer = xg_vk_uniform_buffer_pop ( device_handle, workload_handle );
-    workload->staging_buffers_count = 0;
     workload->staging_buffer = xg_vk_staging_buffer_pop ( device_handle, workload_handle );
-
-    // https://github.com/krOoze/Hello_Triangle/blob/master/doc/Schema.pdf
-    //workload->execution_complete_gpu_event = xg_gpu_queue_event_create ( device_handle ); // TODO pre-create these?
-    workload->execution_complete_gpu_event = xg_null_handle_m;
-    workload->execution_complete_cpu_event = xg_cpu_queue_event_create ( device_handle );
-    workload->swapchain_texture_acquired_event = xg_null_handle_m;
-
-    workload->stop_debug_capture_on_present = false;
-
-    workload->global_bindings = xg_null_handle_m;
-
-    workload->debug_capture = false;
-#if 0
-    workload->timestamp_query_pools_count = 0;
-#endif
 
     return workload_handle;
 }
@@ -610,6 +594,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         write->pNext = &as_info;
                         write->dstSet = vk_set;
                         write->dstBinding = binding_idx;
+                        write->dstArrayElement = 0;
                         write->descriptorCount = 1;
                         write->descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
 #else
@@ -634,7 +619,8 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
 
             }
 
-            if ( writes_count >= xg_vk_workload_resource_bindings_update_batch_size_m - xg_pipeline_resource_max_bindings_m ) {
+            // TODO
+            if ( writes_count >= xg_vk_workload_resource_bindings_update_batch_size_m ) {
                 vkUpdateDescriptorSets ( device->vk_handle, writes_count, writes_array, 0, NULL );
                 writes_count = 0;
                 buffer_info_count = 0;
@@ -654,8 +640,11 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
     workload->gen = ( workload->gen + 1 ) & std_bit_mask_ls_64_m ( xg_workload_handle_gen_bits_m );
 
     // cmd buffer
-    xg_cmd_buffer_discard ( workload->cmd_buffers, workload->cmd_buffers_count );
-    xg_resource_cmd_buffer_discard ( workload->resource_cmd_buffers, workload->resource_cmd_buffers_count );
+    if ( workload->setup_cmd_buffer != xg_null_handle_m ) {
+        xg_cmd_buffer_destroy ( &workload->setup_cmd_buffer, 1 );
+    }
+    xg_cmd_buffer_destroy ( workload->cmd_buffers, workload->cmd_buffers_count );
+    xg_resource_cmd_buffer_destroy ( workload->resource_cmd_buffers, workload->resource_cmd_buffers_count );
 
     // events
     //xg_gpu_queue_event_destroy ( workload->execution_complete_gpu_event );
@@ -759,13 +748,20 @@ typedef struct {
 
 static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_vk_workload_sort_context_t* context, xg_workload_h workload_handle ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
-    const xg_cmd_buffer_t* cmd_buffers[xg_cmd_buffer_max_cmd_buffers_per_workload_m];
+    const xg_cmd_buffer_t* cmd_buffers[xg_cmd_buffer_max_cmd_buffers_per_workload_m + 1];
     std_assert_m ( workload->cmd_buffers_count < xg_cmd_buffer_max_cmd_buffers_per_workload_m );
     uint64_t total_header_size = 0;
 
+    size_t total_cmd_buffers_count = 0;
+    if ( workload->setup_cmd_buffer != xg_null_handle_m ) {
+        const xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->setup_cmd_buffer );
+        cmd_buffers[total_cmd_buffers_count++] = cmd_buffer;
+        total_header_size += std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
+    }
+
     for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {
         const xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->cmd_buffers[i] );
-        cmd_buffers[i] = cmd_buffer;
+        cmd_buffers[total_cmd_buffers_count++] = cmd_buffer;
         total_header_size += std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
     }
 
@@ -783,7 +779,7 @@ static xg_vk_workload_cmd_sort_result_t xg_vk_workload_sort_cmd_buffers ( xg_vk_
         context->capacity = total_header_count;
     }
 
-    xg_cmd_buffer_sort ( sort_result, sort_temp, total_header_count, cmd_buffers, workload->cmd_buffers_count );
+    xg_cmd_buffer_sort ( sort_result, sort_temp, total_header_count, cmd_buffers, total_cmd_buffers_count );
 
     xg_vk_workload_cmd_sort_result_t result;
     result.cmd_headers = sort_result;
@@ -878,6 +874,8 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
         case xg_cmd_texture_clear_m:
         case xg_cmd_texture_depth_stencil_clear_m:
         case xg_cmd_buffer_clear_m:
+        case xg_cmd_build_raytrace_geometry_m:
+        case xg_cmd_build_raytrace_world_m:
             std_assert_m ( !in_renderpass );
             std_assert_m ( queue_chunk.queue == xg_cmd_queue_graphics_m || queue_chunk.queue == xg_cmd_queue_compute_m );
             if ( cmd_chunk.begin == -1 ) cmd_chunk.begin = cmd_it;
@@ -1109,7 +1107,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
             const xg_cmd_header_t* header = &cmd_headers_array[cmd_it];
             //device->ext_api.cmd_set_checkpoint ( vk_cmd_buffer, (void*) header->key );
             xg_cmd_type_e cmd_type = header->type;
-            
+
             switch ( cmd_type ) {
             case xg_cmd_graphics_renderpass_begin_m: {
                 std_auto_m args = ( xg_cmd_renderpass_params_t* ) header->args;
@@ -1833,6 +1831,121 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 vkCmdResetQueryPool ( vk_cmd_buffer, pool->vk_handle, 0, pool->params.capacity );
             }
             break;
+#if 1
+            case xg_cmd_build_raytrace_geometry_m: {
+                std_auto_m args = ( xg_cmd_build_raytrace_geometry_t* ) header->args;
+                const xg_vk_raytrace_geometry_t* geo = xg_vk_raytrace_geometry_get ( args->geo );
+                const xg_raytrace_geometry_params_t* params = &geo->params;
+#if xg_vk_enable_nv_raytracing_ext_m
+                #if 0
+                VkGeometryNV* geometries = std_virtual_heap_alloc_array_m ( VkGeometryNV, params->geometry_count );
+                for ( uint32_t i = 0; i < params->geometry_count; ++i ) {
+                    const xg_vk_buffer_t* vertex_buffer = xg_vk_buffer_get ( params->geometries[i].vertex_buffer );
+                    const xg_vk_buffer_t* index_buffer = xg_vk_buffer_get ( params->geometries[i].index_buffer );
+                    const xg_vk_buffer_t* transform_buffer = NULL;
+                    if ( params->geometries[i].transform_buffer != xg_null_handle_m ) {
+                        transform_buffer = xg_vk_buffer_get ( params->geometries[i].transform_buffer );
+                    }
+
+                    VkGeometryNV geometry = ( VkGeometryNV ) {
+                        .sType = VK_STRUCTURE_TYPE_GEOMETRY_NV,
+                        .flags = VK_GEOMETRY_OPAQUE_BIT_NV,
+                        .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV,
+                        .geometry = {
+                            .triangles = {
+                                .sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV,
+                                .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
+                                .vertexData = vertex_buffer->vk_handle,
+                                .vertexOffset = params->geometries[i].vertex_buffer_offset,
+                                .vertexCount = params->geometries[i].vertex_count,
+                                .vertexStride = params->geometries[i].vertex_stride,
+                                .indexType = VK_INDEX_TYPE_UINT32, // TODO support u16?
+                                .indexData = index_buffer->vk_handle,
+                                .indexOffset = params->geometries[i].index_buffer_offset,
+                                .indexCount = params->geometries[i].index_count,
+                                .transformData = transform_buffer ? transform_buffer->vk_handle : VK_NULL_HANDLE,
+                                .transformOffset = transform_buffer ? params->geometries[i].transform_buffer_offset : 0,
+                            },
+                            .aabbs = {
+                                .sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV,
+                                .aabbData = VK_NULL_HANDLE,
+                            },
+                        }
+                    };
+
+                    geometries[i] = geometry;
+                }
+                #else
+                VkGeometryNV* geometries = geo->geometries;
+                #endif
+
+                VkAccelerationStructureInfoNV as_info = {
+                    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV,
+                    .type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV,
+                    .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV,
+                    .geometryCount = params->geometry_count,
+                    .pGeometries = geometries,
+                };
+
+                const xg_vk_buffer_t* scratch_buffer = xg_vk_buffer_get ( args->scratch_buffer );
+                xg_vk_device_ext_api ( device_handle )->cmd_build_acceleration_structure ( vk_cmd_buffer, &as_info, NULL, 0, VK_FALSE, geo->vk_handle, VK_NULL_HANDLE, scratch_buffer->vk_handle, 0 );
+#else
+                std_not_implemented_m();
+#endif
+            }
+            break;
+            case xg_cmd_build_raytrace_world_m: {
+                std_auto_m args = ( xg_cmd_build_raytrace_world_t* ) header->args;
+                const xg_vk_raytrace_world_t* world = xg_vk_raytrace_world_get ( args->world );
+                const xg_raytrace_world_params_t* params = &world->params;
+
+#if xg_vk_enable_nv_raytracing_ext_m
+                // Seems like this is necessary for the TLAS build to produce a proper result when issuing the TLAS build right after the BLAS builds...
+                #if 1
+                VkMemoryBarrier memory_barrier = {
+                    .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV,
+                    .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV,
+                };
+                vkCmdPipelineBarrier ( vk_cmd_buffer, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_NV, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_NV, 0, 1, &memory_barrier, 0, NULL, 0, NULL );
+                #endif
+
+                VkAccelerationStructureInfoNV as_info = {
+                    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV,
+                    .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV,
+                    .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV,
+                    .instanceCount = params->instance_count,
+                };
+                const xg_vk_buffer_t* scratch_buffer = xg_vk_buffer_get ( args->scratch_buffer );
+                const xg_vk_buffer_t* instance_buffer = xg_vk_buffer_get ( args->instance_buffer );
+#if 0
+                std_auto_m instance_data = ( VkAccelerationStructureInstanceNV* ) instance_buffer->allocation.mapped_address;
+
+                uint32_t sbt_handle_size = device->raytrace_properties.shaderGroupHandleSize;
+                uint32_t sbt_record_stride = std_align ( sbt_handle_size, device->raytrace_properties.shaderGroupBaseAlignment );
+                std_assert_m ( sbt_record_stride <= device->raytrace_properties.maxShaderGroupStride );
+
+                for ( uint32_t i = 0; i < params->instance_count; ++i ) {
+                    xg_raytrace_geometry_instance_t* instance = &world->instances[i];
+
+                    const xg_vk_raytrace_geometry_t* geometry = xg_vk_raytrace_geometry_get ( instance->geometry );
+                    uint64_t blas_ref = 0;
+                    xg_vk_device_ext_api ( device_handle )->get_acceleration_structure_reference ( device->vk_handle, geometry->vk_handle, sizeof ( blas_ref ), &blas_ref );
+                    std_log_info_m ( std_fmt_u64_m, blas_ref );
+
+                    VkAccelerationStructureInstanceNV* vk_instance = &instance_data[i];
+                    vk_instance->accelerationStructureReference = blas_ref;
+                }
+#endif
+                xg_vk_device_ext_api ( device_handle )->cmd_build_acceleration_structure ( vk_cmd_buffer, &as_info, instance_buffer->vk_handle, 0, VK_FALSE, world->vk_handle, VK_NULL_HANDLE, scratch_buffer->vk_handle, 0 );
+
+#else
+                std_not_implemented_m();
+#endif
+            }
+            break;
+#endif
             default:
                 break;
             }
@@ -2023,12 +2136,31 @@ void xg_vk_workload_submit_cmd_chunks ( xg_vk_workload_submit_context_t* context
     }
 }
 
+static xg_cmd_buffer_h xg_workload_get_setup_cmd_buffer ( xg_workload_h workload_handle ) {
+#if std_log_assert_enabled_m
+    uint64_t handle_gen = std_bit_read_ms_64_m ( workload_handle, xg_workload_handle_gen_bits_m );
+#endif
+    uint64_t handle_idx = std_bit_read_ls_64_m ( workload_handle, xg_workload_handle_idx_bits_m );
+    xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
+    std_assert_m ( workload->gen == handle_gen );
+
+    xg_cmd_buffer_h cmd_buffer;
+
+    if ( workload->setup_cmd_buffer != xg_null_handle_m ) {
+        cmd_buffer = workload->setup_cmd_buffer;
+    } else {
+        cmd_buffer = xg_cmd_buffer_create ( workload_handle );
+        workload->setup_cmd_buffer = cmd_buffer;
+    }
+
+    return cmd_buffer;
+}
+
 static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
     const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
     std_assert_m ( workload );
 
-    // TODO is this ok?
-    xg_cmd_buffer_h cmd_buffer = xg_workload_add_cmd_buffer ( workload_handle );
+    xg_cmd_buffer_h cmd_buffer = xg_workload_get_setup_cmd_buffer ( workload_handle );
     
     // TODO transition staging buffer to copy source?
     //
@@ -2375,6 +2507,9 @@ void xg_vk_workload_context_submit_inline ( xg_vk_workload_context_inline_t* inl
 void xg_workload_submit ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
 
+    std_assert_m ( !workload->is_submitted );
+    workload->is_submitted = true;
+
     uint64_t device_idx = xg_vk_device_get_idx ( workload->device );
     xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
     std_assert_m ( device_context->device_handle != xg_null_handle_m );
@@ -2390,6 +2525,11 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
     // test cmd buffers, if empty process resource cmd buffers and exit here
     {
         size_t total_header_size = 0;
+
+        if ( workload->setup_cmd_buffer != xg_null_handle_m ) {
+            xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->setup_cmd_buffer );
+            total_header_size += std_virtual_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
+        }
 
         for ( size_t i = 0; i < workload->cmd_buffers_count; ++i ) {
             xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( workload->cmd_buffers[i] );
@@ -2410,8 +2550,6 @@ void xg_workload_submit ( xg_workload_h workload_handle ) {
 
     xg_vk_workload_context_init ( workload_context );
     workload_context->workload = workload_handle;
-    //submit_context->desc_allocator = xg_vk_desc_allocator_pop ( device_context->device_handle, workload_handle );
-    //std_assert_m ( workload_context->desc_allocator );
 
     // merge & sort
     xg_vk_workload_cmd_sort_result_t sort_result = xg_vk_workload_sort_cmd_buffers ( &workload_context->sort, workload_handle );
@@ -2605,7 +2743,7 @@ xg_resource_cmd_buffer_h xg_workload_add_resource_cmd_buffer ( xg_workload_h wor
     xg_vk_workload_t* workload = &xg_vk_workload_state->workload_array[handle_idx];
     std_assert_m ( workload->gen == handle_gen );
 
-    xg_resource_cmd_buffer_h cmd_buffer = xg_resource_cmd_buffer_open ( workload_handle );
+    xg_resource_cmd_buffer_h cmd_buffer = xg_resource_cmd_buffer_create ( workload_handle );
 
     workload->resource_cmd_buffers[workload->resource_cmd_buffers_count++] = cmd_buffer;
 

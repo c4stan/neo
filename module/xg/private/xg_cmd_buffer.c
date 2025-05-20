@@ -22,8 +22,6 @@ int xg_vertex_stream_binding_cmp_f ( const void* _a, const void* _b ) {
     return a->stream_id > b->stream_id ? 1 : a->stream_id < b->stream_id ? -1 : 0;
 }
 
-// STATIC
-
 static xg_cmd_buffer_state_t* xg_cmd_buffer_state;
 
 static void xg_cmd_buffer_alloc_memory ( xg_cmd_buffer_t* cmd_buffer ) {
@@ -39,26 +37,20 @@ static void xg_cmd_buffer_free_memory ( xg_cmd_buffer_t* cmd_buffer ) {
 void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state ) {
     xg_cmd_buffer_state = state;
 
-    // The pool is used to store all the xg_cmd_buffer_t items that eventually get used by the user.
-    // Command Buffers contain poiners to the actual memory, which is allocated somewhere else.
-    // xg_cmd_buffer_preallocated_cmd_buffers_m is the number of buffers that have their memory allocated from the start.
-    // Once the pool runs out of buffers and more are requestd, it can grow, by lazily allocating more buffers.
-    xg_cmd_buffer_state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_cmd_buffer_t, xg_cmd_buffer_max_cmd_buffers_m );
-    xg_cmd_buffer_state->cmd_buffers_freelist = NULL;//std_freelist_m ( xg_cmd_buffer_state->cmd_buffers_array, sizeof ( xg_cmd_buffer_t ) );
-    xg_cmd_buffer_state->cmd_buffers_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_ceil_m ( xg_cmd_buffer_max_cmd_buffers_m, 64 ) );
-    std_mutex_init ( &xg_cmd_buffer_state->cmd_buffers_mutex );
+    state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_cmd_buffer_t, xg_cmd_buffer_max_cmd_buffers_m );
+    std_mem_zero_array_m ( state->cmd_buffers_array, xg_cmd_buffer_max_cmd_buffers_m );
+    state->cmd_buffers_freelist = std_freelist_m ( state->cmd_buffers_array, xg_cmd_buffer_max_cmd_buffers_m );
 
     for ( size_t i = 0; i < xg_cmd_buffer_preallocated_cmd_buffers_m; ++i ) {
-        xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[i];
+        xg_cmd_buffer_t* cmd_buffer = &state->cmd_buffers_array[i];
         xg_cmd_buffer_alloc_memory ( cmd_buffer );
-        std_list_push ( &xg_cmd_buffer_state->cmd_buffers_freelist, cmd_buffer );
     }
-
-    xg_cmd_buffer_state->allocated_cmd_buffers_count = xg_cmd_buffer_preallocated_cmd_buffers_m;
 
     if ( xg_cmd_buffer_cmd_buffer_size_m % std_virtual_page_size() != 0 ) {
         std_log_warn_m ( "Command buffer size is not a multiple of the system virtual page size, sub-optimal memory usage could result from this." );
     }
+
+    std_mutex_init ( &state->cmd_buffers_mutex );
 }
 
 void xg_cmd_buffer_reload ( xg_cmd_buffer_state_t* state ) {
@@ -66,14 +58,12 @@ void xg_cmd_buffer_reload ( xg_cmd_buffer_state_t* state ) {
 }
 
 void xg_cmd_buffer_unload ( void ) {
-    for ( size_t i = 0; i < xg_cmd_buffer_state->allocated_cmd_buffers_count; ++i ) {
-        // TODO test workload and wait for completion?
+    for ( size_t i = 0; i < xg_cmd_buffer_max_cmd_buffers_m; ++i ) {
         xg_cmd_buffer_t* cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[i];
         xg_cmd_buffer_free_memory ( cmd_buffer );
     }
 
     std_virtual_heap_free ( xg_cmd_buffer_state->cmd_buffers_array );
-    std_virtual_heap_free ( xg_cmd_buffer_state->cmd_buffers_bitset );
     std_mutex_deinit ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 }
 
@@ -82,11 +72,9 @@ xg_cmd_buffer_h xg_cmd_buffer_create ( xg_workload_h workload ) {
 
     xg_cmd_buffer_t* cmd_buffer = std_list_pop_m ( &xg_cmd_buffer_state->cmd_buffers_freelist );
 
-    if ( cmd_buffer == NULL ) {
-        std_assert_m ( xg_cmd_buffer_state->allocated_cmd_buffers_count + 1 <= xg_cmd_buffer_max_cmd_buffers_m );
-        std_log_info_m ( "Allocating additional command buffer " std_fmt_u64_m "/" std_fmt_int_m ", consider increasing xg_cmd_buffer_preallocated_cmd_buffers_m.", xg_cmd_buffer_state->allocated_cmd_buffers_count + 1, xg_cmd_buffer_max_cmd_buffers_m );
+    if ( cmd_buffer->cmd_headers_allocator.begin == NULL ) {
+        std_log_info_m ( "Allocating additional command buffer, consider increasing xg_cmd_buffer_preallocated_cmd_buffers_m." );
         // Buffers are linearly added to the pool. Therefore if freeing is allowed it must also be linear and back-to-front.
-        cmd_buffer = &xg_cmd_buffer_state->cmd_buffers_array[xg_cmd_buffer_state->allocated_cmd_buffers_count++];
         xg_cmd_buffer_alloc_memory ( cmd_buffer );
     }
 
@@ -349,7 +337,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // sorted result is in buffer2
 }
 
-void xg_cmd_buffer_discard ( xg_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
+void xg_cmd_buffer_destroy ( xg_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
     std_mutex_lock ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 
     for ( size_t i = 0; i < count; ++i ) {
@@ -582,4 +570,19 @@ void xg_cmd_buffer_reset_query_pool ( xg_cmd_buffer_h cmd_buffer_handle, uint64_
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_reset_query_pool_m, key, xg_query_pool_h );
     *cmd_args = pool;
+}
+
+void xg_cmd_build_raytrace_geometry ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_raytrace_geometry_h geo, xg_buffer_h scratch ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_build_raytrace_geometry_m, key, xg_cmd_build_raytrace_geometry_t );
+    cmd_args->geo = geo;
+    cmd_args->scratch_buffer = scratch;
+}
+
+void xg_cmd_build_raytrace_world ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, xg_raytrace_world_h world, xg_buffer_h scratch, xg_buffer_h instances ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_build_raytrace_world_m, key, xg_cmd_build_raytrace_world_t );
+    cmd_args->world = world;
+    cmd_args->scratch_buffer = scratch;
+    cmd_args->instance_buffer = instances;
 }

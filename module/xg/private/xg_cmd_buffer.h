@@ -75,6 +75,9 @@ typedef enum {
     xg_cmd_end_debug_region_m,
     xg_cmd_write_timestamp_m,
     xg_cmd_reset_query_pool_m,
+
+    xg_cmd_build_raytrace_geometry_m,
+    xg_cmd_build_raytrace_world_m,
 } xg_cmd_type_e;
 
 #define xg_cmd_buffer_cmd_alignment_m 8
@@ -132,6 +135,17 @@ typedef struct {
     std_mutex_t         cmd_buffers_mutex;
 } xg_cmd_buffer_state_t;
 
+typedef struct {
+    xg_raytrace_geometry_h geo;
+    xg_buffer_h scratch_buffer;
+} xg_cmd_build_raytrace_geometry_t;
+
+typedef struct {
+    xg_raytrace_world_h world;
+    xg_buffer_h scratch_buffer;
+    xg_buffer_h instance_buffer;
+} xg_cmd_build_raytrace_world_t;
+
 void xg_cmd_buffer_load ( xg_cmd_buffer_state_t* state );
 void xg_cmd_buffer_reload ( xg_cmd_buffer_state_t* state );
 void xg_cmd_buffer_unload ( void );
@@ -140,6 +154,7 @@ void xg_cmd_buffer_unload ( void );
 //                               C M D   B U F F E R   A P I
 // ======================================================================================= //
 xg_cmd_buffer_h xg_cmd_buffer_create ( xg_workload_h workload );
+void xg_cmd_buffer_destroy ( xg_cmd_buffer_h* cmd_buffers, size_t count );
 
 // sorts all cmd headers from an array of cmd buffers into a single sorted array
 // cmd_header_cap should be big enough to contain all the cmd headers contained in the passed in cmd buffers
@@ -147,21 +162,17 @@ xg_cmd_buffer_h xg_cmd_buffer_create ( xg_workload_h workload );
 // after calling cmd_headers will contain the sorted result. cmd_headers_temp will contain garbage and can be reused or destroyed 
 void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_headers_temp, size_t cmd_header_cap, const xg_cmd_buffer_t** cmd_buffers, size_t cmd_buffer_count );
 
-void xg_cmd_buffer_discard ( xg_cmd_buffer_h* cmd_buffers, size_t count );
-
 xg_cmd_buffer_t* xg_cmd_buffer_get ( xg_cmd_buffer_h cmd_buffer );
 
 // ======================================================================================= //
 //                                     G R A P H I C S
 // ======================================================================================= //
-// Begin/end renderpass
 void xg_cmd_buffer_cmd_renderpass_begin ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_renderpass_params_t* params );
 void xg_cmd_buffer_cmd_renderpass_end ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
 void xg_cmd_dynamic_viewport ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_viewport_state_t* viewport );
 void xg_cmd_dynamic_scissor ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_scissor_state_t* scissor );
 
-// Draw calls
 void xg_cmd_buffer_cmd_draw ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );
 
 // ======================================================================================= //
@@ -196,3 +207,6 @@ void xg_cmd_buffer_begin_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key
 void xg_cmd_buffer_end_debug_region ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 void xg_cmd_buffer_write_timestamp ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_query_timestamp_params_t* params );
 void xg_cmd_buffer_reset_query_pool ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_query_pool_h pool );
+
+void xg_cmd_build_raytrace_geometry ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_raytrace_geometry_h geo, xg_buffer_h scratch );
+void xg_cmd_build_raytrace_world ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_raytrace_world_h world, xg_buffer_h scratch, xg_buffer_h instances );

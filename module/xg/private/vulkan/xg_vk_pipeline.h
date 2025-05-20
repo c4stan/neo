@@ -59,8 +59,8 @@ typedef struct {
     uint32_t gen_offsets[xg_raytrace_shader_state_max_gen_shaders_m];
     uint32_t miss_offsets[xg_raytrace_shader_state_max_miss_shaders_m];
     uint32_t hit_offsets[xg_raytrace_shader_state_max_hit_groups_m];
-#if xg_vk_enable_nv_raytracing_ext_m
     xg_buffer_h sbt_buffer;
+#if xg_vk_enable_nv_raytracing_ext_m
     VkDeviceSize sbt_gen_offset;
     VkDeviceSize sbt_miss_offset;
     VkDeviceSize sbt_miss_stride;

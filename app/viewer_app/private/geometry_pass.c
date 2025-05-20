@@ -171,7 +171,7 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
     xf_texture_info_t color_info;
     xf->get_texture_info ( &color_info, color );
 
-    xf_node_h node = xf->add_node ( graph, &xf_node_params_m (
+    xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "geometry",
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
@@ -309,7 +309,7 @@ xf_node_h add_object_id_node ( xf_graph_h graph, xf_texture_h object_id, xf_text
     xf_texture_info_t info;
     xf->get_texture_info ( &info, object_id );
 
-    xf_node_h node = xf->add_node ( graph, &xf_node_params_m (
+    xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "object_id",
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (

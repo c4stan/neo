@@ -16,6 +16,7 @@ struct instance_t {
     uint64_t nor_buffer;
     float albedo[3];
     float emissive[3];
+    uint id;
 };
 
 layout ( buffer_reference, scalar ) buffer float3_buffer_t { float[3] data[]; };
@@ -60,14 +61,17 @@ void main ( void ) {
     vec3 world_pos = vec3 ( gl_ObjectToWorldNV * vec4 ( model_pos, 1.0 ) );
 
     vec3 model_normal = n0 * bary.x + n1 * bary.y + n2 * bary.z;
-    vec3 world_normal = vec3 ( model_normal * gl_WorldToObjectNV ); // ??
+    //vec3 world_normal = vec3 ( model_normal * gl_WorldToObjectNV );
+    vec3 world_normal = vec3 ( mat3 ( gl_ObjectToWorldNV ) * model_normal );
     world_normal = normalize ( world_normal );
 
     vec3 base_color = load_vec3 ( instance.albedo );
     vec3 emissive = load_vec3 ( instance.emissive );
+    uint id = instance.id;
 
     ray_payload.color = base_color;
     ray_payload.distance = gl_HitTNV;
     ray_payload.normal = world_normal;
     ray_payload.emissive = emissive;
+    ray_payload.id = id;
 }

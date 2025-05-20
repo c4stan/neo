@@ -59,9 +59,9 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     uint64_t light_count = light_query_result.entity_count;
     light_count = std_min ( light_count, viewapp_max_lights_m );
 
+    // TODO avoid this, just alloc staging and write directly into it. need to expose API for it
     size_t light_data_size = sizeof ( light_buffer_t ) + sizeof ( uniform_light_data_t ) * ( light_count + 1 ) * 6;
     std_auto_m light_data = ( light_buffer_t* ) std_virtual_heap_alloc_m ( light_data_size, 16 );
-    std_assert_m ( light_data );
 
     uint32_t light_view_count = 0;
 
@@ -105,7 +105,6 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     std_assert_m ( light_view_count <= viewapp_max_lights_m );
 
     xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, light_data, light_data_size );
-
     std_virtual_heap_free ( light_data );
 
     xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
@@ -120,7 +119,7 @@ xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h light_buffer ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
 
-    xf_node_h node = xf->add_node ( graph, &xf_node_params_m ( 
+    xf_node_h node = xf->create_node ( graph, &xf_node_params_m ( 
         .type = xf_node_type_custom_pass_m,
         .debug_name = "light_update",
         .pass.custom = xf_node_custom_pass_params_m (

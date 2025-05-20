@@ -107,7 +107,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
         .height = hiz_info.height,
     };
 ;
-    xf_node_h hiz_mip0_gen_node = xf->add_node ( graph, &xf_node_params_m (
+    xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "hiz_gen_mip0",
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
@@ -172,7 +172,7 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
     );
     std_str_format_m ( params.debug_name, "hiz_gen_mip" std_fmt_u32_m, mip_level );
 
-    xf_node_h hiz_submip_gen_node = xf->add_node ( graph, &params );
+    xf_node_h hiz_submip_gen_node = xf->create_node ( graph, &params );
 
     return hiz_submip_gen_node;
 }

@@ -6,7 +6,7 @@
 #include <std_queue.h>
 #include <std_mutex.h>
 
-// TODO allocate cmds on opposide sides of the buffer depending on time_e
+// TODO allocate cmds on opposide sides of the buffer depending on time_e?
 typedef struct {
     xg_workload_h workload;
     std_virtual_stack_t cmd_headers_allocator;    // xg_cmd_header_t
@@ -29,11 +29,6 @@ typedef enum {
 
     // TODO pipeline create/destroy
     //      once that is available, rewrite pipeline destrouction in xs pipeline update to use resource cmd buffers instead of tracking workloads internally?
-
-    //xg_resource_cmd_query_buffer_create_m,
-    xg_resource_cmd_timestamp_query_buffer_destroy_m,
-    xg_resource_cmd_timestamp_query_buffer_clear_m,
-    xg_resource_cmd_timestamp_query_buffer_readback_m,
 } xg_resource_cmd_type_e;
 
 #define xg_resource_cmd_buffer_cmd_alignment_m 8
@@ -106,19 +101,11 @@ typedef struct {
     xg_resource_cmd_buffer_time_e destroy_time;
 } xg_resource_cmd_queue_event_destroy_t;
 
-#if 0
-typedef struct {
-    xg_timestamp_query_buffer_h buffer;
-    xg_resource_cmd_buffer_time_e time;
-} xg_resource_cmd_timestamp_query_buffer_args_t;
-#endif
-
 // ---
 
 typedef struct {
     xg_resource_cmd_buffer_t* cmd_buffers_array;
     xg_resource_cmd_buffer_t* cmd_buffers_freelist;
-    uint64_t allocated_cmd_buffers_count;
     std_mutex_t cmd_buffers_mutex;
 } xg_resource_cmd_buffer_state_t;
 
@@ -126,14 +113,8 @@ void xg_resource_cmd_buffer_load ( xg_resource_cmd_buffer_state_t* state );
 void xg_resource_cmd_buffer_reload ( xg_resource_cmd_buffer_state_t* state );
 void xg_resource_cmd_buffer_unload ( void );
 
-xg_resource_cmd_buffer_h xg_resource_cmd_buffer_open ( xg_workload_h workload );
-void xg_resource_cmd_buffer_open_n ( xg_resource_cmd_buffer_h* cmd_buffers, size_t count, xg_workload_h workload );
-
-#if 0
-    void xg_resource_cmd_buffer_close ( xg_resource_cmd_buffer_h* cmd_buffers, size_t count );
-#endif
-
-void xg_resource_cmd_buffer_discard ( xg_resource_cmd_buffer_h* cmd_buffers, size_t count );
+xg_resource_cmd_buffer_h xg_resource_cmd_buffer_create ( xg_workload_h workload );
+void xg_resource_cmd_buffer_destroy ( xg_resource_cmd_buffer_h* cmd_buffers, size_t count );
 
 xg_resource_cmd_buffer_t* xg_resource_cmd_buffer_get ( xg_resource_cmd_buffer_h cmd_buffer );
 
@@ -154,10 +135,3 @@ void            xg_resource_cmd_buffer_resource_bindings_destroy   ( xg_resource
 void            xg_resource_cmd_buffer_graphics_renderpass_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time );
 
 void            xg_resource_cmd_buffer_queue_event_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_queue_event_h event, xg_resource_cmd_buffer_time_e destroy_time );
-
-#if 0
-    //xg_query_buffer_h xg_resource_cmd_buffer_query_buffer_create    ( xg_resource_cmd_buffer_h cmd_buffer, const xg_query_buffer_params_t* params );
-    void            xg_resource_cmd_buffer_timestamp_query_buffer_clear     ( xg_resource_cmd_buffer_h cmd_buffer, xg_timestamp_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time );
-    xg_timestamp_query_buffer_results_t xg_resource_cmd_buffer_timestamp_query_buffer_readback ( xg_resource_cmd_buffer_h cmd_buffer, xg_timestamp_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time );
-    void            xg_resource_cmd_buffer_timestamp_query_buffer_destroy   ( xg_resource_cmd_buffer_h cmd_buffer, xg_timestamp_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time );
-#endif

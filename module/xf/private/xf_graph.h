@@ -343,6 +343,8 @@ typedef struct {
     uint32_t multi_textures_count;
     //uint64_t multi_textures_hashes[xf_graph_max_multi_textures_m];
     //std_hash_set_t multi_textures_hash_set;
+    uint32_t multi_buffers_array[xf_graph_max_multi_buffers_m]; // indexes buffers_array
+    uint32_t multi_buffers_count;
     
     // queue[n][q] stores the idx of the predecessor of node n for queue type q. All indices are to nodes_execution_order. defaults to -1
     int32_t cross_queue_node_deps[xf_graph_max_nodes_m][xg_cmd_queue_count_m];

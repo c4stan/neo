@@ -114,7 +114,7 @@ static void xf_test ( void ) {
 #if 1
         float color[3] = { 1, 0, 0 };
 
-        xf->add_node ( graph, &xf_node_params_m ( 
+        xf->create_node ( graph, &xf_node_params_m ( 
             .debug_name = "clear1",
             .type = xf_node_type_clear_pass_m,
             .pass.clear = xf_node_clear_pass_params_m (
@@ -132,7 +132,7 @@ static void xf_test ( void ) {
             ),
         ) );
 
-        xf->add_node ( graph, &xf_node_params_m ( 
+        xf->create_node ( graph, &xf_node_params_m ( 
             .debug_name = "clear2",
             .type = xf_node_type_compute_pass_m,
             .queue = xg_cmd_queue_compute_m,
@@ -153,7 +153,7 @@ static void xf_test ( void ) {
         //color[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
         //color[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
 
-        xf->add_node ( graph, &xf_node_params_m ( 
+        xf->create_node ( graph, &xf_node_params_m ( 
             .debug_name = "clear",
             .type = xf_node_type_clear_pass_m,
             .pass.clear = xf_node_clear_pass_params_m (
@@ -169,7 +169,7 @@ static void xf_test ( void ) {
     xf_triangle_pass_args_t triangle_pass_args = {
         .pipeline_state = pipeline_state,
     };
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "triangle",
         .debug_color = xg_debug_region_color_green_m,
         .type = xf_node_type_custom_pass_m,
@@ -185,7 +185,7 @@ static void xf_test ( void ) {
         ),
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
         .resources = xf_node_resource_params_m (

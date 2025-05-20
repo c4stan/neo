@@ -2511,6 +2511,7 @@ typedef struct {
     // TODO rename all draw/dispatch/trace_rays cmds to graphics/compute/raytrace_dispatch ?
     void                    ( *cmd_clear_texture )                  ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_color_clear_t clear );
     void                    ( *cmd_clear_depth_stencil_texture )    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear );
+    void                    ( *cmd_clear_buffer )                   ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_buffer_h buffer, uint32_t value );
     // TODO rename to transition_resources or something similar
     void                    ( *cmd_barrier_set )                    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_barrier_set_t* barrier_set );
     //void                    ( *cmd_set_vertex_streams )             ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t count, uint64_t key );
@@ -2596,8 +2597,8 @@ typedef struct {
     xg_texture_h            ( *get_default_texture )                ( xg_device_h device, xg_default_texture_e texture );
 
     // TODO separate creation and build
-    xg_raytrace_geometry_h  ( *create_raytrace_geometry )           ( const xg_raytrace_geometry_params_t* params );
-    xg_raytrace_world_h     ( *create_raytrace_world )              ( const xg_raytrace_world_params_t* params );
+    xg_raytrace_geometry_h  ( *create_raytrace_geometry )           ( xg_workload_h workload, uint64_t key, const xg_raytrace_geometry_params_t* params );
+    xg_raytrace_world_h     ( *create_raytrace_world )              ( xg_workload_h workload, uint64_t key, const xg_raytrace_world_params_t* params );
 
     void                    ( *destroy_raytrace_geometry )          ( xg_raytrace_geometry_h geometry );
     void                    ( *destroy_raytrace_world )             ( xg_raytrace_world_h world );

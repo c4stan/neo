@@ -472,12 +472,15 @@ typedef struct {
     bool allow_aliasing;
     bool upload;
     char debug_name[xf_debug_name_size_m];
+    bool clear_on_create;
+    uint32_t clear_value;
 } xf_buffer_params_t;
 
 #define xf_buffer_params_m( ... ) ( xf_buffer_params_t ) { \
     .size = 0, \
     .allow_aliasing = false, \
     .debug_name = {0}, \
+    .clear_on_create = false, \
     ##__VA_ARGS__ \
 }
 
@@ -497,11 +500,13 @@ typedef struct {
 typedef struct {
     xf_buffer_params_t buffer;
     uint32_t multi_buffer_count;
+    bool auto_advance;
 } xf_multi_buffer_params_t;
 
 #define xf_multi_buffer_params_m( ... ) ( xf_multi_buffer_params_t ) { \
     .buffer = xf_buffer_params_m(), \
     .multi_buffer_count = 2, \
+    .auto_advance = true, \
     ##__VA_ARGS__ \
 }
 
@@ -596,15 +601,14 @@ typedef struct {
     xf_texture_h ( *create_texture ) ( const xf_texture_params_t* params );
     xf_buffer_h ( *create_buffer ) ( const xf_buffer_params_t* params );
     xf_texture_h ( *create_multi_texture ) ( const xf_multi_texture_params_t* params );
-    //xf_buffer_h ( *declare_multi_buffer ) ( const xf_multi_buffer_params_t* params );
+    xf_buffer_h ( *create_multi_buffer ) ( const xf_multi_buffer_params_t* params );
     void ( *destroy_unreferenced_resources ) ( xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time );
 
     void ( *destroy_texture ) ( xf_texture_h texture );
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
-    xf_node_h ( *add_node ) ( xf_graph_h graph, const xf_node_params_t* params ); // TODO rename create_node
+    xf_node_h ( *create_node ) ( xf_graph_h graph, const xf_node_params_t* params ); // TODO rename create_node
     void ( *finalize_graph ) ( xf_graph_h graph );
-    //void ( *build_graph ) ( xf_graph_h graph, xg_workload_h workload );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
@@ -614,10 +618,10 @@ typedef struct {
     void ( *node_set_enabled ) ( xf_graph_h graph, xf_node_h node, bool enabled );
 
     void ( *advance_multi_texture ) ( xf_texture_h multi_texture );
-    //void ( *advance_multi_buffer ) ( xf_multi_buffer_h multi_buffer );
+    void ( *advance_multi_buffer ) ( xf_buffer_h multi_buffer );
     xf_texture_h ( *get_multi_texture ) ( xf_texture_h multi_texture, int32_t offset );
+    xf_buffer_h ( *get_multi_buffer ) ( xf_texture_h multi_buffer, int32_t offset );
 
-    // TODO prefix declare_ to these
     xf_texture_h ( *create_multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
     xf_texture_h ( *create_texture_from_external ) ( xg_texture_h texture );
     void ( *refresh_external_texture ) ( xf_texture_h texture );

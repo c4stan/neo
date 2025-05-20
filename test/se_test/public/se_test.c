@@ -250,7 +250,7 @@ static void run_se_test_2 ( void ) {
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
     xf_graph_h graph = xf->create_graph( &xf_graph_params_m ( .device = device, .debug_name = "se_test" ) );
     
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "clear",
         .type = xf_node_type_clear_pass_m,
         .pass.clear = xf_node_clear_pass_params_m (
@@ -262,7 +262,7 @@ static void run_se_test_2 ( void ) {
         )
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "se_pass",
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (

@@ -158,7 +158,7 @@ uint64_t xi_ui_get_hovered_id ( void );
 
 const xi_ui_update_state_t* xi_ui_get_update_state ( void );
 
-void xi_ui_geo_init ( xg_device_h device_handle );
+void xi_ui_geo_init ( xg_device_h device_handle, xg_workload_h workload );
 void xi_ui_draw_line ( xi_workload_h workload, xi_line_state_t* state );
 bool xi_ui_draw_transform ( xi_workload_h workload, xi_transform_state_t* state );
 

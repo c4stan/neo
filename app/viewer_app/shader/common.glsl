@@ -38,6 +38,7 @@ struct ray_payload_t {
     float distance;
     vec3 normal;
     vec3 emissive;
+    uint id;
 };
 
 struct shadow_ray_payload_t {

@@ -185,7 +185,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
         .debug_name = "mouse_pick_depth"
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m ( 
+    xf->create_node ( graph, &xf_node_params_m ( 
         .debug_name = "mouse_pick_clear",
         .type = xf_node_type_clear_pass_m,
         .pass.clear = {
@@ -219,7 +219,7 @@ static void viewapp_boot_mouse_pick_graph ( void ) {
 
     xf_texture_h copy_dest = xf->create_texture_from_external ( readback_texture );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "mouse_pick_object_id_copy",
         .type = xf_node_type_copy_pass_m,
         .pass.copy = xf_node_copy_pass_params_m(),
@@ -255,21 +255,76 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m ( 
         .width = resolution_x,
         .height = resolution_y,
-        .format = xg_format_r8g8b8a8_unorm_m,
+        .format = xg_format_a2b10g10r10_unorm_pack32_m,
         .debug_name = "color_texture"
     ));
 
+    xf_buffer_h instance_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = raytrace_instance_data_size(),
+        .debug_name = "instance_buffer",
+    ) );
+
+    xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = raytrace_light_data_size(),
+        .debug_name = "light_buffer",
+    ) );
+
+    xf_buffer_h reservoir_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
+        .buffer = xf_buffer_params_m (
+            .size = 16 * resolution_x * resolution_y,
+            .debug_name = "reservoir_buffer",
+            .clear_on_create = true,
+            .clear_value = 0,
+        ),
+        .multi_buffer_count = 1,
+    ) );
+
     // raytrace
-    add_raytrace_pass ( graph, color_texture );
+    add_raytrace_setup_pass ( graph, instance_buffer, light_buffer );
+    add_raytrace_pass ( graph, color_texture, instance_buffer, light_buffer, reservoir_buffer );
+
+    // tonemap
+    xs_i* xs = m_state->modules.xs;
+    xg_i* xg = m_state->modules.xg;
+    xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_a2b10g10r10_unorm_pack32_m,
+        .debug_name = "tonemap_texture",
+    ) );
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "tonemap",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "tonemap" ) ) ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = tonemap_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 1,
+            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = color_texture ) },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_copy_m,
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ),
+                )
+            },
+        ),
+    ) );
 
     // ui
     //m_state->render.export_dest = xf->create_texture_from_external ( m_state->ui.export_texture );
     //add_ui_pass ( graph, color_texture, m_state->render.export_dest );
-    add_ui_pass ( graph, color_texture, xf_null_handle_m );
+    add_ui_pass ( graph, tonemap_texture, xf_null_handle_m );
 
     // present
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
         .pass.copy = xf_node_copy_pass_params_m(),
@@ -277,7 +332,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
             .copy_texture_writes_count = 1,
             .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
             .copy_texture_reads_count = 1,
-            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = color_texture ) },
+            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = tonemap_texture ) },
             .presentable_texture = swapchain_multi_texture,
         )
     ) );
@@ -313,7 +368,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "shadow_texture"
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m ( 
+    xf->create_node ( graph, &xf_node_params_m ( 
         .debug_name = "shadow_clear",
         .type = xf_node_type_clear_pass_m,
         .pass.clear = {
@@ -390,7 +445,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "geometry_clear",
         .type = xf_node_type_clear_pass_m,
         .pass.clear = xf_node_clear_pass_params_m (
@@ -453,7 +508,7 @@ static void viewapp_boot_raster_graph ( void ) {
 
     xf_node_h light_update_node = add_light_update_pass ( graph, light_buffer );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "light_cluster_build",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
@@ -471,7 +526,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .node_dependencies = { light_update_node }
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m ( 
+    xf->create_node ( graph, &xf_node_params_m ( 
         .debug_name = "light_cull",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
@@ -507,7 +562,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .shadow_size = shadow_size,
     };
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
         .queue = xg_cmd_queue_compute_m,
@@ -577,7 +632,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .view_access = xg_texture_view_access_separate_mips_m,
     ) );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting_mip_0",
         .type = xf_node_type_copy_pass_m,
         .pass.copy = xf_node_copy_pass_params_m (
@@ -614,7 +669,7 @@ static void viewapp_boot_raster_graph ( void ) {
         );
         std_stack_t stack = std_static_stack_m ( params.debug_name );
         std_stack_string_append_format ( &stack, "lighting_mip_" std_fmt_u32_m, i );
-        xf->add_node ( graph, &params );
+        xf->create_node ( graph, &params );
     }
 
     // ssgi
@@ -669,7 +724,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_texture_h prev_depth_texture = xf->get_multi_texture ( depth_texture, -1 );
     xg_texture_h ssgi_history_texture = xf->get_multi_texture ( ssgi_accumulation_texture, -1 );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssgi_ta",
         .pass.compute = xf_node_compute_pass_params_m (
@@ -736,7 +791,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xg_texture_h ssgi_2_history_texture = xf->get_multi_texture ( ssgi_2_accumulation_texture, -1 );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssgi_2_ta",
         .pass.compute = xf_node_compute_pass_params_m (
@@ -810,7 +865,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xf_texture_h ssr_history_texture = xf->get_multi_texture ( ssr_accumulation_texture, -1 );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssr_ta",
         .queue = xg_cmd_queue_compute_m,
@@ -849,7 +904,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "combine_texture",
     ) );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "combine",
         .pass.compute = xf_node_compute_pass_params_m (
@@ -883,7 +938,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
-    xf_node_h taa_node = xf->add_node ( graph, &xf_node_params_m (
+    xf_node_h taa_node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "taa",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
@@ -923,7 +978,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
         .debug_name = "tonemap_texture",
     ) );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "tonemap",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
@@ -954,7 +1009,7 @@ static void viewapp_boot_raster_graph ( void ) {
 
     // present
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
         .pass.copy = xf_node_copy_pass_params_m(),
@@ -972,7 +1027,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->finalize_graph ( graph );
 }
 
-static void viewapp_build_mesh_raytrace_geo ( se_entity_h entity, viewapp_mesh_component_t* mesh ) {
+static void viewapp_build_mesh_raytrace_geo ( xg_workload_h workload, se_entity_h entity, viewapp_mesh_component_t* mesh ) {
     if ( !m_state->render.supports_raytrace ) {
         return;
     }
@@ -999,11 +1054,11 @@ static void viewapp_build_mesh_raytrace_geo ( se_entity_h entity, viewapp_mesh_c
         .geometry_count = 1,
     );
     std_str_copy_static_m ( rt_geo_params.debug_name, entity_properties.name );
-    xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( &rt_geo_params );
+    xg_raytrace_geometry_h rt_geo = xg->create_raytrace_geometry ( workload, 0, &rt_geo_params );
     mesh->rt_geo = rt_geo;
 }
 
-static void viewapp_build_raytrace_geo ( void ) {
+static void viewapp_build_raytrace_geo ( xg_workload_h workload ) {
     if ( !m_state->render.supports_raytrace ) {
         return;
     }
@@ -1020,11 +1075,11 @@ static void viewapp_build_raytrace_geo ( void ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         
         se_entity_h* entity_handle = se_stream_iterator_next ( &entity_iterator );
-        viewapp_build_mesh_raytrace_geo ( *entity_handle, mesh_component );
+        viewapp_build_mesh_raytrace_geo ( workload, *entity_handle, mesh_component );
     }
 }
 
-static void viewapp_build_raytrace_world ( void ) {
+static void viewapp_build_raytrace_world ( xg_workload_h workload ) {
 #if xg_enable_raytracing_m
     if ( !m_state->render.supports_raytrace ) {
         return;
@@ -1086,7 +1141,7 @@ static void viewapp_build_raytrace_world ( void ) {
     xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "raytrace" ) );
     xg_graphics_pipeline_state_h rt_pipeline_state = xs->get_pipeline_state ( rt_pipeline );
 
-    xg_raytrace_world_h rt_world = xg->create_raytrace_world ( &xg_raytrace_world_params_m (
+    xg_raytrace_world_h rt_world = xg->create_raytrace_world ( workload, 0, &xg_raytrace_world_params_m (
         .device = device,
         .pipeline = rt_pipeline_state,
         .instance_array = rt_instances,
@@ -1129,7 +1184,7 @@ static sm_vec_3f_t viewapp_light_view_dir ( uint32_t idx ) {
     return dir;
 }
 
-static void viewapp_boot_scene_cornell_box ( void ) {
+static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
     rv_i* rv = m_state->modules.rv;
@@ -1143,7 +1198,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
     // sphere
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1213,7 +1268,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
 
     for ( uint32_t i = 0; i < 5; ++i ) {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 5.f );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1269,7 +1324,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
     // light
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 100, 100 );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1354,7 +1409,7 @@ static void viewapp_boot_scene_cornell_box ( void ) {
 
 #if 1
 std_unused_static_m()
-static void viewapp_boot_scene_field ( void ) {
+static void viewapp_boot_scene_field ( xg_workload_h workload ) {
     se_i* se = m_state->modules.se;
     xs_i* xs = m_state->modules.xs;
     rv_i* rv = m_state->modules.rv;
@@ -1368,7 +1423,7 @@ static void viewapp_boot_scene_field ( void ) {
     // plane
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 100.f );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1413,7 +1468,7 @@ static void viewapp_boot_scene_field ( void ) {
     // quads
     for ( uint32_t i = 0; i < 10; ++i ) {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 10.f );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1465,7 +1520,7 @@ static void viewapp_boot_scene_field ( void ) {
     #if 1
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1549,7 +1604,7 @@ static void viewapp_boot_scene_field ( void ) {
 
     {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
-        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, &geo );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
             .geo_data = geo,
@@ -1782,7 +1837,7 @@ static xg_texture_h viewapp_upload_texture_to_gpu ( xg_resource_cmd_buffer_h cmd
     return texture_handle;
 }
 
-static void viewapp_import_scene ( const char* input_path ) {
+static void viewapp_import_scene ( xg_workload_h workload, const char* input_path ) {
     se_i* se = m_state->modules.se;
     xg_i* xg = m_state->modules.xg;
     xs_i* xs = m_state->modules.xs;
@@ -1802,7 +1857,6 @@ static void viewapp_import_scene ( const char* input_path ) {
 
     std_tick_t start_tick = std_tick_now();
 
-    xg_workload_h workload = xg->create_workload ( m_state->render.device );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     std_log_info_m ( "Importing input scene " std_fmt_str_m, input_path );
@@ -1865,7 +1919,7 @@ static void viewapp_import_scene ( const char* input_path ) {
                 geo.idx[i * 3 + 2] = face.mIndices[2];
             }
 
-            xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
+            xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, workload, &geo );
 
             viewapp_material_data_t mesh_material = viewapp_material_data_m (
                 .base_color = { 
@@ -2008,7 +2062,7 @@ static void viewapp_import_scene ( const char* input_path ) {
         }
     }
 
-    xg->submit_workload ( workload );
+    //xg->submit_workload ( workload );
 
     aiReleaseImport ( scene );
 
@@ -2017,20 +2071,14 @@ static void viewapp_import_scene ( const char* input_path ) {
     std_log_info_m ( "Scene imported in " std_fmt_f32_dec_m(3) "s", time_ms / 1000.f );
 }
 
-static void update_raytrace_world ( xg_workload_h workload ) {
+static void update_raytrace_world ( void ) {
 #if xg_enable_raytracing_m
-    xg_i* xg = m_state->modules.xg;
-    xf_i* xf = m_state->modules.xf;
-    xg->wait_all_workload_complete();
-    viewapp_build_raytrace_world();
-    xf->destroy_graph ( m_state->render.raytrace_graph, workload );
-    viewapp_boot_raytrace_graph();
+    m_state->render.raytrace_world_update = true;
 #endif
 }
 
 static void viewapp_load_scene ( uint32_t id ) {
     xg_i* xg = m_state->modules.xg;
-
     xg->wait_all_workload_complete();
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
@@ -2047,7 +2095,7 @@ static void viewapp_load_scene ( uint32_t id ) {
         viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
         if ( mesh_component ) {
             xg_geo_util_free_data ( &mesh_component->geo_data );
-            xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, resource_cmd_buffer );
+            xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload );
 
             viewapp_material_data_t* material = &mesh_component->material;
             if ( material->color_texture != xg_null_handle_m ) {
@@ -2067,22 +2115,80 @@ static void viewapp_load_scene ( uint32_t id ) {
         se->destroy_entity ( *entity );
     }
 
-    xg->submit_workload ( workload );
-
     viewapp_create_cameras();
 
     if ( id == 0 ) {
-        viewapp_boot_scene_cornell_box();
+        viewapp_boot_scene_cornell_box ( workload );
     } else if ( id == 1 ) {
-        viewapp_boot_scene_field();
+        viewapp_boot_scene_field ( workload );
     } else {
-        viewapp_import_scene ( m_state->scene.custom_scene_path );
+        viewapp_import_scene ( workload, m_state->scene.custom_scene_path );
     }
 
     m_state->scene.active_scene = id;
+    viewapp_build_raytrace_geo ( workload );
+    viewapp_build_raytrace_world ( workload );
+    xg->submit_workload ( workload );
+}
 
-    viewapp_build_raytrace_geo();
-    viewapp_build_raytrace_world();
+static void viewapp_boot_ui ( xg_device_h device ) {
+    xg_i* xg = m_state->modules.xg;
+    xi_i* xi = m_state->modules.xi;
+
+    xg_workload_h workload = xg->create_workload ( device );
+
+    xi->load_shaders ( device );
+    xi->init_geos ( device, workload );
+
+    std_file_h font_file = std_file_open ( "assets/ProggyVector-Regular.ttf", std_file_read_m );
+    std_file_info_t font_file_info;
+    std_file_info ( &font_file_info, font_file );
+    void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );
+    std_file_read ( font_data_alloc, font_file_info.size, font_file );
+
+    m_state->ui.font = xi->create_font ( 
+        std_buffer ( font_data_alloc, font_file_info.size ),
+        &xi_font_params_m (
+            .xg_device = device,
+            .pixel_height = 16,
+            .debug_name = "proggy_clean"
+        )
+    );
+
+    std_virtual_heap_free ( font_data_alloc );
+
+    m_state->ui.window_state = xi_window_state_m (
+        .title = "debug",
+        .minimized = false,
+        .x = 50,
+        .y = 100,
+        .width = 350,
+        .height = 500,
+        .padding_x = 10,
+        .padding_y = 2,
+        .style = xi_default_style_m (
+            .font = m_state->ui.font,
+            .color = xi_color_gray_m,
+        )
+    );
+
+    m_state->ui.frame_section_state = xi_section_state_m ( .title = "frame" );
+    m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
+    m_state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
+    m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
+    m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
+    m_state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
+
+    m_state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
+        .device = device,
+        .width = m_state->render.resolution_x,
+        .height = m_state->render.resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .allowed_usage = xg_texture_usage_bit_storage_m | xg_texture_usage_bit_sampled_m,
+        .debug_name = "export",
+    ) );
+
+    xg->submit_workload ( workload );
 }
 
 static void viewapp_boot ( void ) {
@@ -2225,59 +2331,7 @@ static void viewapp_boot ( void ) {
     xs_database_build_result_t build_result = xs->build_database ( sdb );
     std_assert_m ( build_result.failed_pipeline_states == 0 );
 
-    xi_i* xi = m_state->modules.xi;
-    xi->load_shaders ( device );
-    xi->init_geos ( device );
-
-    {
-        std_file_h font_file = std_file_open ( "assets/ProggyVector-Regular.ttf", std_file_read_m );
-        std_file_info_t font_file_info;
-        std_file_info ( &font_file_info, font_file );
-        void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );
-        std_file_read ( font_data_alloc, font_file_info.size, font_file );
-
-        m_state->ui.font = xi->create_font ( 
-            std_buffer ( font_data_alloc, font_file_info.size ),
-            &xi_font_params_m (
-                .xg_device = device,
-                .pixel_height = 16,
-                .debug_name = "proggy_clean"
-            )
-        );
-
-        std_virtual_heap_free ( font_data_alloc );
-
-        m_state->ui.window_state = xi_window_state_m (
-            .title = "debug",
-            .minimized = false,
-            .x = 50,
-            .y = 100,
-            .width = 350,
-            .height = 500,
-            .padding_x = 10,
-            .padding_y = 2,
-            .style = xi_default_style_m (
-                .font = m_state->ui.font,
-                .color = xi_color_gray_m,
-            )
-        );
-
-        m_state->ui.frame_section_state = xi_section_state_m ( .title = "frame" );
-        m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
-        m_state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
-        m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
-        m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
-        m_state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
-    
-        m_state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
-            .device = device,
-            .width = resolution_x,
-            .height = resolution_y,
-            .format = xg_format_r8g8b8a8_unorm_m,
-            .allowed_usage = xg_texture_usage_bit_storage_m | xg_texture_usage_bit_sampled_m,
-            .debug_name = "export",
-        ) );
-    }
+    viewapp_boot_ui ( device );
 
     xf_i* xf = m_state->modules.xf;
     xf->load_shaders ( device );
@@ -2442,8 +2496,8 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                 dirty_xform = true;
             }
 
-            bool up_press = new_input_state->keyboard[wm_keyboard_state_shift_left_m];
-            bool down_press = new_input_state->keyboard[wm_keyboard_state_ctrl_left_m];
+            bool up_press = new_input_state->keyboard[wm_keyboard_state_z_m];
+            bool down_press = new_input_state->keyboard[wm_keyboard_state_x_m];
             if ( ( up_press && !down_press ) || ( !up_press && down_press ) ) {
                 float above = ( up_press ? 1.f : 0.f ) - ( down_press ? 1.f : 0.f );
                 xform.position[1] += above * speed * dt;
@@ -2488,6 +2542,8 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
     }
 }
 
+// TODO this causes double frees on shared resources
+#if 0
 static void duplicate_selection ( void ) {
     se_i* se = m_state->modules.se;
 
@@ -2522,8 +2578,9 @@ static void duplicate_selection ( void ) {
         )
     ) );
 }
+#endif
 
-static se_entity_h spawn_plane ( void ) {
+static se_entity_h spawn_plane ( xg_workload_h workload ) {
     xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
 
@@ -2532,7 +2589,7 @@ static se_entity_h spawn_plane ( void ) {
     xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
 
     xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 1.f );
-    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, workload, &geo );
 
     viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
         .geo_data = geo,
@@ -2577,11 +2634,12 @@ static se_entity_h spawn_plane ( void ) {
     ) );
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
-    viewapp_build_mesh_raytrace_geo ( entity, mesh );
+    viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
+    update_raytrace_world();
     return entity;
 }
 
-static se_entity_h spawn_light ( void ) {
+static se_entity_h spawn_light ( xg_workload_h workload ) {
     xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
     rv_i* rv = m_state->modules.rv;
@@ -2591,7 +2649,7 @@ static se_entity_h spawn_light ( void ) {
     xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
 
     xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
-    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, &geo );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, workload, &geo );
 
     viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
         .geo_data = geo,
@@ -2651,7 +2709,6 @@ static se_entity_h spawn_light ( void ) {
         light_component.views[i] = rv->create_view ( &view_params );
     }
 
-
     se_entity_h entity = se->create_entity( &se_entity_params_m (
         .debug_name = "sphere",
         .update = se_entity_update_m (
@@ -2674,9 +2731,8 @@ static se_entity_h spawn_light ( void ) {
     ) );
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
-    viewapp_build_mesh_raytrace_geo ( entity, mesh );
-    // TODO need a workload to call this
-    //update_raytrace_world();
+    viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
+    update_raytrace_world();
     return entity;
 }
 
@@ -3292,6 +3348,9 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         // dispatch deletes and keep expanded entities bitset in sync
         uint32_t remaining_entities = entity_count;
+        if ( destroy_count > 0 ) {
+            update_raytrace_world();
+        }
         for ( uint32_t i = 0; i < destroy_count; ++i ) {
             uint32_t entity_idx = destroy_list[i];
             se->destroy_entity ( entity_list[entity_idx] );
@@ -3316,7 +3375,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 .horizontal_padding = 8,
             ),
         ) ) ) {
-            spawn_light();
+            spawn_light ( workload );
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
@@ -3325,7 +3384,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 .horizontal_padding = 8,
             ),
         ) ) ) {
-            spawn_plane();
+            spawn_plane ( workload );
         }
     }
     xi->end_section ( xi_workload );
@@ -3334,7 +3393,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
     // raytrace update
     if ( entity_edit ) {
-        update_raytrace_world ( workload );
+        update_raytrace_world();
     }
 
     // geos
@@ -3373,7 +3432,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             transform->orientation[3] = xform.rotation[3];
 
             if ( rtworld_needs_update ) {
-                update_raytrace_world ( workload );
+                update_raytrace_world();
             }
         }
     }
@@ -3502,13 +3561,15 @@ static std_app_state_e viewapp_update ( void ) {
         m_state->render.capture_frame = true;
     }
 
+#if 0
     if ( !input_state->keyboard[wm_keyboard_state_f5_m] && new_input_state.keyboard[wm_keyboard_state_f5_m] ) {
         duplicate_selection();
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f6_m] && new_input_state.keyboard[wm_keyboard_state_f6_m] ) {
-        spawn_light();
+        spawn_light (  );
     }
+#endif
 
     m_state->render.frame_id += 1;
 
@@ -3543,7 +3604,7 @@ static std_app_state_e viewapp_update ( void ) {
         viewapp_boot_raytrace_graph();
         viewapp_boot_mouse_pick_graph();
 
-        viewapp_build_raytrace_world();
+        viewapp_build_raytrace_world ( workload );
 
         if ( active_graph[0] ) m_state->render.active_graph = m_state->render.raster_graph;
         if ( active_graph[1] ) m_state->render.active_graph = m_state->render.raytrace_graph;
@@ -3586,6 +3647,16 @@ static std_app_state_e viewapp_update ( void ) {
 
     xs->update_pipeline_states ( workload );
     //xf->destroy_unreferenced_resources();
+
+    if ( m_state->render.raytrace_world_update ) {
+        xg->wait_all_workload_complete();
+        xg_workload_h workload = xg->create_workload ( m_state->render.device );
+        viewapp_build_raytrace_world ( workload );
+        xf->destroy_graph ( m_state->render.raytrace_graph, workload );
+        viewapp_boot_raytrace_graph();
+        xg->submit_workload ( workload );
+        m_state->render.raytrace_world_update = false;
+    }
 
     std_tick_t update_tick = std_tick_now();
     float update_ms = std_tick_to_milli_f32 ( update_tick - new_tick );
@@ -3632,7 +3703,6 @@ void viewer_app_unload ( void ) {
     xg->wait_all_workload_complete();
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     se_i* se = m_state->modules.se;
     se_query_result_t mesh_query_result;
@@ -3643,7 +3713,7 @@ void viewer_app_unload ( void ) {
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_geo_util_free_data ( &mesh_component->geo_data );
-        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, resource_cmd_buffer );
+        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload );
     }
 
     xg->submit_workload ( workload );

@@ -1,15 +1,30 @@
 #version 460
 #extension GL_NV_ray_tracing : require
+#extension GL_EXT_scalar_block_layout : enable
 
 #include <xs.glsl>
 
 #include "common.glsl"
 
-layout ( location = 0 ) rayPayloadNV ray_payload_t          ray_payload;
-layout ( location = 1 ) rayPayloadNV shadow_ray_payload_t   shadow_ray_payload;
+layout ( location = 0 ) rayPayloadNV ray_payload_t ray_payload;
+layout ( location = 1 ) rayPayloadNV ray_payload_t shadow_ray_payload;
 
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform accelerationStructureNV scene;
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m, rgba32f ) uniform image2D img_color;
+
+struct light_t {
+    float pos[3];
+    float radius;
+    float color[3];
+    float emissive;
+    uint id;
+};
+
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m, scalar ) buffer light_array_t {
+    uint light_count;
+    uint _pad0[3];
+    light_t data[];
+} light_buffer;
 
 struct reservoir_t {
     uint light;
@@ -17,6 +32,10 @@ struct reservoir_t {
     float weight_sum;
     float light_count;
 };
+
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m, scalar ) buffer reservoir_buffer_t {
+    reservoir_t data[];
+} reservoir_buffer;
 
 bool update_reservoir ( inout reservoir_t res, uint light, float weight, float count, inout rng_wang_state_t rng_state ) {
     res.weight_sum += weight;
@@ -29,6 +48,10 @@ bool update_reservoir ( inout reservoir_t res, uint light, float weight, float c
     }
 
     return false;
+}
+
+vec3 load_vec3 ( float[3] f32 ) {
+    return vec3 ( f32[0], f32[1], f32[2] );
 }
 
 void trace_ray ( vec3 pos, vec3 dir ) {
@@ -56,9 +79,10 @@ void trace_ray ( vec3 pos, vec3 dir ) {
 }
 
 void trace_shadow_ray ( vec3 pos, vec3 dir ) {
+#if 0
     const uint trace_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitNV;
     const uint cull_mask = 0xff;
-    const uint sbt_hit_idx = 1;
+    const uint sbt_hit_idx = 0;
     const uint sbt_stride = 0;
     const uint sbt_miss_idx = 1;
     const float t_min = 0.001;
@@ -77,6 +101,29 @@ void trace_shadow_ray ( vec3 pos, vec3 dir ) {
         t_max,
         payload_id
     );
+#else
+    const uint trace_flags = gl_RayFlagsOpaqueEXT;
+    const uint cull_mask = 0xff;
+    const uint sbt_hit_idx = 0;
+    const uint sbt_stride = 0;
+    const uint sbt_miss_idx = 0;
+    const float t_min = 0.001;
+    const float t_max = 10000.0;
+    const int payload_id = 1;
+    traceNV (
+        scene,
+        trace_flags,
+        cull_mask,
+        sbt_hit_idx,
+        sbt_stride,
+        sbt_miss_idx,
+        pos,
+        t_min,
+        dir,
+        t_max,
+        payload_id
+    );
+#endif
 }
 
 void main ( void ) {
@@ -93,7 +140,7 @@ void main ( void ) {
 
     rng_wang_state_t rng_state = rng_wang_init ( pixel_center );
 
-    const uint bounces = 2;
+    const uint bounces = 1;
     for ( uint i = 0; i < bounces; ++i ) {
         trace_ray ( origin, direction );
 
@@ -103,14 +150,83 @@ void main ( void ) {
             break;
         }
 
+        vec3 hit_pos = origin + direction * ray_payload.distance;
+
+        // ray contrib
         radiance += ray_payload.color * ray_payload.emissive * throughput;
         throughput *= ray_payload.color;
         //throughput *= dot ( ray_payload.normal, -direction );
 
-        origin = origin + direction * ray_payload.distance + ray_payload.normal * 0.001f;
-        direction = sample_cosine_weighted_hemisphere_normal ( vec2 ( rng_wang ( rng_state ), rng_wang ( rng_state ) ), ray_payload.normal );
+        // direct
+        #if 0
+        light_t light = light_buffer.data[0];
+        if ( ray_payload.id != light.id ) {
+        vec3 light_pos = load_vec3 ( light.pos );
+            vec3 light_dir = normalize ( light_pos - hit_pos );
+            float d = distance ( light_pos, hit_pos );
+            vec3 light_color = load_vec3 ( light.color );
+            radiance += light_color * light.emissive * throughput * dot ( ray_payload.normal, light_dir ) / ( PI * d * d );
+        }
+        #endif
 
-        //trace_shadow_ray();
+        // direct + shadow
+        #if 0
+        light_t light = light_buffer.data[0];
+        vec3 light_pos = load_vec3 ( light.pos );
+        vec3 light_dir = normalize ( light_pos - hit_pos );
+        trace_shadow_ray ( hit_pos, light_dir );
+        if ( ray_payload.id != light.id && shadow_ray_payload.id == light.id ) {
+            float d = distance ( light_pos, hit_pos );
+            vec3 light_color = load_vec3 ( light.color );
+            radiance += light_color * light.emissive * throughput * dot ( ray_payload.normal, light_dir ) / ( PI * d * d );
+        }
+        #endif
+
+        // reservoir light pick
+        #if 1
+        vec2 screen_uv = vec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y );
+        rng_wang_state_t rng_state = rng_wang_init ( screen_uv );
+        uint light_count = light_buffer.light_count;
+
+        uint reservoir_idx = gl_LaunchIDNV.x + ( gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) * gl_LaunchSizeNV.x;
+        reservoir_t reservoir = reservoir_t ( 0, 0, 0, 0 );// = reservoir_buffer.data[reservoir_idx];
+        for ( uint i = 0; i < light_count; ++i ) {
+            uint light_idx = int ( rng_wang ( rng_state ) * light_count );
+            light_t light = light_buffer.data[light_idx];
+
+            vec3 light_pos = load_vec3 ( light.pos );
+            vec3 light_color = load_vec3 ( light.color );
+            vec3 light_dir = normalize ( light_pos - hit_pos );
+            float cos_theta = max ( 0, dot ( ray_payload.normal, light_dir ) );
+            if ( cos_theta <= 0 ) continue;
+            
+            float d = distance ( light_pos, hit_pos );
+            float p_hat = length ( ( light.emissive * light_color * ray_payload.color * cos_theta ) / ( d * d * PI ) );
+            float pdf = 1.0 / light_count;
+            update_reservoir ( reservoir, light_idx, p_hat / pdf, 1, rng_state );
+        }
+        if ( reservoir.light_count > 0 ) {
+            light_t light = light_buffer.data[reservoir.light];
+            vec3 light_pos = load_vec3 ( light.pos );
+            vec3 light_color = load_vec3 ( light.color );
+            vec3 light_dir = normalize ( light_pos - hit_pos );
+            trace_shadow_ray ( hit_pos, light_dir );
+            vec3 light_radiance = 0.0.xxx;
+            if ( ray_payload.id != light.id && shadow_ray_payload.id == light.id ) {
+                float d = distance ( light_pos, hit_pos );
+                vec3 light_radiance = light_color * light.emissive * throughput * dot ( ray_payload.normal, light_dir ) / ( PI * d * d );
+                float p_hat = length ( light_radiance );
+                reservoir.weight = p_hat > 0 ? reservoir.weight_sum / ( p_hat * reservoir.light_count ) : 0.0;
+                radiance += light_radiance * reservoir.weight;
+            }
+        }
+        reservoir_buffer.data[reservoir_idx] = reservoir;
+        #endif
+
+        //radiance = reservoir.light == 0 ? vec3(1, 0, 0) : vec3(0, 0, 1);
+
+        origin = hit_pos + ray_payload.normal * 0.001f;
+        direction = sample_cosine_weighted_hemisphere_normal ( vec2 ( rng_wang ( rng_state ), rng_wang ( rng_state ) ), ray_payload.normal );
     }
 
     imageStore ( img_color, ivec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y ), vec4 ( radiance, 1 ) );

@@ -190,7 +190,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
         .height = texture_info.height,
     };
 
-    xf_node_h node = xf->add_node ( graph, &xf_node_params_m (
+    xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "shadows",
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (

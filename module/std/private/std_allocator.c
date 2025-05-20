@@ -85,8 +85,11 @@ bool std_virtual_unmap ( void* from, void* to ) {
 }
 
 bool std_virtual_free ( void* from, void* to ) {
+    if ( !from && !to ) {
+        return true;
+    }
+
     uint64_t size = to - from;
-    std_assert_m ( from != NULL );
     std_assert_m ( std_align_test_ptr ( from, std_allocator_state->virtual_page_size ) );
 
     bool result;
@@ -99,7 +102,8 @@ bool std_virtual_free ( void* from, void* to ) {
 
     std_atomic_fetch_sub_u64 ( &std_allocator_state->virtual_reserved_size, size );
 
-    return result;}
+    return result;
+}
 
 //==============================================================================
 

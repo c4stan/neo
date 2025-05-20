@@ -77,6 +77,6 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color, xf_texture_h expor
         params.resources.sampled_textures[0] = xf_shader_texture_dependency_m ( .texture = export, .stage = xg_pipeline_stage_bit_fragment_shader_m );
     }
 
-    xf_node_h ui_node = xf->add_node ( graph, &params );
+    xf_node_h ui_node = xf->create_node ( graph, &params );
     return ui_node;
 }

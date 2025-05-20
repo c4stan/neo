@@ -4,8 +4,8 @@ include common.xsi
 
 begin bindings
     buffer uniform
-    buffer storage[3]
-    texture sampled[6]
+    buffer[3] storage
+    texture[6] sampled
     texture storage
     sampler
 end

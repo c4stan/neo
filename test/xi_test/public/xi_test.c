@@ -164,7 +164,7 @@ static void xi_test ( void ) {
 
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
 
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "clear",
         .debug_color = xg_debug_region_color_red_m,
         .type = xf_node_type_clear_pass_m,
@@ -189,7 +189,7 @@ static void xi_test ( void ) {
     ) );
 
     xf_ui_pass_args_t ui_node_args;
-    xf->add_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "ui",
         .debug_color = xg_debug_region_color_green_m,
         .type = xf_node_type_custom_pass_m,

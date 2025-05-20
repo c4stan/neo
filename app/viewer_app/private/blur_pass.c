@@ -116,6 +116,6 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
         ),
     );
     std_str_copy_static_m ( params.debug_name, debug_name );
-    xf_node_h blur_node = xf->add_node ( graph, &params );
+    xf_node_h blur_node = xf->create_node ( graph, &params );
     return blur_node;
 }

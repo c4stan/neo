@@ -492,21 +492,6 @@ bool xf_resource_texture_is_depth ( xf_texture_h texture_handle ) {
 }
 
 // ======================================================================================= //
-//                                 M U L T I   B U F F E R
-// ======================================================================================= //
-
-xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer_handle ) {
-    bool is_multi_buffer = xf_resource_handle_is_multi_m ( buffer_handle );
-
-    if ( is_multi_buffer ) {
-        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( buffer_handle )];
-        return multi_buffer;
-    } else {
-        return NULL;
-    }
-}
-
-// ======================================================================================= //
 //                                       B U F F E R
 // ======================================================================================= //
 
@@ -531,6 +516,9 @@ void xf_resource_buffer_destroy ( xf_buffer_h buffer_handle ) {
 xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params ) {
     xf_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->buffers_freelist );
     *buffer = xf_buffer_m ( .params = *params );
+    if ( params->clear_on_create ) {
+        buffer->required_usage |= xg_texture_usage_bit_copy_dest_m;
+    }
     xf_buffer_h handle = ( xf_buffer_h ) ( buffer - xf_resource_state->buffers_array );
     std_bitset_set ( xf_resource_state->buffers_bitset, handle );
     return handle;
@@ -564,7 +552,7 @@ xf_buffer_t* xf_resource_buffer_get ( xf_buffer_h buffer_handle ) {
 }
 
 void xf_resource_buffer_map_to_new ( xf_buffer_h buffer_handle, xg_buffer_h xg_handle, xg_buffer_usage_bit_e allowed_usage ) {
-    xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
+    xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
     buffer->xg_handle = xg_handle;
     buffer->allowed_usage = allowed_usage;
     buffer->state = xf_buffer_execution_state_m(); // TODO
@@ -635,6 +623,7 @@ static void xf_resource_buffer_barrier ( std_stack_t* stack, xf_buffer_h buffer_
             .memory.invalidations = new_state->access,
             .execution.blocker = prev_state->stage,
             .execution.blocked = new_state->stage,
+            .size = buffer->params.size,
         );
 
         xf_resource_buffer_set_execution_state ( buffer_handle, new_state );
@@ -647,6 +636,16 @@ void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer_h
     xf_resource_buffer_barrier ( stack, buffer_handle, old_state, new_state );
 }
 
+xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer_handle ) {
+    bool is_multi_buffer = xf_resource_handle_is_multi_m ( buffer_handle );
+
+    if ( is_multi_buffer ) {
+        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( buffer_handle )];
+        return multi_buffer;
+    } else {
+        return NULL;
+    }
+}
 
 void xf_resource_buffer_add_ref ( xf_buffer_h handle ) {
     bool is_multi = xf_resource_handle_is_multi_m ( handle );
@@ -826,6 +825,65 @@ void xf_resource_swapchain_resize ( xf_texture_h swapchain ) {
 }
 
 // ======================================================================================= //
+//                                 M U L T I   B U F F E R
+// ======================================================================================= //
+
+xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* params ) {
+    xf_multi_buffer_t* multi_buffer = std_list_pop_m ( &xf_resource_state->multi_buffers_freelist );
+    *multi_buffer = xf_multi_buffer_m ( .params = *params );
+
+    for ( uint32_t i = 0; i < params->multi_buffer_count; ++i ) {
+        char id[8];
+        std_u32_to_str ( id, 8, i, 0 );
+        xf_buffer_params_t buffer_params = params->buffer;
+        std_stack_t stack = std_static_stack_m ( buffer_params.debug_name );
+        stack.top += std_str_len ( buffer_params.debug_name );
+        std_stack_string_append ( &stack, "(" );
+        std_stack_string_append ( &stack, id );
+        std_stack_string_append ( &stack, ")" );
+        xf_buffer_h handle = xf_resource_buffer_create ( &buffer_params );
+        xf_buffer_t* buffer = xf_resource_buffer_get ( handle );
+        buffer->is_multi = true;
+        buffer->ref_count = 1;
+        multi_buffer->buffers[i] = handle;
+    }
+
+    xf_buffer_h handle = ( xf_buffer_h ) ( multi_buffer - xf_resource_state->multi_buffers_array );
+    std_bitset_set ( xf_resource_state->multi_buffers_bitset, handle );
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
+    return handle;
+}
+
+void xf_resource_multi_buffer_advance ( xf_buffer_h multi_buffer_handle ) {
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_buffer_handle ) );
+    xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( multi_buffer_handle )];
+    multi_buffer->index = ( multi_buffer->index + 1 ) % multi_buffer->params.multi_buffer_count;
+}
+
+xf_buffer_h xf_resource_multi_buffer_get_buffer ( xf_buffer_h multi_buffer_handle, int32_t offset ) {
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_buffer_handle ) );
+    xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( multi_buffer_handle )];
+
+    uint32_t buffer_count = multi_buffer->params.multi_buffer_count;
+    int32_t rem = ( ( int32_t ) multi_buffer->index + offset ) % ( int32_t ) buffer_count;
+    uint32_t index = rem < 0 ? ( uint32_t ) ( rem + ( int32_t ) buffer_count ) : ( uint32_t ) rem;
+    std_assert_m ( index < buffer_count );
+
+    uint64_t handle = multi_buffer_handle & 0xffff;
+    handle |= index << 16;
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
+    return handle;
+}
+
+xf_buffer_h xf_resource_multi_buffer_get_default ( xf_buffer_h multi_buffer_handle ) {
+    std_assert_m ( xf_resource_handle_is_multi_m ( multi_buffer_handle ) );
+    xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[xf_resource_handle_multi_idx_m ( multi_buffer_handle )];
+    xf_buffer_h handle = ( xf_buffer_h ) ( multi_buffer - xf_resource_state->multi_buffers_array );
+    handle = xf_resource_handle_tag_as_multi_m ( handle );
+    return handle;
+}
+
+// ======================================================================================= //
 //                               D E V I C E   T E X T U R E
 // ======================================================================================= //
 
@@ -926,6 +984,12 @@ void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resou
     while ( std_bitset_scan ( &idx, xf_resource_state->multi_buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_buffers_m ) ) ) {
         xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[idx];
         if ( multi_buffer->ref_count == 0 ) {
+            for ( uint32_t i = 0; i < multi_buffer->params.multi_buffer_count; ++i ) {
+                xf_buffer_t* buffer = &xf_resource_state->buffers_array[multi_buffer->buffers[i]];
+                if ( buffer->xg_handle != xg_null_handle_m ) {
+                    xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, time );
+                }
+            }
             xf_resource_buffer_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
         }
         ++idx;

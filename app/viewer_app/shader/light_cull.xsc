@@ -4,5 +4,5 @@ compute_shader light_cull.comp
 
 begin bindings
     buffer uniform
-    buffer storage[4]
+    buffer[4] storage
 end

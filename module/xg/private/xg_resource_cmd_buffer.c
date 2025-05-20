@@ -22,27 +22,27 @@ static void xg_resource_cmd_buffer_alloc_memory ( xg_resource_cmd_buffer_t* cmd_
 static void xg_resource_cmd_buffer_free_memory ( xg_resource_cmd_buffer_t* cmd_buffer ) {
     std_virtual_stack_destroy ( &cmd_buffer->cmd_headers_allocator );
     std_virtual_stack_destroy ( &cmd_buffer->cmd_args_allocator );
+    cmd_buffer->cmd_headers_allocator = ( std_virtual_stack_t ) {};
+    cmd_buffer->cmd_args_allocator = ( std_virtual_stack_t ) {};
 }
 
 void xg_resource_cmd_buffer_load ( xg_resource_cmd_buffer_state_t* state ) {
-    // Copied from xg_cmd_buffer
-
     xg_resource_cmd_buffer_state = state;
 
-    xg_resource_cmd_buffer_state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_resource_cmd_buffer_t, xg_cmd_buffer_max_resource_cmd_buffers_m );
-    xg_resource_cmd_buffer_state->cmd_buffers_freelist = std_freelist_m ( xg_resource_cmd_buffer_state->cmd_buffers_array, xg_cmd_buffer_max_resource_cmd_buffers_m );
-    std_mutex_init ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
+    state->cmd_buffers_array = std_virtual_heap_alloc_array_m ( xg_resource_cmd_buffer_t, xg_cmd_buffer_max_resource_cmd_buffers_m );
+    std_mem_zero_array_m ( state->cmd_buffers_array, xg_cmd_buffer_max_resource_cmd_buffers_m );
+    state->cmd_buffers_freelist = std_freelist_m ( state->cmd_buffers_array, xg_cmd_buffer_max_resource_cmd_buffers_m );
 
     for ( size_t i = 0; i < xg_cmd_buffer_preallocated_resource_cmd_buffers_m; ++i ) {
-        xg_resource_cmd_buffer_t* cmd_buffer = &xg_resource_cmd_buffer_state->cmd_buffers_array[i];
+        xg_resource_cmd_buffer_t* cmd_buffer = &state->cmd_buffers_array[i];
         xg_resource_cmd_buffer_alloc_memory ( cmd_buffer );
     }
-
-    xg_resource_cmd_buffer_state->allocated_cmd_buffers_count = xg_cmd_buffer_preallocated_cmd_buffers_m;
 
     if ( xg_cmd_buffer_resource_cmd_buffer_size_m % std_virtual_page_size() != 0 ) {
         std_log_warn_m ( "Resource command buffer size is not a multiple of the system virtual page size, sub-optimal memory usage could result from this." );
     }
+
+    std_mutex_init ( &state->cmd_buffers_mutex );
 }
 
 void xg_resource_cmd_buffer_reload ( xg_resource_cmd_buffer_state_t* state ) {
@@ -50,7 +50,7 @@ void xg_resource_cmd_buffer_reload ( xg_resource_cmd_buffer_state_t* state ) {
 }
 
 void xg_resource_cmd_buffer_unload ( void ) {
-    for ( size_t i = 0; i < xg_resource_cmd_buffer_state->allocated_cmd_buffers_count; ++i ) {
+    for ( size_t i = 0; i < xg_cmd_buffer_max_resource_cmd_buffers_m; ++i ) {
         xg_resource_cmd_buffer_t* cmd_buffer = &xg_resource_cmd_buffer_state->cmd_buffers_array[i];
         xg_resource_cmd_buffer_free_memory ( cmd_buffer );
     }
@@ -59,54 +59,26 @@ void xg_resource_cmd_buffer_unload ( void ) {
     std_mutex_deinit ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
 }
 
-void xg_resource_cmd_buffer_open_n ( xg_resource_cmd_buffer_h* cmd_buffer_handles, size_t count, xg_workload_h workload ) {
-    // Copied from xg_cmd_buffer
-
+xg_resource_cmd_buffer_h xg_resource_cmd_buffer_create ( xg_workload_h workload ) {
     std_mutex_lock ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
 
-    for ( size_t i = 0; i < count; ++i ) {
-        xg_resource_cmd_buffer_t* cmd_buffer = std_list_pop_m ( &xg_resource_cmd_buffer_state->cmd_buffers_freelist );
+    xg_resource_cmd_buffer_t* cmd_buffer = std_list_pop_m ( &xg_resource_cmd_buffer_state->cmd_buffers_freelist );
 
-        if ( cmd_buffer == NULL ) {
-            std_assert_m ( xg_resource_cmd_buffer_state->allocated_cmd_buffers_count + 1 <= xg_cmd_buffer_max_resource_cmd_buffers_m );
-            std_log_info_m ( "Allocating additional resource command buffer " std_fmt_u64_m "/" std_fmt_int_m ", consider increasing xg_cmd_buffer_preallocated_resource_cmd_buffers_m.", xg_resource_cmd_buffer_state->allocated_cmd_buffers_count + 1, xg_cmd_buffer_max_resource_cmd_buffers_m );
-            // Buffers are linearly added to the pool. Therefore if freeing is allowed it must also be linear and back-to-front.
-            cmd_buffer = &xg_resource_cmd_buffer_state->cmd_buffers_array[xg_resource_cmd_buffer_state->allocated_cmd_buffers_count++];
-            xg_resource_cmd_buffer_alloc_memory ( cmd_buffer );
-        }
-
-        cmd_buffer->workload = workload;
-
-        xg_resource_cmd_buffer_h cmd_buffer_handle = ( xg_resource_cmd_buffer_h ) ( cmd_buffer - xg_resource_cmd_buffer_state->cmd_buffers_array );
-        cmd_buffer_handles[i] = cmd_buffer_handle;
-        //xg_workload_add_resource_cmd_buffer ( workload_handle, cmd_buffer_handle );
+    if ( cmd_buffer->cmd_headers_allocator.begin == NULL ) {
+        std_log_info_m ( "Allocating additional resource command buffer, consider increasing xg_cmd_buffer_preallocated_resource_cmd_buffers_m" );
+        // Buffers are linearly added to the pool. Therefore if freeing is allowed it must also be linear and back-to-front.
+        xg_resource_cmd_buffer_alloc_memory ( cmd_buffer );
     }
 
-    std_mutex_unlock ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
-}
+    cmd_buffer->workload = workload;
+    xg_resource_cmd_buffer_h handle = ( xg_resource_cmd_buffer_h ) ( cmd_buffer - xg_resource_cmd_buffer_state->cmd_buffers_array );
 
-xg_resource_cmd_buffer_h xg_resource_cmd_buffer_open ( xg_workload_h workload ) {
-    xg_resource_cmd_buffer_h handle;
-    xg_resource_cmd_buffer_open_n ( &handle, 1, workload );
+    std_mutex_unlock ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
+
     return handle;
 }
 
-#if 0
-void xg_resource_cmd_buffer_close ( xg_resource_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
-    // Copied from xg_cmd_buffer
-
-    for ( size_t i = 0; i < count; ++i ) {
-        xg_resource_cmd_buffer_h handle = cmd_buffer_handles[i];
-        xg_resource_cmd_buffer_t* cmd_buffer = &xg_resource_cmd_buffer_state.cmd_buffers_array[handle];
-
-        xg_workload_add_resource_cmd_buffer ( cmd_buffer->workload, handle );
-    }
-}
-#endif
-
-void xg_resource_cmd_buffer_discard ( xg_resource_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
-    // Copied from xg_cmd_buffer
-
+void xg_resource_cmd_buffer_destroy ( xg_resource_cmd_buffer_h* cmd_buffer_handles, size_t count ) {
     std_mutex_lock ( &xg_resource_cmd_buffer_state->cmd_buffers_mutex );
 
     for ( size_t i = 0; i < count; ++i ) {
@@ -129,8 +101,6 @@ xg_resource_cmd_buffer_t* xg_resource_cmd_buffer_get ( xg_resource_cmd_buffer_h 
 //
 
 static void* xg_resource_cmd_buffer_record_cmd ( xg_resource_cmd_buffer_t* cmd_buffer, xg_resource_cmd_type_e type, size_t args_size ) {
-    // Copied from xg_cmd_buffer
-
     std_virtual_stack_align ( &cmd_buffer->cmd_headers_allocator, xg_resource_cmd_buffer_cmd_alignment_m );
     std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, xg_resource_cmd_buffer_cmd_alignment_m );
 
@@ -308,27 +278,3 @@ void xg_resource_cmd_buffer_queue_event_destroy ( xg_resource_cmd_buffer_h cmd_b
     cmd_args->event = event;
     cmd_args->destroy_time = destroy_time;
 }
-
-#if 0
-void xg_resource_cmd_buffer_timestamp_query_buffer_clear ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time ) {
-    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
-    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_timestamp_query_buffer_clear_m, xg_resource_cmd_timestamp_query_buffer_args_t );
-    cmd_args->buffer = query_buffer;
-    cmd_args->time = time;
-}
-
-xg_timestamp_query_buffer_results_t xg_resource_cmd_buffer_timestamp_query_buffer_readback ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time ) {
-    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
-    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_timestamp_query_buffer_readback_m, xg_resource_cmd_timestamp_query_buffer_args_t );
-    cmd_args->buffer = query_buffer;
-    cmd_args->time = time;
-    return xg_timestamp_query_buffer_get_results ( query_buffer );
-}
-
-void xg_resource_cmd_buffer_timestamp_query_buffer_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_query_buffer_h query_buffer, xg_resource_cmd_buffer_time_e time ) {
-    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
-    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_timestamp_query_buffer_destroy_m, xg_resource_cmd_timestamp_query_buffer_args_t );
-    cmd_args->buffer = query_buffer;
-    cmd_args->time = time;
-}
-#endif

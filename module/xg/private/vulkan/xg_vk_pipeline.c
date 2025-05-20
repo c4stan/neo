@@ -826,6 +826,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         //xg_vk_pipeline->sbt_raygen_region = sbt_raygen_region;
         //xg_vk_pipeline->sbt_miss_region = sbt_miss_region;
         //xg_vk_pipeline->sbt_hit_region = sbt_hit_region;
+        xg_vk_pipeline->sbt_buffer = xg_null_handle_m;
         xg_vk_pipeline->sbt_handle_buffer = groups_buffer;
         std_mem_copy_static_array_m ( xg_vk_pipeline->gen_offsets, gen_offsets );
         std_mem_copy_static_array_m ( xg_vk_pipeline->miss_offsets, miss_offsets );
@@ -883,6 +884,8 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
     }
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, xg_vk_cpu_allocator() );
     vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, xg_vk_cpu_allocator() );
+
+    //xg_buffer_destroy ( pipeline->sbt_buffer );
 
     //for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
     //    xg_resource_bindings_layout_h layout_handle = pipeline->common.resource_layouts[i];

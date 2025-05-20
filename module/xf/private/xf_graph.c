@@ -777,70 +777,6 @@ static xg_texture_params_t xf_graph_texture_params ( xg_device_h device, xf_text
     return params;
 }
 
-static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_device_h device, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
-    const xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
-
-    bool create_new = false;
-
-    if ( buffer->xg_handle == xg_null_handle_m ) {
-        create_new = true;
-    }
-
-    if ( buffer->required_usage &~ buffer->allowed_usage ) {
-        create_new = true;
-    }
-
-#if 0
-    if ( buffer->params.upload ) {
-        create_new = true;
-    }
-#endif
-
-    if ( create_new ) {
-        if ( buffer->xg_handle != xg_null_handle_m && !buffer->params.upload ) {
-            std_assert_m ( false );
-            //xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, xg_resource_cmd_buffer_time_workload_start_m );
-        }
-
-#if 0
-        xg_buffer_params_t params = xg_buffer_params_m (
-            .memory_type = buffer->params.upload ? xg_memory_type_upload_m : xg_memory_type_gpu_only_m, // TODO readback ?
-            .device = device,
-            .size = buffer->params.size,
-            .allowed_usage = buffer->required_usage,
-        );
-        std_str_copy_static_m ( params.debug_name, buffer->params.debug_name );
-#else
-        xg_buffer_params_t params = xf_graph_buffer_params ( device, buffer_handle );
-#endif
-
-#if 0
-        xg_buffer_h new_buffer;
-        // TODO use a preallocated ring buffer?
-        if ( buffer->params.upload ) {
-            // TODO always do non-cmd create?
-            new_buffer = xg->create_buffer ( &params );
-            xg->cmd_destroy_buffer ( resource_cmd_buffer, new_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
-        } else {
-            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params );
-        }
-#else
-        xg_buffer_h new_buffer;
-        if ( buffer->params.upload ) {
-            // If tagged as upload the buffer needs to be available immediately
-            new_buffer = xg->create_buffer ( &params );
-        } else {
-            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params, NULL );
-        }
-#endif
-
-        xf_resource_buffer_map_to_new ( buffer_handle, new_buffer, params.allowed_usage );
-    }
-
-    // TODO
-    std_unused_m ( cmd_buffer );
-}
-
 static void xf_graph_resource_lifespan_extend ( xf_graph_resource_lifespan_t* lifespan, uint32_t node, xg_cmd_queue_e queue ) {
     lifespan->first = std_min_i32 ( lifespan->first, node );
     lifespan->last[queue] = std_max_i32 ( lifespan->last[queue], node );
@@ -1387,10 +1323,30 @@ static void xf_graph_scan_buffers ( xf_graph_h graph_handle ) {
     graph->buffers_count = graph_buffers_array.count;
 }
 
+static void xf_graph_scan_multi_buffers ( xf_graph_h graph_handle ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    uint64_t buffer_hashes[xf_graph_max_multi_buffers_m * 2];
+    std_hash_set_t buffers_set = std_static_hash_set_m ( buffer_hashes );
+    std_auto_m multi_buffers_array = std_static_array_m ( uint32_t, graph->multi_buffers_array );
+
+    for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
+        xf_buffer_h buffer = graph->buffers_array[i].handle;
+        if ( xf_resource_buffer_is_multi ( buffer ) ) {
+            buffer = xf_resource_multi_buffer_get_default ( buffer );
+            if ( std_hash_set_insert ( &buffers_set, std_hash_64_m ( buffer ) ) ) {
+                std_array_push_m ( &multi_buffers_array, i );
+            }
+        }
+    }
+
+    graph->multi_buffers_count = multi_buffers_array.count;
+}
+
 static void xf_graph_scan_resources ( xf_graph_h graph_handle ) {
     xf_graph_scan_textures ( graph_handle );
     xf_graph_scan_buffers ( graph_handle );
     xf_graph_scan_multi_textures ( graph_handle );
+    xf_graph_scan_multi_buffers ( graph_handle );
 }
 
 #if 1
@@ -1950,6 +1906,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
     }
 }
 
+// TODO remove this, use xg init params
 static uint64_t xf_graph_clear_owned_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_buffer_h cmd_buffer, uint64_t key ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
@@ -1999,15 +1956,152 @@ static uint64_t xf_graph_clear_owned_textures ( xf_graph_h graph_handle, xg_i* x
     return key;
 }
 
-static void xf_graph_build_resources ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+static void xf_graph_build_buffers ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
-    xf_graph_build_textures ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
+    for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
+        xf_buffer_h buffer_handle = graph->buffers_array[i].handle;
+        const xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
+
+        bool create_new = false;
+
+        if ( buffer->xg_handle == xg_null_handle_m ) {
+            create_new = true;
+        } else {
+            if ( buffer->required_usage &~ buffer->allowed_usage ) {
+                // TODO free current device texture
+                std_log_error_m ( "Buffer required and allowed usage mismatch. Fix your usage declaration or implement this code path" );
+                std_not_implemented_m();
+                create_new = true;
+            }
+        }
+
+        if ( create_new ) {
+            xg_buffer_params_t params = xf_graph_buffer_params ( graph->params.device, buffer_handle );
+            xg_buffer_h new_buffer;
+            if ( buffer->params.upload ) {
+                // If tagged as upload the buffer needs to be available immediately
+                new_buffer = xg->create_buffer ( &params );
+            } else {
+                new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params, NULL );
+            }
+            xf_resource_buffer_map_to_new ( buffer_handle, new_buffer, params.allowed_usage );
+        }
+    }
+}
+
+// TODO remove this, use xg init params
+static uint64_t xf_graph_clear_buffers ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_buffer_h cmd_buffer, uint64_t key ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+
+    uint64_t transition_key = ++key;
+    uint64_t clear_key = ++key;
+
+    xg_buffer_memory_barrier_t buffer_barriers_array[128]; // TODO
+    std_stack_t buffer_barriers_stack = std_static_stack_m ( buffer_barriers_array );
+
+    for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
+        xf_graph_buffer_t* graph_buffer = &graph->buffers_array[i];
+        xf_buffer_h buffer_handle = graph_buffer->handle;
+        xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
+        if ( buffer->params.clear_on_create ) {
+            xg_texture_h xg_handle = buffer->xg_handle;
+
+            xf_graph_buffer_transition_t transition = xf_graph_buffer_transition_m (
+                .state = xf_buffer_execution_state_m (
+                    .stage = xg_pipeline_stage_bit_transfer_m,
+                    .access = xg_memory_access_bit_transfer_write_m,
+                ),
+                .buffer = buffer_handle,
+            );
+            xf_resource_buffer_state_barrier ( &buffer_barriers_stack, transition.buffer, &transition.state );
+            xg->cmd_clear_buffer ( cmd_buffer, clear_key, xg_handle, buffer->params.clear_value );
+        }
+    }
+
+    xg_barrier_set_t barrier_set = xg_barrier_set_m();
+    barrier_set.buffer_memory_barriers = buffer_barriers_array;
+    barrier_set.buffer_memory_barriers_count = std_stack_array_count_m ( &buffer_barriers_stack, xg_buffer_memory_barrier_t );
+    xg->cmd_barrier_set ( cmd_buffer, transition_key, &barrier_set );
+
+    return key;
+}
+
+#if 0
+static void xf_graph_build_buffer ( xf_buffer_h buffer_handle, xg_device_h device, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    const xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
+
+    bool create_new = false;
+
+    if ( buffer->xg_handle == xg_null_handle_m ) {
+        create_new = true;
+    }
+
+    if ( buffer->required_usage &~ buffer->allowed_usage ) {
+        create_new = true;
+    }
+
+#if 0
+    if ( buffer->params.upload ) {
+        create_new = true;
+    }
+#endif
+
+    if ( create_new ) {
+        if ( buffer->xg_handle != xg_null_handle_m && !buffer->params.upload ) {
+            std_assert_m ( false );
+            //xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, xg_resource_cmd_buffer_time_workload_start_m );
+        }
+
+#if 0
+        xg_buffer_params_t params = xg_buffer_params_m (
+            .memory_type = buffer->params.upload ? xg_memory_type_upload_m : xg_memory_type_gpu_only_m, // TODO readback ?
+            .device = device,
+            .size = buffer->params.size,
+            .allowed_usage = buffer->required_usage,
+        );
+        std_str_copy_static_m ( params.debug_name, buffer->params.debug_name );
+#else
+        xg_buffer_params_t params = xf_graph_buffer_params ( device, buffer_handle );
+#endif
+
+#if 0
+        xg_buffer_h new_buffer;
+        // TODO use a preallocated ring buffer?
+        if ( buffer->params.upload ) {
+            // TODO always do non-cmd create?
+            new_buffer = xg->create_buffer ( &params );
+            xg->cmd_destroy_buffer ( resource_cmd_buffer, new_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
+        } else {
+            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params );
+        }
+#else
+        xg_buffer_h new_buffer;
+        if ( buffer->params.upload ) {
+            // If tagged as upload the buffer needs to be available immediately
+            new_buffer = xg->create_buffer ( &params );
+        } else {
+            new_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &params, NULL );
+        }
+#endif
+
+        xf_resource_buffer_map_to_new ( buffer_handle, new_buffer, params.allowed_usage );
+    }
 
     // TODO
-    for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
-        xf_graph_build_buffer ( graph->buffers_array[i].handle, graph->params.device, xg, cmd_buffer, resource_cmd_buffer );
-    }
+    std_unused_m ( cmd_buffer );
+}
+#endif
+
+static void xf_graph_build_resources ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_buffer_h cmd_buffer, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    xf_graph_build_textures ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
+    xf_graph_build_buffers ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
+
+    // TODO
+    //xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    //for ( uint32_t i = 0; i < graph->buffers_count; ++i ) {
+    //    xf_graph_build_buffer ( graph->buffers_array[i].handle, graph->params.device, xg, cmd_buffer, resource_cmd_buffer );
+    //}
 }
 
 static void xf_graph_build_renderpasses ( xf_graph_t* graph, xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
@@ -2347,6 +2441,7 @@ void xf_graph_invalidate ( xf_graph_h graph_handle, xg_workload_h workload ) {
     graph->buffers_count = 0;
     graph->physical_textures_count = 0;
     graph->multi_textures_count = 0;
+    graph->multi_buffers_count = 0;
     graph->owned_textures_count = 0;
     graph->segments_count = 0;
 
@@ -2419,6 +2514,7 @@ uint64_t xf_graph_build ( xf_graph_h graph_handle, xg_workload_h workload, uint6
 
     xf_graph_build_resources ( graph_handle, xg, cmd_buffer, resource_cmd_buffer );
     key = xf_graph_clear_owned_textures ( graph_handle, xg, cmd_buffer, key );
+    key = xf_graph_clear_buffers ( graph_handle, xg, cmd_buffer, key );
     xf_graph_create_segment_events ( graph_handle, xg );
 
     graph->is_built = true;
@@ -2657,6 +2753,7 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
     }
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg->wait_all_workload_complete();
     //xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( xg_workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( xg_workload );
 
@@ -3347,6 +3444,14 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
         }
     }
 
+    for ( uint32_t i = 0; i < graph->multi_buffers_count; ++i ) {
+        xf_buffer_h buffer_handle = graph->buffers_array[graph->multi_buffers_array[i]].handle;
+        xf_multi_buffer_t* multi_buffer = xf_resource_multi_buffer_get ( buffer_handle );
+        if ( multi_buffer->params.auto_advance ) {
+            xf_resource_multi_buffer_advance ( buffer_handle );
+        }
+    }
+
     //xf_graph_cleanup ( graph_handle );
 
     return sort_key;
@@ -3362,6 +3467,16 @@ void xf_graph_advance_multi_textures ( xf_graph_h graph_handle ) {
         if ( swapchain == xg_null_handle_m ) {
             xf_resource_multi_texture_advance ( texture_handle );
         }
+    }
+}
+
+void xf_graph_advance_multi_buffers ( xf_graph_h graph_handle ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+
+    // Advance multi resources
+    for ( uint64_t i = 0; i < graph->multi_buffers_count; ++i ) {
+        xf_buffer_h buffer_handle = graph->buffers_array[graph->multi_buffers_array[i]].handle;
+        xf_resource_multi_buffer_advance ( buffer_handle );
     }
 }
 

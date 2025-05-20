@@ -3,7 +3,7 @@ compute_shader combine.comp
 include common.xsi
 
 begin bindings
-    texture sampled[3]
+    texture[3] sampled
     texture storage
     sampler
 end

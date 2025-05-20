@@ -53,6 +53,7 @@ typedef struct {
     xg_resource_cmd_buffer_h resource_cmd_buffers[xg_cmd_buffer_max_resource_cmd_buffers_per_workload_m];
     size_t cmd_buffers_count;
     size_t resource_cmd_buffers_count;
+    xg_cmd_buffer_h setup_cmd_buffer;
     
     xg_device_h device;
     uint64_t id;
@@ -97,7 +98,18 @@ typedef struct {
     xg_resource_bindings_h global_bindings;
 
     bool debug_capture;
+    bool is_submitted;
 } xg_vk_workload_t;
+
+#define xg_vk_workload_m( ... ) ( xg_vk_workload_t ) { \
+    .setup_cmd_buffer = xg_null_handle_m, \
+    .device = xg_null_handle_m, \
+    .swapchain_texture_acquired_event = xg_null_handle_m, \
+    .execution_complete_gpu_event = xg_null_handle_m, \
+    .execution_complete_cpu_event = xg_null_handle_m, \
+    .global_bindings = xg_null_handle_m, \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_cmd_header_t* result;

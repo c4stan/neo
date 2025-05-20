@@ -65,6 +65,6 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
         ),
     );
     std_str_copy_static_m ( params.debug_name, name );
-    xf_node_h ssgi_trace_node = xf->add_node ( graph, &params );
+    xf_node_h ssgi_trace_node = xf->create_node ( graph, &params );
     return ssgi_trace_node;
 }

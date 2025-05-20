@@ -51,6 +51,6 @@ end
 begin bindings
     buffer uniform vertex
     buffer uniform fragment
-    texture sampled fragment[2]
+    texture[2] sampled fragment
     sampler fragment
 end

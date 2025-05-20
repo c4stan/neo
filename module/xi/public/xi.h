@@ -568,7 +568,7 @@ typedef struct {
 
     void ( *add_texture )   ( xi_workload_h workload, xi_texture_state_t* state );
 
-    void ( *init_geos )     ( xg_device_h device );
+    void ( *init_geos )     ( xg_device_h device, xg_workload_h workload );
     void ( *draw_line )     ( xi_workload_h workload, xi_line_state_t* state );
     bool ( *draw_transform )( xi_workload_h workload, xi_transform_state_t* state );    
 

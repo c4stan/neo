@@ -35,9 +35,8 @@ void xi_ui_unload ( void ) {
     if ( xi_ui_state->device != xg_null_handle_m ) {
         xg_i* xg = std_module_get_m ( xg_module_name_m );
         xg_workload_h workload = xg->create_workload ( xi_ui_state->device );
-        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg_geo_util_free_data ( &xi_ui_state->transform_geo.cpu );
-        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu, resource_cmd_buffer );
+        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu, workload );
         xg->submit_workload ( workload );
     }
 }
@@ -1655,10 +1654,10 @@ bool xi_ui_property_editor ( xi_workload_h workload, xi_property_editor_state_t*
     return edited;
 }
 
-void xi_ui_geo_init ( xg_device_h device_handle ) {
+void xi_ui_geo_init ( xg_device_h device_handle, xg_workload_h workload ) {
     xi_ui_state->device = device_handle;
     xi_ui_state->transform_geo.cpu = xg_geo_util_generate_sphere ( 0.1f, 30, 30 );
-    xi_ui_state->transform_geo.gpu = xg_geo_util_upload_geometry_to_gpu ( device_handle, &xi_ui_state->transform_geo.cpu );
+    xi_ui_state->transform_geo.gpu = xg_geo_util_upload_geometry_to_gpu ( device_handle, workload, &xi_ui_state->transform_geo.cpu );
 }
 
 static bool xi_ui_ray_triangle_intersect ( sm_vec_3f_t* intersection, float* ray_depth,  sm_vec_3f_t ray_origin, sm_vec_3f_t ray_direction, sm_vec_3f_t tri_a, sm_vec_3f_t tri_b, sm_vec_3f_t tri_c ) {

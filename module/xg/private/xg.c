@@ -72,6 +72,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_barrier_set = xg_cmd_buffer_barrier_set;
     xg->cmd_clear_texture = xg_cmd_buffer_clear_texture;
     xg->cmd_clear_depth_stencil_texture = xg_cmd_buffer_clear_depth_stencil_texture;
+    xg->cmd_clear_buffer = xg_cmd_buffer_clear_buffer;
     xg->cmd_draw = xg_cmd_buffer_cmd_draw;
     xg->cmd_compute = xg_cmd_buffer_cmd_compute;
     xg->cmd_copy_texture = xg_cmd_buffer_copy_texture;

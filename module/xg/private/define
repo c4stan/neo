@@ -14,16 +14,16 @@ xg_vk_workload_max_staging_buffers_per_workload_m       8
 xg_workload_max_timestamp_query_pools_per_workload_m    8
 xg_workload_timing_name_size_m                          32
 
-xg_cmd_buffer_max_cmd_buffers_per_workload_m            32
-xg_cmd_buffer_max_resource_cmd_buffers_per_workload_m   32
+xg_cmd_buffer_max_cmd_buffers_per_workload_m            64
+xg_cmd_buffer_max_resource_cmd_buffers_per_workload_m   128
 
 # TODO crash when trying to use non-preallocated resource cmd buffer ( allocator is null ) - investigate and fix 
 xg_cmd_buffer_cmd_buffer_size_m                     32 * 1024 * 1024
-xg_cmd_buffer_max_cmd_buffers_m                     64
+xg_cmd_buffer_max_cmd_buffers_m                     1024
 xg_cmd_buffer_preallocated_cmd_buffers_m            64
 
 xg_cmd_buffer_resource_cmd_buffer_size_m            64 * 1024 * 1024
-xg_cmd_buffer_max_resource_cmd_buffers_m            64
+xg_cmd_buffer_max_resource_cmd_buffers_m            1024
 xg_cmd_buffer_preallocated_resource_cmd_buffers_m   64
 
 xg_instance_enabled_runtime_layers_m        (xg_runtime_layer_bit_debug_m | xg_runtime_layer_bit_renderdoc_m)
@@ -76,7 +76,7 @@ xg_vk_workload_max_framebuffers_per_workload_m      4
 xg_vk_workload_max_desc_allocators_per_workload_m   8
 xg_vk_workload_max_cmd_allocators_per_workload_m    8
 xg_vk_workload_max_resource_bindings_m              1024*10
-xg_vk_workload_resource_bindings_update_batch_size_m 128
+xg_vk_workload_resource_bindings_update_batch_size_m 1
 xg_vk_workload_max_fences_m                         16
 xg_vk_workload_max_translates_per_submit_m          2
 xg_vk_workload_max_execution_barriers_per_cmd_m     8

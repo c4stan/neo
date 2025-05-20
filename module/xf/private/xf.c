@@ -24,7 +24,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->create_texture = xf_resource_texture_create;
     xf->create_buffer = xf_resource_buffer_create;
     xf->create_graph = xf_graph_create;
-    xf->add_node = xf_graph_node_create;
+    xf->create_node = xf_graph_node_create;
     xf->finalize_graph = xf_graph_finalize;
     //xf->build_graph = xf_graph_build;
     xf->execute_graph = xf_graph_execute;
@@ -39,17 +39,16 @@ static void xf_api_init ( xf_i* xf ) {
     xf->node_set_enabled = xf_graph_node_set_enabled;
 
     xf->create_multi_texture = xf_resource_multi_texture_create;
-    //xf.declare_multi_buffer = xf_multi_resource_declare_multi_buffer;
+    xf->create_multi_buffer = xf_resource_multi_buffer_create;
     xf->advance_multi_texture = xf_resource_multi_texture_advance;
-    //xf.advance_multi_buffer = xf_multi_resource_advance_multi_buffer;
-    //xf.get_multi_texture = xf_multi_resource_get_multi_texture;
-    //xf.get_multi_buffer = xf_multi_resource_get_multi_buffer;
+    xf->advance_multi_buffer = xf_resource_multi_buffer_advance;
     xf->create_multi_texture_from_swapchain = xf_resource_multi_texture_create_from_swapchain;
 
     xf->destroy_texture = xf_resource_texture_destroy;
 
     xf->create_texture_from_external = xf_resource_texture_create_from_external;
     xf->get_multi_texture = xf_resource_multi_texture_get_texture;
+    xf->get_multi_buffer = xf_resource_multi_buffer_get_buffer;
 
     xf->get_texture_info = xf_resource_texture_get_info;
     xf->get_graph_info = xf_graph_get_info;
