@@ -14,7 +14,9 @@ include common.xsi
 
 begin bindings
     ray_world ray_gen ray_hit_closest
-    texture storage ray_gen
+    sampler
+    texture[5] sampled
+    texture[2] storage ray_gen
+    buffer storage ray_gen
     buffer storage ray_hit_closest
-    buffer[2] storage ray_gen
 end

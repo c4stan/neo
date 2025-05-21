@@ -244,6 +244,8 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xg_swapchain_h swapchain = m_state->render.swapchain;    
     uint32_t resolution_x = m_state->render.resolution_x;
     uint32_t resolution_y = m_state->render.resolution_y;
+    xg_i* xg = m_state->modules.xg;
+    xs_i* xs = m_state->modules.xs;
     xf_i* xf = m_state->modules.xf;
 
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
@@ -252,11 +254,100 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
     m_state->render.raytrace_graph = graph;
 
-    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m ( 
+    // gbuffer laydown
+    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "color_texture",
+    ) );
+
+    xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "normal_texture",
+    ) );
+
+    xf_texture_h material_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "material_texture"
+    ) );
+
+    xf_texture_h radiosity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "radiosity_texture"
+    ) );
+
+    xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_r8g8b8a8_uint_m,
+            .debug_name = "gbuffer_object_id",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m()
+        ),
+    ) );
+
+    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r16g16_sfloat_m,
+        .debug_name = "velocity_texture",
+    ) );
+
+    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_d32_sfloat_m,
+            .debug_name = "depth_texture",
+            .clear_on_create = true,
+            .clear.depth_stencil = xg_depth_stencil_clear_m ()
+        ),
+    ) );
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "geometry_clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { 
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+            }
+        ),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 7,
+            .copy_texture_writes = {
+                xf_copy_texture_dependency_m ( .texture = depth_texture ),
+                xf_copy_texture_dependency_m ( .texture = color_texture ),
+                xf_copy_texture_dependency_m ( .texture = normal_texture ),
+                xf_copy_texture_dependency_m ( .texture = material_texture ),
+                xf_copy_texture_dependency_m ( .texture = radiosity_texture ),
+                xf_copy_texture_dependency_m ( .texture = object_id_texture ),
+                xf_copy_texture_dependency_m ( .texture = velocity_texture ),
+            }
+        ),
+    ) );
+
+    add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
+
+    // raytrace
+    xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
-        .debug_name = "color_texture"
+        .debug_name = "lighting_texture"
     ));
 
     xf_buffer_h instance_buffer = xf->create_buffer ( &xf_buffer_params_m (
@@ -269,23 +360,68 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .debug_name = "light_buffer",
     ) );
 
-    xf_buffer_h reservoir_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
-        .buffer = xf_buffer_params_m (
-            .size = 16 * resolution_x * resolution_y,
-            .debug_name = "reservoir_buffer",
+    xf_texture_h reservoir_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .debug_name = "reservoir_texture",
+            .format = xg_format_r16g16b16a16_sfloat_m,
             .clear_on_create = true,
-            .clear_value = 0,
+            .clear.color = xg_color_clear_m()
         ),
-        .multi_buffer_count = 1,
+        .multi_texture_count = 2,
     ) );
 
-    // raytrace
     add_raytrace_setup_pass ( graph, instance_buffer, light_buffer );
-    add_raytrace_pass ( graph, color_texture, instance_buffer, light_buffer, reservoir_buffer );
+    add_raytrace_pass ( graph, color_texture, normal_texture, material_texture, radiosity_texture, depth_texture, lighting_texture, instance_buffer, light_buffer, reservoir_texture );
+
+    // taa
+    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_b10g11r11_ufloat_pack32_m,
+            .debug_name = "taa_accumulation_texture",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m()
+        ),
+    ) );
+    xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
+    //xf_node_h taa_node = 
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "taa",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "taa" ) ) ),
+            .samplers_count = 2,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = taa_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 5,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = lighting_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_texture ), 
+                xf_compute_texture_dependency_m ( .texture = taa_history_texture ), 
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ),
+                xf_compute_texture_dependency_m ( .texture = velocity_texture ) 
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { 
+                xf_texture_passthrough_m ( 
+                    .mode = xf_passthrough_mode_copy_m, 
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = lighting_texture ) 
+                ) 
+            }
+        )
+    ) );
+    //m_state->render.taa_node = taa_node;
 
     // tonemap
-    xs_i* xs = m_state->modules.xs;
-    xg_i* xg = m_state->modules.xg;
     xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
@@ -305,13 +441,13 @@ static void viewapp_boot_raytrace_graph ( void ) {
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = tonemap_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
             .sampled_textures_count = 1,
-            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = color_texture ) },
+            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = taa_accumulation_texture ) },
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
             .storage_texture_writes = { xf_texture_passthrough_m (
                     .mode = xf_passthrough_mode_copy_m,
-                    .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ),
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = taa_accumulation_texture ),
                 )
             },
         ),
@@ -319,8 +455,8 @@ static void viewapp_boot_raytrace_graph ( void ) {
 
     // ui
     //m_state->render.export_dest = xf->create_texture_from_external ( m_state->ui.export_texture );
-    //add_ui_pass ( graph, color_texture, m_state->render.export_dest );
-    add_ui_pass ( graph, tonemap_texture, xf_null_handle_m );
+    add_ui_pass ( graph, tonemap_texture, m_state->render.export_dest );
+    //add_ui_pass ( graph, tonemap_texture, xf_null_handle_m );
 
     // present
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );

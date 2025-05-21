@@ -24,11 +24,7 @@ layout ( buffer_reference, scalar ) buffer uint3_buffer_t { uint[3] data[]; };
 
 layout ( location = 0 ) rayPayloadInNV ray_payload_t ray_payload;
 
-layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform accelerationStructureNV scene;
-
-layout ( binding = 1, set = xs_shader_binding_set_dispatch_m, rgba32f ) uniform image2D img_color;
-
-layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, scalar ) buffer instance_array_t {
+layout ( binding = 10, set = xs_shader_binding_set_dispatch_m, scalar ) buffer instance_array_t {
     instance_t data[];
 } instance_array;
 

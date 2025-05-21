@@ -154,29 +154,32 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
         .layout = xg->get_pipeline_resource_layout ( pipeline, xg_shader_binding_set_dispatch_m ),
         .bindings = xg_pipeline_resource_bindings_m (
             .raytrace_world_count = 1,
-            .raytrace_worlds = { xg_raytrace_world_resource_binding_m (
-                .shader_register = 0,
-                .world = pass_args->world,
-            )},
-            .texture_count = 1,
-            .textures = {  
-                xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[0], 1 ),
+            .raytrace_worlds = { xg_raytrace_world_resource_binding_m ( .shader_register = 0, .world = pass_args->world ) },
+            .sampler_count = 1,
+            .samplers = { 
+                xg_sampler_resource_binding_m ( .shader_register = 1, .sampler = xg->get_default_sampler ( node_args->device, xg_default_sampler_point_clamp_m ) )
             },
-            .buffer_count = 3,
+            .texture_count = 7,
+            .textures = {  
+                xf_shader_texture_binding_m ( node_args->io->sampled_textures[0], 2 ),
+                xf_shader_texture_binding_m ( node_args->io->sampled_textures[1], 3 ),
+                xf_shader_texture_binding_m ( node_args->io->sampled_textures[2], 4 ),
+                xf_shader_texture_binding_m ( node_args->io->sampled_textures[3], 5 ),
+                xf_shader_texture_binding_m ( node_args->io->sampled_textures[4], 6 ),
+                xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[0], 7 ),
+                xf_shader_texture_binding_m ( node_args->io->storage_texture_writes[1], 8 ),
+            },
+            .buffer_count = 2,
             .buffers = {
                 xg_buffer_resource_binding_m ( 
-                    .shader_register = 2,
+                    .shader_register = 9,
                     .range = xg_buffer_range_whole_buffer_m ( node_args->io->storage_buffer_reads[0] ),
                 ),
                 xg_buffer_resource_binding_m ( 
-                    .shader_register = 3,
+                    .shader_register = 10,
                     .range = xg_buffer_range_whole_buffer_m ( node_args->io->storage_buffer_reads[1] ),
                 ),
-                xg_buffer_resource_binding_m ( 
-                    .shader_register = 4,
-                    .range = xg_buffer_range_whole_buffer_m ( node_args->io->storage_buffer_writes[0] ),
-                ),
-            }
+            },
         )
     ) );
 
@@ -189,7 +192,7 @@ static void raytrace_pass ( const xf_node_execute_args_t* node_args, void* user_
     ) );
 }
 
-xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target, xf_buffer_h instances, xf_buffer_h lights, xf_buffer_h reservoir ) {
+xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h color_texture, xf_texture_h normal_texture, xf_texture_h material_texture, xf_texture_h radiosity_texture, xf_texture_h depth_texture, xf_texture_h target, xf_buffer_h instances, xf_buffer_h lights, xg_texture_h reservoir ) {
     viewapp_state_t* state = viewapp_state_get();
     xs_i* xs = state->modules.xs;
     xf_i* xf = state->modules.xf;
@@ -215,13 +218,22 @@ xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h target, xf_buffer_h
         .resources = xf_node_resource_params_m (
             .storage_buffer_reads_count = 2,
             .storage_buffer_reads = { 
-                xf_shader_buffer_dependency_m ( .buffer = instances, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
                 xf_shader_buffer_dependency_m ( .buffer = lights, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
+                xf_shader_buffer_dependency_m ( .buffer = instances, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
             },
-            .storage_buffer_writes_count = 1,
-            .storage_buffer_writes = { xf_shader_buffer_dependency_m ( .buffer = reservoir, .stage = xg_pipeline_stage_bit_raytrace_shader_m ) },
-            .storage_texture_writes_count = 1,
-            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = target, .stage = xg_pipeline_stage_bit_raytrace_shader_m ) },
+            .storage_texture_writes_count = 2,
+            .storage_texture_writes = { 
+                xf_shader_texture_dependency_m ( .texture = target, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = reservoir, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
+            },
+            .sampled_textures_count = 5,
+            .sampled_textures = {
+                xf_shader_texture_dependency_m ( .texture = color_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = normal_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = material_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = radiosity_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = depth_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+            }
         ),
     );
     xf_node_h node = xf->create_node ( graph, &node_params );
