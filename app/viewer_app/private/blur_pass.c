@@ -93,7 +93,7 @@ xf_node_h add_bilateral_blur_pass ( xf_graph_h graph, xf_texture_h dst, xf_textu
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = pipeline_state,
-            .uniform_data = std_buffer_m ( &uniform_data ),
+            .uniform_data = std_buffer_struct_m ( &uniform_data ),
             .workgroup_count = { std_div_ceil_u32 ( dst_info.width, 8 ), std_div_ceil_u32 ( dst_info.height, 8 ), 1 },
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ) },

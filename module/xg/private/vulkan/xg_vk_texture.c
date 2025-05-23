@@ -620,10 +620,12 @@ void xg_vk_texture_update_swapchain_texture ( xg_texture_h texture_handle, const
 }
 
 const xg_vk_texture_t* xg_vk_texture_get ( xg_texture_h texture_handle ) {
+    std_assert_m ( texture_handle != xg_null_handle_m );
     return &xg_vk_texture_state->textures_array[texture_handle];
 }
 
 const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture_handle, xg_texture_view_t view ) {
+    std_assert_m ( texture_handle != xg_null_handle_m );
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 
     if ( std_likely_m ( xg_texture_view_is_default_m ( view, texture->params.mip_levels, texture->params.array_layers, texture->params.format, texture->params.allowed_usage ) ) ) {

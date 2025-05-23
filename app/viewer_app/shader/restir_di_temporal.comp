@@ -1,0 +1,100 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : enable
+
+#include <xs.glsl>
+
+#include "common.glsl"
+#include "restir_di_common.glsl"
+
+struct light_t {
+    float pos[3];
+    float radius;
+    float color[3];
+    float emissive;
+    uint id;
+};
+
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m, scalar ) buffer light_array_t {
+    uint light_count;
+    uint _pad0[3];
+    light_t data[];
+} light_buffer;
+
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m, scalar ) buffer prev_reservoir_array_t {
+    reservoir_t data[];
+} prev_reservoir_buffer;
+
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, scalar ) buffer reservoir_array_t {
+    reservoir_t data[];
+} reservoir_buffer;
+
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_velocity;
+
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+
+layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+vec3 load_vec3 ( float[3] f32 ) {
+    return vec3 ( f32[0], f32[1], f32[2] );
+}
+
+float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_color ) {
+    light_t light = light_buffer.data[light_idx];
+    vec3 light_pos = load_vec3 ( light.pos );
+    vec3 light_color = load_vec3 ( light.color );
+    vec3 light_dir = normalize ( light_pos - world_pos );
+    float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+    float d = distance ( light_pos, world_pos );
+    float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
+    return p_hat;
+}
+
+void main ( void ) {
+    ivec2 screen_tex = ivec2 ( gl_GlobalInvocationID.xy );
+    vec2 screen_uv = vec2 ( ( screen_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
+
+    vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
+    vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
+    float roughness = normal_rough_sample.w;
+    vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
+    vec3 base_color = color_metal_sample.xyz;
+    float metalness = color_metal_sample.w;
+    float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
+    vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_linear ), screen_uv ).xy;
+
+    vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
+    vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
+    vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
+
+    uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
+
+    vec2 reprojected_uv = screen_uv - velocity;
+    uvec2 reprojected_tex = vec2 ( round ( reprojected_uv * frame_uniforms.resolution_f32 ) );
+    //uint prev_reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    uint prev_reservoir_idx = reprojected_tex.y * frame_uniforms.resolution_u32.x + reprojected_tex.x;
+    reservoir_t prev_reservoir = prev_reservoir_buffer.data[prev_reservoir_idx];
+    prev_reservoir.light_count = min ( prev_reservoir.light_count, reservoir.light_count * 20 );
+
+    rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
+    reservoir_t temporal_reservoir = reservoir_init();
+
+    float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
+    update_reservoir ( temporal_reservoir, reservoir.light, p_hat * reservoir.weight * reservoir.light_count, reservoir.light_count, rng_state );
+
+    float prev_p_hat = light_p ( prev_reservoir.light, world_geo_pos, world_normal, base_color );
+    update_reservoir ( temporal_reservoir, prev_reservoir.light, prev_p_hat * prev_reservoir.weight * prev_reservoir.light_count, prev_reservoir.light_count, rng_state );
+
+    float temporal_p_hat = light_p ( temporal_reservoir.light, world_geo_pos, world_normal, base_color );
+    temporal_reservoir.weight = temporal_p_hat > 0 ? temporal_reservoir.weight_sum / ( temporal_p_hat * temporal_reservoir.light_count ) : 0.0;
+
+    if ( prev_reservoir.light == reservoir.light ) {
+        temporal_reservoir.debug = 0;
+    }
+
+    reservoir_buffer.data[reservoir_idx] = temporal_reservoir;
+}

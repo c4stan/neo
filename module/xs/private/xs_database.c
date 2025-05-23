@@ -550,7 +550,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                             std_log_info_m ( "Shader " std_fmt_str_m " failed to build", shader_path );
                         }
                         ++shader_fail;
-                        bytecode->buffer = std_null_buffer_m;
+                        bytecode->buffer = std_buffer_m();
                         continue;
                     } else {
                         ++shader_success;

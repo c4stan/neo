@@ -896,6 +896,7 @@ void xg_vk_raytrace_geometry_destroy ( xg_raytrace_geometry_h geo_handle ) {
 }
 
 const xg_vk_raytrace_geometry_t* xg_vk_raytrace_geometry_get ( xg_raytrace_geometry_h geo ) {
+    std_assert_m ( geo != xg_null_handle_m );
 #if xg_enable_raytracing_m
     return &xg_vk_raytrace_state->geometries_array[geo];
 #else
@@ -904,6 +905,7 @@ const xg_vk_raytrace_geometry_t* xg_vk_raytrace_geometry_get ( xg_raytrace_geome
 }
 
 const xg_vk_raytrace_world_t* xg_vk_raytrace_world_get ( xg_raytrace_world_h world ) {
+    std_assert_m ( world != xg_null_handle_m );
 #if xg_enable_raytracing_m
     return &xg_vk_raytrace_state->worlds_array[world];
 #else

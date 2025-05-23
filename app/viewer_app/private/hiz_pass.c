@@ -112,7 +112,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = hz_gen_mip0_copy_pass,
-            .user_args = std_buffer_m ( &args ),
+            .user_args = std_buffer_struct_m ( &args ),
             .auto_renderpass = true,
         ),
         .resources = xf_node_resource_params_m (
@@ -155,7 +155,7 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = pipeline_state,
             .workgroup_count = { std_div_ceil_u32 ( dst_width, 8 ), std_div_ceil_u32 ( dst_height, 8 ), 1 },
-            .uniform_data = std_buffer_m ( &uniform_data ),
+            .uniform_data = std_buffer_struct_m ( &uniform_data ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( graph_info.device, xg_default_sampler_point_clamp_m ) }
         ),

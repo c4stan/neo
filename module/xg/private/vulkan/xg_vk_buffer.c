@@ -187,5 +187,6 @@ bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
 }
 
 const xg_vk_buffer_t* xg_vk_buffer_get ( xg_buffer_h buffer_handle ) {
+    std_assert_m ( buffer_handle != xg_null_handle_m );
     return &xg_vk_buffer_state->buffer_array[buffer_handle];
 }

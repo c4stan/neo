@@ -208,9 +208,24 @@ typedef struct {
 }
 
 typedef struct {
+    xf_passthrough_mode_e mode;
+    union {
+        uint32_t clear;
+        xf_buffer_h copy_source;
+    };
+} xf_buffer_passthrough_t;
+
+#define xf_buffer_passthrough_m( ... ) ( xf_buffer_passthrough_t ) { \
+    .mode = xf_passthrough_mode_ignore_m, \
+    .clear = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
     bool enable;
     xf_texture_passthrough_t render_targets[xf_node_max_render_targets_m];
     xf_texture_passthrough_t storage_texture_writes[xf_node_max_storage_texture_writes_m];
+    xf_buffer_passthrough_t storage_buffer_writes[xf_node_max_storage_buffer_writes_m];
 } xf_node_passthrough_params_t;
 
 // TODO add depth_stencil?
@@ -218,6 +233,7 @@ typedef struct {
     .enable = false, \
     .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_texture_passthrough_m() }, \
     .storage_texture_writes = { [0 ... xf_node_max_storage_texture_writes_m - 1] = xf_texture_passthrough_m() }, \
+    .storage_buffer_writes = { [0 ... xf_node_max_storage_buffer_writes_m - 1] = xf_buffer_passthrough_m() }, \
     ##__VA_ARGS__ \
 }
 
@@ -319,11 +335,7 @@ typedef struct {
 } xf_node_custom_pass_params_t;
 
 #define xf_node_custom_pass_params_m( ... ) ( xf_node_custom_pass_params_t ) { \
-    .key_space_size = 0, \
-    .routine = NULL, \
-    .user_args = std_null_buffer_m, \
     .copy_args = true, \
-    .auto_renderpass = false, \
     ##__VA_ARGS__ \
 }
 
@@ -339,10 +351,28 @@ typedef struct {
 #define xf_node_compute_pass_params_m( ... ) ( xf_node_compute_pass_params_t ) { \
     .pipeline = xg_null_handle_m, \
     .workgroup_count = { 1, 1, 1 }, \
-    .uniform_data = std_null_buffer_m, \
     .copy_uniform_data = true, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
-    .samplers_count = 0, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xg_raytrace_pipeline_state_h pipeline;
+    uint32_t thread_count[3];
+    std_buffer_t uniform_data;
+    bool copy_uniform_data;
+    xg_sampler_h samplers[xg_pipeline_resource_max_samplers_per_set_m];
+    uint32_t samplers_count;
+    // TODO move into resources and do transitions etc?
+    xg_raytrace_world_h raytrace_worlds[xg_pipeline_resource_max_raytrace_worlds_per_set_m];
+    uint32_t raytrace_worlds_count;
+} xf_node_raytrace_pass_params_t;
+
+#define xf_node_raytrace_pass_params_m( ... ) ( xf_node_raytrace_pass_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .thread_count = { 1, 1, 1 }, \
+    .copy_uniform_data = true, \
+    .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
     ##__VA_ARGS__ \
 }
 
@@ -388,6 +418,7 @@ typedef struct {
     union {
         xf_node_custom_pass_params_t custom;
         xf_node_compute_pass_params_t compute;
+        xf_node_raytrace_pass_params_t raytrace;
         xf_node_copy_pass_params_t copy;
         xf_node_clear_pass_params_t clear;
     };
@@ -396,6 +427,7 @@ typedef struct {
 typedef enum {
     xf_node_type_custom_pass_m,
     xf_node_type_compute_pass_m,
+    xf_node_type_raytrace_pass_m,
     xf_node_type_copy_pass_m,
     xf_node_type_clear_pass_m,
 } xf_node_type_e;

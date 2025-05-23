@@ -43,7 +43,7 @@ void*   std_virtual_heap_alloc ( size_t size, size_t align, std_alloc_scope_t sc
 #else
 void*   std_virtual_heap_alloc ( size_t size, size_t align );
 #define std_virtual_heap_alloc_m( size, align ) ( std_virtual_heap_alloc ( size, align ) )
-#define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
+#define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc_m ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
 #define std_virtual_heap_alloc_struct_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
 #endif
 bool    std_virtual_heap_free ( void* ptr );
@@ -70,19 +70,17 @@ typedef struct {
 
 void std_virtual_heap_allocator_module_info ( std_allocator_module_info_t* info );
 
-/*
-    Buffer utilities
-*/
-// Just a utility struct. Can be used as return value, or to store a memory segment without having to split it into 2 separate fields
+// Just a utility buffer struct. Can be used as return value, or to store a memory segment without having to split it into 2 separate fields
 typedef struct {
     void* base;
     size_t size;
 } std_buffer_t;
 
-std_buffer_t std_buffer ( void* base, size_t size );
-#define std_buffer_m( item ) std_buffer ( item, sizeof ( *item ) )
-#define std_buffer_static_array_m( array ) std_buffer ( array, sizeof ( array ) )
-#define std_null_buffer_m ( std_buffer_t ) { NULL, 0 }
+#define std_buffer_m( ... ) ( std_buffer_t ) { \
+    __VA_ARGS__ \
+}
+#define std_buffer_struct_m( item ) std_buffer_m ( .base = item, .size = sizeof ( *item ) )
+#define std_buffer_static_array_m( array ) std_buffer_m ( .base = array, .size = sizeof ( array ) )
 
 // TODO split the stacks out to new file std_stack?
 // Linear fixed size allocator. Can be manually resized by cloning to a bigger separate stack and freeing the old one. 
@@ -199,5 +197,3 @@ size_t       std_tagged_page_size ( void );
 std_buffer_t std_tagged_alloc ( size_t size, uint64_t tag );
 void         std_tagged_free ( uint64_t tag );
 #endif
-
-

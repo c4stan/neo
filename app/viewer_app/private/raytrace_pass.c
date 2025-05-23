@@ -213,7 +213,7 @@ xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h color_texture, xf_t
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = raytrace_pass,
-            .user_args = std_buffer_m ( &args ),
+            .user_args = std_buffer_struct_m ( &args ),
         ),
         .resources = xf_node_resource_params_m (
             .storage_buffer_reads_count = 2,

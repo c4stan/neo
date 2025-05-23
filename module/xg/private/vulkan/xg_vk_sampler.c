@@ -168,6 +168,6 @@ bool xg_sampler_destroy ( xg_sampler_h sampler_handle ) {
 }
 
 const xg_vk_sampler_t* xg_vk_sampler_get ( xg_sampler_h sampler_handle ) {
-    const xg_vk_sampler_t* sampler = &xg_vk_sampler_state->samplers_array[sampler_handle];
-    return sampler;
+    std_assert_m ( sampler_handle != xg_null_handle_m );
+    return &xg_vk_sampler_state->samplers_array[sampler_handle];
 }

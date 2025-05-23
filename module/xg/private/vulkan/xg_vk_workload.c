@@ -488,6 +488,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         const xg_resource_binding_layout_t* layout = &resource_bindings_layout->params.resources[binding_idx];
                         xg_resource_binding_e binding_type = layout->type;
                         const xg_vk_buffer_t* buffer = xg_vk_buffer_get ( binding->range.handle );
+                        std_assert_m ( buffer->vk_handle != VK_NULL_HANDLE );
 
                         VkDescriptorBufferInfo* info = &buffer_info_array[buffer_info_count++];
                         info->offset = binding->range.offset;
@@ -525,6 +526,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         const xg_resource_binding_layout_t* layout = &resource_bindings_layout->params.resources[binding_idx];
                         xg_resource_binding_e binding_type = layout->type;
                         const xg_vk_texture_view_t* view = xg_vk_texture_get_view ( binding->texture, binding->view );
+                        std_assert_m ( view->vk_handle != VK_NULL_HANDLE );
 
                         VkDescriptorImageInfo* info = &image_info_array[image_info_count++];
                         info->sampler = VK_NULL_HANDLE;
@@ -559,6 +561,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         std_assert_m ( binding->shader_register != -1, "Resource binding shader register not set" );
                         uint32_t binding_idx = resource_bindings_layout->shader_register_to_descriptor_idx[binding->shader_register];
                         const xg_vk_sampler_t* sampler = xg_vk_sampler_get ( binding->sampler );
+                        std_assert_m ( sampler->vk_handle != VK_NULL_HANDLE );
 
                         VkDescriptorImageInfo* info = &image_info_array[image_info_count++];
                         info->sampler = sampler->vk_handle;
@@ -580,6 +583,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         std_assert_m ( binding->shader_register != -1, "Resource binding shader register not set" );
                         uint32_t binding_idx = resource_bindings_layout->shader_register_to_descriptor_idx[binding->shader_register];
                         const xg_vk_raytrace_world_t* world = xg_vk_raytrace_world_get ( binding->world );
+                        std_assert_m ( world->vk_handle != VK_NULL_HANDLE );
 
 #if xg_vk_enable_nv_raytracing_ext_m
                         VkWriteDescriptorSetAccelerationStructureNV as_info = {

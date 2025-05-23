@@ -1,0 +1,103 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : enable
+
+#include <xs.glsl>
+
+#include "common.glsl"
+#include "restir_di_common.glsl"
+
+struct light_t {
+    float pos[3];
+    float radius;
+    float color[3];
+    float emissive;
+    uint id;
+};
+
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m, scalar ) buffer light_array_t {
+    uint light_count;
+    uint _pad0[3];
+    light_t data[];
+} light_buffer;
+
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m, scalar ) buffer reservoir_array_t {
+    reservoir_t data[];
+} reservoir_buffer;
+
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+
+layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+
+vec3 load_vec3 ( float[3] f32 ) {
+    return vec3 ( f32[0], f32[1], f32[2] );
+}
+
+float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_color ) {
+    light_t light = light_buffer.data[light_idx];
+    vec3 light_pos = load_vec3 ( light.pos );
+    vec3 light_color = load_vec3 ( light.color );
+    vec3 light_dir = normalize ( light_pos - world_pos );
+    float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+    float d = distance ( light_pos, world_pos );
+    float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
+    return p_hat;
+}
+
+void main ( void ) {
+    ivec2 screen_tex = ivec2 ( gl_GlobalInvocationID.xy );
+    vec2 screen_uv = vec2 ( ( screen_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
+
+    vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
+    vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
+    float roughness = normal_rough_sample.w;
+    vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
+    vec3 base_color = color_metal_sample.xyz;
+    float metalness = color_metal_sample.w;
+    float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
+
+    vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
+    vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
+    vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
+
+    rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
+    reservoir_t spatial_reservoir = reservoir_init();
+
+    uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
+
+    float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
+    update_reservoir ( spatial_reservoir, reservoir.light, p_hat * reservoir.weight * reservoir.light_count, reservoir.light_count, rng_state );
+
+    uint sample_count = 5;
+    float radius = 30;
+    for ( uint i = 0; i < sample_count; ++i ) {
+        vec2 offset = 2.0 * vec2 ( rng_wang ( rng_state ), rng_wang ( rng_state ) ) - 1.0.xx;
+     
+        ivec2 sample_tex = ivec2 ( gl_GlobalInvocationID.xy ) + ivec2 ( offset * radius );
+        
+        vec2 sample_uv = vec2 ( ( sample_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
+        float sample_depth = texture ( sampler2D ( tex_depth, sampler_linear ), sample_uv ).x;
+        vec3 sample_normal = texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv ).xyz;
+        vec3 sample_view_normal = normalize ( sample_normal.xyz * 2 - 1 );
+        vec3 sample_world_normal = mat3 ( frame_uniforms.world_from_view ) * sample_view_normal;
+        if ( abs ( sample_depth - depth ) > 0.0002 || dot ( sample_world_normal, world_normal ) < 0.9 ) { 
+            continue;
+        }
+     
+        uint sample_reservoir_idx = sample_tex.y * frame_uniforms.resolution_u32.x + sample_tex.x;
+        reservoir_t sample_reservoir = reservoir_buffer.data[sample_reservoir_idx];
+
+        float sample_p_hat = light_p ( sample_reservoir.light, world_geo_pos, world_normal, base_color );
+        update_reservoir ( spatial_reservoir, sample_reservoir.light, sample_p_hat * sample_reservoir.weight * sample_reservoir.light_count, sample_reservoir.light_count, rng_state );
+    }
+
+    float spatial_p_hat = light_p ( spatial_reservoir.light, world_geo_pos, world_normal, base_color );
+    spatial_reservoir.weight = spatial_p_hat > 0 ? spatial_reservoir.weight_sum / ( spatial_p_hat * spatial_reservoir.light_count ) : 0.0;
+
+    reservoir_buffer.data[reservoir_idx] = spatial_reservoir;
+}

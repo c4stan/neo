@@ -1,0 +1,168 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+#extension GL_EXT_scalar_block_layout : enable
+
+#include <xs.glsl>
+
+#include "common.glsl"
+#include "restir_di_common.glsl"
+
+layout ( location = 0 ) rayPayloadNV ray_payload_t ray_payload;
+layout ( location = 1 ) rayPayloadNV ray_payload_t shadow_ray_payload;
+
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform accelerationStructureNV scene;
+
+struct light_t {
+    float pos[3];
+    float radius;
+    float color[3];
+    float emissive;
+    uint id;
+};
+
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, scalar ) buffer light_array_t {
+    uint light_count;
+    uint _pad0[3];
+    light_t data[];
+} light_buffer;
+
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m, scalar ) buffer reservoir_array_t {
+    reservoir_t data[];
+} reservoir_buffer;
+
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_radiosity;
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+
+layout ( binding = 9, set = xs_shader_binding_set_dispatch_m ) writeonly uniform image2D img_color;
+
+layout ( binding = 10, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+
+vec3 load_vec3 ( float[3] f32 ) {
+    return vec3 ( f32[0], f32[1], f32[2] );
+}
+
+void trace_ray ( vec3 pos, vec3 dir ) {
+    const uint trace_flags = gl_RayFlagsOpaqueEXT;
+    const uint cull_mask = 0xff;
+    const uint sbt_hit_idx = 0;
+    const uint sbt_stride = 0;
+    const uint sbt_miss_idx = 0;
+    const float t_min = 0.001;
+    const float t_max = 10000.0;
+    const int payload_id = 0;
+    traceNV (
+        scene,
+        trace_flags,
+        cull_mask,
+        sbt_hit_idx,
+        sbt_stride,
+        sbt_miss_idx,
+        pos,
+        t_min,
+        dir,
+        t_max,
+        payload_id
+    );
+}
+
+void trace_shadow_ray ( vec3 pos, vec3 dir ) {
+#if 0
+    const uint trace_flags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitNV;
+    const uint cull_mask = 0xff;
+    const uint sbt_hit_idx = 0;
+    const uint sbt_stride = 0;
+    const uint sbt_miss_idx = 1;
+    const float t_min = 0.001;
+    const float t_max = 10000.0;
+    const int payload_id = 1;
+    traceNV (
+        scene,
+        trace_flags,
+        cull_mask,
+        sbt_hit_idx,
+        sbt_stride,
+        sbt_miss_idx,
+        pos,
+        t_min,
+        dir,
+        t_max,
+        payload_id
+    );
+#else
+    const uint trace_flags = gl_RayFlagsOpaqueEXT;
+    const uint cull_mask = 0xff;
+    const uint sbt_hit_idx = 0;
+    const uint sbt_stride = 0;
+    const uint sbt_miss_idx = 0;
+    const float t_min = 0.001;
+    const float t_max = 10000.0;
+    const int payload_id = 1;
+    traceNV (
+        scene,
+        trace_flags,
+        cull_mask,
+        sbt_hit_idx,
+        sbt_stride,
+        sbt_miss_idx,
+        pos,
+        t_min,
+        dir,
+        t_max,
+        payload_id
+    );
+#endif
+}
+
+void main ( void ) {
+    const vec2 pixel_center = vec2 ( gl_LaunchIDNV.xy ) + 0.5.xx;
+    const vec2 uv = pixel_center / vec2 ( gl_LaunchSizeNV.xy );
+    const vec2 ndc = uv * 2.0 - 1.0;
+    ivec2 texel = ivec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y );
+
+    rng_wang_state_t rng_state = rng_wang_init ( pixel_center );
+
+    vec2 screen_uv = vec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) / gl_LaunchSizeNV.xy;
+    vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
+    vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
+    float roughness = normal_rough_sample.w;
+    vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
+    vec3 base_color = color_metal_sample.xyz;
+    float metalness = color_metal_sample.w;
+    vec3 radiosity = texture ( sampler2D ( tex_radiosity, sampler_linear ), screen_uv ).xyz;
+    float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
+
+    vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
+    vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
+    vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
+    vec3 radiance = base_color * radiosity;
+
+    uint reservoir_idx = gl_LaunchIDNV.x + ( gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) * gl_LaunchSizeNV.x;
+    reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
+
+
+    if ( reservoir.light_count > 0 ) {
+        light_t light = light_buffer.data[reservoir.light];
+        vec3 light_pos = load_vec3 ( light.pos );
+        vec3 light_color = load_vec3 ( light.color );
+        vec3 light_dir = normalize ( light_pos - world_geo_pos );
+        float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+        if ( cos_theta > 0 ) {
+            trace_shadow_ray ( world_geo_pos + light_dir * 0.04, light_dir );
+            float shadow_factor = shadow_ray_payload.id == light.id ? 1 : 0;
+            float d = distance ( light_pos, world_geo_pos );
+            vec3 light_radiance = shadow_factor * light.emissive * light_color * base_color * cos_theta / ( d * d * PI );
+            //float p_hat = length ( light_radiance );
+            //reservoir.weight = p_hat > 0 ? reservoir.weight_sum / ( p_hat * reservoir.light_count ) : 0.0;
+            radiance += light_radiance * reservoir.weight;
+        }
+    }
+
+    if ( reservoir.debug == 1 ) {
+        radiance = vec3 ( 1, 0, 0 );
+    }
+
+    imageStore ( img_color, texel, vec4 ( radiance, 1 ) );
+}

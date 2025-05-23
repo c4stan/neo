@@ -64,7 +64,7 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color, xf_texture_h expor
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = ui_pass_routine,
             .key_space_size = 128,
-            .user_args = std_buffer_m ( &args ),
+            .user_args = std_buffer_struct_m ( &args ),
         ),
         .resources = xf_node_resource_params_m (
             .render_targets_count = 1,

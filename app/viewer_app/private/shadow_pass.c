@@ -195,7 +195,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = shadow_pass_routine,
-            .user_args = std_buffer_m ( &args ),
+            .user_args = std_buffer_struct_m ( &args ),
             .auto_renderpass = true
         ),
         .resources = xf_node_resource_params_m (

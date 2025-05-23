@@ -1136,11 +1136,8 @@ typedef struct {
     std_buffer_t buffer;
 } xg_pipeline_state_shader_t;
 
-#define xg_pipeline_state_shader_m(...) ( xg_pipeline_state_shader_t ) { \
-    .enable = false, \
+#define xg_pipeline_state_shader_m( ... ) ( xg_pipeline_state_shader_t ) { \
     .stage = xg_shading_stage_null_m, \
-    .hash = 0, \
-    .buffer = std_null_buffer_m, \
     ##__VA_ARGS__ \
 }
 

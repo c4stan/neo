@@ -1,13 +1,13 @@
 begin ray_gen 0
-    shader ray_gen.rgen
+    shader restir_di_lighting.rgen
 end
 
 begin ray_miss 0
-    shader ray_miss.rmiss
+    shader restir_di_lighting.rmiss
 end
 
 begin ray_hit 0
-    hit_closest_shader ray_hit.rchit
+    hit_closest_shader restir_di_lighting.rchit
 end
 
 include common.xsi
@@ -15,8 +15,8 @@ include common.xsi
 begin bindings
     ray_world ray_gen ray_hit_closest
     buffer storage ray_hit_closest
-    buffer storage ray_gen
+    buffer[2] storage ray_gen
     texture[5] sampled
-    texture[2] storage ray_gen
+    texture storage ray_gen
     sampler
 end

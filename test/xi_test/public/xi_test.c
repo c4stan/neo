@@ -148,7 +148,7 @@ static void xi_test ( void ) {
             .outline = false,
             .debug_name = "proggy_clean"
         );
-        font = xi->create_font ( std_buffer ( font_data_alloc, font_file_info.size ), &font_params );
+        font = xi->create_font ( std_buffer_m ( .base = font_data_alloc, .size = font_file_info.size ), &font_params );
         std_virtual_heap_free ( font_data_alloc );
     }
 
@@ -195,7 +195,7 @@ static void xi_test ( void ) {
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = ui_pass,
-            .user_args = std_buffer_m ( &ui_node_args ),
+            .user_args = std_buffer_struct_m ( &ui_node_args ),
             .copy_args = false,
             .key_space_size = 128,
         ),

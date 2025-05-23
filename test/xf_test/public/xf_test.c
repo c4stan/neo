@@ -175,7 +175,7 @@ static void xf_test ( void ) {
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = xf_triangle_pass,
-            .user_args = std_buffer_m ( &triangle_pass_args ),
+            .user_args = std_buffer_struct_m ( &triangle_pass_args ),
             .auto_renderpass = true,
         ),
         .resources = xf_node_resource_params_m (

@@ -596,16 +596,16 @@ std_buffer_t fs_file_path_read_alloc ( const char* path ) {
     fs_file_info_t file_info;
     bool valid_info = fs_file_get_info ( &file_info, file );
     if ( !valid_info ) {
-        return std_null_buffer_m;
+        return std_buffer_m();
     }
     
     void* buffer = std_virtual_heap_alloc_m ( file_info.size, 16 );
     uint64_t read_size = fs_file_read ( buffer, file_info.size, file );
     if ( read_size == fs_read_error_m ) {
-        return std_null_buffer_m;
         std_virtual_heap_free ( buffer );
+        return std_buffer_m();
     }
 
     fs_file_close ( file );
-    return std_buffer ( buffer, file_info.size );
+    return std_buffer_m ( .base = buffer, .size = file_info.size );
 }

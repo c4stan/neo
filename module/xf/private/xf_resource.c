@@ -439,7 +439,7 @@ void xf_resource_texture_add_ref ( xf_texture_h handle ) {
         xf_texture_t* texture = xf_resource_texture_get ( handle );
         texture->ref_count += 1;
         if ( texture->ref_count > 1 ) {
-            std_log_warn_m ( std_fmt_str_m ":" std_fmt_u32_m, texture->params.debug_name, texture->ref_count );
+            //std_log_warn_m ( std_fmt_str_m ":" std_fmt_u32_m, texture->params.debug_name, texture->ref_count );
         }
     }
 }

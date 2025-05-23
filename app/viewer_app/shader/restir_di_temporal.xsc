@@ -1,0 +1,9 @@
+compute_shader restir_di_temporal.comp
+
+include common.xsi
+
+begin bindings
+    buffer[3] storage
+    texture[5] sampled
+    sampler
+end

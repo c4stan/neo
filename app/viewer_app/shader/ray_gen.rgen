@@ -11,17 +11,6 @@ layout ( location = 1 ) rayPayloadNV ray_payload_t shadow_ray_payload;
 
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform accelerationStructureNV scene;
 
-layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
-
-layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
-layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
-layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
-layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_radiosity;
-layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
-
-layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) writeonly uniform image2D img_color;
-layout ( binding = 8, set = xs_shader_binding_set_dispatch_m, rgba16f ) uniform image2D img_reservoir;
-
 struct light_t {
     float pos[3];
     float radius;
@@ -30,11 +19,23 @@ struct light_t {
     uint id;
 };
 
-layout ( binding = 9, set = xs_shader_binding_set_dispatch_m, scalar ) buffer light_array_t {
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, scalar ) buffer light_array_t {
     uint light_count;
     uint _pad0[3];
     light_t data[];
 } light_buffer;
+
+
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_radiosity;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) writeonly uniform image2D img_color;
+layout ( binding = 9, set = xs_shader_binding_set_dispatch_m, rgba16f ) uniform image2D img_reservoir;
+
+layout ( binding = 10, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
 struct reservoir_t {
     uint light;
@@ -162,45 +163,49 @@ void main ( void ) {
 
     const uint bounces = 1;
     for ( uint i = 0; i < bounces; ++i ) {
-#if 0
-        trace_ray ( origin, direction );
+        vec3 world_geo_pos;
+        vec3 world_normal;
+        
+        if ( i > 0 ) {
+            trace_ray ( origin, direction );
 
-        if ( ray_payload.distance < 0 ) {
+            if ( ray_payload.distance < 0 ) {
+                throughput *= ray_payload.color;
+                radiance += throughput;
+                break;
+            }
+
+            world_geo_pos = origin + direction * ray_payload.distance;
+            world_normal = ray_payload.normal;
+
+            // ray contrib
+            radiance += ray_payload.color * ray_payload.emissive * throughput;
             throughput *= ray_payload.color;
-            radiance += throughput;
-            break;
+        } else {
+            vec2 screen_uv = vec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) / gl_LaunchSizeNV.xy;
+            vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
+            vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
+            float roughness = normal_rough_sample.w;
+            vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
+            vec3 base_color = color_metal_sample.xyz;
+            float metalness = color_metal_sample.w;
+            vec3 radiosity = texture ( sampler2D ( tex_radiosity, sampler_linear ), screen_uv ).xyz;
+            float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
+
+            vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
+            // Normal Offset shadows, helps with acne
+            // https://digitalrune.github.io/DigitalRune-Documentation/html/3f4d959e-9c98-4a97-8d85-7a73c26145d7.htm
+            // https://mynameismjp.wordpress.com/2013/09/10/shadow-maps/
+            // https://c0de517e.blogspot.com/2011/05/shadowmap-bias-notes.html
+            // https://ndotl.wordpress.com/2014/12/19/notes-on-shadow-bias/
+            view_geo_pos += view_normal * 0.0;
+            world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
+            world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
+
+            radiance += base_color * radiosity * throughput;
+            throughput *= base_color;
         }
 
-        vec3 hit_pos = origin + direction * ray_payload.distance;
-
-        // ray contrib
-        radiance += ray_payload.color * ray_payload.emissive * throughput;
-        throughput *= ray_payload.color;
-
-#else
-        vec2 screen_uv = vec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) / gl_LaunchSizeNV.xy;
-        vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
-        vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
-        float roughness = normal_rough_sample.w;
-        vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
-        vec3 base_color = color_metal_sample.xyz;
-        float metalness = color_metal_sample.w;
-        vec3 radiosity = texture ( sampler2D ( tex_radiosity, sampler_linear ), screen_uv ).xyz;
-        float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
-
-        vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
-        // Normal Offset shadows, helps with acne
-        // https://digitalrune.github.io/DigitalRune-Documentation/html/3f4d959e-9c98-4a97-8d85-7a73c26145d7.htm
-        // https://mynameismjp.wordpress.com/2013/09/10/shadow-maps/
-        // https://c0de517e.blogspot.com/2011/05/shadowmap-bias-notes.html
-        // https://ndotl.wordpress.com/2014/12/19/notes-on-shadow-bias/
-        view_geo_pos += view_normal * 0.0;
-        vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
-        vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
-
-        radiance += base_color * radiosity * throughput;
-        throughput *= base_color;
-#endif
         // direct
         #if 0
         light_t light = light_buffer.data[0];
@@ -215,7 +220,7 @@ void main ( void ) {
         #endif
 
         // direct + shadow
-        #if 0
+        #if 1
         light_t light = light_buffer.data[0];
         vec3 light_pos = load_vec3 ( light.pos );
         vec3 light_dir = normalize ( light_pos - world_geo_pos );
@@ -230,8 +235,41 @@ void main ( void ) {
         }
         #endif
 
+        // light loop direct
+        #if 0
+        for ( uint i = 0; i < light_buffer.light_count; ++i ) {
+            light_t light = light_buffer.data[i];
+            vec3 light_pos = load_vec3 ( light.pos );
+            vec3 light_dir = normalize ( light_pos - world_geo_pos );
+            float d = distance ( light_pos, world_geo_pos );
+            vec3 light_color = load_vec3 ( light.color );
+            float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+            if ( cos_theta > 0 ) {
+                radiance += light_color * light.emissive * throughput * cos_theta / ( PI * d * d );
+            }
+        }
+        #endif
+
+        // light loop direct + shadow
+        #if 0
+        for ( uint i = 0; i < light_buffer.light_count; ++i ) {
+            light_t light = light_buffer.data[i];
+            vec3 light_pos = load_vec3 ( light.pos );
+            vec3 light_dir = normalize ( light_pos - world_geo_pos );
+            trace_shadow_ray ( world_geo_pos + light_dir * 0.04, light_dir );
+            if ( /*ray_payload.id != light.id &&*/ shadow_ray_payload.id == light.id ) {
+                float d = distance ( light_pos, world_geo_pos );
+                vec3 light_color = load_vec3 ( light.color );
+                float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+                if ( cos_theta > 0 ) {
+                    radiance += light_color * light.emissive * throughput * cos_theta / ( PI * d * d );
+                }
+            }
+        }
+        #endif
+
         // reservoir light pick
-        #if 1
+        #if 0
         uint light_count = light_buffer.light_count;
         uint light_pool = light_count; // could be a fixed M<N
         float light_pdf = 1.0 / light_pool;
@@ -266,8 +304,8 @@ void main ( void ) {
         imageStore ( img_reservoir, texel, reservoir_to_vec4 ( reservoir ) );
         #endif
 
-        //origin = world_geo_pos + world_normal * 0.001f;
-        //direction = sample_cosine_weighted_hemisphere_normal ( vec2 ( rng_wang ( rng_state ), rng_wang ( rng_state ) ), world_normal );
+        origin = world_geo_pos + world_normal * 0.001f;
+        direction = sample_cosine_weighted_hemisphere_normal ( vec2 ( rng_wang ( rng_state ), rng_wang ( rng_state ) ), world_normal );
     }
 
     imageStore ( img_color, texel, vec4 ( radiance, 1 ) );

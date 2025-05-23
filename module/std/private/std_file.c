@@ -1463,16 +1463,16 @@ std_buffer_t std_file_read_to_virtual_heap ( const char* path ) {
     std_file_info_t file_info;
     bool valid_info = std_file_info ( &file_info, file );
     if ( !valid_info ) {
-        return std_null_buffer_m;
+        return std_buffer_m();
     }
 
     void* buffer = std_virtual_heap_alloc_m ( file_info.size, 16 );
     uint64_t read_size = std_file_read ( buffer, file_info.size, file );
     if ( read_size == std_file_read_error_m ) {
-        return std_null_buffer_m;
         std_virtual_heap_free ( buffer );
+        return std_buffer_m();
     }
 
     std_file_close ( file );
-    return std_buffer ( buffer, file_info.size );
+    return ( std_buffer_t ) { .base = buffer, .size = file_info.size };
 }
