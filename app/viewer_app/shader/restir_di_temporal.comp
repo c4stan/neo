@@ -74,11 +74,11 @@ void main ( void ) {
     reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
 
     vec2 reprojected_uv = screen_uv - velocity;
-    uvec2 reprojected_tex = vec2 ( round ( reprojected_uv * frame_uniforms.resolution_f32 ) );
-    //uint prev_reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    uvec2 reprojected_tex = uvec2 ( reprojected_uv * frame_uniforms.resolution_f32 );
     uint prev_reservoir_idx = reprojected_tex.y * frame_uniforms.resolution_u32.x + reprojected_tex.x;
     reservoir_t prev_reservoir = prev_reservoir_buffer.data[prev_reservoir_idx];
     prev_reservoir.light_count = min ( prev_reservoir.light_count, reservoir.light_count * 20 );
+    // TODO history rejection
 
     rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
     reservoir_t temporal_reservoir = reservoir_init();
@@ -90,11 +90,7 @@ void main ( void ) {
     update_reservoir ( temporal_reservoir, prev_reservoir.light, prev_p_hat * prev_reservoir.weight * prev_reservoir.light_count, prev_reservoir.light_count, rng_state );
 
     float temporal_p_hat = light_p ( temporal_reservoir.light, world_geo_pos, world_normal, base_color );
-    temporal_reservoir.weight = temporal_p_hat > 0 ? temporal_reservoir.weight_sum / ( temporal_p_hat * temporal_reservoir.light_count ) : 0.0;
-
-    if ( prev_reservoir.light == reservoir.light ) {
-        temporal_reservoir.debug = 0;
-    }
+    update_reservoir_weight ( temporal_reservoir, temporal_p_hat );
 
     reservoir_buffer.data[reservoir_idx] = temporal_reservoir;
 }

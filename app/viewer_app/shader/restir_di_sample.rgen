@@ -33,12 +33,9 @@ layout ( binding = 3, set = xs_shader_binding_set_dispatch_m, scalar ) buffer re
 layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
 layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
 layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
-layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_radiosity;
-layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
 
-layout ( binding = 9, set = xs_shader_binding_set_dispatch_m ) writeonly uniform image2D img_color;
-
-layout ( binding = 10, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
 vec3 load_vec3 ( float[3] f32 ) {
     return vec3 ( f32[0], f32[1], f32[2] );
@@ -116,6 +113,18 @@ void trace_shadow_ray ( vec3 pos, vec3 dir ) {
 #endif
 }
 
+float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_color ) {
+    light_t light = light_buffer.data[light_idx];
+    vec3 light_pos = load_vec3 ( light.pos );
+    vec3 light_color = load_vec3 ( light.color );
+    vec3 light_dir = normalize ( light_pos - world_pos );
+    float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+    float d = distance ( light_pos, world_pos );
+    float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
+    return p_hat;
+}
+
+
 void main ( void ) {
     const vec2 pixel_center = vec2 ( gl_LaunchIDNV.xy ) + 0.5.xx;
     const vec2 uv = pixel_center / vec2 ( gl_LaunchSizeNV.xy );
@@ -131,38 +140,37 @@ void main ( void ) {
     vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
     vec3 base_color = color_metal_sample.xyz;
     float metalness = color_metal_sample.w;
-    vec3 radiosity = texture ( sampler2D ( tex_radiosity, sampler_linear ), screen_uv ).xyz;
     float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
 
     vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
     vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
     vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
-    vec3 radiance = base_color * radiosity;
 
-    uint reservoir_idx = gl_LaunchIDNV.x + ( gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) * gl_LaunchSizeNV.x;
-    reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
+    uint light_count = light_buffer.light_count;
+    uint light_pool = light_count; // could be a fixed M<N
+    float light_pdf = 1.0 / light_pool;
+    reservoir_t reservoir = reservoir_init();
+    
+    if ( depth < 1 ) {
+        for ( uint i = 0; i < light_pool; ++i ) {
+            uint light_idx = int ( rng_wang ( rng_state ) * light_pool );
+            float p_hat = light_p ( light_idx, world_geo_pos, world_normal, base_color );
+            update_reservoir ( reservoir, light_idx, p_hat / light_pdf, 1, rng_state );
+        }
 
+        float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
+        update_reservoir_weight ( reservoir, p_hat );
+        //reservoir.weight = p_hat > 0 ? reservoir.weight_sum / ( p_hat * reservoir.light_count ) : 0.0;
 
-    if ( reservoir.light_count > 0 ) {
         light_t light = light_buffer.data[reservoir.light];
         vec3 light_pos = load_vec3 ( light.pos );
-        vec3 light_color = load_vec3 ( light.color );
         vec3 light_dir = normalize ( light_pos - world_geo_pos );
-        float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
-        if ( cos_theta > 0 ) {
-            trace_shadow_ray ( world_geo_pos + light_dir * 0.04, light_dir );
-            float shadow_factor = shadow_ray_payload.id == light.id ? 1 : 0;
-            float d = distance ( light_pos, world_geo_pos );
-            vec3 light_radiance = shadow_factor * light.emissive * light_color * base_color * cos_theta / ( d * d * PI );
-            //float p_hat = length ( light_radiance );
-            //reservoir.weight = p_hat > 0 ? reservoir.weight_sum / ( p_hat * reservoir.light_count ) : 0.0;
-            radiance += light_radiance * reservoir.weight;
+        trace_shadow_ray ( world_geo_pos + light_dir * 0.04, light_dir );
+        if ( shadow_ray_payload.id != light.id ) {
+            reservoir.weight = 0;
         }
     }
 
-    if ( reservoir.debug == 1 ) {
-        radiance = vec3 ( 1, 0, 0 );
-    }
-
-    imageStore ( img_color, texel, vec4 ( radiance, 1 ) );
+    uint reservoir_idx = gl_LaunchIDNV.x + ( gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) * gl_LaunchSizeNV.x;
+    reservoir_buffer.data[reservoir_idx] = reservoir;
 }

@@ -422,38 +422,36 @@ static void viewapp_boot_raytrace_graph ( void ) {
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "restir_di_sample",
-        .type = xf_node_type_compute_pass_m,
-        .pass.compute = xf_node_compute_pass_params_m (
+        .type = xf_node_type_raytrace_pass_m,
+        .pass.raytrace = xf_node_raytrace_pass_params_m (
+            .thread_count = { resolution_x, resolution_y, 1 },
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "restir_di_sample" ) ) ),
+            .raytrace_worlds_count = 1,
+            .raytrace_worlds = { m_state->render.raytrace_world },
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
-            .storage_buffer_reads_count = 1,
+            .storage_buffer_reads_count = 3,
             .storage_buffer_reads = {
+                xf_shader_buffer_dependency_m ( .buffer = instance_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
                 xf_shader_buffer_dependency_m ( .buffer = light_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
-            },
-            .storage_buffer_writes_count = 1,
-            .storage_buffer_writes = {
                 xf_shader_buffer_dependency_m ( .buffer = reservoir_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
             },
             .sampled_textures_count = 4,
-            .sampled_textures = { 
-                xf_compute_texture_dependency_m ( .texture = color_texture ), 
-                xf_compute_texture_dependency_m ( .texture = normal_texture ), 
-                xf_compute_texture_dependency_m ( .texture = material_texture ), 
-                xf_compute_texture_dependency_m ( .texture = depth_texture ),
+            .sampled_textures = {
+                xf_shader_texture_dependency_m ( .texture = color_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = normal_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = material_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = depth_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
             .storage_texture_writes = { 
-                xf_texture_passthrough_m ( 
-                    .mode = xf_passthrough_mode_clear_m, 
-                ) 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) ), 
             }
-        )
+        ),
     ) );
 
     xf_buffer_h prev_reservoir_buffer = xf->get_multi_buffer ( reservoir_buffer, -1 );
@@ -529,29 +527,29 @@ static void viewapp_boot_raytrace_graph ( void ) {
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "restir_di_lighting",
-        .type = xf_node_type_raytrace_pass_m,
-        .pass.raytrace = xf_node_raytrace_pass_params_m (
-            .thread_count = { resolution_x, resolution_y, 1 },
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "restir_di_lighting" ) ) ),
-            .raytrace_worlds_count = 1,
-            .raytrace_worlds = { m_state->render.raytrace_world },
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
-            .storage_buffer_reads_count = 3,
+            .storage_buffer_reads_count = 1,
             .storage_buffer_reads = {
-                xf_shader_buffer_dependency_m ( .buffer = instance_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
                 xf_shader_buffer_dependency_m ( .buffer = light_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
+            },
+            .storage_buffer_writes_count = 1,
+            .storage_buffer_writes = {
                 xf_shader_buffer_dependency_m ( .buffer = reservoir_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
             },
             .sampled_textures_count = 5,
-            .sampled_textures = {
-                xf_shader_texture_dependency_m ( .texture = color_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
-                xf_shader_texture_dependency_m ( .texture = normal_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
-                xf_shader_texture_dependency_m ( .texture = material_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
-                xf_shader_texture_dependency_m ( .texture = radiosity_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
-                xf_shader_texture_dependency_m ( .texture = depth_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = color_texture ), 
+                xf_compute_texture_dependency_m ( .texture = normal_texture ), 
+                xf_compute_texture_dependency_m ( .texture = material_texture ), 
+                xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
+                xf_compute_texture_dependency_m ( .texture = depth_texture ),
             },
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { 
@@ -561,9 +559,11 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
             .storage_texture_writes = { 
-                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) ), 
+                xf_texture_passthrough_m ( 
+                    .mode = xf_passthrough_mode_clear_m, 
+                ) 
             }
-        ),
+        )
     ) );
 #endif
 
@@ -1467,7 +1467,7 @@ static void viewapp_build_raytrace_world ( xg_workload_h workload ) {
     }
 
     // TODO
-    xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "restir_di_lighting" ) );
+    xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "restir_di_sample" ) );
     xg_raytrace_pipeline_state_h rt_pipeline_state = xs->get_pipeline_state ( rt_pipeline );
 
     xg_raytrace_world_h rt_world = xg->create_raytrace_world ( workload, 0, &xg_raytrace_world_params_m (

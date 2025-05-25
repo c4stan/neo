@@ -1,9 +1,0 @@
-compute_shader restir_di_sample.comp
-
-include common.xsi
-
-begin bindings
-    buffer[2] storage
-    texture[4] sampled
-    sampler
-end

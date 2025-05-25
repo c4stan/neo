@@ -85,7 +85,7 @@ typedef struct {
         VkDeviceSize                                callableShaderBindingStride,
         uint32_t                                    width,
         uint32_t                                    height,
-        uint32_t                                    depth);
+        uint32_t                                    depth );
 
     // vkDestroyAccelerationStructureNV
     void ( *destroy_acceleration_structure ) (
@@ -128,7 +128,7 @@ typedef struct {
         VkDevice                                    device,
         VkAccelerationStructureNV                   accelerationStructure,
         size_t                                      dataSize,
-        void*                                       pData);
+        void*                                       pData );
 #else
     // vkGetAccelerationStructureBuildSizesKHR
     void ( *get_acceleration_structure_build_sizes ) ( 

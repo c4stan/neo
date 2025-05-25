@@ -1,0 +1,10 @@
+compute_shader restir_di_lighting.comp
+
+include common.xsi
+
+begin bindings
+    buffer[2] storage
+    texture[5] sampled
+    texture storage
+    sampler
+end

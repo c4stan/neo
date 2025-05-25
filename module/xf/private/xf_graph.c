@@ -1948,7 +1948,6 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
 
                 uint32_t graph_texture_idx = graph_texture - graph->textures_array;
                 graph->owned_textures_array[graph->owned_textures_count++] = graph_texture_idx;
-
             }
         }
     }

@@ -27,9 +27,12 @@ layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) buffer reservoir_
 layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
 layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
 layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
-layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_radiosity;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
 
-layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) writeonly uniform image2D img_color;
+
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
@@ -57,27 +60,27 @@ void main ( void ) {
     vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
     vec3 base_color = color_metal_sample.xyz;
     float metalness = color_metal_sample.w;
+    vec3 radiosity = texture ( sampler2D ( tex_radiosity, sampler_linear ), screen_uv ).xyz;
     float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
 
     vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
     vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
     vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
 
-    rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
-    uint light_count = light_buffer.light_count;
-    uint light_pool = light_count; // could be a fixed M<N
-    float light_pdf = 1.0 / light_pool;
-    reservoir_t reservoir = reservoir_init();
-    
-    for ( uint i = 0; i < light_pool; ++i ) {
-        uint light_idx = int ( rng_wang ( rng_state ) * light_pool );
-        float p_hat = light_p ( light_idx, world_geo_pos, world_normal, base_color );
-        update_reservoir ( reservoir, light_idx, p_hat / light_pdf, 1, rng_state );
+    uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
+    light_t light = light_buffer.data[reservoir.light];
+    vec3 light_pos = load_vec3 ( light.pos );
+    vec3 light_color = load_vec3 ( light.color );
+    vec3 light_dir = normalize ( light_pos - world_geo_pos );
+    float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+    float d = distance ( light_pos, world_geo_pos );
+    vec3 light_radiance = light.emissive * light_color * base_color * cos_theta / ( d * d * PI );
+    vec3 radiance = radiosity + light_radiance * reservoir.weight;
+
+    if ( reservoir.debug == 1 ) {
+        radiance = vec3 ( 1, 0, 0 );
     }
 
-    float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
-    reservoir.weight = p_hat > 0 ? reservoir.weight_sum / ( p_hat * reservoir.light_count ) : 0.0;
-
-    uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
-    reservoir_buffer.data[reservoir_idx] = reservoir;
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( radiance, 1 ) );
 }
