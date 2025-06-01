@@ -33,8 +33,11 @@ layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D
 layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
 layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
 layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_velocity;
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform utexture2D tex_id;
+layout ( binding = 9, set = xs_shader_binding_set_dispatch_m ) uniform utexture2D tex_id_prev;
 
-layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
+layout ( binding = 10, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
+layout ( binding = 11, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
@@ -54,40 +57,58 @@ float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_col
 }
 
 void main ( void ) {
-    ivec2 screen_tex = ivec2 ( gl_GlobalInvocationID.xy );
+    uvec2 screen_tex = gl_GlobalInvocationID.xy;
     vec2 screen_uv = vec2 ( ( screen_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
 
-    vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
+    vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv );
     vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
     float roughness = normal_rough_sample.w;
-    vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_linear ), screen_uv );
+    vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_point ), screen_uv );
     vec3 base_color = color_metal_sample.xyz;
     float metalness = color_metal_sample.w;
-    float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
-    vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_linear ), screen_uv ).xy;
+    float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
+    vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy - 0.5.xx;
+    uvec4 id_sample = texture ( usampler2D ( tex_id, sampler_point ), screen_uv );
+    uint object_id = id_sample.x << 8 | id_sample.y;
 
     vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
     vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
     vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
 
-    uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    uint reservoir_idx = screen_tex.x + screen_tex.y * frame_uniforms.resolution_u32.x;
     reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
 
     vec2 reprojected_uv = screen_uv - velocity;
     uvec2 reprojected_tex = uvec2 ( reprojected_uv * frame_uniforms.resolution_f32 );
-    uint prev_reservoir_idx = reprojected_tex.y * frame_uniforms.resolution_u32.x + reprojected_tex.x;
-    reservoir_t prev_reservoir = prev_reservoir_buffer.data[prev_reservoir_idx];
-    prev_reservoir.light_count = min ( prev_reservoir.light_count, reservoir.light_count * 20 );
-    // TODO history rejection
+    uint history_reservoir_idx = reprojected_tex.y * frame_uniforms.resolution_u32.x + reprojected_tex.x;
+    reservoir_t history_reservoir = prev_reservoir_buffer.data[history_reservoir_idx];
+    history_reservoir.light_count = min ( history_reservoir.light_count, reservoir.light_count * 20 );
 
-    rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
+    // Reject history if not valid
+    if ( any ( lessThan ( reprojected_uv, vec2 ( 0 ) ) ) || any ( greaterThan ( reprojected_uv, vec2 ( 1 ) ) ) ) {
+        return;
+    }
+
+    // Need to bind and use prev_depth
+    //float history_depth = texture ( sampler2D ( tex_depth, sampler_linear ), reprojected_uv ).x;
+    //if ( abs ( linearize_depth ( depth ) - linearize_depth ( history_depth ) ) > 0.0009 ) {
+    //    //return;
+    //}
+
+    uvec4 history_id_sample = texture ( usampler2D ( tex_id_prev, sampler_point ), reprojected_uv );
+    uint history_id = history_id_sample.x << 8 | history_id_sample.y;
+    if ( object_id != history_id ) {
+        return;
+    }
+
+    rng_wang_state_t rng_state = rng_wang_init ( screen_tex );
     reservoir_t temporal_reservoir = reservoir_init();
 
     float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
     update_reservoir ( temporal_reservoir, reservoir.light, p_hat * reservoir.weight * reservoir.light_count, reservoir.light_count, rng_state );
 
-    float prev_p_hat = light_p ( prev_reservoir.light, world_geo_pos, world_normal, base_color );
-    update_reservoir ( temporal_reservoir, prev_reservoir.light, prev_p_hat * prev_reservoir.weight * prev_reservoir.light_count, prev_reservoir.light_count, rng_state );
+    float prev_p_hat = light_p ( history_reservoir.light, world_geo_pos, world_normal, base_color );
+    update_reservoir ( temporal_reservoir, history_reservoir.light, prev_p_hat * history_reservoir.weight * history_reservoir.light_count, history_reservoir.light_count, rng_state );
 
     float temporal_p_hat = light_p ( temporal_reservoir.light, world_geo_pos, world_normal, base_color );
     update_reservoir_weight ( temporal_reservoir, temporal_p_hat );

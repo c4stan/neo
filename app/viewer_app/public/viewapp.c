@@ -297,7 +297,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
-        .format = xg_format_r16g16_sfloat_m,
+        .format = xg_format_r16g16_unorm_m,
         .debug_name = "velocity_texture",
     ) );
 
@@ -323,7 +323,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m( .f32 = { 0.5, 0.5, 0, 0 } ) ),
             }
         ),
         .resources = xf_node_resource_params_m (
@@ -455,13 +455,17 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     xf_buffer_h prev_reservoir_buffer = xf->get_multi_buffer ( reservoir_buffer, -1 );
+    xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "restir_di_temporal",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "restir_di_temporal" ) ) ),
-            .samplers_count = 1,
-            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+            .samplers_count = 2,
+            .samplers = { 
+                xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ),
+                xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ),
+            },
             .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
@@ -474,13 +478,15 @@ static void viewapp_boot_raytrace_graph ( void ) {
             .storage_buffer_writes = {
                 xf_shader_buffer_dependency_m ( .buffer = reservoir_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
             },
-            .sampled_textures_count = 5,
+            .sampled_textures_count = 7,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = color_texture ), 
                 xf_compute_texture_dependency_m ( .texture = normal_texture ), 
                 xf_compute_texture_dependency_m ( .texture = material_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = velocity_texture ),
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ),
+                xf_compute_texture_dependency_m ( .texture = prev_object_id_texture ),
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
@@ -758,7 +764,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
-        .format = xg_format_r16g16_sfloat_m,
+        .format = xg_format_r16g16_unorm_m,
         .debug_name = "velocity_texture",
     ) );
 
@@ -784,7 +790,7 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
-                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m( .f32 = { 0.5, 0.5, 0, 0 } ) ),
             }
         ),
         .resources = xf_node_resource_params_m (
@@ -3002,6 +3008,7 @@ static se_entity_h spawn_light ( xg_workload_h workload ) {
 
     viewapp_transform_component_t transform_component = viewapp_transform_component_m (
         .position = { 0, 0, 0 },
+        .scale = 0.1,
     );
 
     viewapp_light_component_t light_component = viewapp_light_component_m (
@@ -3159,6 +3166,27 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         std_u32_to_str ( frame_id_value.text, xi_label_text_size, m_state->render.frame_id, 0 );
         xi->add_label ( xi_workload, &frame_id_label );
         xi->add_label ( xi_workload, &frame_id_value );
+        xi->newline();
+
+        xi->add_label ( xi_workload, &xi_label_state_m ( .text = "target fps" ) );
+        char target_fps_select_strings[std_static_array_capacity_m ( m_state->ui.target_fps_values )][6];
+        const char* target_fps_select_items[std_static_array_capacity_m ( m_state->ui.target_fps_values )];
+        for ( uint32_t i = 0; i < std_static_array_capacity_m ( m_state->ui.target_fps_values ); ++i ) {
+            std_u32_to_str ( target_fps_select_strings[i], 6, m_state->ui.target_fps_values[i], 0 );
+            target_fps_select_items[i] = target_fps_select_strings[i];
+        }
+        xi_select_state_t target_fps_select = xi_select_state_m (
+            .items = target_fps_select_items,
+            .item_count = std_static_array_capacity_m ( target_fps_select_items ),
+            .item_idx = m_state->ui.target_fps_idx,
+            .width = 30,
+            .sort_order = 2,
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+        );
+        if ( xi->add_select ( xi_workload, &target_fps_select ) ) {
+            m_state->ui.target_fps_idx = target_fps_select.item_idx;
+            m_state->render.target_fps = m_state->ui.target_fps_values[target_fps_select.item_idx];
+        }
         xi->newline();
 
         xi_label_state_t frame_time_label = xi_label_state_m ( .text = "frame time" );
@@ -3842,7 +3870,7 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
-    float target_fps = 120.f;
+    float target_fps = m_state->render.target_fps;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = m_state->render.frame_tick;
     float time_ms = m_state->render.time_ms;

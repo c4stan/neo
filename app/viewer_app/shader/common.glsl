@@ -3,6 +3,7 @@
 #define PI 3.1415f
 #define REVERSE_Z 0 // TODO
 
+// %v3f etc for vectors
 #define print debugPrintfEXT
 
 // ======================================================================================= //
@@ -272,8 +273,8 @@ float rng_wang ( inout rng_wang_state_t state ) {
     return float ( wang_hash ( state.v ) ) / 4294967296.0;
 }
 
-rng_wang_state_t rng_wang_init ( vec2 tex_coord ) {
-    uint v = uint ( uint ( tex_coord.x ) * uint ( 1973 ) + uint ( tex_coord.y ) * uint ( 9277 ) + uint ( frame_uniforms.frame_id ) * uint ( 26699 ) ) | uint ( 1 );
+rng_wang_state_t rng_wang_init ( uvec2 screen_tex ) {
+    uint v = uint ( uint ( screen_tex.x ) * uint ( 1973 ) + uint ( screen_tex.y ) * uint ( 9277 ) + uint ( frame_uniforms.frame_id ) * uint ( 26699 ) ) | uint ( 1 );
     rng_wang_state_t state;
     state.v = v;
     return state;

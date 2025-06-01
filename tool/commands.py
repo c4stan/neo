@@ -73,11 +73,6 @@ def reload(root_path, tool_path, workspace_paths):
     importlib.reload(makegen)
     init(root_path, tool_path, workspace_paths)
 
-def print_header():
-    print('****************************************************')
-    print('********************  NEO  CLI  ********************')
-    print('****************************************************')
-
 def print_help():
     print('\t' + Color.OKGREEN + 'help' + Color.ENDC + ' to print this')
     print('\t' + Color.OKGREEN + 'exit' + Color.ENDC + ' to exit')
@@ -639,7 +634,7 @@ def clear_console():
     elif platform.system() == 'Linux':
         os.system('clear')
 
-def parse(string):
+def execute(string):
     tokens = string.split(' ')
     cmd = tokens[0]
 

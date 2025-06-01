@@ -1,5 +1,6 @@
 #version 460
 #extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_debug_printf : require
 
 #include <xs.glsl>
 
@@ -49,7 +50,7 @@ float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_col
 }
 
 void main ( void ) {
-    ivec2 screen_tex = ivec2 ( gl_GlobalInvocationID.xy );
+    uvec2 screen_tex = gl_GlobalInvocationID.xy;
     vec2 screen_uv = vec2 ( ( screen_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
 
     vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
@@ -68,48 +69,40 @@ void main ( void ) {
     rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
     reservoir_t spatial_reservoir = reservoir_init();
 
-    uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
+    uint reservoir_idx = screen_tex.x + screen_tex.y * frame_uniforms.resolution_u32.x;
     reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
 
     float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
     update_reservoir ( spatial_reservoir, reservoir.light, p_hat * reservoir.weight * reservoir.light_count, reservoir.light_count, rng_state );
 
     int sample_count = 5;
-    float radius = 30;
+    float radius = 2;
     for ( int i = 0; i < sample_count; ++i ) {
         vec2 offset = 2.0 * vec2 ( rng_wang ( rng_state ), rng_wang ( rng_state ) ) - 1;
-        ivec2 sample_tex = screen_tex + ivec2 ( offset * radius );
-        sample_tex = clamp ( sample_tex, ivec2 ( 0 ), ivec2 ( frame_uniforms.resolution_u32 - 1 ) );
-        vec2 sample_uv = ( sample_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32;
-        //sample_uv = clamp ( sample_uv, 0.05.xx, frame_uniforms.resolution_f32 - 0.05.xx );
-        //vec2 sample_uv = screen_uv + offset * radius / frame_uniforms.resolution_f32;
-        //sample_uv = clamp ( sample_uv, 0.05.xx, frame_uniforms.resolution_f32 - 0.05.xx );
+        ivec2 sample_tex = ivec2 ( screen_tex ) + ivec2 ( offset * radius );
+        sample_tex = clamp ( sample_tex, ivec2 ( 0 ), ivec2 ( frame_uniforms.resolution_u32 - ivec2 ( 1 ) ) );
+        vec2 sample_uv = vec2 ( sample_tex + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32;
         float sample_depth = texture ( sampler2D ( tex_depth, sampler_linear ), sample_uv ).x;
         vec3 sample_normal = texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv ).xyz;
         vec3 sample_view_normal = normalize ( sample_normal.xyz * 2 - 1 );
         vec3 sample_world_normal = mat3 ( frame_uniforms.world_from_view ) * sample_view_normal;
         float sample_depth_linear = linearize_depth ( sample_depth );
-        //if ( sample_depth_linear > 1.1 * depth_linear || sample_depth_linear < 0.9 * depth_linear ) {
-        //if ( abs ( sample_depth_linear - depth_linear ) > 0.1 * depth_linear ) {
-        //if ( abs ( sample_depth - depth ) > 0.001 ) {
-        if ( length ( sample_uv - screen_uv ) > 0.01 ) {
-            //spatial_reservoir.debug += 1;
+        //vec3 sample_view_pos = view_from_depth ( screen_uv, sample_depth );
+        //vec3 sample_world_pos = ( frame_uniforms.world_from_view * vec4 ( sample_view_pos, 1.f ) ).xyz;
+        //if ( length ( sample_world_pos - world_geo_pos ) > 0.05 ) {
+        //    continue;
+        //}
+
+        if ( abs ( sample_depth_linear - depth_linear ) > 0.1 * depth_linear ) {
             continue;
         }
 
         if ( dot ( sample_world_normal, world_normal ) < 0.9 ) {
-            //spatial_reservoir.debug = 2;
             continue;
         }
-        
-        //uvec2 sample_tex = uvec2 ( sample_uv * frame_uniforms.resolution_f32 );
 
-        uint sample_reservoir_idx = sample_tex.y * frame_uniforms.resolution_u32.x + sample_tex.x;
+        uint sample_reservoir_idx = sample_tex.x + sample_tex.y * frame_uniforms.resolution_u32.x;
         reservoir_t sample_reservoir = reservoir_buffer.data[sample_reservoir_idx];
-
-        if ( sample_reservoir.weight != sample_reservoir.weight ) {
-            spatial_reservoir.debug = 1;
-        }
 
         float sample_p_hat = light_p ( sample_reservoir.light, world_geo_pos, world_normal, base_color );
         update_reservoir ( spatial_reservoir, sample_reservoir.light, sample_p_hat * sample_reservoir.weight * sample_reservoir.light_count, sample_reservoir.light_count, rng_state );
@@ -117,7 +110,23 @@ void main ( void ) {
 
     float spatial_p_hat = light_p ( spatial_reservoir.light, world_geo_pos, world_normal, base_color );
     update_reservoir_weight ( spatial_reservoir, spatial_p_hat );
-    //spatial_reservoir.weight = spatial_p_hat > 0 ? spatial_reservoir.weight_sum / ( spatial_p_hat * spatial_reservoir.light_count ) : 0.0;
 
-    reservoir_buffer.data[reservoir_idx] = reservoir;
+#if 0
+    if ( spatial_reservoir.weight > 200 ) {
+        light_t light = light_buffer.data[spatial_reservoir.light];
+        vec3 light_pos = load_vec3 ( light.pos );
+        vec3 light_color = load_vec3 ( light.color );
+        vec3 light_dir = normalize ( light_pos - world_geo_pos );
+        float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
+        //float d = distance ( light_pos, world_pos );
+        //float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
+        print ( "%d %d %f %f %d %f", screen_tex.x, screen_tex.y, spatial_reservoir.weight, spatial_p_hat, spatial_reservoir.light, cos_theta );
+    }
+#endif
+
+    if ( spatial_reservoir.weight != spatial_reservoir.weight ) {
+        spatial_reservoir.debug = 1;
+    }
+
+    reservoir_buffer.data[reservoir_idx] = spatial_reservoir;
 }

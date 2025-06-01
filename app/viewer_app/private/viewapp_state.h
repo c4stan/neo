@@ -64,6 +64,7 @@ typedef struct {
     float delta_time_ms;
     float update_time_ms;
     std_tick_t frame_tick;
+    float target_fps;
 
     uint32_t next_object_id;
 
@@ -118,6 +119,7 @@ typedef struct {
     .frame_tick = 0, \
     .allow_graph_aliasing = true, \
     .export_dest = xf_null_handle_m, \
+    .target_fps = 120, \
     ##__VA_ARGS__ \
 }
 
@@ -147,6 +149,9 @@ typedef struct {
     xf_export_channel_e export_channels[4];
 
     se_entity_h mouse_pick_entity;
+
+    uint32_t target_fps_values[6];
+    uint32_t target_fps_idx;
 } viewapp_ui_state_t;
 
 #define viewapp_ui_state_m( ... ) ( viewapp_ui_state_t ) { \
@@ -162,6 +167,7 @@ typedef struct {
     .export_node_id = -1, \
     .export_tex_id = -1, \
     .mouse_pick_entity = se_null_handle_m, \
+    .target_fps_values = { 120, 90, 60, 30, 24, 8 }, \
     ##__VA_ARGS__ \
 }
 

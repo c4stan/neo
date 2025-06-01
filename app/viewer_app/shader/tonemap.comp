@@ -10,13 +10,19 @@ layout ( set = xs_shader_binding_set_dispatch_m, binding = 2 ) uniform sampler s
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
+float gradient_noise ( in vec2 uv ) {
+    return fract ( 52.9829189 * fract ( dot ( uv, vec2 ( 0.06711056, 0.00583715 ) ) ) );
+}
+
 void main ( void ) {
     // screen uv
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2(0.5) ) / frame_uniforms.resolution_f32 );
-    //vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 );
 
     // sample
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
+
+    // dither
+    color += ( 1.0 / 255.0 ) * gradient_noise ( gl_GlobalInvocationID.xy + vec2(0.5) ) - ( 0.5 / 255.0 );
 
     // tonemap
     float luma = rgb_to_luma ( color );

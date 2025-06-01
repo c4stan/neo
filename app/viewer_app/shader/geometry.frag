@@ -70,6 +70,6 @@ void main() {
     vec2 curr_vel_pos = in_curr_clip_pos.xy / in_curr_clip_pos.w;
     vec2 prev_vel_pos = in_prev_clip_pos.xy / in_prev_clip_pos.w;
     vec2 velocity = curr_vel_pos.xy - prev_vel_pos.xy;
-    velocity = velocity * vec2 ( 0.5, -0.5 );
+    velocity = velocity * vec2 ( 0.5, -0.5 ) + 0.5;
     out_vel = velocity;
 }

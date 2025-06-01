@@ -1,5 +1,6 @@
 #version 460
 #extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_debug_printf : require
 
 #include <xs.glsl>
 
@@ -78,8 +79,8 @@ void main ( void ) {
     vec3 light_radiance = light.emissive * light_color * base_color * cos_theta / ( d * d * PI );
     vec3 radiance = radiosity + light_radiance * reservoir.weight;
 
-    if ( reservoir.debug == 1 ) {
-        radiance = vec3 ( 1, 0, 0 );
+    if ( reservoir.debug > 0 ) {
+        radiance = vec3 ( reservoir.debug / 1.0, 0, 0 );
     }
 
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( radiance, 1 ) );

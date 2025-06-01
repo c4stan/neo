@@ -159,7 +159,7 @@ void main ( void ) {
     vec3 throughput = 1.0.xxx;
     vec3 radiance = 0.0.xxx;
 
-    rng_wang_state_t rng_state = rng_wang_init ( pixel_center );
+    rng_wang_state_t rng_state = rng_wang_init ( texel );
 
     const uint bounces = 1;
     for ( uint i = 0; i < bounces; ++i ) {

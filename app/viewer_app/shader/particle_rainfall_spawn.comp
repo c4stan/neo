@@ -22,7 +22,7 @@ void main() {
         return;
     }
 
-    rng_wang_state_t rng_state = rng_wang_init ( vec2 ( spawn_idx, spawn_idx ) );
+    rng_wang_state_t rng_state = rng_wang_init ( uvec2 ( spawn_idx, spawn_idx ) );
     float u = rng_wang ( rng_state );
     float v = rng_wang ( rng_state );
 

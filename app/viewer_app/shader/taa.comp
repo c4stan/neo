@@ -32,7 +32,7 @@ void main ( void ) {
     // Sample
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
     float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
-    vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy;
+    vec2 velocity = texture ( sampler2D ( tex_velocity, sampler_point ), screen_uv ).xy - 0.5;
 
     // Reproject
 #if 0

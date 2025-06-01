@@ -25,7 +25,7 @@ begin render_target 4 // xy: object id, zw: triangle id
 end
 
 begin render_target 5 // xy: velocity
-    format R16G16_FLOAT
+    format R16G16_UNORM
 end
 
 begin input 0

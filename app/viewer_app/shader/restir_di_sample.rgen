@@ -124,16 +124,11 @@ float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_col
     return p_hat;
 }
 
-
 void main ( void ) {
-    const vec2 pixel_center = vec2 ( gl_LaunchIDNV.xy ) + 0.5.xx;
-    const vec2 uv = pixel_center / vec2 ( gl_LaunchSizeNV.xy );
-    const vec2 ndc = uv * 2.0 - 1.0;
-    ivec2 texel = ivec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y );
+    uvec2 screen_tex = uvec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y - 1 );
+    vec2 screen_uv = vec2 ( screen_tex ) / gl_LaunchSizeNV.xy;
+    rng_wang_state_t rng_state = rng_wang_init ( screen_tex );
 
-    rng_wang_state_t rng_state = rng_wang_init ( pixel_center );
-
-    vec2 screen_uv = vec2 ( gl_LaunchIDNV.x, gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) / gl_LaunchSizeNV.xy;
     vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv );
     vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
     float roughness = normal_rough_sample.w;
@@ -147,7 +142,7 @@ void main ( void ) {
     vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
 
     uint light_count = light_buffer.light_count;
-    uint light_pool = light_count; // could be a fixed M<N
+    uint light_pool = min ( light_count, 32 );
     float light_pdf = 1.0 / light_pool;
     reservoir_t reservoir = reservoir_init();
     
@@ -160,7 +155,6 @@ void main ( void ) {
 
         float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
         update_reservoir_weight ( reservoir, p_hat );
-        //reservoir.weight = p_hat > 0 ? reservoir.weight_sum / ( p_hat * reservoir.light_count ) : 0.0;
 
         light_t light = light_buffer.data[reservoir.light];
         vec3 light_pos = load_vec3 ( light.pos );
@@ -171,6 +165,6 @@ void main ( void ) {
         }
     }
 
-    uint reservoir_idx = gl_LaunchIDNV.x + ( gl_LaunchSizeNV.y - gl_LaunchIDNV.y ) * gl_LaunchSizeNV.x;
+    uint reservoir_idx = screen_tex.x + screen_tex.y * frame_uniforms.resolution_u32.x;
     reservoir_buffer.data[reservoir_idx] = reservoir;
 }
