@@ -21,6 +21,7 @@ typedef uint64_t xg_cmd_buffer_h;
 typedef uint64_t xg_swapchain_h;
 typedef uint64_t xg_renderpass_h;
 typedef uint64_t xg_query_pool_h;
+typedef uint64_t xg_workload_h;
 
 typedef uint64_t xg_resource_h;
 typedef uint64_t xg_buffer_h;
@@ -35,7 +36,7 @@ typedef uint64_t xg_raytrace_pipeline_state_h;
 
 #define xg_null_handle_m UINT64_MAX
 
-// -- Color types --
+// -- Data types --
 typedef enum {
     // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkFormat.html
     // e: exponent
@@ -280,10 +281,10 @@ typedef enum {
 } xg_format_e;
 
 typedef enum {
-    xg_colorspace_linear_m,
     xg_colorspace_srgb_m,     // https://en.wikipedia.org/wiki/SRGB
     xg_colorspace_hdr_hlg_m,  // https://en.wikipedia.org/wiki/Hybrid_Log-Gamma
     xg_colorspace_hdr_pq_m,   // https://en.wikipedia.org/wiki/High-dynamic-range_video#Perceptual_Quantizer
+    xg_colorspace_linear_m,
 } xg_color_space_e;
 
 // -- Device --
@@ -322,120 +323,6 @@ typedef enum {
     xg_cmd_queue_count_m,
     xg_cmd_queue_invalid_m,
 } xg_cmd_queue_e;
-
-// -- Display --
-// TODO is this working?
-typedef struct {
-    uint64_t id;
-    size_t width;
-    size_t height;
-    size_t refresh_rate;
-} xg_display_mode_t;
-
-typedef struct {
-    xg_display_h display_handle;
-    size_t pixel_width;
-    size_t pixel_height;
-    size_t millimeter_width;
-    size_t millimeter_height;
-    char name[xg_display_name_size_m];
-    xg_display_mode_t display_modes[xg_display_max_modes_m];
-} xg_display_info_t;
-
-// -- Swapchain --
-typedef enum {
-    xg_present_mode_immediate_m,        // no wait for vblank, tear
-    xg_present_mode_mailbox_m,          // wait for vblank, single slot fifo
-    xg_present_mode_fifo_m,             // wait for vblank, queue to prev requests
-    xg_present_mode_fifo_relaxed_m,     // wait for vblank, tear if prev vblank was missed
-    xg_present_mode_fifo_latest_m,      // same as fifo, but vblank can pop multiple from fifo (always present latest)
-} xg_present_mode_e;
-
-typedef struct {
-    bool acquired;
-    uint32_t acquired_texture_idx;
-    size_t texture_count;
-    xg_texture_h textures[xg_swapchain_max_textures_m];
-    xg_format_e format;
-    xg_color_space_e color_space;
-    size_t width;
-    size_t height;
-    xg_present_mode_e present_mode;
-    xg_device_h device;
-    wm_window_h window;
-    xg_display_h display;
-    char debug_name[xg_debug_name_size_m];
-} xg_swapchain_info_t;
-
-typedef struct {
-    uint32_t width;
-    uint32_t height;
-} xg_swapchain_size_t;
-
-typedef struct {
-    xg_format_e format;
-    xg_color_space_e color_space;
-} xg_swapchain_image_format_t;
-
-typedef struct {
-    uint32_t min_width;
-    uint32_t min_height;
-    uint32_t max_width;
-    uint32_t max_height;
-    uint32_t min_count;
-    uint32_t max_count;
-    uint32_t image_formats_count;
-    xg_swapchain_image_format_t image_formats_array[xg_swpachain_max_capability_formats];
-} xg_swapchain_window_capabilities_t;
-
-typedef struct {
-    size_t texture_count;
-    xg_format_e format;
-    xg_color_space_e color_space;
-    xg_present_mode_e present_mode;
-    xg_device_h device;
-    wm_window_h window;
-    char debug_name[xg_debug_name_size_m];
-} xg_swapchain_window_params_t;
-
-#define xg_swapchain_window_params_m( ... ) ( xg_swapchain_window_params_t ) { \
-    .texture_count = 0, \
-    .format = xg_format_undefined_m, \
-    .color_space = xg_colorspace_srgb_m, \
-    .present_mode = xg_present_mode_fifo_m, \
-    .debug_name = "swapchain", \
-    .device = xg_null_handle_m, \
-    .window = wm_null_handle_m, \
-    ##__VA_ARGS__ \
-}
-
-typedef struct {
-    size_t texture_count;
-    xg_format_e format;
-    xg_color_space_e color_space;
-    xg_present_mode_e present_mode;
-    xg_device_h device;
-    xg_display_h display;
-    char debug_name[xg_debug_name_size_m];
-} xg_swapchain_display_params_t;
-
-typedef struct {
-    size_t texture_count;
-    xg_format_e format;
-    xg_color_space_e color_space;
-    size_t width;
-    size_t height;
-    xg_device_h device;
-    char debug_name[xg_debug_name_size_m];
-} xg_swapchain_virtual_params_t;
-
-typedef struct {
-    xg_texture_h texture;
-    uint32_t idx;
-    bool resize;
-    //uint32_t width;
-    //uint32_t height;
-} xg_swapchain_acquire_result_t;
 
 // -- Device Memory --
 /*
@@ -937,11 +824,7 @@ typedef struct {
 } xg_render_textures_layout_t;
 
 #define xg_render_textures_layout_m( ... ) ( xg_render_textures_layout_t ) { \
-    .render_targets_count = 0, \
-    .render_targets = { 0 }, \
-    .depth_stencil_enabled = false, \
-    .depth_stencil = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef union {
@@ -1329,25 +1212,6 @@ typedef struct {
     const char* debug_name;
 } xg_pipeline_info_t;
 
-// -- Renderpass --
-
-typedef struct {
-    xg_device_h device;
-    xg_render_textures_layout_t render_textures;
-    uint32_t resolution_x;
-    uint32_t resolution_y;
-    char debug_name[xg_debug_name_size_m];
-} xg_renderpass_params_t;
-
-#define xg_renderpass_params_m( ... ) ( xg_renderpass_params_t ) { \
-    .device = xg_null_handle_m, \
-    .render_textures = xg_render_textures_layout_m(), \
-    .resolution_x = -1, \
-    .resolution_y = -1, \
-    .debug_name = "", \
-    ##__VA_ARGS__ \
-}
-
 // -- Resource Management --
 // TODO simplyfy/abstract a bit the below?
 // Where not specified, a usage encompasses both pipeline output and pipeline resource usage
@@ -1406,7 +1270,6 @@ typedef enum {
     xg_texture_dimension_3d_m,
 } xg_texture_dimension_e;
 
-// TODO
 typedef enum {
     xg_texture_usage_bit_none_m             =      0,
     xg_texture_usage_bit_copy_source_m      = 1 << 0,
@@ -1601,8 +1464,35 @@ typedef struct {
 }
 
 // -- Commands --
-typedef uint64_t xg_workload_h;
-#define xg_workload_null_m UINT64_MAX;
+
+// Because Vulkan requires all attachments supported usages to be declared at framebuffer creation time.
+typedef struct {
+    xg_texture_usage_bit_e render_targets[xg_pipeline_output_max_color_targets_m];
+    xg_texture_usage_bit_e depth_stencil;
+} xg_render_textures_usage_t;
+
+#define xg_render_textures_usage_m( ... ) ( xg_render_textures_usage_t ) { \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    xg_device_h device;
+    xg_render_textures_layout_t render_textures_layout;
+    xg_render_textures_usage_t render_textures_usage;
+    uint32_t resolution_x;
+    uint32_t resolution_y;
+    char debug_name[xg_debug_name_size_m];
+} xg_renderpass_params_t;
+
+#define xg_renderpass_params_m( ... ) ( xg_renderpass_params_t ) { \
+    .device = xg_null_handle_m, \
+    .render_textures_layout = xg_render_textures_layout_m(), \
+    .render_textures_usage = xg_render_textures_usage_m(), \
+    .resolution_x = -1, \
+    .resolution_y = -1, \
+    .debug_name = "", \
+    ##__VA_ARGS__ \
+}
 
 typedef struct {
     xg_buffer_h buffer;
@@ -2447,6 +2337,119 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
+// -- Display --
+// TODO is this working?
+typedef struct {
+    uint64_t id;
+    size_t width;
+    size_t height;
+    size_t refresh_rate;
+} xg_display_mode_t;
+
+typedef struct {
+    xg_display_h display_handle;
+    size_t pixel_width;
+    size_t pixel_height;
+    size_t millimeter_width;
+    size_t millimeter_height;
+    char name[xg_display_name_size_m];
+    xg_display_mode_t display_modes[xg_display_max_modes_m];
+} xg_display_info_t;
+
+// -- Swapchain --
+typedef enum {
+    xg_present_mode_immediate_m,        // no wait for vblank, tear
+    xg_present_mode_mailbox_m,          // wait for vblank, single slot fifo
+    xg_present_mode_fifo_m,             // wait for vblank, queue to prev requests
+    xg_present_mode_fifo_relaxed_m,     // wait for vblank, tear if prev vblank was missed
+    xg_present_mode_fifo_latest_m,      // same as fifo, but vblank can pop multiple from fifo (always present latest)
+} xg_present_mode_e;
+
+typedef struct {
+    bool acquired;
+    uint32_t acquired_texture_idx;
+    size_t texture_count;
+    xg_texture_h textures[xg_swapchain_max_textures_m];
+    xg_format_e format;
+    xg_color_space_e color_space;
+    size_t width;
+    size_t height;
+    xg_present_mode_e present_mode;
+    xg_device_h device;
+    wm_window_h window;
+    xg_display_h display;
+    char debug_name[xg_debug_name_size_m];
+} xg_swapchain_info_t;
+
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+} xg_swapchain_size_t;
+
+typedef struct {
+    xg_format_e format;
+    xg_color_space_e color_space;
+} xg_swapchain_image_format_t;
+
+typedef struct {
+    uint32_t min_width;
+    uint32_t min_height;
+    uint32_t max_width;
+    uint32_t max_height;
+    uint32_t min_count;
+    uint32_t max_count;
+    uint32_t image_formats_count;
+    xg_swapchain_image_format_t image_formats_array[xg_swpachain_max_capability_formats];
+} xg_swapchain_window_capabilities_t;
+
+typedef struct {
+    size_t texture_count;
+    xg_format_e format;
+    xg_color_space_e color_space;
+    xg_present_mode_e present_mode;
+    xg_texture_usage_bit_e allowed_usage;
+    xg_device_h device;
+    wm_window_h window;
+    char debug_name[xg_debug_name_size_m];
+} xg_swapchain_window_params_t;
+
+#define xg_swapchain_window_params_m( ... ) ( xg_swapchain_window_params_t ) { \
+    .texture_count = 0, \
+    .format = xg_format_undefined_m, \
+    .color_space = xg_colorspace_srgb_m, \
+    .present_mode = xg_present_mode_fifo_m, \
+    .debug_name = "swapchain", \
+    .device = xg_null_handle_m, \
+    .window = wm_null_handle_m, \
+    ##__VA_ARGS__ \
+}
+
+typedef struct {
+    size_t texture_count;
+    xg_format_e format;
+    xg_color_space_e color_space;
+    xg_present_mode_e present_mode;
+    xg_device_h device;
+    xg_display_h display;
+    char debug_name[xg_debug_name_size_m];
+} xg_swapchain_display_params_t;
+
+typedef struct {
+    size_t texture_count;
+    xg_format_e format;
+    xg_color_space_e color_space;
+    size_t width;
+    size_t height;
+    xg_device_h device;
+    char debug_name[xg_debug_name_size_m];
+} xg_swapchain_virtual_params_t;
+
+typedef struct {
+    xg_texture_h texture;
+    uint32_t idx;
+    bool resize;
+} xg_swapchain_acquire_result_t;
+
 // XG API
 typedef struct {
     // Device
@@ -2620,8 +2623,4 @@ typedef struct {
 
     void                    ( *wait_all_workload_complete )         ( void );
     void                    ( *wait_for_workload )                  ( xg_workload_h workload );
-
-#if xg_debug_enable_simple_frame_test_m
-    void                    ( *debug_simple_frame )                 ( xg_device_h device, wm_window_h window );
-#endif
 } xg_i;

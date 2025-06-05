@@ -35,7 +35,6 @@ typedef struct {
     uint64_t resolution_x;
     uint64_t resolution_y;
     xi_workload_h xi_workload;
-    xg_renderpass_h renderpass;
 } xf_ui_pass_args_t;
 
 static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -69,7 +68,6 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
         params.render_target_format = xg_format_b8g8r8a8_unorm_m;
         params.viewport.width = args->resolution_x;
         params.viewport.height = args->resolution_y;
-        params.renderpass = node_args->renderpass;
         params.render_target_binding = xf_render_target_binding_m ( node_args->io->render_targets[0] );
 
         key = xi->flush_workload ( args->xi_workload, &params );
@@ -108,6 +106,7 @@ static void xi_test ( void ) {
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m;
             .color_space = xg_colorspace_srgb_m,
             .present_mode = xg_present_mode_fifo_m,
+            .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );
@@ -174,17 +173,6 @@ static void xi_test ( void ) {
         .resources = xf_node_resource_params_m (
             .copy_texture_writes_count = 1,
             .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
-        )
-    ) );
-
-    xg_renderpass_h ui_renderpass = xg->create_renderpass ( &xg_renderpass_params_m (
-        .device = device,
-        .debug_name = "xi_test_ui",
-        .resolution_x = resolution_x,
-        .resolution_y = resolution_y,
-        .render_textures = xg_render_textures_layout_m (
-            .render_targets_count = 1,
-            .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
         )
     ) );
 
@@ -354,7 +342,10 @@ static void xi_test ( void ) {
     );
     rv_view_h view = rv->create_view ( &view_params );
 
-    xi->init_geos ( device );
+    xg_workload_h workload = xg->create_workload ( device );
+    xi->init_geos ( device, workload );
+    xg->submit_workload ( workload );
+
     xi_transform_state_t xform_state = xi_transform_state_m();
 
     float target_fps = 24.f;
@@ -460,7 +451,6 @@ static void xi_test ( void ) {
             ui_node_args.resolution_x = new_window_info.width;
             ui_node_args.resolution_y = new_window_info.height;
             ui_node_args.xi_workload = xi_workload;
-            ui_node_args.renderpass = ui_renderpass;
         }
 
         xf->execute_graph ( graph, workload, 0 );

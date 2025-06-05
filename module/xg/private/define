@@ -33,7 +33,6 @@ xg_debug_enable_events_log_m                    0
 xg_debug_enable_flush_gpu_submissions_m         0
 # TODO move this to Vulkan backend?
 xg_debug_enable_disable_semaphore_frame_sync_m  0
-xg_debug_enable_simple_frame_test_m             0
 xg_debug_enable_measure_present_time_m          0
 xg_debug_enable_measure_acquire_time_m          0
 xg_debug_enable_measure_workload_wait_time_m    0

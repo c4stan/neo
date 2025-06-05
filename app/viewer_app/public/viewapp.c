@@ -1024,7 +1024,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssgi_raymarch_texture",
     ) );
-    add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, lighting_texture, hiz_texture );
+    add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, downsampled_lighting_texture, hiz_texture );
 
     // ssgi blur
 #if 0
@@ -2571,6 +2571,8 @@ static void viewapp_boot ( void ) {
         .device = device,
         .texture_count = 3,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m,
+        .debug_name = "swapchain",
     ) );
     std_assert_m ( swapchain != xg_null_handle_m );
 
@@ -2712,10 +2714,6 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
     se_i* se = m_state->modules.se;
     xi_i* xi = m_state->modules.xi;
     rv_i* rv = m_state->modules.rv;
-
-    if ( xi->get_active_element_id() != 0 ) {
-        return;
-    }
 
     se_query_result_t camera_query_result;
     se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
@@ -2942,7 +2940,6 @@ static se_entity_h spawn_plane ( xg_workload_h workload ) {
             .ssr = false,
             .roughness = 0.01,
             .metalness = 0,
-            .emissive = { 1, 1, 1 },
         )
     );
 
@@ -2953,6 +2950,64 @@ static se_entity_h spawn_plane ( xg_workload_h workload ) {
 
     se_entity_h entity = se->create_entity( &se_entity_params_m (
         .debug_name = "plane",
+        .update = se_entity_update_m (
+            .component_count = 2,
+            .components = {
+                se_component_update_m (
+                    .id = viewapp_mesh_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                ),
+                se_component_update_m (
+                    .id = viewapp_transform_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &transform_component ) }
+                ),
+            }
+        )
+    ) );
+
+    viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
+    viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
+    update_raytrace_world();
+    return entity;
+}
+
+static se_entity_h spawn_sphere ( xg_workload_h workload ) {
+    xs_i* xs = m_state->modules.xs;
+    se_i* se = m_state->modules.se;
+
+    xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
+    xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
+    xs_database_pipeline_h object_id_pipeline_state = xs->get_database_pipeline ( m_state->render.sdb, xs_hash_static_string_m ( "object_id" ) );
+
+    xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( m_state->render.device, workload, &geo );
+
+    viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+        .geo_data = geo,
+        .geo_gpu_data = gpu_data,
+        .object_id_pipeline = object_id_pipeline_state,
+        .geometry_pipeline = geometry_pipeline_state,
+        .shadow_pipeline = shadow_pipeline_state,
+        .object_id = m_state->render.next_object_id++,
+        .material = viewapp_material_data_m (
+            .base_color = {
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 240 / 255.f, 2.2 ),
+                powf ( 250 / 255.f, 2.2 )
+            },
+            .ssr = false,
+            .roughness = 0.01,
+            .metalness = 0,
+        )
+    );
+
+    viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        .position = { 0, 0, 0 },
+    );
+
+
+    se_entity_h entity = se->create_entity( &se_entity_params_m (
+        .debug_name = "sphere",
         .update = se_entity_update_m (
             .component_count = 2,
             .components = {
@@ -3046,7 +3101,7 @@ static se_entity_h spawn_light ( xg_workload_h workload ) {
     }
 
     se_entity_h entity = se->create_entity( &se_entity_params_m (
-        .debug_name = "sphere",
+        .debug_name = "light",
         .update = se_entity_update_m (
             .component_count = 3,
             .components = { 
@@ -3712,18 +3767,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             uint32_t entity_idx = destroy_list[i];
             se->destroy_entity ( entity_list[entity_idx] );
             --remaining_entities;
-            #if 0
-            for ( uint32_t i = entity_idx; i < remaining_entities; ++i ) {
-                bool next = std_bitset_test ( m_state->ui.expanded_entities_bitset, i + 1 );
-                if ( next ) {
-                    std_bitset_set ( m_state->ui.expanded_entities_bitset, i );
-                } else {
-                    std_bitset_clear ( m_state->ui.expanded_entities_bitset, i );
-                }
-            }
-            #else
             std_bitset_shift_left ( m_state->ui.expanded_entities_bitset, entity_idx, 1, std_static_array_capacity_m ( m_state->ui.expanded_entities_bitset ) );
-            #endif
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
@@ -3733,6 +3777,15 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             ),
         ) ) ) {
             spawn_light ( workload );
+        }
+
+        if ( xi->add_button ( xi_workload, &xi_button_state_m (
+            .text = "Add sphere",
+            .style = xi_default_style_m (
+                .horizontal_padding = 8,
+            ),
+        ) ) ) {
+            spawn_sphere ( workload );
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
@@ -3918,16 +3971,6 @@ static std_app_state_e viewapp_update ( void ) {
         m_state->render.capture_frame = true;
     }
 
-#if 0
-    if ( !input_state->keyboard[wm_keyboard_state_f5_m] && new_input_state.keyboard[wm_keyboard_state_f5_m] ) {
-        duplicate_selection();
-    }
-
-    if ( !input_state->keyboard[wm_keyboard_state_f6_m] && new_input_state.keyboard[wm_keyboard_state_f6_m] ) {
-        spawn_light (  );
-    }
-#endif
-
     m_state->render.frame_id += 1;
 
     xg_workload_h workload = xg->create_workload ( m_state->render.device );
@@ -4003,7 +4046,6 @@ static std_app_state_e viewapp_update ( void ) {
     xg->present_swapchain ( m_state->render.swapchain, workload );
 
     xs->update_pipeline_states ( workload );
-    //xf->destroy_unreferenced_resources();
 
     if ( m_state->render.raytrace_world_update ) {
         xg->wait_all_workload_complete();

@@ -108,174 +108,8 @@ xg_texture_h xg_texture_create ( const xg_texture_params_t* params ) {
     return texture_handle;
 }
 
-void xg_texture_create_view ( xg_vk_texture_view_t* view, xg_texture_h texture_handle, xg_texture_view_t view_desc ) {
-    xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
-    const xg_vk_device_t* device = xg_vk_device_get ( texture->params.device );
-
-    VkImageView vk_view;
-    xg_vk_texture_view_params_t params;
-    {
-        xg_format_e format;
-
-        if ( view_desc.format != xg_texture_view_default_format_m ) {
-            format = view_desc.format;
-        } else {
-            format = texture->params.format;
-        }
-
-        uint32_t mip_count;
-        uint32_t array_count;
-
-        if ( view_desc.mip_count == xg_texture_all_mips_m ) {
-            mip_count = VK_REMAINING_MIP_LEVELS;
-        } else {
-            mip_count = view_desc.mip_count;
-        }
-
-        if ( view_desc.array_count == xg_texture_whole_array_m ) {
-            array_count = VK_REMAINING_ARRAY_LAYERS;
-        } else {
-            array_count = view_desc.array_count;
-        }
-
-        VkImageAspectFlags aspect = 0;
-
-        if ( view_desc.aspect == xg_texture_aspect_default_m ) {
-            if ( texture->flags & xg_texture_flag_bit_render_target_texture_m ) {
-                aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-            } else if ( texture->flags & xg_texture_flag_bit_depth_texture_m ) {
-                aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-            } else if ( texture->flags & xg_texture_flag_bit_stencil_texture_m ) {
-                aspect = VK_IMAGE_ASPECT_STENCIL_BIT;
-            } else {
-                aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-            }
-        } else {
-            aspect = xg_texture_aspect_to_vk ( view_desc.aspect );
-        }
-
-        VkImageViewCreateInfo vk_view_info;
-        vk_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        vk_view_info.pNext = NULL;
-        vk_view_info.flags = 0;
-        vk_view_info.image = texture->vk_handle;
-        vk_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        vk_view_info.format = xg_format_to_vk ( format );
-        vk_view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        vk_view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        vk_view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        vk_view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        vk_view_info.subresourceRange.aspectMask = aspect;
-        vk_view_info.subresourceRange.baseMipLevel = view_desc.mip_base;
-        vk_view_info.subresourceRange.levelCount = mip_count;
-        vk_view_info.subresourceRange.baseArrayLayer = view_desc.array_base;
-        vk_view_info.subresourceRange.layerCount = array_count;
-        xg_vk_assert_m ( vkCreateImageView ( device->vk_handle, &vk_view_info, NULL, &vk_view ) );
-
-        if ( texture->params.debug_name[0] ) {
-            char buffer[xg_debug_name_size_m + 16] = {0};
-            std_stack_t stack = std_static_stack_m ( buffer );
-            std_stack_string_append ( &stack, texture->params.debug_name );
-            std_stack_string_append ( &stack, "view" );
-            
-            VkDebugUtilsObjectNameInfoEXT debug_name;
-            debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-            debug_name.pNext = NULL;
-            debug_name.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
-            debug_name.objectHandle = ( uint64_t ) vk_view;
-            debug_name.pObjectName = buffer;
-            xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
-        }
-
-        // TODO refactor this, have the create function take params struct only and do the translation outside
-        params.format = format;
-        params.mip_count = mip_count;
-        params.array_count = array_count;
-        params.aspect = aspect;
-        params.desc = view_desc;
-    }
-
-    view->vk_handle = vk_view;
-    view->params = params;
-}
-
 uint32_t xg_texture_max_mip_levels ( uint32_t width, uint32_t height ) {
     return floor ( log2 ( std_max_u32 ( width, height ) ) ) + 1;
-}
-
-// TODO move VkImage create in here (like for buffers)? Why is it even split in two exactly other than potential memory "savings"?
-//      buffer creation was moved into reserve because of raytrace geometry creation taking VK handles and storing VkGeometryNV arrays... should that be avoided? 
-xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
-    std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
-    xg_vk_texture_t* texture = std_list_pop_m ( &xg_vk_texture_state->textures_freelist );
-    xg_texture_h texture_handle = ( xg_texture_h ) ( texture - xg_vk_texture_state->textures_array );
-    std_bitset_set ( xg_vk_texture_state->textures_bitset, texture_handle );
-    std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
-    std_assert_m ( texture );
-
-    xg_texture_flag_bit_e flags = 0;
-
-    // These are required by validation at creation time for appropriate formats, even if usage as depth/stencil target is not selected
-    if ( xg_format_has_depth ( params->format ) ) {
-        flags |= xg_texture_flag_bit_depth_texture_m;
-    }
-    if ( xg_format_has_stencil ( params->format ) ) {
-        flags |= xg_texture_flag_bit_stencil_texture_m;
-    }
-
-    if ( params->allowed_usage & xg_texture_usage_bit_render_target_m ) {
-        flags = xg_texture_flag_bit_render_target_texture_m;
-    }
-
-    texture->vk_handle = VK_NULL_HANDLE;
-    texture->allocation.handle = xg_null_memory_handle_m;
-    texture->params = *params;
-    texture->flags = flags;
-    texture->default_view.vk_handle = VK_NULL_HANDLE;
-
-    // TODO add proper support for this everywhere
-    if ( params->mip_levels == xg_texture_all_mips_m ) {
-        texture->params.mip_levels = xg_texture_max_mip_levels ( params->width, params->height );
-    }
-
-    texture->state = xg_vk_texture_state_reserved_m;
-
-    xg_texture_aspect_e default_aspect;
-
-    // TODO make texture_aspect a bitflag, allow both stencil and depth?
-    if ( texture->flags & xg_texture_flag_bit_render_target_texture_m ) {
-        default_aspect = xg_texture_aspect_color_m;
-    } else if ( texture->flags & xg_texture_flag_bit_depth_texture_m ) {
-        default_aspect = xg_texture_aspect_depth_m;
-    } else if ( texture->flags & xg_texture_flag_bit_stencil_texture_m ) {
-        default_aspect = xg_texture_aspect_stencil_m;
-    } else {
-        default_aspect = xg_texture_aspect_color_m;
-    }
-
-    texture->default_aspect = default_aspect;
-
-    if ( flags & xg_texture_flag_bit_render_target_texture_m ) {
-        texture->params.allowed_usage |= xg_texture_usage_bit_sampled_m;
-        texture->params.allowed_usage |= xg_texture_usage_bit_storage_m;
-        texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
-        texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
-    } else if ( flags & ( xg_texture_flag_bit_depth_texture_m | xg_texture_flag_bit_stencil_texture_m ) ) {
-        texture->params.allowed_usage |= xg_texture_usage_bit_sampled_m;
-        texture->params.allowed_usage |= xg_texture_usage_bit_copy_source_m;
-        texture->params.allowed_usage |= xg_texture_usage_bit_copy_dest_m;
-    }
-
-    if ( params->view_access == xg_texture_view_access_default_only_m ) {
-        std_mem_zero_m ( &texture->external_views );
-    } else if ( params->view_access == xg_texture_view_access_separate_mips_m ) {
-        texture->external_views.mips.array = std_virtual_heap_alloc_array_m ( xg_vk_texture_view_t, params->mip_levels );
-        std_mem_zero ( texture->external_views.mips.array, sizeof ( xg_vk_texture_view_t ) * params->mip_levels );
-    } else if ( params->view_access == xg_texture_view_access_dynamic_m ) {
-        std_not_implemented_m();
-    }
-
-    return texture_handle;
 }
 
 xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_t* params ) {
@@ -319,7 +153,7 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
 #endif
     vk_image_info.initialLayout = xg_image_layout_to_vk ( params->initial_layout );
 
-    // Query for memory requiremens
+    // query for memory requiremens
     vkCreateImage ( device->vk_handle, &vk_image_info, NULL, &vk_image );
 
     VkMemoryDedicatedRequirements dedicated_requirements = {
@@ -338,11 +172,10 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
     vkGetImageMemoryRequirements2 ( device->vk_handle, &image_requirements_info, &memory_requirements_2 );
     const VkMemoryRequirements* vk_memory_requirements = &memory_requirements_2.memoryRequirements;
 
-    // Destroy Vulkan image
+    // destroy Vulkan image
     // TODO is there no way to do this without creating and destroying a temp VkImage?
     vkDestroyImage ( device->vk_handle, vk_image, NULL );
 
-    // Return
     xg_memory_requirement_t req = {
         .size = vk_memory_requirements->size,
         .align = vk_memory_requirements->alignment,
@@ -356,22 +189,177 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
     return req;
 }
 
-bool xg_texture_alloc ( xg_texture_h texture_handle ) {
+static xg_vk_texture_view_params_t xg_texture_view_params ( xg_texture_h texture_handle, xg_texture_view_t view_desc ) {
+    xg_vk_texture_view_params_t params;
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 
-    std_assert_m ( texture->state == xg_vk_texture_state_reserved_m );
+    if ( view_desc.format != xg_texture_view_default_format_m ) {
+        params.format = view_desc.format;
+    } else {
+        params.format = texture->params.format;
+    }
 
+    if ( view_desc.mip_count == xg_texture_all_mips_m ) {
+        params.mip_count = VK_REMAINING_MIP_LEVELS;
+    } else {
+        params.mip_count = view_desc.mip_count;
+    }
+
+    if ( view_desc.array_count == xg_texture_whole_array_m ) {
+        params.array_count = VK_REMAINING_ARRAY_LAYERS;
+    } else {
+        params.array_count = view_desc.array_count;
+    }
+
+    if ( view_desc.aspect == xg_texture_aspect_default_m ) {
+        if ( texture->flags & xg_texture_flag_bit_render_target_texture_m ) {
+            params.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+        } else if ( texture->flags & xg_texture_flag_bit_depth_texture_m ) {
+            params.aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+        } else if ( texture->flags & xg_texture_flag_bit_stencil_texture_m ) {
+            params.aspect = VK_IMAGE_ASPECT_STENCIL_BIT;
+        } else {
+            params.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+    } else {
+        params.aspect = xg_texture_aspect_to_vk ( view_desc.aspect );
+    }
+
+    params.desc = view_desc;
+    params.image = texture->vk_handle;
+
+    std_stack_t stack = std_static_stack_m ( params.debug_name );
+    std_stack_string_append ( &stack, texture->params.debug_name );
+    std_stack_string_append ( &stack, "view" ); // TODO add more info
+
+    return params;
+}
+
+static VkImageView xg_texture_view_create_vk ( xg_device_h device_handle, const xg_vk_texture_view_params_t* params ) {
+    VkImageView vk_view;
+
+    const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
+    VkImageViewCreateInfo vk_view_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .image = params->image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = xg_format_to_vk ( params->format ),
+        .components.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .components.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .components.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .components.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .subresourceRange.aspectMask = params->aspect,
+        .subresourceRange.baseMipLevel = params->desc.mip_base,
+        .subresourceRange.levelCount = params->mip_count,
+        .subresourceRange.baseArrayLayer = params->desc.array_base,
+        .subresourceRange.layerCount = params->array_count,
+    };
+    xg_vk_assert_m ( vkCreateImageView ( device->vk_handle, &vk_view_info, NULL, &vk_view ) );
+
+    if ( params->debug_name[0] ) {        
+        VkDebugUtilsObjectNameInfoEXT debug_name;
+        debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        debug_name.pNext = NULL;
+        debug_name.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
+        debug_name.objectHandle = ( uint64_t ) vk_view;
+        debug_name.pObjectName = params->debug_name;
+        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+    }
+
+    return vk_view;
+}
+
+static void xg_texture_create_texture_views ( xg_texture_h texture_handle ) {
+    xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
     const xg_texture_params_t* params = &texture->params;
 
-    const xg_vk_device_t* device = xg_vk_device_get ( params->device );
+    bool needs_view = params->allowed_usage & ( xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_depth_stencil_m );
+
+    if ( needs_view ) {
+        texture->default_view.params = xg_texture_view_params ( texture_handle, xg_texture_view_m() );
+        texture->default_view.vk_handle = xg_texture_view_create_vk ( texture->params.device, &texture->default_view.params );
+
+        if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
+            for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
+                xg_texture_view_t view = xg_texture_view_m ( .mip_base = i, .mip_count = 1 );
+                texture->external_views.mips.array[i].params = xg_texture_view_params ( texture_handle, view );
+                texture->external_views.mips.array[i].vk_handle = xg_texture_view_create_vk ( texture->params.device, &texture->external_views.mips.array[i].params );
+            }
+        } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
+            std_not_implemented_m();
+        }
+    } else {
+        texture->default_view.vk_handle = VK_NULL_HANDLE;
+        std_mem_zero_m ( &texture->default_view.params );
+    }
+}
+
+xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
+    std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
+    xg_vk_texture_t* texture = std_list_pop_m ( &xg_vk_texture_state->textures_freelist );
+    xg_texture_h texture_handle = ( xg_texture_h ) ( texture - xg_vk_texture_state->textures_array );
+    std_bitset_set ( xg_vk_texture_state->textures_bitset, texture_handle );
+    std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
+    std_assert_m ( texture );
+
+    xg_texture_flag_bit_e flags = 0;
+
+    // These are required by validation at creation time for appropriate formats, even if usage as depth/stencil target is not selected
+    if ( xg_format_has_depth ( params->format ) ) {
+        flags |= xg_texture_flag_bit_depth_texture_m;
+    }
+    if ( xg_format_has_stencil ( params->format ) ) {
+        flags |= xg_texture_flag_bit_stencil_texture_m;
+    }
+
+    if ( params->allowed_usage & xg_texture_usage_bit_render_target_m ) {
+        flags = xg_texture_flag_bit_render_target_texture_m;
+    }
+
+    texture->vk_handle = VK_NULL_HANDLE;
+    texture->allocation.handle = xg_null_memory_handle_m;
+    texture->params = *params;
+    texture->flags = flags;
+    texture->default_view.vk_handle = VK_NULL_HANDLE;
+
+    size_t mip_levels = params->mip_levels;
+    if ( params->mip_levels == xg_texture_all_mips_m ) {
+        mip_levels = xg_texture_max_mip_levels ( params->width, params->height );
+    }
+    texture->params.mip_levels = mip_levels;
+
+    texture->state = xg_vk_texture_state_reserved_m;
+
+    xg_texture_aspect_e default_aspect;
+
+    // TODO make texture_aspect a bitflag, allow both stencil and depth?
+    if ( texture->flags & xg_texture_flag_bit_render_target_texture_m ) {
+        default_aspect = xg_texture_aspect_color_m;
+    } else if ( texture->flags & xg_texture_flag_bit_depth_texture_m ) {
+        default_aspect = xg_texture_aspect_depth_m;
+    } else if ( texture->flags & xg_texture_flag_bit_stencil_texture_m ) {
+        default_aspect = xg_texture_aspect_stencil_m;
+    } else {
+        default_aspect = xg_texture_aspect_color_m;
+    }
+
+    texture->default_aspect = default_aspect;
+
+    if ( params->view_access == xg_texture_view_access_default_only_m ) {
+        std_mem_zero_m ( &texture->external_views );
+    } else if ( params->view_access == xg_texture_view_access_separate_mips_m ) {
+        texture->external_views.mips.array = std_virtual_heap_alloc_array_m ( xg_vk_texture_view_t, mip_levels );
+        std_mem_zero ( texture->external_views.mips.array, sizeof ( xg_vk_texture_view_t ) * mip_levels );
+    } else if ( params->view_access == xg_texture_view_access_dynamic_m ) {
+        std_not_implemented_m();
+    }
 
     // Create Vulkan image
+    const xg_vk_device_t* device = xg_vk_device_get ( params->device );
+    
     VkImage vk_image;
-    std_assert_m ( params->width < UINT32_MAX );
-    std_assert_m ( params->height < UINT32_MAX );
-    std_assert_m ( params->depth < UINT32_MAX );
-    std_assert_m ( params->mip_levels < UINT32_MAX );
-    std_assert_m ( params->array_layers < UINT32_MAX );
     VkImageCreateInfo vk_image_info;
     vk_image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     vk_image_info.pNext = NULL;
@@ -381,7 +369,7 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     vk_image_info.extent.width = ( uint32_t ) params->width;
     vk_image_info.extent.height = ( uint32_t ) params->height;
     vk_image_info.extent.depth = ( uint32_t ) params->depth;
-    vk_image_info.mipLevels = ( uint32_t ) params->mip_levels;
+    vk_image_info.mipLevels = ( uint32_t ) mip_levels;
     vk_image_info.arrayLayers = ( uint32_t ) params->array_layers;
     vk_image_info.samples = xg_sample_count_to_vk ( params->samples_per_pixel );
     vk_image_info.tiling = xg_texture_tiling_to_vk ( params->tiling );
@@ -398,21 +386,29 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
 #endif
     vk_image_info.initialLayout = xg_image_layout_to_vk ( params->initial_layout );
 
-    // Query for memory requiremens, allocate and bind
+    // query for memory requiremens, allocate and bind
     vkCreateImage ( device->vk_handle, &vk_image_info, NULL, &vk_image );
 
     if ( params->debug_name[0] ) {
-        char buffer[32];
-        std_u64_to_str ( buffer, 32, texture_handle );
         VkDebugUtilsObjectNameInfoEXT debug_name;
         debug_name.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
         debug_name.pNext = NULL;
         debug_name.objectType = VK_OBJECT_TYPE_IMAGE;
         debug_name.objectHandle = ( uint64_t ) vk_image;
-        //debug_name.pObjectName = params->debug_name;
-        debug_name.pObjectName = buffer;
+        debug_name.pObjectName = params->debug_name;
         xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
     }
+
+    texture->vk_handle = vk_image;
+
+    return texture_handle;
+}
+
+bool xg_texture_alloc ( xg_texture_h texture_handle ) {
+    xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
+    std_assert_m ( texture->state == xg_vk_texture_state_reserved_m );
+    const xg_texture_params_t* params = &texture->params;
+    const xg_vk_device_t* device = xg_vk_device_get ( params->device );
 
     VkDeviceMemory alloc_base;
     VkDeviceSize alloc_offset;
@@ -434,7 +430,7 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
         const VkImageMemoryRequirementsInfo2 image_requirements_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
             .pNext = NULL,
-            .image = vk_image
+            .image = texture->vk_handle
         };
         vkGetImageMemoryRequirements2 ( device->vk_handle, &image_requirements_info, &memory_requirements_2 );
         // TODO
@@ -454,31 +450,12 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
         texture->allocation = alloc;
     }
 
-    VkResult result = vkBindImageMemory ( device->vk_handle, vk_image, alloc_base, alloc_offset );
+    VkResult result = vkBindImageMemory ( device->vk_handle, texture->vk_handle, alloc_base, alloc_offset );
     std_verify_m ( result == VK_SUCCESS );
 
-    texture->vk_handle = vk_image;
-
-    bool needs_view = params->allowed_usage & ( xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_depth_stencil_m );
-
-    if ( needs_view ) {
-        xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
-
-        if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
-            for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
-                xg_texture_view_t view = xg_texture_view_m ( .mip_base = i, .mip_count = 1 );
-                xg_texture_create_view ( &texture->external_views.mips.array[i], texture_handle, view );
-            }
-        } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
-            std_not_implemented_m();
-        }
-    } else {
-        texture->default_view.vk_handle = VK_NULL_HANDLE;
-        std_mem_zero_m ( &texture->default_view.params );
-    }
+    xg_texture_create_texture_views ( texture_handle );
 
     texture->state = xg_vk_texture_state_created_m;
-    //texture->layout = params->initial_layout;
 
     return true;
 }
@@ -578,8 +555,9 @@ xg_texture_h xg_vk_texture_register_swapchain_texture ( const xg_texture_params_
     texture->allocation = xg_null_alloc_m;
     texture->params = *params;
     texture->flags = xg_texture_flag_bit_swapchain_texture_m | xg_texture_flag_bit_render_target_texture_m;
-    texture->state = xg_vk_texture_state_created_m; // TODO
-    xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
+    texture->state = xg_vk_texture_state_created_m;
+
+    xg_texture_create_texture_views ( texture_handle );
 
     VkDebugUtilsObjectNameInfoEXT debug_name = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -616,7 +594,7 @@ void xg_vk_texture_update_swapchain_texture ( xg_texture_h texture_handle, const
 
     texture->vk_handle = image;
     texture->params = *params;
-    xg_texture_create_view ( &texture->default_view, texture_handle, xg_texture_view_m() );
+    xg_texture_create_texture_views ( texture_handle );
 }
 
 const xg_vk_texture_t* xg_vk_texture_get ( xg_texture_h texture_handle ) {

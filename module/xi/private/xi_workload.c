@@ -144,6 +144,10 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
         std_not_implemented_m();
     }
 
+    xg_texture_info_t render_target_info;
+    xg->get_texture_info ( &render_target_info, flush_params->render_target_binding.texture );
+
+    // TODO test for usage change
     if ( renderpass->xg_handle == xg_null_handle_m || renderpass->resolution_x != viewport_w || renderpass->resolution_y != viewport_h ) {
         if ( renderpass->xg_handle != xg_null_handle_m ) {
             xg->cmd_destroy_renderpass ( flush_params->resource_cmd_buffer, renderpass->xg_handle, xg_resource_cmd_buffer_time_workload_complete_m );
@@ -153,9 +157,12 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             .debug_name = "xi_renderpass",
             .resolution_x = viewport_w,
             .resolution_y = viewport_h,
-            .render_textures = xg_render_textures_layout_m (
+            .render_textures_layout = xg_render_textures_layout_m (
                 .render_targets_count = 1,
                 .render_targets = { xg_render_target_layout_m ( .format = flush_params->render_target_format ) }
+            ),
+            .render_textures_usage = xg_render_textures_usage_m (
+                .render_targets = { render_target_info.allowed_usage }
             ),
         ) );
         renderpass->resolution_x = viewport_w;

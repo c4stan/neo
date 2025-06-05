@@ -239,10 +239,13 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .resolution_x = xi_font_texture_atlas_width_m,
             .resolution_y = xi_font_texture_atlas_height_m,
             .debug_name = "xi_font_renderpass",
-            .render_textures = xg_render_textures_layout_m (
+            .render_textures_layout = xg_render_textures_layout_m (
                 .render_targets_count = 1,
                 .render_targets = { xg_render_target_layout_m ( .format = xg_format_r8g8b8a8_unorm_m ) }
-            )
+            ),
+            .render_textures_usage = xg_render_textures_usage_m (
+                .render_targets = { xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m },
+            ),
         ) );
     }
 

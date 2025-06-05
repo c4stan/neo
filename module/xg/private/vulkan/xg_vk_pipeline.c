@@ -189,73 +189,73 @@ void xg_vk_pipeline_unload ( void ) {
     std_virtual_heap_free ( xg_vk_pipeline_state->resource_bindings_layouts_bitset );
 }
 
-static VkFramebuffer xg_vk_framebuffer_create_vk ( xg_device_h device_handle, VkRenderPass vk_renderpass, const xg_render_textures_layout_t* render_textures_layout, uint32_t width, uint32_t height, const char* debug_name ) {
+static VkFramebuffer xg_vk_framebuffer_create_vk ( xg_device_h device_handle, VkRenderPass vk_renderpass, const xg_render_textures_layout_t* render_textures_layout, const xg_render_textures_usage_t* render_textures_usage, uint32_t width, uint32_t height, const char* debug_name ) {
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
     bool use_depth_stencil = render_textures_layout->depth_stencil_enabled;
 
     // Framebuffer
     VkFramebuffer framebuffer;
-    {
-        VkFramebufferAttachmentImageInfo attachment_image_info[xg_pipeline_output_max_color_targets_m + 1];
 
-        VkFormat formats[xg_pipeline_output_max_color_targets_m + 1];
+    VkFramebufferAttachmentImageInfo attachment_image_info[xg_pipeline_output_max_color_targets_m + 1];
+    VkFormat formats[xg_pipeline_output_max_color_targets_m + 1];
 
-        for ( size_t i = 0; i < render_textures_layout->render_targets_count; ++i ) {
-            formats[i] = xg_format_to_vk ( render_textures_layout->render_targets[i].format );
+    for ( size_t i = 0; i < render_textures_layout->render_targets_count; ++i ) {
+        formats[i] = xg_format_to_vk ( render_textures_layout->render_targets[i].format );
 
-            attachment_image_info[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO;
-            attachment_image_info[i].pNext = NULL;
-            attachment_image_info[i].flags = 0;
-            attachment_image_info[i].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-            attachment_image_info[i].usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // see xg_vk_swapchain.c swapchain creation allowed usages comment
-            attachment_image_info[i].usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-            attachment_image_info[i].usage |= VK_IMAGE_USAGE_STORAGE_BIT; // see xg_vk_texture.c xg_texture_reserve. TODO take these as parameters instead of tagging all render targets
-            attachment_image_info[i].width = width;
-            attachment_image_info[i].height = height;
-            attachment_image_info[i].layerCount = 1;
-            attachment_image_info[i].viewFormatCount = 1;
-            attachment_image_info[i].pViewFormats = &formats[i];
-        }
-
-        // depth stencil
-        {
-            size_t i = render_textures_layout->render_targets_count;
-
-            formats[i] = xg_format_to_vk ( render_textures_layout->depth_stencil.format );
-
-            attachment_image_info[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO;
-            attachment_image_info[i].pNext = NULL;
-            attachment_image_info[i].flags = 0;
-            attachment_image_info[i].usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-            attachment_image_info[i].usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-            attachment_image_info[i].usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-            attachment_image_info[i].width = width;
-            attachment_image_info[i].height = height;
-            attachment_image_info[i].layerCount = 1;
-            attachment_image_info[i].viewFormatCount = 1;
-            attachment_image_info[i].pViewFormats = &formats[i];
-        }
-
-        VkFramebufferAttachmentsCreateInfo attachments_create_info;
-        attachments_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO;
-        attachments_create_info.pNext = NULL;
-        attachments_create_info.attachmentImageInfoCount = ( uint32_t ) ( render_textures_layout->render_targets_count + ( use_depth_stencil ? 1 : 0 ) );
-        attachments_create_info.pAttachmentImageInfos = attachment_image_info;
-
-        VkFramebufferCreateInfo framebuffer_create_info;
-        framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebuffer_create_info.pNext = &attachments_create_info;
-        framebuffer_create_info.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
-        framebuffer_create_info.renderPass = vk_renderpass;
-        framebuffer_create_info.attachmentCount = ( uint32_t ) ( render_textures_layout->render_targets_count + ( use_depth_stencil ? 1 : 0 ) );
-        framebuffer_create_info.pAttachments = NULL;
-        framebuffer_create_info.width = width;
-        framebuffer_create_info.height = height;
-        framebuffer_create_info.layers = 1;
-
-        std_verify_m ( vkCreateFramebuffer ( device->vk_handle, &framebuffer_create_info, xg_vk_cpu_allocator(), &framebuffer ) == VK_SUCCESS );
+        attachment_image_info[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO;
+        attachment_image_info[i].pNext = NULL;
+        attachment_image_info[i].flags = 0;
+        // TODO take these as param
+        //attachment_image_info[i].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+        attachment_image_info[i].usage = render_textures_usage->render_targets[i];
+        attachment_image_info[i].width = width;
+        attachment_image_info[i].height = height;
+        attachment_image_info[i].layerCount = 1;
+        attachment_image_info[i].viewFormatCount = 1;
+        attachment_image_info[i].pViewFormats = &formats[i];
     }
+
+    // depth stencil
+    if ( use_depth_stencil ) {
+        size_t i = render_textures_layout->render_targets_count;
+
+        formats[i] = xg_format_to_vk ( render_textures_layout->depth_stencil.format );
+
+        attachment_image_info[i].sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO;
+        attachment_image_info[i].pNext = NULL;
+        attachment_image_info[i].flags = 0;
+        //attachment_image_info[i].usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        //attachment_image_info[i].usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        //attachment_image_info[i].usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+        attachment_image_info[i].usage = render_textures_usage->depth_stencil;
+        attachment_image_info[i].width = width;
+        attachment_image_info[i].height = height;
+        attachment_image_info[i].layerCount = 1;
+        attachment_image_info[i].viewFormatCount = 1;
+        attachment_image_info[i].pViewFormats = &formats[i];
+    }
+
+    VkFramebufferAttachmentsCreateInfo attachments_create_info = {
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO,
+        .pNext = NULL,
+        .attachmentImageInfoCount = ( uint32_t ) ( render_textures_layout->render_targets_count + ( use_depth_stencil ? 1 : 0 ) ),
+        .pAttachmentImageInfos = attachment_image_info,
+    };
+
+    VkFramebufferCreateInfo framebuffer_create_info = {
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .pNext = &attachments_create_info,
+        .flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT,
+        .renderPass = vk_renderpass,
+        .attachmentCount = ( uint32_t ) ( render_textures_layout->render_targets_count + ( use_depth_stencil ? 1 : 0 ) ),
+        .pAttachments = NULL,
+        .width = width,
+        .height = height,
+        .layers = 1,
+    };
+
+    std_verify_m ( vkCreateFramebuffer ( device->vk_handle, &framebuffer_create_info, xg_vk_cpu_allocator(), &framebuffer ) == VK_SUCCESS );
 
     if ( debug_name != NULL ) {
         VkDebugUtilsObjectNameInfoEXT debug_name_info;
@@ -371,7 +371,6 @@ static VkRenderPass xg_vk_renderpass_create_vk ( xg_device_h device_handle, cons
         vkCreateRenderPass ( device->vk_handle, &info, xg_vk_cpu_allocator(), &renderpass );
     }
 
-    // TODO remove?
     if ( debug_name != NULL ) {
         VkDebugUtilsObjectNameInfoEXT debug_name_info;
         debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -1660,8 +1659,8 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
 xg_renderpass_h xg_vk_renderpass_create ( const xg_renderpass_params_t* params ) {
     xg_vk_renderpass_t* renderpass = std_list_pop ( &xg_vk_pipeline_state->renderpasses_freelist );
 
-    VkRenderPass vk_renderpass = xg_vk_renderpass_create_vk ( params->device, &params->render_textures, params->debug_name );
-    VkFramebuffer vk_framebuffer = xg_vk_framebuffer_create_vk ( params->device, vk_renderpass, &params->render_textures, params->resolution_x, params->resolution_y, params->debug_name );
+    VkRenderPass vk_renderpass = xg_vk_renderpass_create_vk ( params->device, &params->render_textures_layout, params->debug_name );
+    VkFramebuffer vk_framebuffer = xg_vk_framebuffer_create_vk ( params->device, vk_renderpass, &params->render_textures_layout, &params->render_textures_usage, params->resolution_x, params->resolution_y, params->debug_name );
     
     renderpass->vk_handle = vk_renderpass;
     renderpass->vk_framebuffer_handle = vk_framebuffer;

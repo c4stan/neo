@@ -317,8 +317,3 @@ xg_vk
 */
 
 // ----------------------------
-
-#if xg_debug_enable_simple_frame_test_m
-    #include <wm.h>
-    void xg_debug_simple_frame ( xg_device_h device_handle, wm_window_h window_handle );
-#endif

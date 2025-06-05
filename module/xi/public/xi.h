@@ -502,7 +502,6 @@ typedef struct {
 
     xg_format_e render_target_format;
     xi_viewport_t viewport;
-    xg_renderpass_h renderpass;
     xg_render_target_binding_t render_target_binding;
 } xi_flush_params_t;
 

@@ -16,7 +16,7 @@ layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D
 layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
 layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_hiz;
 
-layout ( binding = 5, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform writeonly image2D img_color;
 layout ( binding = 6, set = xs_shader_binding_set_dispatch_m, r16f ) uniform writeonly image2D img_intersect_dist;
 
 layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
@@ -68,6 +68,68 @@ vec3 ggx_sample_vndf ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
     return wi;
 }
 
+void drawLineBresenham(writeonly image2D targetImage, vec2 p1_uv, vec2 p2_uv, vec4 color) {
+    // Get the dimensions of the image in pixels
+    ivec2 imageSize = imageSize(targetImage);
+
+    // Convert UV coordinates to integer pixel coordinates
+    ivec2 p1_px = ivec2(p1_uv * vec2(imageSize));
+    ivec2 p2_px = ivec2(p2_uv * vec2(imageSize));
+
+    int dx = abs(p2_px.x - p1_px.x);
+    int dy = abs(p2_px.y - p1_px.y);
+
+    int sx = (p1_px.x < p2_px.x) ? 1 : -1;
+    int sy = (p1_px.y < p2_px.y) ? 1 : -1;
+
+    int err = dx - dy;
+
+    ivec2 current_px = p1_px;
+
+    while (true) {
+        // Ensure pixelCoord is within image bounds before writing (good practice)
+        if (current_px.x >= 0 && current_px.x < imageSize.x &&
+            current_px.y >= 0 && current_px.y < imageSize.y) {
+            imageStore(targetImage, current_px, color);
+        }
+
+        if (current_px.x == p2_px.x && current_px.y == p2_px.y) break;
+
+        int e2 = 2 * err;
+        if (e2 > -dy) {
+            err -= dy;
+            current_px.x += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            current_px.y += sy;
+        }
+    }
+}
+
+void draw_debug_line2 ( writeonly image2D img, vec2 uv0, vec2 uv1, vec4 color ) {
+    ivec2 image_size = imageSize ( img );
+    ivec2 p0 = ivec2 ( uv0 * image_size );
+    ivec2 p1 = ivec2 ( uv1 * image_size );
+
+    int x0 = p0.x;
+    int y0 = p0.y;
+    int x1 = p1.x;
+    int y1 = p1.y;
+
+    int dx =  abs (x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = -abs (y1 - y0), sy = y0 < y1 ? 1 : -1; 
+    int err = dx + dy, e2; /* error value e_xy */
+
+    for (;;){  /* loop */
+        imageStore(img_color, ivec2(x0, y0), color);
+        if (x0 == x1 && y0 == y1) break;
+        e2 = 2 * err;
+        if (e2 >= dy) { err += dy; x0 += sx; } /* e_xy+e_x > 0 */
+        if (e2 <= dx) { err += dx; y0 += sy; } /* e_xy+e_y < 0 */
+        }
+    }
+
 // ---
 // TODO: try: downsample depth & normals -> raytrace in half-resolution -> upsample result back using a bi-filter (read half res depth and normals)
 void main ( void ) {
@@ -100,6 +162,8 @@ void main ( void ) {
     vec3 sample_color = vec3 ( 0, 0, 0 );
     float sample_distance = 1;
 
+    //view_ray_dir = vec3 ( 0, 1, 1 );
+
     /*
         depth thickness:
             render objects to the usual depth prepass and gbuffer passes
@@ -126,6 +190,9 @@ void main ( void ) {
         //hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 10 );
 
         if ( hit ) {
+            if ( length ( screen_uv - hit_screen_pos.xy ) < 0.01 ) {
+                //draw_debug_line ( img_color, screen_uv, hit_screen_pos.xy, vec4 ( 1, 0, 0, 1 ) );
+            }
             vec3 hit_color = texture ( sampler2D ( tex_color, sampler_point ), hit_screen_pos.xy ).xyz;
             float depth_delta = - ( linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ) );
             float depth_threshold = 0.4;

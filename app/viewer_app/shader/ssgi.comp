@@ -13,7 +13,7 @@ layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D
 layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_lighting;
 layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_hiz;
 
-layout ( binding = 5, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform writeonly image2D img_color;
 
 layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
@@ -49,6 +49,8 @@ void main ( void ) {
     float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
     vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
 
+    view_normal = normalize ( view_normal );
+
     // reconstruct position
     vec3 view_pos = view_from_depth ( screen_uv, depth );
 
@@ -72,48 +74,46 @@ void main ( void ) {
     //ex = randomFloat ( seed );
     //ey = randomFloat ( seed );
 
-    float incoming_radiance;
     vec3 hemisphere_normal;
     vec3 hit_normal;
+
+    vec3 sample_color = vec3 ( 0, 0, 0 );
 
     if ( depth < 1 ) {
         for ( uint ray_it = 0; ray_it < RAY_COUNT; ++ray_it ) {
             // sample hemisphere
             vec2 e2 = vec2 ( ex, ey );
             hemisphere_normal = sample_cosine_weighted_hemisphere_normal ( e2, view_normal );
-            hemisphere_normal = normalize ( view_normal * 0.5f + hemisphere_normal ); // bias towards normal to reduce hiz self intersections
+            hemisphere_normal = normalize ( hemisphere_normal ); // bias towards normal to reduce hiz self intersections
 
             // trace
             vec3 hit_screen_pos;
             float hit_depth;
             bool hit;
 
-            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50 ); 
+            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * 0.0, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50 ); 
 
             if ( hit ) {
-                vec3 hit_color = texture ( sampler2D ( tex_base_color, sampler_linear ), hit_screen_pos.xy ).xyz;
-                hit_normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), hit_screen_pos.xy ).xyz * 2 - 1 );
+                vec3 hit_lighting = textureLod ( sampler2D ( tex_lighting, sampler_linear ), hit_screen_pos.xy, 7 ).xyz;
                 vec3 hit_view_pos = view_from_depth ( hit_screen_pos.xy, hit_depth );
                 float hit_distance = distance ( view_pos, hit_view_pos );
-                incoming_radiance = clamp ( dot ( hit_normal, -hemisphere_normal ), 0, 1 ); // Approximate with a simple NdotL...
-                sample_colors[ray_it] = hit_color *  dot ( view_normal, hemisphere_normal ) * incoming_radiance;
+                //float incoming_radiance = max ( dot ( hit_normal, -hemisphere_normal ), 0 ); // Approximate with a simple NdotL...
+                sample_colors[ray_it] = hit_lighting;// * max ( dot ( view_normal, hemisphere_normal ), 0 );// * incoming_radiance;
                 sample_distances[ray_it] = hit_distance;
             }
         }
     }
 
-    vec3 sample_color = vec3 ( 0, 0, 0 );
 
     for ( uint ray_it = 0; ray_it < RAY_COUNT; ++ray_it ) {
         float d = sample_distances[ray_it];
         float attenuation = 1.0 / ( d * d + 5 );
         //float occlusion = min ( 1.0, sample_distances[ray_it] );
-        sample_color += sample_colors[ray_it] * base_color * attenuation / 3.1415;// * occlusion;// * attenuation * attenuation;
+        sample_color += sample_colors[ray_it] * base_color * 1;// * occlusion;// * attenuation * attenuation;
     }
 
     sample_color /= float ( RAY_COUNT );
 
-    //out_color = vec4 ( sample_color, 1 );
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( sample_color, 1 ) );
-    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( hit_normal * 0.5 + vec3(0.5), 1 ) );
+    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( 0,0,0, 1 ) );
 }

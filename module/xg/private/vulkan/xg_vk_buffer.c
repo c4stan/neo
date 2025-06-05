@@ -97,8 +97,6 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( params->device );
 
     // Query for memory requiremens, allocate and bind
-    //VkMemoryRequirements vk_buffer_memory;
-    //vkGetBufferMemoryRequirements ( device->vk_handle, vk_buffer, &vk_buffer_memory );
     VkMemoryDedicatedRequirements dedicated_requirements =
     {
         .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS,
@@ -126,7 +124,6 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
         .type = params->memory_type,
     );
     std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
-    //xg_alloc_t alloc = params->allocator.alloc ( params->allocator.impl, params->device, vk_buffer_memory.size, vk_buffer_memory.alignment );
     xg_alloc_t alloc = xg_alloc ( &alloc_params );
     VkResult result = vkBindBufferMemory ( device->vk_handle, buffer->vk_handle, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
     std_assert_m ( result == VK_SUCCESS );
@@ -175,7 +172,6 @@ bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
 
     const xg_vk_device_t* device = xg_vk_device_get ( buffer->params.device );
     vkDestroyBuffer ( device->vk_handle, buffer->vk_handle, xg_vk_cpu_allocator() );
-    //buffer->params.allocator.free ( buffer->params.allocator.impl, buffer->allocation.handle );
     xg_free ( buffer->allocation.handle );
 
     std_bitset_clear ( xg_vk_buffer_state->buffer_bitset, idx );

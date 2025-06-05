@@ -13,6 +13,8 @@ typedef struct {
     uint32_t mip_count;
     uint32_t array_count;
     VkImageAspectFlags aspect;
+    VkImage image;
+    char debug_name[xg_debug_name_size_m];
 } xg_vk_texture_view_params_t;
 
 typedef struct {
@@ -30,7 +32,7 @@ typedef struct {
     VkImage                 vk_handle;
     xg_alloc_t              allocation;
     xg_texture_params_t     params;
-    xg_texture_flag_bit_e      flags;
+    xg_texture_flag_bit_e   flags;
 
     xg_vk_texture_view_t    default_view;
 

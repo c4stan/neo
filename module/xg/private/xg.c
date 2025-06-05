@@ -117,10 +117,6 @@ static void xg_api_init ( xg_i* xg ) {
     xg->destroy_query_pool = xg_vk_query_pool_destroy;
     xg->cmd_query_timestamp = xg_cmd_buffer_write_timestamp;
     xg->cmd_reset_query_pool = xg_cmd_buffer_reset_query_pool;
-
-#if xg_debug_enable_simple_frame_test_m
-    xg->debug_simple_frame = xg_debug_simple_frame;
-#endif
 }
 
 void* xg_load ( void* std_runtime ) {

@@ -176,31 +176,29 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     uint32_t width = ( uint32_t ) swapchain->width;
     uint32_t height = ( uint32_t ) swapchain->height;
 
-    xg_texture_usage_bit_e allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m; // TODO probably need more allowed usages
-    allowed_usage |= xg_texture_usage_bit_copy_source_m; // Looks like this gets added automatically once copy_dest is in? and if it's not accounted for in the attachments info it will cause a warning to spam
-    allowed_usage |= xg_texture_usage_bit_sampled_m; // For now defaulting all render targets to render_target/copy_source/copy_dest/shader_resource. TODO create and cache framebuffers on the fly
-    allowed_usage |= xg_texture_usage_bit_storage_m; // Because storage usage was added by default to framebuffer creation, becuase of raytracing...
+    xg_texture_usage_bit_e allowed_usage = params->allowed_usage;
 
-    VkSwapchainCreateInfoKHR swapchain_create_info;
-    swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchain_create_info.pNext = NULL;
-    swapchain_create_info.flags = 0;
-    swapchain_create_info.surface = swapchain->surface;
-    swapchain_create_info.minImageCount = texture_count;
-    swapchain_create_info.imageFormat = vk_format; //VK_FORMAT_B8G8R8A8_UNORM;
-    swapchain_create_info.imageColorSpace = vk_color_space; //VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-    swapchain_create_info.imageExtent.width = width;
-    swapchain_create_info.imageExtent.height = height;
-    swapchain_create_info.imageArrayLayers = 1;
-    swapchain_create_info.imageUsage = xg_image_usage_to_vk ( allowed_usage );
-    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapchain_create_info.queueFamilyIndexCount = 0;
-    swapchain_create_info.pQueueFamilyIndices = NULL;
-    swapchain_create_info.preTransform = surface_capabilities.currentTransform;//VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    swapchain_create_info.presentMode = vk_present_mode; //VK_PRESENT_MODE_MAILBOX_KHR;
-    swapchain_create_info.clipped = VK_TRUE;
-    swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
+    VkSwapchainCreateInfoKHR swapchain_create_info = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .pNext = NULL,
+        .flags = 0,
+        .surface = swapchain->surface,
+        .minImageCount = texture_count,
+        .imageFormat = vk_format, //VK_FORMAT_B8G8R8A8_UNORM;
+        .imageColorSpace = vk_color_space, //VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+        .imageExtent.width = width,
+        .imageExtent.height = height,
+        .imageArrayLayers = 1,
+        .imageUsage = xg_image_usage_to_vk ( allowed_usage ),
+        .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices = NULL,
+        .preTransform = surface_capabilities.currentTransform, //VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = vk_present_mode, //VK_PRESENT_MODE_MAILBOX_KHR;
+        .clipped = VK_TRUE,
+        .oldSwapchain = VK_NULL_HANDLE,
+    };
     xg_vk_safecall_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ), xg_null_handle_m );
 
     if ( params->debug_name[0] != '\0' ) {
@@ -255,6 +253,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     swapchain->texture_count = texture_count;
     swapchain->format = format;
     swapchain->color_space = color_space;
+    swapchain->allowed_usage = allowed_usage;
     swapchain->present_mode = params->present_mode;
     swapchain->device = params->device;
     swapchain->window = params->window;
@@ -322,11 +321,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     VkPresentModeKHR vk_present_mode = xg_present_mode_to_vk ( swapchain->present_mode );
     uint32_t texture_count = ( uint32_t ) swapchain->texture_count;
 
-    xg_texture_usage_bit_e allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_copy_dest_m; // TODO probably need more allowed usages
-    // see _create
-    allowed_usage |= xg_texture_usage_bit_copy_source_m;
-    allowed_usage |= xg_texture_usage_bit_sampled_m;
-    allowed_usage |= xg_texture_usage_bit_storage_m;
+    xg_texture_usage_bit_e allowed_usage = swapchain->allowed_usage;
 
     VkSwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;

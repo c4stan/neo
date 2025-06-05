@@ -67,7 +67,7 @@ void xg_debug_capture_start ( void ) {
 
 void xg_debug_capture_stop ( void ) {
     if ( !xg_debug_capture_is_available() ) {
-        std_log_warn_m ( "Debug capture not available" );
+        //std_log_warn_m ( "Debug capture not available" );
         return;
     }
     xg_debug_capture_get_api()->EndFrameCapture ( NULL, NULL );

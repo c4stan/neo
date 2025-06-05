@@ -289,15 +289,15 @@ typedef struct {
     //uint64_t os_module;
 } wm_window_params_t;
 
-#define wm_window_params_m( ... ) { \
+#define wm_window_params_m( ... ) ( wm_window_params_t ) { \
     .name = "", \
     .x = 0, \
     .y = 0, \
-    .width = 400, \
-    .height = 300, \
+    .width = 600, \
+    .height = 400, \
     .gain_focus = true, \
     .borderless = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

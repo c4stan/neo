@@ -287,7 +287,8 @@ typedef struct {
     //tk_workload_h cpu_workload;
     xg_renderpass_h renderpass;
     struct {
-        xg_render_textures_layout_t render_textures;
+        xg_render_textures_layout_t render_textures_layout;
+        xg_render_textures_usage_t render_textures_usage;
         uint32_t resolution_x;
         uint32_t resolution_y;
     } renderpass_params;

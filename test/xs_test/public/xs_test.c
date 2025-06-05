@@ -409,6 +409,7 @@ static void xs_test ( void ) {
             .format = xg_format_b8g8r8a8_unorm_m,//xg_format_b8g8r8a8_srgb_m
             .color_space = xg_colorspace_srgb_m,
             .present_mode = xg_present_mode_fifo_m,
+            .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m,
             .debug_name = "swapchain",
         );
         swapchain = xg->create_window_swapchain ( &swapchain_params );
@@ -435,9 +436,12 @@ static void xs_test ( void ) {
 
     xg_renderpass_h renderpass = xg->create_renderpass ( &xg_renderpass_params_m ( 
         .device = device,
-        .render_textures = xg_render_textures_layout_m (
+        .render_textures_layout = xg_render_textures_layout_m (
             .render_targets_count = 1,
             .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
+        ),
+        .render_textures_usage = xg_render_textures_usage_m (
+            .render_targets = { xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m }
         ),
         .resolution_x = resolution_x,
         .resolution_y = resolution_y,
@@ -479,9 +483,12 @@ static void xs_test ( void ) {
             xg->destroy_renderpass ( renderpass );
             renderpass = xg->create_renderpass ( &xg_renderpass_params_m ( 
                 .device = device,
-                .render_textures = xg_render_textures_layout_m (
+                .render_textures_layout = xg_render_textures_layout_m (
                     .render_targets_count = 1,
                     .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
+                ),
+                .render_textures_usage = xg_render_textures_usage_m (
+                    .render_targets = { xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m }
                 ),
                 .resolution_x = new_window_info.width,
                 .resolution_y = new_window_info.height,

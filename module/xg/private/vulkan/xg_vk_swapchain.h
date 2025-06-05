@@ -17,6 +17,7 @@ typedef struct {
     size_t texture_count;
     xg_format_e format;
     xg_color_space_e color_space;
+    xg_texture_usage_bit_e allowed_usage;
     size_t width;
     size_t height;
     xg_present_mode_e present_mode;

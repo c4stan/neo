@@ -78,7 +78,8 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     node->params = *params;
     node->enabled = true;
     node->renderpass = xg_null_handle_m;
-    node->renderpass_params.render_textures = xg_render_textures_layout_m();
+    node->renderpass_params.render_textures_layout = xg_render_textures_layout_m();
+    node->renderpass_params.render_textures_usage = xg_render_textures_usage_m();
 
     bool copy_args = false;
     std_buffer_t user_args = std_buffer_m();
@@ -762,15 +763,6 @@ static xg_texture_params_t xf_graph_texture_params ( xg_device_h device, xf_text
         .view_access = texture->params.view_access,
     );
     std_str_copy_static_m ( params.debug_name, texture->params.debug_name ); // TODO not good for memory aliased textures
-
-    // Tag all render tagets as copy src/dest. Matches xg_vk_pipeline framebuffer creation logic
-    if ( texture->required_usage & xg_texture_usage_bit_render_target_m ) {
-        params.allowed_usage |= xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m;
-    }
-
-    if ( texture->required_usage & xg_texture_usage_bit_depth_stencil_m ) {
-        params.allowed_usage |= xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_copy_dest_m;
-    }
 
     // Tag storage textures as copy src/dest to allow aliasing passthrough. TODO more fine grained tagging
     if ( texture->required_usage & xg_texture_usage_bit_storage_m ) {
@@ -1905,7 +1897,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( texture->physical_texture_handle );
             if ( texture->required_usage &~ physical_texture->info.allowed_usage ) {
                 // TODO free current device texture
-                std_log_error_m ( "Texture required and allowed usage mismatch. Fix your usage declaration or implement this code path" );
+                std_log_error_m ( "Texture " std_fmt_str_m " required and allowed usage mismatch. Fix your usage declaration or implement this code path", physical_texture->info.debug_name );
                 std_not_implemented_m();
                 create_new = true;
             }
@@ -2174,11 +2166,12 @@ static void xf_graph_build_resources ( xf_graph_h graph_handle, xg_i* xg, xg_cmd
 }
 
 static void xf_graph_build_renderpasses ( xf_graph_t* graph, xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
-    for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
-        xf_node_h node_handle = graph->nodes_declaration_order[i];
+    for ( uint32_t node_it = 0; node_it < graph->nodes_count; ++node_it ) {
+        xf_node_h node_handle = graph->nodes_declaration_order[node_it];
         xf_node_t* node = &graph->nodes_array[node_handle];
 
-        xg_render_textures_layout_t render_textures = xg_render_textures_layout_m();
+        xg_render_textures_layout_t render_textures_layout = xg_render_textures_layout_m();
+        xg_render_textures_usage_t render_textures_usage = xg_render_textures_usage_m();
         uint32_t resolution_x = 0;
         uint32_t resolution_y = 0;
 
@@ -2186,6 +2179,7 @@ static void xf_graph_build_renderpasses ( xf_graph_t* graph, xg_i* xg, xg_resour
         for ( size_t resource_it = 0; resource_it < node->params.resources.render_targets_count; ++resource_it ) {
             xf_render_target_dependency_t* resource = &node->params.resources.render_targets[resource_it];
             const xf_texture_t* texture = xf_resource_texture_get ( resource->texture );
+            const xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( resource->texture );
 
             uint32_t mip_level = resource->view.mip_base;
             uint32_t width = texture->params.width / ( 1 << mip_level );
@@ -2202,19 +2196,21 @@ static void xf_graph_build_renderpasses ( xf_graph_t* graph, xg_i* xg, xg_resour
             resolution_x = width;
             resolution_y = height;
 
-            uint32_t j = render_textures.render_targets_count++;
-            render_textures.render_targets[j].slot = resource_it;
-            render_textures.render_targets[j].format = texture->params.format;
-            render_textures.render_targets[j].samples_per_pixel = texture->params.samples_per_pixel;
+            uint32_t i = render_textures_layout.render_targets_count++;
+            render_textures_layout.render_targets[i].slot = resource_it;
+            render_textures_layout.render_targets[i].format = texture->params.format;
+            render_textures_layout.render_targets[i].samples_per_pixel = texture->params.samples_per_pixel;
+            render_textures_usage.render_targets[i] = physical_texture->info.allowed_usage;
         }
 
         // check node depth stencil
         {
             xf_texture_h depth_stencil = node->params.resources.depth_stencil_target;
-            render_textures.depth_stencil_enabled = depth_stencil != xf_null_handle_m;
+            render_textures_layout.depth_stencil_enabled = depth_stencil != xf_null_handle_m;
 
             if ( depth_stencil != xf_null_handle_m ) {
                 const xf_texture_t* texture = xf_resource_texture_get ( depth_stencil );
+                const xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( depth_stencil );
 
                 uint32_t width = texture->params.width;
                 uint32_t height = texture->params.height;
@@ -2230,34 +2226,38 @@ static void xf_graph_build_renderpasses ( xf_graph_t* graph, xg_i* xg, xg_resour
                 resolution_x = width;
                 resolution_y = height;
 
-                render_textures.depth_stencil.format = texture->params.format;
-                render_textures.depth_stencil.samples_per_pixel = texture->params.samples_per_pixel;
+                render_textures_layout.depth_stencil.format = texture->params.format;
+                render_textures_layout.depth_stencil.samples_per_pixel = texture->params.samples_per_pixel;
+                render_textures_usage.depth_stencil = physical_texture->info.allowed_usage;
             }
         }
 
         // determine if renderpass update is needed
         bool need_update = false;
-        if ( render_textures.render_targets_count > 0 || render_textures.depth_stencil_enabled ) {
+        if ( render_textures_layout.render_targets_count > 0 || render_textures_layout.depth_stencil_enabled ) {
             need_update = node->renderpass == xg_null_handle_m;
             need_update |= resolution_x != node->renderpass_params.resolution_x;
             need_update |= resolution_y != node->renderpass_params.resolution_y;
-            need_update |= render_textures.render_targets_count != node->renderpass_params.render_textures.render_targets_count;
-            need_update |= render_textures.depth_stencil_enabled != node->renderpass_params.render_textures.depth_stencil_enabled;
+            need_update |= render_textures_layout.render_targets_count != node->renderpass_params.render_textures_layout.render_targets_count;
+            need_update |= render_textures_layout.depth_stencil_enabled != node->renderpass_params.render_textures_layout.depth_stencil_enabled;
 
-            if ( !need_update && render_textures.depth_stencil_enabled && ( 
-                render_textures.depth_stencil.format != node->renderpass_params.render_textures.depth_stencil.format 
-                || render_textures.depth_stencil.samples_per_pixel != node->renderpass_params.render_textures.depth_stencil.samples_per_pixel 
+            if ( !need_update && render_textures_layout.depth_stencil_enabled && ( 
+                render_textures_layout.depth_stencil.format != node->renderpass_params.render_textures_layout.depth_stencil.format 
+                || render_textures_layout.depth_stencil.samples_per_pixel != node->renderpass_params.render_textures_layout.depth_stencil.samples_per_pixel 
+                || render_textures_usage.depth_stencil != node->renderpass_params.render_textures_usage.depth_stencil
             ) ) {
-                need_update |= render_textures.depth_stencil.format != node->renderpass_params.render_textures.depth_stencil.format;
-                need_update |= render_textures.depth_stencil.samples_per_pixel != node->renderpass_params.render_textures.depth_stencil.samples_per_pixel;
+                //need_update |= render_textures_layout.depth_stencil.format != node->renderpass_params.render_textures_layout.depth_stencil.format;
+                //need_update |= render_textures_layout.depth_stencil.samples_per_pixel != node->renderpass_params.render_textures_layout.depth_stencil.samples_per_pixel;
+                need_update = true;
             }
 
             if ( !need_update ) {
-                for ( uint32_t j = 0; j < render_textures.render_targets_count; ++j ) {
+                for ( uint32_t i = 0; i < render_textures_layout.render_targets_count; ++i ) {
                     if ( 
-                        render_textures.render_targets[j].slot != node->renderpass_params.render_textures.render_targets[j].slot 
-                        || render_textures.render_targets[j].format != node->renderpass_params.render_textures.render_targets[j].format 
-                        || render_textures.render_targets[j].samples_per_pixel != node->renderpass_params.render_textures.render_targets[j].samples_per_pixel 
+                        render_textures_layout.render_targets[i].slot != node->renderpass_params.render_textures_layout.render_targets[i].slot 
+                        || render_textures_layout.render_targets[i].format != node->renderpass_params.render_textures_layout.render_targets[i].format 
+                        || render_textures_layout.render_targets[i].samples_per_pixel != node->renderpass_params.render_textures_layout.render_targets[i].samples_per_pixel 
+                        || render_textures_usage.render_targets[i] != node->renderpass_params.render_textures_usage.render_targets[i]
                     ) {
                         need_update = true;
                         break;
@@ -2274,14 +2274,16 @@ static void xf_graph_build_renderpasses ( xf_graph_t* graph, xg_i* xg, xg_resour
 
             xg_renderpass_params_t params = xg_renderpass_params_m (
                 .device = graph->params.device,
-                .render_textures = render_textures,
+                .render_textures_layout = render_textures_layout,
+                .render_textures_usage = render_textures_usage,
                 .resolution_x = resolution_x,
                 .resolution_y = resolution_y,
             );
             std_str_copy_static_m ( params.debug_name, node->params.debug_name );
             node->renderpass = xg->create_renderpass ( &params );
 
-            node->renderpass_params.render_textures = render_textures;
+            node->renderpass_params.render_textures_layout = render_textures_layout;
+            node->renderpass_params.render_textures_usage = render_textures_usage;
             node->renderpass_params.resolution_x = resolution_x;
             node->renderpass_params.resolution_y = resolution_y;
         }

@@ -295,19 +295,16 @@ vec3 random_unit_vector ( vec2 e ) {
 
 // https://alexanderameye.github.io/notes/sampling-the-hemisphere/
 vec3 sample_cosine_weighted_hemisphere_normal ( vec2 e, vec3 normal ) {
-#if 0
-    normal = normalize ( normal );
-    vec3 tangent = generate_tangent ( normal );
-    vec3 bitangent = normalize ( cross ( normal, tangent ) );
-
+#if 1
     float r = sqrt ( e.x );
     float phi = 2.f * 3.1415f * e.y;
     float x = r * cos ( phi );
-    float y = sqrt ( 1.f - e.x );
     float z = r * sin ( phi );
+    //float y = sqrt ( 1.f - e.x );
+    float y = sqrt ( max ( 0.0, 1.0 - x * x - z * z ) );
 
     vec3 wi = vec3 ( x, y, z );
-    mat3 m = mat3 ( tangent, normal, bitangent );
+    mat3 m = tnb_from_normal ( normalize ( normal ) );
     wi = m * wi;
     return normalize ( wi );
 #else
@@ -367,9 +364,12 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     // :: go into screen space ::
     //
     vec3 view_ray_start = view_pos;
-    vec3 screen_ray_start = screen_from_view ( frame_uniforms.jittered_proj_from_view, view_ray_start );
-    //screen_ray_start.y += 1.f / frame_uniforms.resolution_f32.y;
-    vec3 screen_ray_hemisphere_sample = screen_from_view ( frame_uniforms.jittered_proj_from_view, view_ray_start + hemisphere_normal );
+    vec3 screen_ray_start = screen_from_view ( frame_uniforms.proj_from_view, view_ray_start );
+    vec3 view_ray_hemisphere_sample = view_ray_start + hemisphere_normal;
+    if ( view_ray_hemisphere_sample.z < 0 ) { 
+        return false;
+    }
+    vec3 screen_ray_hemisphere_sample = screen_from_view ( frame_uniforms.proj_from_view, view_ray_hemisphere_sample );
     vec3 screen_ray_dir = normalize ( screen_ray_hemisphere_sample - screen_ray_start );
 
     //
@@ -438,8 +438,8 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
         if ( 
                ( cell_index != depth_step_cell_idx )                        // check if we crossed the current hiz cell by depth stepping
             || ( screen_ray_is_backward && depth_delta > 0 )                // if we're going backward, check if there's nothing in the current cell that we can possibly collide with
-            //|| ( hiz_mip == 0 && abs ( depth_delta ) > depth_threshold )  // TODO why the abs?
-            || ( hiz_mip == 0 && depth_delta < -depth_threshold )           // check if we're behind a surface and it's depth threshold (ignore the collision in that case)
+            || ( hiz_mip == 0 && abs ( depth_delta ) > depth_threshold )  // TODO why the abs?
+            //|| ( hiz_mip == 0 && depth_delta < -depth_threshold )           // check if we're behind a surface and its depth threshold (ignore the collision in that case)
         ) {
             // continue tracing
             // depth step failed, do a cell boundary step
@@ -458,7 +458,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
             } else {
                 out_screen_pos = screen_ray_sample;
                 out_depth = sample_depth;
-                return true;
+                return sample_depth < 1;
             }
         }
 
@@ -614,4 +614,41 @@ bool trace_screen_space_ray_linear ( out vec3 out_screen_pos, out float out_dept
     }
 
     return false;
+}
+
+// ======================================================================================= //
+//                                   D E B U G   D R A W
+// ======================================================================================= //
+
+void draw_debug_line ( writeonly image2D img, vec2 uv0, vec2 uv1, vec4 color ) {
+    ivec2 image_size = imageSize ( img );
+    ivec2 p0 = ivec2 ( uv0 * image_size );
+    ivec2 p1 = ivec2 ( uv1 * image_size );
+
+    ivec2 delta = abs ( p1 - p0 );
+    ivec2 sign = ivec2 ( sign ( p1 - p0 ) );
+
+    bool steep = delta.y > delta.x;
+
+    if ( steep ) {
+        p0 = p0.yx;
+        p1 = p1.yx;
+        delta = delta.yx;
+        sign = sign.yx;
+    }
+
+    int error = 2 * delta.y - delta.x;
+    int y = p0.y;
+
+    for ( int x = p0.x; x != p1.x + sign.x; x += sign.x ) {
+        ivec2 coord = steep ? ivec2 ( y, x ) : ivec2 ( x, y );
+        if ( all ( greaterThanEqual ( coord, ivec2 ( 0 ) ) ) && all ( lessThan ( coord, image_size ) ) ) {
+            imageStore ( img, coord, color );
+        }
+        if ( error > 0 ) {
+            y += sign.y;
+            error -= 2 * delta.x;
+        }
+        error += 2 * delta.y;
+    }
 }
