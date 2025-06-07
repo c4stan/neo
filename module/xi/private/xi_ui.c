@@ -36,7 +36,7 @@ void xi_ui_unload ( void ) {
         xg_i* xg = std_module_get_m ( xg_module_name_m );
         xg_workload_h workload = xg->create_workload ( xi_ui_state->device );
         xg_geo_util_free_data ( &xi_ui_state->transform_geo.cpu );
-        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu, workload );
+        xg_geo_util_free_gpu_data ( &xi_ui_state->transform_geo.gpu, workload, xg_resource_cmd_buffer_time_workload_start_m );
         xg->submit_workload ( workload );
     }
 }
@@ -1910,7 +1910,6 @@ bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir ) {
         initial_dir = ".";
     }
 #if defined(std_platform_win32_m)
-    std_log_info_m ( initial_dir );
     char* filename = path_buffer.base;
     OPENFILENAMEA ofn;
     ZeroMemory ( &ofn, sizeof ( ofn ) );

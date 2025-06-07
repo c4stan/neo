@@ -863,7 +863,7 @@ void xg_vk_raytrace_world_destroy ( xg_raytrace_world_h world_handle ) {
     xg_device_h device_handle = world->params.device;
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
 
-    xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, world->vk_handle, NULL );
+    xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, world->vk_handle, xg_vk_cpu_allocator() );
 #if xg_vk_enable_nv_raytracing_ext_m
     xg_free ( world->alloc.handle );
 #else
@@ -883,7 +883,7 @@ void xg_vk_raytrace_geometry_destroy ( xg_raytrace_geometry_h geo_handle ) {
 
     std_virtual_heap_free ( geo->geometries );
 
-    xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, geo->vk_handle, NULL );
+    xg_vk_device_ext_api ( device_handle )->destroy_acceleration_structure ( device->vk_handle, geo->vk_handle, xg_vk_cpu_allocator() );
 #if xg_vk_enable_nv_raytracing_ext_m
     xg_free ( geo->alloc.handle );
 #else

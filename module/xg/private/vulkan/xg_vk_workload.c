@@ -1796,7 +1796,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 };
 
                 // vkCmdPipelineBarrier2KHR
-                xg_vk_instance_ext_api()->cmd_sync2_pipeline_barrier ( vk_cmd_buffer, &vk_dependency_info );
+                xg_vk_device_ext_api ( device_handle )->cmd_sync2_pipeline_barrier ( vk_cmd_buffer, &vk_dependency_info );
 
                 std_noop_m;
             }
@@ -1817,11 +1817,11 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                     .color[1] = ( ( args->color_rgba >> 16 ) & 0xff ) / 255.f,
                     .color[0] = ( ( args->color_rgba >> 24 ) & 0xff ) / 255.f,
                 };
-                xg_vk_instance_ext_api()->cmd_begin_debug_region ( vk_cmd_buffer, &label );
+                xg_vk_device_ext_api ( device_handle )->cmd_begin_debug_region ( vk_cmd_buffer, &label );
             }
             break;
             case xg_cmd_end_debug_region_m:
-                xg_vk_instance_ext_api()->cmd_end_debug_region ( vk_cmd_buffer );
+                xg_vk_device_ext_api ( device_handle )->cmd_end_debug_region ( vk_cmd_buffer );
                 break;
             case xg_cmd_write_timestamp_m: {
                 std_auto_m args = ( xg_cmd_write_timestamp_t* ) header->args;

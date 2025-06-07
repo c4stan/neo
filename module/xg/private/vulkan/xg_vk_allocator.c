@@ -75,7 +75,7 @@ static xg_alloc_t xg_vk_allocator_simple_alloc ( xg_device_h device_handle, size
         .objectHandle = ( uint64_t ) memory,
         .pObjectName = "simple_alloc",
     };
-    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+    xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name );
 
     // Store the allocation
     std_mutex_lock ( &xg_vk_allocator_state->allocations_mutex );

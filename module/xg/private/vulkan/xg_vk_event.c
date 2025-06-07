@@ -107,7 +107,7 @@ xg_queue_event_h xg_gpu_queue_event_create ( const xg_queue_event_params_t* para
             .objectHandle = ( uint64_t ) event->vk_semaphore,
             .pObjectName = debug_name,
         };
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+        xg_vk_device_ext_api ( params->device )->set_debug_name ( device->vk_handle, &debug_name_info );
     }
 
 #if xg_debug_enable_events_log_m

@@ -3,7 +3,7 @@ compute_shader ssgi_ta.comp
 include common.xsi
 
 begin bindings
-    texture[6] sampled
+    texture[7] sampled
     texture storage
     sampler[2]
 end

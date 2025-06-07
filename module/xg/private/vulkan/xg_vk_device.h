@@ -229,7 +229,7 @@ typedef struct {
     VkQueueFamilyCheckpointPropertiesNV queue_checkpoint_properties[16];
     VkQueueFamilyProperties             queue_family_properties[16]; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkQueueFamilyProperties.html
     uint32_t                            queue_family_count;
-    VkDeviceQueueCreateInfo             queue_create_info[16 * 3]; // Determined when caching vulkan properties, used when creating the device (on activation)
+    VkDeviceQueueCreateInfo             queue_create_info[xg_cmd_queue_count_m]; // Determined when caching vulkan properties, used when creating the device (on activation)
     uint32_t                            queue_create_info_count;
     xg_vk_device_cmd_queue_t            queues[xg_cmd_queue_count_m];
     xg_vk_device_memory_heap_t          memory_heaps[xg_memory_type_count_m];

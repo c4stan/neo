@@ -1017,11 +1017,12 @@ static void viewapp_boot_raster_graph ( void ) {
     //        .debug_name = "ssgi_raymarch_texture",
     //    ),
     //) );
-    uint32_t ssgi_scale = 1;
+    uint32_t ssgi_scale = 2;
     xf_texture_h ssgi_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x / ssgi_scale,
         .height = resolution_y / ssgi_scale,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
+        //.format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "ssgi_raymarch_texture",
     ) );
     add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, downsampled_lighting_texture, hiz_texture );
@@ -1051,6 +1052,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .width = resolution_x / ssgi_scale,
             .height = resolution_y / ssgi_scale,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
+            //.format = xg_format_r8g8b8a8_unorm_m,
             .debug_name = "ssgi_accumulation_texture",
             .clear_on_create = true,
             .clear.color = xg_color_clear_m(),
@@ -1070,13 +1072,14 @@ static void viewapp_boot_raster_graph ( void ) {
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssgi_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 6,
+            .sampled_textures_count = 7,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = ssgi_raymarch_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = prev_depth_texture ), 
-                xf_compute_texture_dependency_m ( .texture = hiz_texture ),
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ),
+                xf_compute_texture_dependency_m ( .texture = prev_object_id_texture ),
                 xf_compute_texture_dependency_m ( .texture = velocity_texture )
             },
         ),
@@ -1154,15 +1157,16 @@ static void viewapp_boot_raster_graph ( void ) {
 #endif
 
     // ssr
+    uint32_t ssr_scale = 1;
     xf_texture_h ssr_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
-        .width = resolution_x,
-        .height = resolution_y,
+        .width = resolution_x / ssr_scale,
+        .height = resolution_y / ssr_scale,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_raymarch_texture",
     ) );
     xf_texture_h ssr_intersection_distance = xf->create_texture ( &xf_texture_params_m (
-        .width = resolution_x,
-        .height = resolution_y,
+        .width = resolution_x / ssr_scale,
+        .height = resolution_y / ssr_scale,
         .format = xg_format_r16_sfloat_m,
         .debug_name = "ssr_intersect_distance",
     ) );
@@ -1190,8 +1194,8 @@ static void viewapp_boot_raster_graph ( void ) {
     // ssr ta
     xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
-            .width = resolution_x,
-            .height = resolution_y,
+            .width = resolution_x / ssr_scale,
+            .height = resolution_y / ssr_scale,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
             .debug_name = "ssr_accumulation_texture",
             .clear_on_create = true,
@@ -1205,7 +1209,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_ceil_u32 ( resolution_x / ssr_scale, 8 ), std_div_ceil_u32 ( resolution_y / ssr_scale, 8 ), 1 },
             .samplers_count = 2,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         ),
@@ -1445,8 +1449,6 @@ static void viewapp_build_raytrace_world ( xg_workload_h workload ) {
 
         sm_vec_3f_t up = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 1, 0 ) );
         sm_vec_3f_t dir = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 0, 1 ) );
-        //sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
-        //m_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
         dir = sm_vec_3f_norm ( dir );
         sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
         float scale = transform_component->scale;
@@ -1827,8 +1829,6 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
         viewapp_transform_component_t transform_component = viewapp_transform_component_m (
             .position = { x, 5, 0 },
             .orientation = { rot.x, rot.y, rot.z, rot.w }
-            //.orientation = { 0, 1, 0 },
-            //.up = { 0, 0, -1 },
         );
 
         se->create_entity ( &se_entity_params_m (
@@ -2397,8 +2397,6 @@ static void viewapp_import_scene ( xg_workload_h workload, const char* input_pat
         }
     }
 
-    //xg->submit_workload ( workload );
-
     aiReleaseImport ( scene );
 
     std_tick_t end_tick = std_tick_now();
@@ -2410,6 +2408,32 @@ static void update_raytrace_world ( void ) {
 #if xg_enable_raytracing_m
     m_state->render.raytrace_world_update = true;
 #endif
+}
+
+static void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time ) {
+    xg_i* xg = m_state->modules.xg;
+    se_i* se = m_state->modules.se;
+
+    viewapp_mesh_component_t* mesh_component = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
+    if ( mesh_component ) {
+        xg_geo_util_free_data ( &mesh_component->geo_data );
+        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload, time );
+
+        viewapp_material_data_t* material = &mesh_component->material;
+        if ( material->color_texture != xg_null_handle_m ) {
+            xg->cmd_destroy_texture ( resource_cmd_buffer, material->color_texture, time );
+        }
+        if ( material->normal_texture != xg_null_handle_m ) {
+            xg->cmd_destroy_texture ( resource_cmd_buffer, material->normal_texture, time );
+        }
+        if ( material->metalness_roughness_texture != xg_null_handle_m ) {
+            xg->cmd_destroy_texture ( resource_cmd_buffer, material->metalness_roughness_texture, time );
+        }
+
+        if ( mesh_component->rt_geo != xg_null_handle_m ) {
+            xg->destroy_raytrace_geometry ( mesh_component->rt_geo );
+        }
+    }
 }
 
 static void viewapp_load_scene ( uint32_t id ) {
@@ -2427,26 +2451,7 @@ static void viewapp_load_scene ( uint32_t id ) {
 
     for ( uint64_t i = 0; i < entity_count; ++i ) {
         se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
-        viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
-        if ( mesh_component ) {
-            xg_geo_util_free_data ( &mesh_component->geo_data );
-            xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload );
-
-            viewapp_material_data_t* material = &mesh_component->material;
-            if ( material->color_texture != xg_null_handle_m ) {
-                xg->cmd_destroy_texture ( resource_cmd_buffer, material->color_texture, xg_resource_cmd_buffer_time_workload_start_m );
-            }
-            if ( material->normal_texture != xg_null_handle_m ) {
-                xg->cmd_destroy_texture ( resource_cmd_buffer, material->normal_texture, xg_resource_cmd_buffer_time_workload_start_m );
-            }
-            if ( material->metalness_roughness_texture != xg_null_handle_m ) {
-                xg->cmd_destroy_texture ( resource_cmd_buffer, material->metalness_roughness_texture, xg_resource_cmd_buffer_time_workload_start_m );
-            }
-
-            if ( mesh_component->rt_geo != xg_null_handle_m ) {
-                xg->destroy_raytrace_geometry ( mesh_component->rt_geo );
-            }
-        }
+        viewapp_destroy_entity_resources ( *entity, workload, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_start_m );
         se->destroy_entity ( *entity );
     }
 
@@ -3377,10 +3382,10 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         xf_graph_info_t graph_info;
         xf->get_graph_info ( &graph_info, m_state->render.active_graph );
-        uint32_t passthrough_nodes_count = 0; // TODO remove?
 
         const uint64_t* timings = xf->get_graph_timings ( m_state->render.active_graph );
 
+        std_assert_m ( graph_info.node_count < 64 );
         uint64_t timestamp_sum = 0;
         for ( uint32_t i = 0, node_id = -1; i < graph_info.node_count; ++i ) {
             xf_node_info_t node_info;
@@ -3421,7 +3426,6 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             }
 
             if ( node_info.passthrough ) {
-                ++passthrough_nodes_count;
                 bool node_enabled = node_info.enabled;
                 
                 xi_switch_state_t node_switch = xi_switch_state_m (
@@ -3589,33 +3593,31 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         xi->newline();
 
-        if ( passthrough_nodes_count > 0 ) {
-            if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
-                .text = "Disable all",
-                .width = 100,
-                .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
-            ) ) ) {
-                xf_graph_info_t info;
-                xf->get_graph_info ( &info, m_state->render.active_graph );
+        if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
+            .text = "Disable all",
+            .width = 100,
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
+        ) ) ) {
+            xf_graph_info_t info;
+            xf->get_graph_info ( &info, m_state->render.active_graph );
 
-                for ( uint32_t i = 0; i < info.node_count; ++i ) {
-                    xf->disable_node ( m_state->render.active_graph, info.nodes[i] );
-                }
-                xf->invalidate_graph ( m_state->render.active_graph, workload );
+            for ( uint32_t i = 0; i < info.node_count; ++i ) {
+                xf->disable_node ( m_state->render.active_graph, info.nodes[i] );
             }
-            if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
-                .text = "Enable all", 
-                .width = 100,
-                .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
-            ) ) ) {
-                xf_graph_info_t info;
-                xf->get_graph_info ( &info, m_state->render.active_graph );
+            xf->invalidate_graph ( m_state->render.active_graph, workload );
+        }
+        if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
+            .text = "Enable all", 
+            .width = 100,
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
+        ) ) ) {
+            xf_graph_info_t info;
+            xf->get_graph_info ( &info, m_state->render.active_graph );
 
-                for ( uint32_t i = 0; i < info.node_count; ++i ) {
-                    xf->enable_node ( m_state->render.active_graph, info.nodes[i] );
-                }
-                xf->invalidate_graph ( m_state->render.active_graph, workload );
+            for ( uint32_t i = 0; i < info.node_count; ++i ) {
+                xf->enable_node ( m_state->render.active_graph, info.nodes[i] );
             }
+            xf->invalidate_graph ( m_state->render.active_graph, workload );
         }
     }
     xi->end_section ( xi_workload );
@@ -3630,7 +3632,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
         uint32_t destroy_list[se_max_entities_m];
         uint32_t destroy_count = 0;
         size_t entity_count = se->get_entity_list ( entity_list, se_max_entities_m );
-        std_assert_m ( entity_count < 64 * 8 ); // expanded_entities_bitset
+        std_assert_m ( entity_count < 64 * std_static_array_capacity_m ( m_state->ui.expanded_entities_bitset ) );
 
         bool delete_selected = false;
         if ( !old_input_state->keyboard[wm_keyboard_state_del_m] && input_state->keyboard[wm_keyboard_state_del_m] ) {
@@ -3760,11 +3762,14 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
 
         // dispatch deletes and keep expanded entities bitset in sync
         uint32_t remaining_entities = entity_count;
+        xg_resource_cmd_buffer_h resource_cmd_buffer = xg_null_handle_m;
         if ( destroy_count > 0 ) {
+            resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
             update_raytrace_world();
         }
         for ( uint32_t i = 0; i < destroy_count; ++i ) {
             uint32_t entity_idx = destroy_list[i];
+            viewapp_destroy_entity_resources ( entity_list[entity_idx], workload, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
             se->destroy_entity ( entity_list[entity_idx] );
             --remaining_entities;
             std_bitset_shift_left ( m_state->ui.expanded_entities_bitset, entity_idx, 1, std_static_array_capacity_m ( m_state->ui.expanded_entities_bitset ) );
@@ -3814,7 +3819,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             xi_transform_state_t xform = xi_transform_state_m (
                 .position = { transform->position[0], transform->position[1], transform->position[2] },
                 .rotation = { transform->orientation[0], transform->orientation[1], transform->orientation[2], transform->orientation[3] },
-                .sort_order = 0,
+                .sort_order = 1,
                 .mode = input_state->keyboard[wm_keyboard_state_alt_left_m] ? xi_transform_mode_rotation_m : xi_transform_mode_translation_m,
             );
             transform_drag = xi->draw_transform ( xi_workload, &xform );
@@ -3866,6 +3871,7 @@ static void viewapp_update_lights ( void ) {
     ) );
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
     se_stream_iterator_t transform_iterator = se_component_iterator_m ( &query_result.components[1], 0 );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &query_result.entities );
 
     for ( uint32_t light_it = 0; light_it < query_result.entity_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
@@ -3888,6 +3894,17 @@ static void viewapp_update_lights ( void ) {
                 }
             );
             rv->update_view_transform ( light_component->views[view_it], &transform );
+        }
+
+        se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
+        viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
+        if ( mesh_component && false ) {
+            // assume sphere
+            float area = 3.1415f * 4 * transform_component->scale * transform_component->scale;
+            float radiant_exitance = light_component->intensity / area;
+            mesh_component->material.emissive[0] = light_component->color[0] * radiant_exitance;
+            mesh_component->material.emissive[1] = light_component->color[1] * radiant_exitance;
+            mesh_component->material.emissive[2] = light_component->color[2] * radiant_exitance;
         }
     }
 }
@@ -4112,7 +4129,7 @@ void viewer_app_unload ( void ) {
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_geo_util_free_data ( &mesh_component->geo_data );
-        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload );
+        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload, xg_resource_cmd_buffer_time_workload_start_m );
     }
 
     xg->submit_workload ( workload );

@@ -40,9 +40,96 @@ uint getRandomSeed(vec2 uv, vec2 resolution, float time) {
     return seed;
 }
 
+#if 1
+// SSILVB
+// https://arxiv.org/pdf/2301.11376
+// https://cybereality.com/screen-space-indirect-lighting-with-visibility-bitmask-improvement-to-gtao-ssao-real-time-ambient-occlusion-algorithm-glsl-shader-implementation/
+const float sample_count = 4;
+const float sample_radius = 4;
+const float slice_count = 2;
+const float hit_thickness = 0.5;
+
+const uint sector_count = 32u;
+uint make_bitmask ( float min_horizon, float max_horizon ) {
+    uint start_bit = uint ( min_horizon * float ( sector_count ) );
+    uint horizon_angle = uint ( ceil ( ( max_horizon - min_horizon ) * float ( sector_count ) ) );
+    uint angle_bits = horizon_angle > 0 ? uint ( 0xffffffff >> ( sector_count - horizon_angle ) ) : 0;
+    uint bitmask = angle_bits << start_bit;
+    return bitmask;
+}
+
+vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
+    uint indirect = 0;
+    uint occlusion = 0;
+    float visibility = 0;
+    vec3 lighting = vec3 ( 0 );
+
+    vec2 aspect = draw_uniforms.resolution_f32.yx / draw_uniforms.resolution_f32.x;
+
+    float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
+    vec3 position = view_from_depth ( screen_uv, depth );
+    vec3 view = normalize ( -position );
+    vec3 normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1 );
+    float slice_rotation = 2 * PI / slice_count;
+    float sample_scale = ( -sample_radius * frame_uniforms.proj_from_view[0][0] ) / position.z;
+    float sample_offset = 0.5 * rng_wang ( rng_state );
+    float jitter = rng_wang ( rng_state ) - 0.5;
+
+    for ( float slice = 0.0; slice < slice_count; slice += 1.0 ) {
+        float phi = slice_rotation * ( slice + jitter ) + PI;
+        vec2 omega = vec2 ( cos ( phi ), sin ( phi ) );
+        vec3 direction = vec3 ( omega.x, omega.y, 0.0 );
+        vec3 ortho_direction = direction - dot ( direction, view ) * view;
+        vec3 axis = cross ( direction, view );
+        vec3 proj_normal = normal - dot ( normal, axis ) * axis;
+        float proj_length = length ( proj_normal );
+
+        float sign_n = sign ( dot ( ortho_direction, proj_normal ) );
+        float cos_n = clamp ( dot ( proj_normal, view ) / proj_length, 0.0, 1.0 );
+        float n = sign_n * acos ( cos_n );
+
+        vec3 last_valid_light = 0.0.xxx;
+        uint last_indirect = 0;
+        vec3 last_normal = 0.0.xxx;
+        vec3 last_sample_horizon = 0.0.xxx;
+        vec3 last_sample_normal = 0.0.xxx;
+
+        for ( float current_sample = 0.0; current_sample < sample_count; current_sample += 1.0 ) {
+            float sample_step = ( current_sample + jitter ) / sample_count + sample_offset;
+            vec2 sample_uv = screen_uv - sample_step * sample_scale * omega * aspect;
+            float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
+            vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
+            vec3 sample_normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv ).xyz * 2 - 1 );
+            vec3 sample_light = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv, 0 ).xyz;
+            vec3 sample_distance = sample_position - position;
+            float sample_length = length ( sample_distance );
+            vec3 sample_horizon = sample_distance / sample_length;
+
+            vec2 front_back_horizon;
+            front_back_horizon.x = dot ( sample_horizon, view );
+            front_back_horizon.y = dot ( normalize ( sample_distance - view * hit_thickness ), view );
+            front_back_horizon = acos ( front_back_horizon );
+            front_back_horizon = clamp ( ( front_back_horizon + n + PI / 2 ) / PI, 0.0, 1.0 );
+
+            indirect = make_bitmask ( front_back_horizon.x, front_back_horizon.y );
+            lighting += ( 1.0 - float ( bitCount ( indirect & ~occlusion ) ) / float ( sector_count ) ) * sample_light * clamp ( dot ( normal, sample_horizon ), 0.0, 1.0 ) * clamp ( dot ( sample_normal, -sample_horizon ), 0.0, 1.0 );
+            occlusion |= indirect;
+        }
+
+        visibility += 1.0 - float ( bitCount ( occlusion ) ) / float ( sector_count );
+    }
+
+    visibility /= slice_count;
+    lighting /= slice_count;
+
+    return vec4 ( lighting, visibility );
+}
+#endif
+
 void main ( void ) {
+#if 0
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / draw_uniforms.resolution_f32 );
-    screen_uv = dejitter_uv ( screen_uv );
+    //screen_uv = dejitter_uv ( screen_uv );
 
     // sample
     vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1;
@@ -57,7 +144,7 @@ void main ( void ) {
     // init rng
     rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
 
-#define RAY_COUNT 1
+#define RAY_COUNT 4
 
     // init accumulators
     float sample_distances[RAY_COUNT];
@@ -94,7 +181,7 @@ void main ( void ) {
             hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * 0.0, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50 ); 
 
             if ( hit ) {
-                vec3 hit_lighting = textureLod ( sampler2D ( tex_lighting, sampler_linear ), hit_screen_pos.xy, 7 ).xyz;
+                vec3 hit_lighting = textureLod ( sampler2D ( tex_lighting, sampler_linear ), hit_screen_pos.xy, 5 ).xyz;
                 vec3 hit_view_pos = view_from_depth ( hit_screen_pos.xy, hit_depth );
                 float hit_distance = distance ( view_pos, hit_view_pos );
                 //float incoming_radiance = max ( dot ( hit_normal, -hemisphere_normal ), 0 ); // Approximate with a simple NdotL...
@@ -104,16 +191,24 @@ void main ( void ) {
         }
     }
 
-
     for ( uint ray_it = 0; ray_it < RAY_COUNT; ++ray_it ) {
         float d = sample_distances[ray_it];
-        float attenuation = 1.0 / ( d * d + 5 );
+        float attenuation = 1;
+        //float attenuation = 1 / ( d * d + 1 );
+        //float attenuation = ( d * d ) / ( ( d * d + 0.1 ) * ( d * d + 0.1 ) );
         //float occlusion = min ( 1.0, sample_distances[ray_it] );
-        sample_color += sample_colors[ray_it] * base_color * 1;// * occlusion;// * attenuation * attenuation;
+        //if ( d < 0.01 ) attenuation = 0;
+        sample_color += sample_colors[ray_it] * base_color * attenuation;// * occlusion;// * attenuation * attenuation;
     }
 
     sample_color /= float ( RAY_COUNT );
-
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( sample_color, 1 ) );
-    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( 0,0,0, 1 ) );
+#else
+    vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / draw_uniforms.resolution_f32 );
+    rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
+    vec4 indirect_occlusion = ssilvb ( rng_state, screen_uv );
+    vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( indirect_occlusion.xyz * base_color, 1 ) );
+    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( vec3 ( indirect_occlusion.w ), 1 ) );
+#endif
 }

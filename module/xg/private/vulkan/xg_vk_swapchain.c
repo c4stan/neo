@@ -208,7 +208,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         debug_name.objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
         debug_name.objectHandle = ( uint64_t ) swapchain->vk_handle;
         debug_name.pObjectName = params->debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+        xg_vk_device_ext_api ( params->device )->set_debug_name ( device->vk_handle, &debug_name );
     }
 
     VkImage swapchain_textures[xg_swapchain_max_textures_m];
@@ -352,7 +352,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
         debug_name.objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
         debug_name.objectHandle = ( uint64_t ) swapchain->vk_handle;
         debug_name.pObjectName = swapchain->debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+        xg_vk_device_ext_api ( swapchain->device )->set_debug_name ( device->vk_handle, &debug_name );
     }
 
     VkImage swapchain_textures[xg_swapchain_max_textures_m];

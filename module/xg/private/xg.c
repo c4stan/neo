@@ -126,9 +126,7 @@ void* xg_load ( void* std_runtime ) {
 
     xg_vk_instance_load ( &state->vk.instance, xg_instance_enabled_runtime_layers_m );
     xg_vk_allocator_load ( &state->vk.allocator );
-    std_log_info_m ( "loading xg_vk_device..." );
     xg_vk_device_load ( &state->vk.device );
-    std_log_info_m ( "loading xg_vk_query..." );
     xg_vk_query_load ( &state->vk.query );
     xg_vk_event_load ( &state->vk.event );
     xg_vk_texture_load ( &state->vk.texture );
@@ -141,9 +139,7 @@ void* xg_load ( void* std_runtime ) {
 
     xg_cmd_buffer_load ( &state->cmd_buffer );
     xg_resource_cmd_buffer_load ( &state->resource_cmd_buffer );
-    //#if defined(std_platform_win32_m)
     xg_debug_capture_load ( &state->debug_capture );
-    //#endif
 
     xg_api_init ( &state->api );
     return &state->api;
@@ -169,9 +165,7 @@ void xg_reload ( void* std_runtime, void* api ) {
 
     xg_cmd_buffer_reload ( &state->cmd_buffer );
     xg_resource_cmd_buffer_reload ( &state->resource_cmd_buffer );
-    //#if defined(std_platform_win32_m)
     xg_debug_capture_reload ( &state->debug_capture );
-    //#endif
 
     xg_api_init ( &state->api );
     xg_state_bind ( state );
@@ -201,52 +195,3 @@ void xg_unload ( void ) {
 
     xg_state_free();
 }
-
-#if 0
-#if std_enabled_m(xg_backend_vulkan_m)
-    // Backend
-    xg_vk_instance_init ( xg_runtime_layer_bit_debug_m | xg_runtime_layer_bit_renderdoc_m );
-
-    std_log_info_m ( "xg_vk_instance initialized." );
-    xg_vk_cmd_buffer_init();
-    std_log_info_m ( "xg_vk_cmd_buffer initialized." );
-    xg_vk_device_init();
-    std_log_info_m ( "xg_vk_device initialized." );
-    xg_vk_event_init();
-    std_log_info_m ( "xg_vk_event initialized." );
-    xg_vk_texture_init();
-    std_log_info_m ( "xg_vk_texture initialized." );
-    xg_vk_buffer_init();
-    std_log_info_m ( "xg_vk_buffer initialized." );
-    xg_vk_swapchain_init();
-    std_log_info_m ( "xg_vk_swapchain initialized." );
-    xg_vk_sampler_init();
-    std_log_info_m ( "xg_vk_sampler initialized." );
-    xg_vk_pipeline_init();
-    std_log_info_m ( "xg_vk_pipeline initialized." );
-    xg_cmd_buffer_init();
-    std_log_info_m ( "xg_cmd_buffer initialized." );
-    xg_resource_cmd_buffer_init();
-    std_log_info_m ( "xg_resource_cmd_buffer initialized." );
-    xg_workload_init();
-    std_log_info_m ( "xg_workload initialized." );
-    xg_vk_allocator_init();
-    std_log_info_m ( "xg_vk_allocator initialized." );
-    #if defined(std_platform_win32_m)
-        xg_debug_capture_init();
-        std_log_info_m ( "xg_debug_capture initialized." );
-    #endif
-    // Api
-    s_api = xg_vk_api();
-#else
-    #error "Vulkan is the only xg backend supported for now"
-#endif
-
-return &s_api;
-}
-
-
-void xg_unload ( void ) {
-    xg_vk_device_shutdown();
-}
-#endif

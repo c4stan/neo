@@ -141,21 +141,8 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
 static void xg_vk_instance_load_ext_api ( void ) {
 #define xg_vk_instance_ext_init_pfn_m(ptr, name) { *(ptr) = ( std_typeof_m ( *(ptr) ) ) ( vkGetInstanceProcAddr ( xg_vk_instance_state->vk_handle, name ) ); std_assert_m ( *ptr ); }
 
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_begin_debug_region, "vkCmdBeginDebugUtilsLabelEXT" );
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_end_debug_region, "vkCmdEndDebugUtilsLabelEXT" );
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.set_debug_name, "vkSetDebugUtilsObjectNameEXT" );
-#if xg_vk_enable_sync2_m
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.cmd_sync2_pipeline_barrier, "vkCmdPipelineBarrier2KHR" );
-#endif
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.set_debug_callback, "vkCreateDebugUtilsMessengerEXT" );
     xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.destroy_debug_callback, "vkDestroyDebugUtilsMessengerEXT" );
-
-#if 0//xg_enable_raytracing_m
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_build_sizes, "vkGetAccelerationStructureBuildSizesKHR" );
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.create_acceleration_structure, "vkCreateAccelerationStructureKHR" );
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.build_acceleration_structures, "vkBuildAccelerationStructuresKHR" );
-    xg_vk_instance_ext_init_pfn_m ( &xg_vk_instance_state->ext_api.get_acceleration_structure_device_address, "vkGetAccelerationStructureDeviceAddressKHR" );
-#endif
 
 #undef xg_vk_instance_ext_init_pfn_m    
 }
@@ -361,10 +348,6 @@ void xg_vk_instance_unload ( void ) {
 
 VkInstance xg_vk_instance ( void ) {
     return xg_vk_instance_state->vk_handle;
-}
-
-xg_vk_instance_ext_api_i* xg_vk_instance_ext_api ( void ) {
-    return &xg_vk_instance_state->ext_api;
 }
 
 VkAllocationCallbacks* xg_vk_cpu_allocator ( void ) {

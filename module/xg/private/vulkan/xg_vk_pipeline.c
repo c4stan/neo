@@ -264,7 +264,7 @@ static VkFramebuffer xg_vk_framebuffer_create_vk ( xg_device_h device_handle, Vk
         debug_name_info.objectType = VK_OBJECT_TYPE_FRAMEBUFFER;
         debug_name_info.objectHandle = ( uint64_t ) framebuffer;
         debug_name_info.pObjectName = debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+        xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
     }
 
     return framebuffer;
@@ -378,7 +378,7 @@ static VkRenderPass xg_vk_renderpass_create_vk ( xg_device_h device_handle, cons
         debug_name_info.objectType = VK_OBJECT_TYPE_RENDER_PASS;
         debug_name_info.objectHandle = ( uint64_t ) renderpass;
         debug_name_info.pObjectName = debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+        xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
     }
 
     return renderpass;
@@ -445,7 +445,7 @@ xg_resource_bindings_layout_h xg_vk_pipeline_resource_bindings_layout_create ( c
             debug_name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
             debug_name_info.objectHandle = ( uint64_t ) vk_handle;
             debug_name_info.pObjectName = params->debug_name;
-            xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+            xg_vk_device_ext_api ( params->device )->set_debug_name ( device->vk_handle, &debug_name_info );
         }
 
         xg_vk_resource_bindings_layout_t* layout = std_list_pop_m ( &xg_vk_pipeline_state->resource_bindings_layouts_freelist );
@@ -544,7 +544,7 @@ VkPipelineLayout xg_vk_pipeline_create_pipeline_layout_vk ( xg_device_h device_h
         debug_name_info.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
         debug_name_info.objectHandle = ( uint64_t ) pipeline_layout;
         debug_name_info.pObjectName = debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+        xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
     }
 
     return pipeline_layout;
@@ -627,7 +627,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                     .objectHandle = ( uint64_t ) vk_shader_handles[i],
                     .pObjectName = module_name,
                 };
-                xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
             }
 
             shader_info[i] = ( VkPipelineShaderStageCreateInfo ) {
@@ -701,7 +701,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 .basePipelineHandle = VK_NULL_HANDLE,
                 .basePipelineIndex = 0,
             };
-            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, NULL, &pipeline );
+            VkResult result = xg_vk_device_ext_api( device_handle )->create_raytrace_pipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
 #else
             // TODO
             VkRayTracingPipelineCreateInfoKHR info = {
@@ -731,7 +731,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
                 debug_name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
                 debug_name_info.objectHandle = ( uint64_t ) pipeline;
                 debug_name_info.pObjectName = params->debug_name;
-                xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
             }
         }
 
@@ -949,7 +949,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
                 debug_name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE ;
                 debug_name_info.objectHandle = ( uint64_t ) shader;
                 debug_name_info.pObjectName = module_name;
-                xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
             }
 
             shader_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -987,7 +987,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
                     .objectHandle = ( uint64_t ) pipeline,
                     .pObjectName = params->debug_name,
                 };
-                xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
             }
         }
 
@@ -1499,7 +1499,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                     debug_name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE ;
                     debug_name_info.objectHandle = ( uint64_t ) vk_shader_handles[shader_count];
                     debug_name_info.pObjectName = module_name;
-                    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                    xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
                 }
 
                 ++shader_count;
@@ -1533,7 +1533,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                     debug_name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE ;
                     debug_name_info.objectHandle = ( uint64_t ) vk_shader_handles[shader_count];
                     debug_name_info.pObjectName = module_name;
-                    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                    xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
                 }
                 
                 ++shader_count;
@@ -1578,7 +1578,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
                 debug_name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
                 debug_name_info.objectHandle = ( uint64_t ) pipeline;
                 debug_name_info.pObjectName = params->debug_name;
-                xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name_info );
+                xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
             }
         }
 

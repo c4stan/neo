@@ -265,7 +265,7 @@ static VkImageView xg_texture_view_create_vk ( xg_device_h device_handle, const 
         debug_name.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
         debug_name.objectHandle = ( uint64_t ) vk_view;
         debug_name.pObjectName = params->debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+        xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name );
     }
 
     return vk_view;
@@ -396,7 +396,7 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
         debug_name.objectType = VK_OBJECT_TYPE_IMAGE;
         debug_name.objectHandle = ( uint64_t ) vk_image;
         debug_name.pObjectName = params->debug_name;
-        xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+        xg_vk_device_ext_api ( params->device )->set_debug_name ( device->vk_handle, &debug_name );
     }
 
     texture->vk_handle = vk_image;
@@ -567,7 +567,7 @@ xg_texture_h xg_vk_texture_register_swapchain_texture ( const xg_texture_params_
         .pObjectName = params->debug_name,
     };
     const xg_vk_device_t* device = xg_vk_device_get ( texture->params.device );
-    xg_vk_instance_ext_api()->set_debug_name ( device->vk_handle, &debug_name );
+    xg_vk_device_ext_api ( texture->params.device )->set_debug_name ( device->vk_handle, &debug_name );
 
     return texture_handle;
 }

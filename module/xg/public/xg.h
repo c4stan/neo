@@ -2483,10 +2483,7 @@ typedef struct {
     // Workload
     xg_workload_h           ( *create_workload )                    ( xg_device_h device );
     xg_cmd_buffer_h         ( *create_cmd_buffer )                  ( xg_workload_h workload );
-    //void                    ( *create_cmd_buffers )                 ( xg_cmd_buffer_h* cmd_buffers, size_t count, xg_workload_h workload );
 
-    //void                    ( *close_cmd_buffers )                  ( xg_cmd_buffer_h* cmd_buffers, size_t count ); // TODO remove this
-    //void                    ( *discard_cmd_buffers )                ( xg_cmd_buffer_h* cmd_buffers, size_t count );
     void                    ( *submit_workload )                    ( xg_workload_h workload );
     void                    ( *discard_workload )                   ( xg_workload_h workload );
     bool                    ( *is_workload_complete )               ( xg_workload_h workload );
@@ -2507,23 +2504,12 @@ typedef struct {
     void                    ( *destroy_renderpass )                 ( xg_renderpass_h renderpass );
 
     // Command Buffer
-    // TODO move these to a separate _i api? have them as static functions?
-    // TODO rename all draw/dispatch/trace_rays cmds to graphics/compute/raytrace_dispatch ?
     void                    ( *cmd_clear_texture )                  ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_color_clear_t clear );
     void                    ( *cmd_clear_depth_stencil_texture )    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_texture_h texture, xg_depth_stencil_clear_t clear );
     void                    ( *cmd_clear_buffer )                   ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_buffer_h buffer, uint32_t value );
     // TODO rename to transition_resources or something similar
     void                    ( *cmd_barrier_set )                    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_barrier_set_t* barrier_set );
-    //void                    ( *cmd_set_vertex_streams )             ( xg_cmd_buffer_h cmd_buffer, const xg_vertex_stream_binding_t* bindings, size_t count, uint64_t key );
-    //void                    ( *cmd_draw_indexed )                   ( xg_cmd_buffer_h cmd_buffer, xg_buffer_h ibuffer, size_t index_count, size_t index_base, uint64_t key );
-    //void                    ( *cmd_draw_instanced )                 ( xg_cmd_buffer_h cmd_buffer, size_t vertex_base, size_t vertex_count, size_t instance_base, size_t instance_count, uint64_t key );
-    //void                    ( *cmd_set_graphics_pipeline_state )    ( xg_cmd_buffer_h cmd_buffer, xg_graphics_pipeline_state_h pipeline_state, uint64_t key );
-    //void                    ( *cmd_set_compute_pipeline_state )     ( xg_cmd_buffer_h cmd_buffer, xg_compute_pipeline_state_h pipeline_state, uint64_t key );
-    //void                    ( *cmd_set_render_textures )            ( xg_cmd_buffer_h cmd_buffer, const xg_render_textures_binding_t* bindings, uint64_t key );
-    //void                    ( *cmd_set_pipeline_resources )         ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_resource_bindings_t* bindings, uint64_t key );
-    //void                    ( *cmd_write_pipeline_constant_data )   ( xg_cmd_buffer_h cmd_buffer, const xg_pipeline_constant_data_t* data, uint64_t key );
     
-    // TODO move key to after cmd buffer instead of last for all cmds
     void                    ( *cmd_compute )                        ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_compute_params_t* params );
     void                    ( *cmd_begin_renderpass )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_renderpass_params_t* params );
     void                    ( *cmd_draw )                           ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );

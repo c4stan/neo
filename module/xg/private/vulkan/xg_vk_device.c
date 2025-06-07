@@ -468,8 +468,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     };
 
     // Map queue families
-    // Only support one queue per type for now
-    // TODO does this map properly? need to test on a multi queue device
+    // Only support one queue per type for now(?)
     VkDeviceQueueCreateInfo* device_queues = device->queue_create_info;
     uint32_t device_queues_count = 0;
 
@@ -573,6 +572,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 
     // Finalize
     std_assert_m ( device_queues_count > 0 );
+    std_assert_m ( device_queues_count <= std_static_array_capacity_m ( device->queue_create_info ) );
     device->queue_create_info_count = device_queues_count;
 }
 

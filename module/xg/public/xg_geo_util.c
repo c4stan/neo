@@ -301,14 +301,14 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
     return result;
 }
 
-void xg_geo_util_free_gpu_data ( xg_geo_util_geometry_gpu_data_t* gpu_data, xg_workload_h workload ) {
+void xg_geo_util_free_gpu_data ( xg_geo_util_geometry_gpu_data_t* gpu_data, xg_workload_h workload, xg_resource_cmd_buffer_time_e time ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->pos_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->nor_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->tan_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->bitan_buffer, xg_resource_cmd_buffer_time_workload_start_m );
-    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->idx_buffer, xg_resource_cmd_buffer_time_workload_start_m );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->pos_buffer, time );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->nor_buffer, time );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->tan_buffer, time );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->bitan_buffer, time );
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, gpu_data->idx_buffer, time );
 }
 
 void xg_geo_util_free_data ( xg_geo_util_geometry_data_t* data ) {
