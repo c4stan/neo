@@ -13,4 +13,3 @@ if linux
     bindings = renderdoc_captures
     includes = $renderdoc_include
 endif
-ignores = xg_vk_cmd_buffer.c, xg_vk_pipeline2.c

@@ -321,9 +321,6 @@ float ggx_d ( float NoH, float roughness ) {
     return ( roughness * roughness ) / ( PI * den * den );
 }
 
-// takes in wo (view vector V)
-// returns wi (light vector L)
-
 float ggx_pdf ( vec3 wi, vec3 wo, vec3 normal, float roughness ) {
     vec3 wh = normalize ( wi + wo );
     float NoH = max ( 0, dot ( normal, wh ) );
@@ -405,7 +402,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     bool screen_ray_is_backward = screen_ray_dir.z < 0;
 
     uint sample_it = 0;
-    float depth_threshold = 0.0001;
+    float depth_threshold = 0.5;
 
     while ( t > 0.f && t < 1.f && sample_it < max_sample_count ) {
         //
@@ -423,7 +420,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
         //
         // use the sampled depth to move along the ray path
         vec3 screen_ray_sample_depth_step = screen_ray_sample;
-        float depth_delta = ( sample_depth - screen_ray_sample.z ); // delta from the ray z to the sampled depth. positive if the sample is in front (not occluded) by the depth.
+        float depth_delta = ( linearize_depth ( sample_depth ) - linearize_depth ( screen_ray_sample.z ) ); // delta from the ray z to the sampled depth. positive if the sample is in front (not occluded) by the depth.
 
         if ( depth_delta > 0 && !screen_ray_is_backward ) {
             float depth_t = ( sample_depth - screen_ray_start.z ) / ( screen_ray_path.z );
@@ -436,10 +433,9 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
         // :: resolve ::
         //
         if ( 
-               ( cell_index != depth_step_cell_idx )                        // check if we crossed the current hiz cell by depth stepping
-            || ( screen_ray_is_backward && depth_delta > 0 )                // if we're going backward, check if there's nothing in the current cell that we can possibly collide with
-            || ( hiz_mip == 0 && abs ( depth_delta ) > depth_threshold )  // TODO why the abs?
-            //|| ( hiz_mip == 0 && depth_delta < -depth_threshold )           // check if we're behind a surface and its depth threshold (ignore the collision in that case)
+               ( cell_index != depth_step_cell_idx )                        // check if the current hiz cell was crossed by depth stepping
+            || ( screen_ray_is_backward && depth_delta > 0 )                // if going backward, check if there's nothing in the current cell that we can possibly collide with
+            || ( hiz_mip == 0 && abs ( depth_delta ) > depth_threshold )    // ignore the collision if the ray is too far away from the sampled surface
         ) {
             // continue tracing
             // depth step failed, do a cell boundary step
@@ -505,8 +501,8 @@ float minimum_depth_plane ( vec2 ray, float level, vec2 cell_count, texture2D te
 //vec3 hi_z_trace ( vec3 p, vec3 v, in uint camera, out uint iterations ) {
 bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3 view_pos, vec3 hemisphere_normal, texture2D tex_hiz, uint hiz_mip_count, sampler sampler_point, uint max_sample_count ) {
 
-    vec3 p = screen_from_view ( view_pos );
-    vec3 v = normalize ( screen_from_view ( view_pos + hemisphere_normal ) - p );
+    vec3 p = screen_from_view ( frame_uniforms.proj_from_view, view_pos );
+    vec3 v = normalize ( screen_from_view ( frame_uniforms.proj_from_view, view_pos + hemisphere_normal ) - p );
 
     float level = HIZ_START_LEVEL;
     vec3 v_z = v / v.z;

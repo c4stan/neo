@@ -263,9 +263,6 @@ uint64_t xg_vk_device_get_idx ( xg_device_h device );
 char* xg_vk_device_map_alloc ( const xg_alloc_t* alloc );
 void xg_vk_device_unmap_alloc ( const xg_alloc_t* alloc );
 
-//void xg_vk_device_map_host_buffer ( xg_host_buffer_t* buffer );
-//void xg_vk_device_unmap_host_buffer ( xg_host_buffer_t* buffer );
-
 void xg_vk_device_wait_idle_all ( void );
 
 xg_vk_device_ext_api_i* xg_vk_device_ext_api ( xg_device_h device );

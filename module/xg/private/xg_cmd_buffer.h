@@ -17,13 +17,12 @@
         - Finally, all of the Vulkan cmd buffers can be submitted and followed by a present call.
         - After submission of the cmd buffers, xg keeps tracking the lifetime of those commands and waits until their execution in GPU
           is complete to finally pool back the buffers and the associated resources that got deleted.
+        TODO: finish implementing this. current cmd buffer processing is single threaded
 
     Notes
         - Waiting to receive all cmd buffers from the user before starting to work on them and eventually submit them to GPU introduces latency.
-          This is fine, we are OK with GPU being a bit behind compared to where rendering/sim is. In fact, a frame might look something like
-          [ sim N | rend N-1 | gpu N-2 ] running in parallel.
-        - As we do support sorting of individual comamnds on a global level, it is probably necessary to have some sort of separation of sort keys
-          from actual data, especially for the bigger commands.
+          This is generally considered fine, most renderers are OK with GPU being a bit behind compared to where rendering/sim is. In fact, a frame 
+          might look something like [ sim N | rend N-1 | gpu N-2 ] running in parallel.
         - How to implement resources management? create all resources before submitting commands for one frame, and delete them all after?
           Using a separate cmd buffer type for resource commands would introduce an annoying additional type but it also would allow to sort
           things out in the most efficient manner. Could even allocate create cmds from the top and delete cmds from the bottom.

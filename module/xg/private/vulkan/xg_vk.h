@@ -26,71 +26,6 @@
 /*
 -------------------------------------------------------------------------------
 
-    Only one device is supported at this time.
-    The device state is set up on module init call.
-    Since all of the static state is privately accessed, dll builds are fine.
-    Pipeline states and resources(?) are high frequency access.
-    Everyhting else is low frequency and can be locked.
-    Pipeline states
-        A hash table maps pipeline state hash -> pipeline state idx into
-        an array.
-        The table is normally read only. Supporting building states
-        at runtime means that sometime it is necessary to handle
-        concurrent insertion at some level.
-        The backend does not address that problem. Instead, it only
-        stores the table, and some higher level is expected to handle
-        the eventuality of concurrent access.
-    Resources
-        Resource allocation is strictly connected with allocators.
-        TODO consider how much self-contained allocators are and what
-        leaks into the backend.
-    All of the code declared in here uses the xg_vk_ prefix.
-        is this a good idea? maybe limit it to code declared inside xg_vk.h?
-            xg_vk is static global, all of code contained in xg_vk_* files
-            sees it and modifies it. Code declared inside xg_vk is basically
-            macro/utility shared code that is put here to avoid having to
-            repeat it multiple times inside other xg_vk_* files. there is no
-            real boundary between xg_vk_* code and xg_vk code.
-        no, either all of it or none of it. (with perhaps the exception of
-        conversion functions, where it's not just a namespace but also
-        part of the actual name)
-            no real reason to choose either. it doesn't add anything beside
-            the information 'this was declared inside xg' and it doesnt
-            take away much beside 3 extra characters in the name. also,
-            makes swapping backend slightly harder (the interface api binds
-            to different names depending on the selected backend).
-        take it away.
-            leave it in type converters
-            leave it in xg_vk shared macros too
-                they are direct operations on xg_vk
-                avoids name conflicts with the internal api implementation in
-                cases where an api call is basically fully implemented by a
-                shared macro (e.g. a getter)
-
-    resources
-        many different possible ways to handle resources
-        hard to say which one's the best
-            leave all resource management to the higher level?
-                expose api handles as opaque handles
-                store descs as read only in a giant hash map
-            need to store PSOs by hash
-                standard way to handle them
-                    maybe model other resource management similar to that?
-                        use classic create-delete queues and keep all current resources in a freelisted array?
-                one per device is multi device is supported
-
-    TODO
-        resource bindings
-
-        make creating workloads thread safe
-        test having multiple workloads open at the same time and submitting them out of order
-        resource cleanup
-        use vulkan pAllocator interface
-        ...
-        pso, render pass, framebuffer handling needs to be vastly improved/revisited
-        ...
-        try rendering a triangle
-
 Vulkan
     Generic sources:
         http://media.steampowered.com/apps/valve/2016/Dan_Ginsburg_Source2_Vulkan_Perf_Lessons.pdf
@@ -109,28 +44,17 @@ Vulkan
     Descriptors
         A descriptor can be seen as a handle to an actual resource.
 
-        Descriptors are grouped in descriptor sets which get allocated from descriptor pools. Usually each thread owns one descriptor pool per frame in flight.
+        Descriptors are grouped in descriptor sets which get allocated from descriptor pools. Usually each thread owns one (or more) descriptor pool per frame in flight.
         Once the frame has been fully rendered, the descriptor pool can be reused.
 
         When creating a pipeline, it's necessary to define a number of descriptor set layouts. Each layout is composed of multiple bindings,
-        and each binding contains a resource type (texture, buffer, ...) and the shader stages and register (glsl layout binding) that the resource will be accessible from.
+        and each binding is made of a resource type (texture, buffer, ...) and the shader stages and register (glsl layout binding) that the resource will be accessible from.
         Shader registers must be unique across pipeline states, they cannot be reused per stage.
 
-        A descriptor set is also created against a descriptor sets layout. After allocation, VkWriteDescriptorSet sets which resources the descriptors bindings actually
+        A descriptor set is also created against a descriptor set layout. After allocation, VkWriteDescriptorSet sets which resources the descriptors bindings actually
         point to, along with additional info depending on the resource type (image view if image, offset and size if buffer, ...).
 
         Finally, descriptor sets can be "activated" by calling vkCmdBindDescriptorSets on a cmd buffer before registering the draw commands.
-
-        Example
-            Pipeline Layout:
-                descriptor set 0 : [buffer : 0] [buffer : 1]                           : VERTEX_SHADER
-                descriptor set 1 : [buffer : 0] [buffer : 1] [buffer : 4]              : PIXEL_SHADER
-                descriptor set 2 : [buffer : 2] [buffer : 3]                           : VERTEX_SHADER | PIXEL_SHADER
-                descriptor set 3 : [image : 0]  [image : 1]  [image : 2]  [image : 3]  : PIXEL_SHADER
-
-            Command Buffer:
-                bind ( [set 0, set 1, set 2, set 3] )
-                bind ( [set 2, set 3], starting from pipeline layout set 2 )
 
         In practice a good way to organize descriptors is to have one layout per update frequency, e.g. one layout for per-view bindings, one for per-draw bindings, ...
         This way, assuming that draw calls get sorted by update frequency, the number of descriptor sets changes can be minimized. This is because when switching
@@ -150,12 +74,12 @@ Vulkan
         Memory allocations are explicit and allocated memory can later be used for storing textures or buffers. It is strongly adviced to manually manage memory and sub-allocate. A base block size of 256MB can be a good value.
         Source: https://developer.nvidia.com/vulkan-memory-management
 
-        There are three levels of resource management: traditional resources, sparse binding, and sparse residency. Traditional resources are those that are created in one single call and after that they can't be moved to a different memory block without having to destroying the resource and creating another one, and their memory is contiguous. Sparse binding resources are resources that are organized in "pages" that can be remapped dynamically to non contiguous blocks of memory. Before this
+        There are three levels of resource management: traditional resources, sparse binding, and sparse residency. Traditional resources are those that are created in one single call and after that they can't be moved to a different memory block without having to destroy the resource and creating another one, and their memory is contiguous. Sparse binding resources are resources that are organized in "pages" that can be remapped dynamically to non contiguous blocks of memory. Before this
         resource can be used by the gpu, however, it must be fully resident, meaning that all of its pages must have a physical mapping. Sparse residency resources, on the other hand, do not have this restriction.
         Source: https://www.asawicki.info/news_1698_vulkan_sparse_binding_-_a_quick_overview.html.
 
     Barriers
-        Barriers on GPUs are required for 3 reasons. One is an execution dependency, where we want to make sure that a command is fully completed before starting another one.
+        Barriers on GPUs are required for 3 reasons. One is an execution dependency, to make sure that a command is fully completed before starting another one.
         A second reason is cache coherency. GPUs have multiple caches that can get out of sync (e.g. the caches for sampling and for writing color buffer are separate, so before
         sampling a color buffer, a color buffer cache flush is required). Finally, a third reason is because the GPU under the hood will probably apply some sort of compression
         to things like a render target (to minimize required bandwidth when writing to it) or depth buffer and so when going from writing to it to sampling it a decompression is
@@ -168,8 +92,8 @@ Vulkan
         commands that come after, to wait before doing work in the "destination" stage (e.g. compute) until all the commands that come before have completed their "source" stage
         (e.g. vertex shader).
 
-        Memory barriers can be added to execution barriers and they specify another set of "source" and "destination" stages. This time "source" specifies the writes
-        that shall be flushed from caches (e.g. TODO) and "destination" specifies the consumers that shall invalidate their local caches, so that they can read the flushed writes.
+        Memory barriers can be added to execution barriers and they specify another set of "source" and "destination" stages. This time "source" specifies the types of memory
+        that shall be flushed from local caches to main memory (e.g. copy write from previous dispatch) and "destination" specifies the types of memory that shall invalidate and throw away their local caches, thus making main memory visible to them (e.g. shader read in next dispatch)
 
         Finally, layout barriers are those that can request decompression/compression of data and they can be added to image memory barriers. They take a pair of old and new image
         layouts and the transition will be performed by the GPU after the flush and before any read.
@@ -197,7 +121,7 @@ Vulkan
                 http://themaister.net/blog/2019/08/14/yet-another-blog-explaining-vulkan-synchronization/
 
     Pipelines and Render Passes
-        Pipeline objects embed all pipeline state. They can be either compute or graphics pipelines. Graphics pipeline state is made of input layout, primitive assembly,
+        Pipeline objects embed all pipeline state. They can be either compute, graphics or raytrace pipelines. Graphics pipeline state is made of input layout, primitive assembly,
         tessellation, viewport, rasterizer, msaa, depth, color blend, and also descriptors layouts and render pass (these two are just handles to externally created objects,
         not actual state).
 
@@ -218,7 +142,7 @@ Vulkan
         When creating a framebuffer or a graphics pipeline a render pass is provided. That framebuffer and that pipeline can only be bound when inside that render pass, or
         when inside one compatible with it. Two render passes are compatible when all their attachments have matching format and sample count. Image layouts and load/store ops
         can differ.
-        When binding a compute or raytrace(?) pipeline on the other hand, no render pass must be active. 
+        When binding a compute or raytrace pipeline on the other hand, no render pass must be active. 
         https://www.khronos.org/registry/vulkan/specs/1.1-extensions/html/vkspec.html#renderpass-compatibility
 
     Queries
@@ -266,53 +190,6 @@ Vulkan Raytrace
         Only static parameters should be stored here. Parameters taht change every frame or more should go through regular shader parameter bindings.
         Source: https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
                 https://www.realtimerendering.com/raytracinggems/rtg2/index.html - THE SHADER BINDING TABLE DEMYSTIFIED
-
-xg_vk
-    Command buffers
-        User level command buffers are not Vulkan cmd buffers -- commands are recorded on cpu buffers and then processed, before being submitted to Vulkan. XG has ownership of
-        command buffers memory and the user can temporarily get one with the condition that eventually he will return it, either for submission to the gpu or discarding.
-
-        Once returned for submission, command buffers are staged. Only when the user explicitly asks for submission, the currently staged buffers get processed. This allows for
-        inter-buffer sorting, since all commands in non-resource cmd buffers come with a global user-defined sorting key. The processing is divided in stages that more or less go
-        something like: merge cmd buffers -> sort (parallel?) -> chunk -> translate -> submit. Merge simply merges all command buffers into one single buffer that can be sorted.
-        This can probbaly be united with the sort if we do a merge sort. Sort does the sorting based on the global sort key. Chunk splits the commands into primary and secondary
-        buffers, and translate does the translation of the commands, filling primary and secondary Vulkan cmd buffers.
-
-        Resource command buffers are separate and are not sorted. Basically when command buffers are submitted, first all resource command buffers get executed in the order they
-        were returned to XG, and then regular cmd buffers are executed. This is to ensure all resources are created before comamnds on them are run. Eventually when/if XG will
-        support non-resident resources, commands to fill pages will of course have to go in regular command buffers.
-
-    Lifetimes
-        command buffers -> easy, reuse when gpu is done
-        resource deletes -> need to wait for the cmd buffers that use the resource to be done in gpu
-            on delete specify when to delete: immediately (IMMEDIATE_ASYNC), beginning of frame (WORKLOAD_BEGIN), or end of frame (WORKLOAD_END).
-                this should be enough to do everything. Most usages delete something allocated and used in earlier frames, thus WORKLOAD_BEGIN is the one.
-                to delete something allocated in this frame use WORKLOAD_END. to delete immediately and asynchronously from the gpu use IMMEDIATE_ASYNC (is this ever a good idea?)
-                Extra: might be a nice additional feature to allow for mid-frame deletion at specific points in the frame. This would cause the cmd buffers to be fragmented
-                    appropriately so that we can wait specifically for those commands before deletion. Need to figure out the details of the implementation, though. (give the
-                    deletion point an id and use that id instead of the 3 enums specified above on all delete cmds that should be executed there?)
-        descriptor set
-            many alternatives:
-                use one (or one per type) giant pool and linearly allocate descriptor sets for current frame only. Reset when frame is done.
-                use one (or one per thread) LRU hashmap cache to reuse descriptor sets: hash by content and look up on each bind, and only allocate new set on miss
-                bindless?
-                    http://gpuopen.com/wp-content/uploads/2016/03/VulkanFastPaths.pdf
-                    https://www.youtube.com/watch?v=tXipcoeuNh4
-
-    Synchronization
-        Need to use a number of low level sync primitives for the base render loop
-            per submit context:
-                need a fence per to be signaled on vkQueueSubmit completion, to know on CPU when GPU is done with a frame
-                need a semaphore to make the present call depend on the completion of all previous submissions for current frame
-                need a semaphore to make the submit call depend on the swapchain texture acquire
-
-    Bindings
-        Need to think about what are the possible ways that a user can/should bind memory mapped resources that get updated every frame. Possible options for a memory mapped buffer are:
-            - create N separate vulkan buffer objects. Pick a different one each frame modulo max in flight frames.
-            - create N separate xg_buffer_h objects that all map to the same vulkan buffer, with different offsets. Pick a different one each frame modulo max in flight frames.
-            - create one single vulkan/xg_buffer_h object and suballocate manually into it, store the offset of each suballocation, and pass the offset along with the binding
-            - create N separate big vulkan/xg_buffer_h objects where a bunch of generic allocations can be suballocated for the frame
-
 
 */
 

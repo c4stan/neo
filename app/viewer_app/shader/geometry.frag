@@ -41,7 +41,7 @@ void main() {
     out_color = vec4 ( draw_uniforms.color * color_sample.xyz, draw_uniforms.metalness * color_sample.w );
     
     // normals
-#if 0
+#if 1
     float backface_flip = gl_FrontFacing ? 1.f : -1.f;
     out_nor = vec4 ( vec3 ( in_nor * 0.5 * backface_flip + 0.5 ), draw_uniforms.roughness );
 #else

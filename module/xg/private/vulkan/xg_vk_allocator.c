@@ -469,27 +469,6 @@ void xg_free ( xg_memory_h handle ) {
 #endif
 }
 
-#if 0
-static xg_alloc_t xg_vk_allocator_default_alloc ( void* allocator, xg_device_h device_handle, size_t size, size_t align ) {
-    std_unused_m ( align );
-    xg_memory_type_e type = ( xg_memory_type_e ) allocator;
-    return xg_vk_allocator_simple_alloc ( device_handle, size, type );
-}
-
-static void xg_vk_allocator_default_free ( void* allocator, xg_memory_h memory_handle ) {
-    std_unused_m ( allocator );
-    xg_vk_allocator_simple_free ( memory_handle );
-}
-
-xg_allocator_i xg_allocator_default ( xg_memory_type_e type ) {
-    xg_allocator_i allocator;
-    allocator.impl = ( void* ) type;
-    allocator.alloc = xg_vk_allocator_default_alloc;
-    allocator.free = xg_vk_allocator_default_free;
-    return allocator;
-}
-#endif
-
 void xg_vk_allocator_activate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
     const xg_vk_device_t* device = xg_vk_device_get ( device_handle );

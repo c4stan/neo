@@ -48,7 +48,6 @@ CORE_WARNING_FLAGS = (
     ' -Wno-comment'
     ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
     ' -Wno-missing-braces'                      # suggested braces warnings?
-    #' -Wno-c23-extensions'                      # TODO remove?
 )
 
 EXTENDED_WARNING_FLAGS = (
@@ -89,7 +88,6 @@ COMPILER_GCC = 2
 
 """
     todos:
-        try to output all dlls from the makefile directly into the main project workspace instead of having to manually move them over via gather_dlls. delete modules folder. current design is a leftover from when every dependency module had its own makefile executed separately
         cleanup workflow with non-default configs
 """
 
@@ -804,7 +802,7 @@ class Project:
         if platform.system() == 'Windows':
             #platform_flags = '/J' # default char to unsigned
             platform_flags = '-funsigned-char' # default char to unsigned
-            platform_flags += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION # TODO is there a way to avoid having to do this?
+            platform_flags += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION # TODO remove?
         elif platform.system() == 'Linux':
             platform_flags = '-funsigned-char' # default char to unsigned
 

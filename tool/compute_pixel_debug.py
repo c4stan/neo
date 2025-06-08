@@ -1,8 +1,10 @@
+# Renderdoc extension to provide an easy way to debug a pixel for a compute shader dispatch where the compute threads map 1:1 to the output image pixels in the obvious way
+
 import renderdoc as rd
 from PySide2 import QtWidgets, QtCore
 import sys
 
-print("Pixel Debugger script loaded")
+print("Compute Shader Pixel Debugger script loaded")
 
 class PixelDebuggerExtension:
     def __init__(self, window: QtWidgets.QWidget, controller: rd.ReplayController):

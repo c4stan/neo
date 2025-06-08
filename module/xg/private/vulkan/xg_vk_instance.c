@@ -352,5 +352,6 @@ VkInstance xg_vk_instance ( void ) {
 
 VkAllocationCallbacks* xg_vk_cpu_allocator ( void ) {
     return NULL;
-    return &xg_vk_instance_state->cpu_allocator; // TODO make it thread safe
+    // TODO seems to break renderdoc - find out why
+    //return &xg_vk_instance_state->cpu_allocator; // TODO make it thread safe
 }

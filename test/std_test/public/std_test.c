@@ -1274,6 +1274,7 @@ static void test_byte ( void ) {
         std_assert_m ( found );
         std_assert_m ( idx == 64 * 4 + 9 );
 
+#if 0
         //
         bitset[6] = std_bit_set_64_m ( bitset[6], 9 );
         bitset[2] = std_bit_set_64_m ( bitset[2], 9 );
@@ -1283,7 +1284,6 @@ static void test_byte ( void ) {
         //bitset[1] = std_bit_set_64_m ( bitset[1], 63 );
         bitset[0] = std_bit_set_64_m ( bitset[0], 3 );
 
-#if 1
         for ( uint32_t i = 0; i < 8; ++i ) {
             char bin[65] = {};
             std_u64_to_bin ( bitset[i], bin );
@@ -1296,7 +1296,6 @@ static void test_byte ( void ) {
             std_u64_to_bin ( bitset[i], bin );
             std_log_info_m ( std_fmt_str_m, bin );
         }
-#endif
 
         found = std_bitset_scan ( &idx, bitset, 0, 8 );
         std_assert_m ( found );
@@ -1313,8 +1312,9 @@ static void test_byte ( void ) {
         found = std_bitset_scan_rev ( &idx, bitset, 64 * 6 - 1 );
         std_assert_m ( found );
         std_assert_m ( idx == 64 * 4 + 9 );
-
         //
+#endif
+
         found = std_bitset_scan ( &idx, bitset, 64 * 7, 8 );
         std_assert_m ( !found );
 

@@ -2880,44 +2880,6 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
     }
 }
 
-// TODO this causes double frees on shared resources
-#if 0
-static void duplicate_selection ( void ) {
-    se_i* se = m_state->modules.se;
-
-    if ( m_state->ui.mouse_pick_entity == se_null_handle_m ) {
-        return;
-    }
-
-    viewapp_mesh_component_t* mesh = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_mesh_component_id_m, 0 );
-    viewapp_transform_component_t* transform = se->get_entity_component ( m_state->ui.mouse_pick_entity, viewapp_transform_component_id_m, 0 );
-
-    viewapp_mesh_component_t new_mesh = *mesh;
-    new_mesh.object_id = m_state->render.next_object_id++;
-    viewapp_transform_component_t new_transform = *transform;
-    new_transform.position[0] = 0;
-    new_transform.position[1] = 0;
-    new_transform.position[2] = 0;
-
-    se->create_entity( &se_entity_params_m (
-        .debug_name = "duplicate mesh", // TODO
-        .update = se_entity_update_m (
-            .component_count = 2,
-            .components = { 
-                se_component_update_m (
-                    .id = viewapp_mesh_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &new_mesh ) }
-                ),
-                se_component_update_m (
-                    .id = viewapp_transform_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &new_transform ) }
-                )
-            }
-        )
-    ) );
-}
-#endif
-
 static se_entity_h spawn_plane ( xg_workload_h workload ) {
     xs_i* xs = m_state->modules.xs;
     se_i* se = m_state->modules.se;
@@ -3898,7 +3860,7 @@ static void viewapp_update_lights ( void ) {
 
         se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
         viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
-        if ( mesh_component && false ) {
+        if ( mesh_component ) {
             // assume sphere
             float area = 3.1415f * 4 * transform_component->scale * transform_component->scale;
             float radiant_exitance = light_component->intensity / area;
