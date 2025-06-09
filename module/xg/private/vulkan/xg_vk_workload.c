@@ -434,12 +434,23 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
 
-    VkWriteDescriptorSet writes_array[xg_vk_workload_resource_bindings_update_batch_size_m * xg_pipeline_resource_max_bindings_m];
+#define xg_vk_workload_max_descriptor_writes_per_batch_m ( xg_vk_workload_resource_bindings_update_batch_size_m * xg_pipeline_resource_max_bindings_m )
+
+    VkWriteDescriptorSet writes_array[xg_vk_workload_max_descriptor_writes_per_batch_m];
     uint32_t writes_count = 0;
-    VkDescriptorBufferInfo buffer_info_array[xg_vk_workload_resource_bindings_update_batch_size_m * xg_pipeline_resource_max_bindings_m];
+    VkDescriptorBufferInfo buffer_info_array[xg_vk_workload_max_descriptor_writes_per_batch_m];
     uint32_t buffer_info_count = 0;
-    VkDescriptorImageInfo image_info_array[xg_vk_workload_resource_bindings_update_batch_size_m * xg_pipeline_resource_max_bindings_m];
+    VkDescriptorImageInfo image_info_array[xg_vk_workload_max_descriptor_writes_per_batch_m];
     uint32_t image_info_count = 0;
+
+#if xg_vk_enable_nv_raytracing_ext_m
+    VkWriteDescriptorSetAccelerationStructureNV as_info_array[xg_vk_workload_max_descriptor_writes_per_batch_m];
+#else
+    VkWriteDescriptorSetAccelerationStructureKHR as_info_array[xg_vk_workload_max_descriptor_writes_per_batch_m];
+#endif
+    uint32_t as_info_count = 0;
+
+#undef xg_vk_workload_max_descriptor_writes_per_batch_m
 
     for ( size_t i = 0; i < workload->resource_cmd_buffers_count; ++i ) {
         xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
@@ -586,7 +597,8 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         std_assert_m ( world->vk_handle != VK_NULL_HANDLE );
 
 #if xg_vk_enable_nv_raytracing_ext_m
-                        VkWriteDescriptorSetAccelerationStructureNV as_info = {
+                        VkWriteDescriptorSetAccelerationStructureNV* as_info = &as_info_array[as_info_count++];
+                        *as_info = ( VkWriteDescriptorSetAccelerationStructureNV ) {
                             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV,
                             .pNext = NULL,
                             .accelerationStructureCount = 1,
@@ -595,14 +607,15 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
 
                         VkWriteDescriptorSet* write = &writes_array[writes_count++];
                         write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        write->pNext = &as_info;
+                        write->pNext = as_info;
                         write->dstSet = vk_set;
                         write->dstBinding = binding_idx;
                         write->dstArrayElement = 0;
                         write->descriptorCount = 1;
                         write->descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
 #else
-                        VkWriteDescriptorSetAccelerationStructureKHR as_info = {
+                        VkWriteDescriptorSetAccelerationStructureKHR* as_info = &as_info_array[as_info_count++];
+                        *as_info = ( VkWriteDescriptorSetAccelerationStructureKHR ) {
                             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
                             .pNext = NULL,
                             .accelerationStructureCount = 1,
@@ -611,7 +624,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
 
                         VkWriteDescriptorSet* write = &writes_array[writes_count++];
                         write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        write->pNext = &as_info;
+                        write->pNext = as_info;
                         write->dstSet = vk_set;
                         write->dstBinding = binding_idx;
                         write->descriptorCount = 1;

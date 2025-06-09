@@ -23,11 +23,11 @@ Custom Framework + Renderer. WIP
 
 | name | description |
 | - | - |
-| cli | main dev tool |
-| makegen | generates makefiles |
+| cli.py | main dev tool |
+| makegen.py | script to auto gen makefiles |
 
 ### apps
 
 | name | description |
 | - | - |
-| viewer_app | renderer |
+| viewer_app | scene renderer |

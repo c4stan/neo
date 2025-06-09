@@ -2525,6 +2525,9 @@ static void viewapp_load_scene ( uint32_t id ) {
 
     m_state->scene.active_scene = id;
     viewapp_build_raytrace_geo ( workload );
+    xg->submit_workload ( workload );
+    xg->wait_all_workload_complete();
+    workload = xg->create_workload ( m_state->render.device );
     viewapp_build_raytrace_world ( workload );
     xg->submit_workload ( workload );
 }
@@ -3938,9 +3941,13 @@ static void viewapp_update_lights ( void ) {
         se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
         viewapp_mesh_component_t* mesh_component = se->get_entity_component ( *entity, viewapp_mesh_component_id_m, 0 );
         if ( mesh_component ) {
+#if 0
             // assume sphere
             float area = 3.1415f * 4 * transform_component->scale * transform_component->scale;
             float radiant_exitance = light_component->intensity / area;
+#else
+            float radiant_exitance = 1;
+#endif
             mesh_component->material.emissive[0] = light_component->color[0] * radiant_exitance;
             mesh_component->material.emissive[1] = light_component->color[1] * radiant_exitance;
             mesh_component->material.emissive[2] = light_component->color[2] * radiant_exitance;

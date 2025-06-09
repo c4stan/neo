@@ -88,12 +88,6 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
         float cos_n = clamp ( dot ( proj_normal, view ) / proj_length, 0.0, 1.0 );
         float n = sign_n * acos ( cos_n );
 
-        vec3 last_valid_light = 0.0.xxx;
-        uint last_indirect = 0;
-        vec3 last_normal = 0.0.xxx;
-        vec3 last_sample_horizon = 0.0.xxx;
-        vec3 last_sample_normal = 0.0.xxx;
-
         for ( float current_sample = 0.0; current_sample < sample_count; current_sample += 1.0 ) {
             float sample_step = ( current_sample + jitter ) / sample_count + sample_offset;
             vec2 sample_uv = screen_uv - sample_step * sample_scale * omega * aspect;
