@@ -100,7 +100,7 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
             float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
             vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
             vec3 sample_normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv ).xyz * 2 - 1 );
-            vec3 sample_light = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv, 0 ).xyz;
+            vec3 sample_light = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv, 7 ).xyz;
             vec3 sample_distance = sample_position - position;
             float sample_length = length ( sample_distance );
             vec3 sample_horizon = sample_distance / sample_length;

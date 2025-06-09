@@ -914,12 +914,12 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_buffer_dependency_m ( .buffer = light_list_buffer ), 
                 xf_compute_buffer_dependency_m ( .buffer = light_grid_buffer ) 
             },
-            .sampled_textures_count = 6,
+            .sampled_textures_count = 5,
             .sampled_textures = {
                 xf_compute_texture_dependency_m ( .texture = color_texture ),
                 xf_compute_texture_dependency_m ( .texture = normal_texture ),
                 xf_compute_texture_dependency_m ( .texture = material_texture ),
-                xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
+                //xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
             },
@@ -1254,11 +1254,12 @@ static void viewapp_boot_raster_graph ( void ) {
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
             .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = combine_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
-            .sampled_textures_count = 3,
+            .sampled_textures_count = 4,
             .sampled_textures = { 
                 xf_compute_texture_dependency_m ( .texture = lighting_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssr_accumulation_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssgi_accumulation_texture ), 
+                xf_compute_texture_dependency_m ( .texture = radiosity_texture ), // temp hack to avoid having emissive objects blow up ssgi
                 //xf_compute_texture_dependency_m ( .texture = ssgi_2_accumulation_texture ) 
             },
         ),
@@ -2150,29 +2151,85 @@ static viewapp_texture_t viewapp_import_texture ( const struct aiScene* scene, c
     return texture;
 }
 
-static xg_texture_h viewapp_upload_texture_to_gpu ( xg_resource_cmd_buffer_h cmd_buffer, const viewapp_texture_t* texture, const char* name ) {
-     xg_i* xg = m_state->modules.xg;
+static xg_texture_h viewapp_upload_texture_to_gpu ( xg_cmd_buffer_h cmd_buffer, uint64_t key, xg_resource_cmd_buffer_h resource_cmd_buffer, const viewapp_texture_t* texture, const char* name ) {
+    uint32_t mip_levels = texture->width > ( 1 << 7 ) ? 7 : 1;
+    xg_i* xg = m_state->modules.xg;
     xg_texture_params_t params = xg_texture_params_m ( 
         .memory_type = xg_memory_type_gpu_only_m,
         .device = m_state->render.device,
         .width = texture->width,
         .height = texture->height,
         .format = texture->format,
-        .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_copy_dest_m,
+        .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_copy_source_m,
+        .mip_levels = mip_levels,
     );
     std_str_copy_static_m ( params.debug_name, name );
     //std_path_name ( params.debug_name, sizeof ( params.debug_name ), path );
 
-    xg_texture_h texture_handle = xg->cmd_create_texture ( cmd_buffer, &params, &xg_texture_init_m (
+    xg_texture_h texture_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params, &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
         .upload_data = texture->data,
-        .final_layout = xg_texture_layout_shader_read_m
+        .final_layout = mip_levels > 1 ? xg_texture_layout_copy_dest_m : xg_texture_layout_shader_read_m,
     ) );
+
+    if ( mip_levels > 1 ) {
+        for ( uint32_t i = 1; i < mip_levels; ++i ) {
+            xg->cmd_barrier_set ( cmd_buffer, key, &xg_barrier_set_m (
+                .texture_memory_barriers_count = 1,
+                .texture_memory_barriers = &xg_texture_memory_barrier_m (
+                    .texture = texture_handle,
+                    .mip_base = i - 1,
+                    .mip_count = 1,
+                    .layout.old = xg_texture_layout_copy_dest_m,
+                    .layout.new = xg_texture_layout_copy_source_m,
+                    .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                    .memory.invalidations = xg_memory_access_bit_transfer_read_m,
+                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                    .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+                ),
+            ) );
+
+            xg->cmd_copy_texture ( cmd_buffer, key, &xg_texture_copy_params_m (
+                .source = xg_texture_copy_resource_m ( .texture = texture_handle, .mip_base = i - 1 ),
+                .destination = xg_texture_copy_resource_m ( .texture = texture_handle, .mip_base = i ),
+                .mip_count = 1,
+                .filter = xg_sampler_filter_linear_m,
+            ) );
+        }
+
+        xg->cmd_barrier_set ( cmd_buffer, key, &xg_barrier_set_m (
+            .texture_memory_barriers_count = 2,
+            .texture_memory_barriers = ( xg_texture_memory_barrier_t[2] ) { 
+                xg_texture_memory_barrier_m (
+                    .texture = texture_handle,
+                    .mip_base = 0,
+                    .mip_count = mip_levels - 1,
+                    .layout.old = xg_texture_layout_copy_source_m,
+                    .layout.new = xg_texture_layout_shader_read_m,
+                    .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                    .memory.invalidations = xg_memory_access_bit_shader_read_m,
+                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                    .execution.blocked = xg_pipeline_stage_bit_fragment_shader_m,
+                ),
+                xg_texture_memory_barrier_m (
+                    .texture = texture_handle,
+                    .mip_base = mip_levels - 1,
+                    .mip_count = 1,
+                    .layout.old = xg_texture_layout_copy_dest_m,
+                    .layout.new = xg_texture_layout_shader_read_m,
+                    .memory.flushes = xg_memory_access_bit_transfer_write_m,
+                    .memory.invalidations = xg_memory_access_bit_shader_read_m,
+                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                    .execution.blocked = xg_pipeline_stage_bit_fragment_shader_m,
+                ),
+            }
+        ) );
+    }
 
     return texture_handle;
 }
 
-static void viewapp_import_scene ( xg_workload_h workload, const char* input_path ) {
+static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const char* input_path ) {
     se_i* se = m_state->modules.se;
     xg_i* xg = m_state->modules.xg;
     xs_i* xs = m_state->modules.xs;
@@ -2192,6 +2249,7 @@ static void viewapp_import_scene ( xg_workload_h workload, const char* input_pat
 
     std_tick_t start_tick = std_tick_now();
 
+    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     std_log_info_m ( "Importing input scene " std_fmt_str_m, input_path );
@@ -2326,12 +2384,12 @@ static void viewapp_import_scene ( xg_workload_h workload, const char* input_pat
                 }
 
                 if ( color_texture.data ) {
-                    mesh_material.color_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &color_texture, color_texture_name.data );
+                    mesh_material.color_texture = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &color_texture, color_texture_name.data );
                     std_virtual_heap_free ( color_texture.data );
                 }
 
                 if ( normal_texture.data ) {
-                    mesh_material.normal_texture = viewapp_upload_texture_to_gpu ( resource_cmd_buffer, &normal_texture, normal_texture_name.data );
+                    mesh_material.normal_texture = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &normal_texture, normal_texture_name.data );
                     std_virtual_heap_free ( normal_texture.data );
                 }
 
@@ -2462,7 +2520,7 @@ static void viewapp_load_scene ( uint32_t id ) {
     } else if ( id == 1 ) {
         viewapp_boot_scene_field ( workload );
     } else {
-        viewapp_import_scene ( workload, m_state->scene.custom_scene_path );
+        viewapp_import_scene ( workload, 0, m_state->scene.custom_scene_path );
     }
 
     m_state->scene.active_scene = id;
@@ -2498,7 +2556,7 @@ static void viewapp_boot_ui ( xg_device_h device ) {
     std_virtual_heap_free ( font_data_alloc );
 
     m_state->ui.window_state = xi_window_state_m (
-        .title = "debug",
+        .title = "control",
         .minimized = false,
         .x = 50,
         .y = 100,
@@ -2516,7 +2574,7 @@ static void viewapp_boot_ui ( xg_device_h device ) {
     m_state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
     m_state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
     m_state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
-    m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
+    m_state->ui.entities_section_state = xi_section_state_m ( .title = "entities", .style = xi_default_style_m() );
     m_state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
 
     m_state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
@@ -3183,6 +3241,14 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
     // frame
     xi->begin_section ( xi_workload, &m_state->ui.frame_section_state );
     {
+        xi_label_state_t device_name_label = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
+        xg_device_info_t device_info;
+        xg->get_device_info ( &device_info, m_state->render.device );
+        std_str_copy_static_m ( device_name_label.text, device_info.name );
+        xi->add_label ( xi_workload, &xi_label_state_m ( .text = "device" ) );
+        xi->add_label ( xi_workload, &device_name_label );
+        xi->newline();
+
         xi_label_state_t frame_id_label = xi_label_state_m ( .text = "frame id" );
         xi_label_state_t frame_id_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
         std_u32_to_str ( frame_id_value.text, xi_label_text_size, m_state->render.frame_id, 0 );
@@ -3357,6 +3423,11 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                 continue;
             }
 
+            // skip mip generation passes...
+            if ( std_str_find ( node_info.debug_name, "_mip_" ) != std_str_find_null_m ) {
+                continue;
+            }
+
             ++node_id;
 
             xi_label_state_t node_label = xi_label_state_m (
@@ -3409,7 +3480,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             }
 
             uint64_t timestamp_diff = timings[i * 2 + 1] - timings[i * 2];
-            timestamp_sum += timestamp_diff;
+            //timestamp_sum += timestamp_diff;
             float ms = xg->timestamp_to_ns ( m_state->render.device ) * timestamp_diff / 1000000.f;
             char buffer[32];
             std_f32_to_str ( ms, buffer, 32 );
@@ -3528,6 +3599,11 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             }
         }
 
+        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
+            uint64_t timestamp_diff = timings[i * 2 + 1] - timings[i * 2];
+            timestamp_sum += timestamp_diff;
+        }
+
         xi->newline();
 
         {
@@ -3620,7 +3696,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
             // entity label
             xi_label_state_t name_label = xi_label_state_m(
                 .style = xi_style_m (
-                    .font_color = font_color
+                    .font_color = font_color,
                 )
             );
             std_str_copy_static_m ( name_label.text, props.name );
@@ -3685,7 +3761,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                     se_component_properties_t* component = &props.components[j];
 
                     // component label
-                    xi_label_state_t label;
+                    xi_label_state_t label = xi_label_state_m();
                     std_stack_string_append ( &stack, "  " );
                     std_stack_string_append ( &stack, component->name );
                     std_str_copy_static_m ( label.text, buffer );
@@ -3697,6 +3773,7 @@ static void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t*
                         se_property_t* property = &component->properties[k];
 
                         // property label
+                        xi_label_state_t label = xi_label_state_m();
                         std_stack_string_append ( &stack, "  " );
                         std_stack_string_append ( &stack, "  " );
                         std_stack_string_append ( &stack, property->name );

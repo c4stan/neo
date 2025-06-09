@@ -14,7 +14,6 @@ Windows dependencies:
 
 	Clang for Windows:
 		https://releases.llvm.org/download.html
-			latest available for Windows seems to be 11.0.0
 		opt in for adding clang to PATH during install process
 
 	Visual Studio (for debugging)

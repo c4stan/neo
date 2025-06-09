@@ -2221,7 +2221,7 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
                             break;
                         }
 
-                        if ( args->init_layout != xg_texture_layout_undefined_m ) {
+                        if ( args->init_layout != xg_texture_layout_undefined_m && args->init_layout != xg_texture_layout_copy_dest_m ) {
                             xg_cmd_buffer_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
                                 .texture_memory_barriers_count = 1,
                                 .texture_memory_barriers = &xg_texture_memory_barrier_m (

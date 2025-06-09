@@ -87,6 +87,7 @@ static void hz_gen_mip0_copy_pass ( const xf_node_execute_args_t* node_args, voi
 }
 #endif
 
+// TODO single pass compute downsample? try some stuff out
 xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture_h depth ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
@@ -108,7 +109,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
     };
 ;
     xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &xf_node_params_m (
-        .debug_name = "hiz_gen_mip0",
+        .debug_name = "hiz_gen_mip_0",
         .type = xf_node_type_custom_pass_m,
         .pass.custom = xf_node_custom_pass_params_m (
             .routine = hz_gen_mip0_copy_pass,
@@ -170,7 +171,7 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
             },
         )
     );
-    std_str_format_m ( params.debug_name, "hiz_gen_mip" std_fmt_u32_m, mip_level );
+    std_str_format_m ( params.debug_name, "hiz_gen_mip_" std_fmt_u32_m, mip_level );
 
     xf_node_h hiz_submip_gen_node = xf->create_node ( graph, &params );
 
