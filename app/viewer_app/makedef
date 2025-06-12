@@ -4,7 +4,6 @@ defs = public.def
 configs = debug, release
 output = app
 deps = std, rv, xs, xf, se, sm, xi
-ignores = particle_pass.c
 if win32
     dlls = $assimp_dll
     libs = $assimp_lib

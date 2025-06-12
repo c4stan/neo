@@ -77,10 +77,6 @@ typedef struct {
     uint32_t focused_sub_id;
     uint32_t active_sub_id;
 
-    // keyboard is currently interacting with this element
-    // TODO remove
-    uint64_t keyboard_id;
-
     // used only by the get_active_id API
     uint64_t active_layer;
     uint64_t hovered_layer;

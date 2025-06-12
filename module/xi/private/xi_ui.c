@@ -13,8 +13,6 @@
 #include <std_log.h>
 #include <std_platform.h>
 
-std_warnings_ignore_m ( "-Wunused-function" )
-
 static xi_ui_state_t* xi_ui_state;
 
 void xi_ui_load ( xi_ui_state_t* state ) {
@@ -115,10 +113,6 @@ static xi_ui_layer_t* xi_ui_layer_add ( int64_t x, int64_t y, uint32_t width, ui
     }
 
     return layer;
-}
-
-static void xi_ui_layer_pop ( void ) {
-    xi_ui_state->layer_count--;
 }
 
 static void xi_ui_layer_pop_all ( void ) {
@@ -289,15 +283,6 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
     return result;
 }
 
-static bool xi_ui_acquire_keyboard ( uint64_t id ) {
-    if ( xi_ui_state->keyboard_id != id ) {
-        xi_ui_state->keyboard_id = id;
-        return true;
-    }
-
-    return false;
-}
-
 static uint32_t xi_ui_focus_stack_push ( uint64_t id, uint32_t sub_id ) {
     uint32_t idx = xi_ui_state->focus_stack_count++;
     xi_ui_state->focus_stack_ids[idx] = id;
@@ -319,20 +304,10 @@ static uint32_t xi_ui_focus_stack_push ( uint64_t id, uint32_t sub_id ) {
     return idx;
 }
 
-static bool xi_ui_release_keyboard ( uint64_t id ) {
-    if ( xi_ui_state->keyboard_id == id ) {
-        xi_ui_state->keyboard_id = 0;
-        return true;
-    }
-
-    return false;
-}
-
 static bool xi_ui_acquire_active ( uint64_t id, uint32_t sub_id ) {
     if ( xi_ui_state->active_id == 0 && !xi_ui_state->cleared_active ) {
         xi_ui_state->active_id = id;
         xi_ui_state->active_sub_id = sub_id;
-        xi_ui_state->keyboard_id = 0;
         return true;
     }
 
@@ -372,7 +347,6 @@ static bool xi_ui_release_active ( uint64_t id ) {
         xi_ui_state->active_id = 0;
         xi_ui_state->active_sub_id = 0;
         xi_ui_state->cleared_active = true;
-        xi_ui_state->keyboard_id = 0;
 
         return true;
     }
@@ -628,8 +602,8 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     uint32_t header_height = std_max_u32 ( state->header_height, font_info.pixel_height ) + title_pad_y * 2;
 
     uint32_t x = 0, y = 0;
-    uint32_t triangle_width = header_height  * 0.8;
-    uint32_t triangle_height = header_height * 0.8;
+    uint32_t triangle_width = header_height  * 0.7;
+    uint32_t triangle_height = header_height * 0.7;
 
     uint32_t window_height = state->minimized ? header_height : state->height;
     uint32_t window_width = state->width;
@@ -935,15 +909,13 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
     uint32_t title_pad_x = 10;
     uint32_t title_pad_y = 0;
 
-    //state->height = 20;
-
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
     uint32_t x = layer->line_offset;
     uint32_t y = layer->line_y;
 
     uint32_t header_height = std_max_u32 ( state->height, font_info.pixel_height ) + title_pad_y * 2;
-    uint32_t triangle_width = header_height  * 0.8;
-    uint32_t triangle_height = header_height * 0.8;
+    uint32_t triangle_width = header_height  * 0.7;
+    uint32_t triangle_height = header_height * 0.7;
     uint32_t title_width = xi_ui_string_width ( state->title, style.font ) + triangle_width;
 
     if ( !xi_ui_layer_add_section ( title_width, header_height ) ) {
@@ -1145,7 +1117,7 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
     }
 
     // draw
-    float color_scale = xi_ui_state->keyboard_id == state->id ? 0.35f : 0.5f;
+    float color_scale = has_focus ? 0.35f : 0.5f;
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, color_scale ), x, y, width, height, state->sort_order );
     uint32_t string_offset = 0;
     if ( state->text_alignment == xi_horizontal_alignment_centered_m ) {
