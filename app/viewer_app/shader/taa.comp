@@ -138,7 +138,7 @@ void main ( void ) {
 #endif
 
     // Reject history if not valid
-    if ( any ( lessThan ( reprojected_uv, vec2 ( 0 ) ) ) || any ( greaterThan ( reprojected_uv, vec2 ( 1 ) ) ) ) {
+    if ( is_outside_screen ( reprojected_uv ) ) {
         blend_factor = vec3 ( 1.0 );
     }
 

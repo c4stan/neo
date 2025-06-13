@@ -40,7 +40,62 @@ uint getRandomSeed(vec2 uv, vec2 resolution, float time) {
     return seed;
 }
 
-#if 1
+// GTAO
+// https://www.activision.com/cdn/research/Practical_Real_Time_Strategies_for_Accurate_Indirect_Occlusion_NEW%20VERSION_COLOR.pdf
+float gtao ( vec2 screen_uv ) {
+    float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
+    if ( depth == 1 ) {
+        return 0;
+    }
+    vec3 position = view_from_depth ( screen_uv, depth );
+    vec3 normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1 );
+    vec3 view = normalize ( -position );
+
+    float visibility = 0;
+
+    float sample_scale = ( 0.5 * frame_uniforms.proj_from_view[0][0] ) / position.z;
+
+    int gtao_slice_count = 1;
+    for ( int slice_it = 0; slice_it < gtao_slice_count; ++slice_it ) {
+        float phi = ( PI / gtao_slice_count ) * slice_it;
+        vec2 omega = vec2 ( cos ( phi ), sin ( phi ) );
+        vec3 direction = vec3 ( omega.x, omega.y, 0 );
+        vec3 ortho_direction = direction - dot ( direction, view ) * view;
+        vec3 axis = cross ( direction, view );
+        vec3 proj_normal = normal - dot ( normal, axis ) * axis;
+        float proj_length = length ( proj_normal );
+        float sign_n = sign ( dot ( ortho_direction, proj_normal ) );
+        float cos_n = clamp ( dot ( proj_normal, view ) / proj_length, 0.0, 1.0 );
+        float n = sign_n * acos ( cos_n );
+
+        for ( int side_it = 0; side_it < 2; ++side_it ) {
+            float horizon_cos = -1;
+
+            int gtao_sample_count = 1;
+            float gtao_scaling = 0.1;
+            for ( int sample_it = 0; sample_it < gtao_sample_count; ++sample_it ) {
+                float s = float ( sample_it ) / gtao_sample_count;
+                float x = -1 + 2 * side_it;
+                vec2 sample_uv = screen_uv + x * s * sample_scale * vec2 ( omega.x, -omega.y );
+                float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
+                if ( sample_depth == 1 ) {
+                    continue;
+                }
+                vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
+                vec3 sample_horizon = normalize ( sample_position - position );
+                horizon_cos = max ( horizon_cos, dot ( sample_horizon, view ) );
+            }
+
+            float h = n + clamp ( ( -1 + 2 * side_it ) * acos ( horizon_cos ) - n, -PI/2, PI/2 );
+            visibility = visibility + length ( proj_normal ) * ( cos_n + 2 * h * sin ( n ) - cos ( 2 * h - n) ) / 4;
+        }
+    }
+
+    visibility /= gtao_slice_count;
+
+    return visibility;
+}
+
 // SSILVB
 // https://arxiv.org/pdf/2301.11376
 // https://cybereality.com/screen-space-indirect-lighting-with-visibility-bitmask-improvement-to-gtao-ssao-real-time-ambient-occlusion-algorithm-glsl-shader-implementation/
@@ -91,6 +146,11 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
         for ( float current_sample = 0.0; current_sample < sample_count; current_sample += 1.0 ) {
             float sample_step = ( current_sample + jitter ) / sample_count + sample_offset;
             vec2 sample_uv = screen_uv - sample_step * sample_scale * omega * aspect;
+            
+            if ( is_outside_screen ( sample_uv ) ) {
+                continue;
+            }
+
             float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
             vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
             vec3 sample_normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv ).xyz * 2 - 1 );
@@ -118,7 +178,6 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
 
     return vec4 ( lighting, visibility );
 }
-#endif
 
 void main ( void ) {
 #if 0
@@ -203,6 +262,6 @@ void main ( void ) {
     vec4 indirect_occlusion = ssilvb ( rng_state, screen_uv );
     vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( indirect_occlusion.xyz * base_color, 1 ) );
-    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( vec3 ( indirect_occlusion.w ), 1 ) );
+
 #endif
 }

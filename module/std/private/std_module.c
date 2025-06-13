@@ -350,6 +350,11 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
 
         argv[argc++] = stack.top;
         std_stack_string_copy ( &stack, "-r" ); // reload flag
+
+#if !std_build_debug_m
+        argv[argc++] = stack.top;
+        std_stack_string_copy ( &stack, "-o" );
+#endif
     }
 
     // The builder will send back the build results to this process through this pipe
@@ -369,7 +374,7 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
 #elif defined ( std_platform_linux_m )
     char* python_path = "python3";
 #endif
-    std_process_h compiler = std_process ( python_path, "python", argv, 4, std_process_type_default_m, std_process_io_default_m );
+    std_process_h compiler = std_process ( python_path, "python", argv, argc, std_process_type_default_m, std_process_io_default_m );
     std_process_pipe_wait_for_connection ( pipe );
 
     size_t read_size = 0;

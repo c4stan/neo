@@ -365,12 +365,12 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                 continue;
             }
 
+            ++node_id;
+
             // skip mip generation passes...
             if ( std_str_find ( node_info.debug_name, "_mip_" ) != std_str_find_null_m ) {
                 continue;
             }
-
-            ++node_id;
 
             xi_label_state_t node_label = xi_label_state_m (
                 .id = xi_mix_id_m ( i ),

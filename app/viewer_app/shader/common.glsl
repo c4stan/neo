@@ -108,7 +108,7 @@ float proj_depth_diff ( float a, float b ) {
 }
 
 // ======================================================================================= //
-//                             T R A N S F O R M   S P A C E S
+//                            C O O R D I N A T E   S P A C E S
 // ======================================================================================= //
 
 /*
@@ -184,6 +184,10 @@ vec2 dejitter_uv ( vec2 screen_uv ) {
 //    screen_uv = dejitter_uv ( screen_uv );
 //    return screen_uv;
 //}
+
+bool is_outside_screen ( vec2 uv ) {
+    return any ( lessThan ( uv, vec2 ( 0 ) ) ) || any ( greaterThan ( uv, vec2 ( 1 ) ) );
+}
 
 // ======================================================================================= //
 //                                 C O L O R   S P A C E S
