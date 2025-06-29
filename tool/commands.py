@@ -83,7 +83,7 @@ def print_help():
     print('\t\t' + Color.OKBLUE + '-asm' + Color.ENDC + ' to output asm')
     print('\t\t' + Color.OKBLUE + '-pp' + Color.ENDC + ' to output the preprocessor result')
     print('\t\t' + Color.OKBLUE + '-o' + Color.ENDC + ' to enable optimization flags')
-    print('\t\t' + Color.OKBLUE + '-d' + Color.ENDC + ' to enable permissive warnings')
+    print('\t\t' + Color.OKBLUE + '-w' + Color.ENDC + ' to enable permissive warnings')
     print('\t' + Color.OKGREEN + 'makegen' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run makegen on a workspace')
     print('\t' + Color.OKGREEN + 'clear' + Color.ENDC + ' to clear the console')
     print('\t' + Color.OKGREEN + 'clean' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to clean a workspace')

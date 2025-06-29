@@ -109,7 +109,7 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
             state->ui.mouse_pick_entity = *entity;
             se_entity_properties_t props;
             se->get_entity_properties ( &props, *entity );
-            std_log_info_m ( "Mouse pick entity handle " std_fmt_u64_m " " std_fmt_str_m, state->ui.mouse_pick_entity, props.name );
+            std_log_info_m ( "Mouse pick entity id " std_fmt_u8_m " handle " std_fmt_u64_m " " std_fmt_str_m, id, state->ui.mouse_pick_entity, props.name );
             return;
         }
     }
@@ -416,7 +416,6 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
                 if ( node_switch.value != node_enabled ) {
                     xf->node_set_enabled ( state->render.active_graph, graph_info.nodes[i], node_switch.value );
-                    xf->invalidate_graph ( state->render.active_graph, workload );
                     state->render.graph_reload = true;
                 }
             }
@@ -531,7 +530,6 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                                 }
                             }
 
-                            xf->invalidate_graph ( state->render.active_graph, workload );
                             xf->set_graph_texture_export ( state->render.active_graph, state->ui.export_node, state->ui.export_source, state->render.export_dest, state->ui.export_channels );
                         }
 
@@ -584,7 +582,6 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             for ( uint32_t i = 0; i < info.node_count; ++i ) {
                 xf->disable_node ( state->render.active_graph, info.nodes[i] );
             }
-            xf->invalidate_graph ( state->render.active_graph, workload );
         }
         if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
             .text = "Enable all", 
@@ -597,7 +594,6 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             for ( uint32_t i = 0; i < info.node_count; ++i ) {
                 xf->enable_node ( state->render.active_graph, info.nodes[i] );
             }
-            xf->invalidate_graph ( state->render.active_graph, workload );
         }
     }
     xi->end_section ( xi_workload );

@@ -639,7 +639,7 @@ typedef struct {
     void ( *destroy_texture ) ( xf_texture_h texture );
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
-    xf_node_h ( *create_node ) ( xf_graph_h graph, const xf_node_params_t* params ); // TODO rename create_node
+    xf_node_h ( *create_node ) ( xf_graph_h graph, const xf_node_params_t* params );
     void ( *finalize_graph ) ( xf_graph_h graph );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
@@ -663,8 +663,6 @@ typedef struct {
     void ( *get_node_info ) ( xf_node_info_t* info, xf_graph_h graph, xf_node_h node );
 
     void ( *debug_print_graph ) ( xf_graph_h graph );
-
-    void ( *invalidate_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
     const uint64_t* ( *get_graph_timings ) ( xf_graph_h graph );
 

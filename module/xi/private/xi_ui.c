@@ -176,7 +176,7 @@ static bool xi_ui_layer_add_section ( uint32_t width, uint32_t height ) {
 }
 
 static void xi_ui_layer_align ( int32_t* x, int32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
-    xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+    const xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
     int32_t rx = 0, ry = 0;
 
@@ -211,6 +211,19 @@ static void xi_ui_layer_align ( int32_t* x, int32_t* y, uint32_t width, uint32_t
 
 bool xi_ui_layer_row_hover_test ( uint32_t height ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+
+    if ( xi_ui_state->minimized_window ) {
+        return false;
+    }
+
+    if ( xi_ui_state->culled_section ) {
+        return false;
+    }
+
+    if ( xi_ui_state->in_section && xi_ui_state->minimized_section ) {
+        return false;
+    }
+
     return xi_ui_layer_cursor_test ( 0, layer->line_y, layer->width, height );
 }
 
@@ -219,25 +232,27 @@ bool xi_ui_layer_row_hover_test ( uint32_t height ) {
 static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
-    bool result = true;
-
     if ( xi_ui_state->minimized_window ) {
-        result = false;
+        return false;
     }
 
     if ( xi_ui_state->culled_section ) {
-        result = false;
+        return false;
     }
 
     if ( xi_ui_state->in_section && xi_ui_state->minimized_section ) {
-        result = false;
-        return result;
+        return false;
     }
 
-    // apply padding to element size
-    // TODO keep or remove?
-    //width += layer->line_padding_x * 2;
-    //height += layer->line_padding_y * 2;
+    // check for enough horizontal space
+    if ( /*width +*/ layer->line_offset + layer->line_offset_rev > layer->width ) {
+        return false;
+    }
+
+    // check for enough vertical space
+    if ( /*height +*/ layer->line_y > layer->height ) {
+        return false;
+    }
 
     if ( style->horizontal_border_margin != xi_style_border_margin_invalid_m ) {
         if ( style->horizontal_alignment == xi_horizontal_alignment_left_to_right_m ) {
@@ -245,16 +260,6 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
         } else if ( style->horizontal_alignment == xi_horizontal_alignment_right_to_left_m ) {
             layer->line_offset_rev = std_max_u32 ( layer->line_offset_rev, style->horizontal_border_margin );
         }
-    }
-
-    // check for enough horizontal space
-    if ( /*width +*/ layer->line_offset + layer->line_offset_rev > layer->width ) {
-        result = false;
-    }
-
-    // check for enough vertical space
-    if ( /*height +*/ layer->line_y > layer->height ) {
-        result = false;
     }
 
     xi_ui_layer_align ( x, y, width, height, style );
@@ -277,10 +282,10 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
     }
 
     if ( layer->line_y + height < 0 ) {
-        result = false;
+        return false;
     }
 
-    return result;
+    return true;
 }
 
 static uint32_t xi_ui_focus_stack_push ( uint64_t id, uint32_t sub_id ) {
@@ -976,9 +981,6 @@ void xi_ui_section_begin ( xi_workload_h workload, xi_section_state_t* state ) {
         //  title text
         xi_ui_draw_string ( workload, style.font, style.font_color, state->title, layer->x + x + title_pad_x * 2 + triangle_width, layer->y + y + title_pad_y / 2 + ( header_height - font_info.pixel_height ) / 2, state->sort_order );
     }
-
-    // new layer
-    //xi_ui_layer_add ( x + title_pad_x, layer->line_y, layer->width, layer->height, layer->line_padding_x, layer->line_padding_y, &style );
 }
 
 void xi_ui_section_end ( xi_workload_h workload ) {
@@ -989,12 +991,6 @@ void xi_ui_section_end ( xi_workload_h workload ) {
     if ( !xi_ui_state->in_section ) {
         return;
     }
-
-    //xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
-    //uint32_t title_pad_x = 10;
-    //layer->x -= title_pad_x;
-    //layer->width += title_pad_x;
-    //layer->line_height = 4;
 
     if ( !xi_ui_state->minimized_section ) {
         xi_ui_newline();

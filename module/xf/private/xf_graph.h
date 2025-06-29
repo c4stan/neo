@@ -329,8 +329,9 @@ typedef struct {
     uint32_t nodes_declaration_order[xf_graph_max_nodes_m]; // indexes nodes
     uint32_t nodes_count;
     bool is_finalized;
+    bool is_compiled;
     bool is_built;
-    bool is_invalidated;
+    bool needs_clear;
 
     xf_graph_texture_t textures_array[xf_graph_max_textures_m];
     xf_graph_buffer_t buffers_array[xf_graph_max_buffers_m];

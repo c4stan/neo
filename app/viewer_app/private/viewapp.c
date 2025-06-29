@@ -522,10 +522,6 @@ static std_app_state_e viewapp_update ( void ) {
             }
         }
 
-        if ( any_passthrough ) {
-            xf->invalidate_graph ( state->render.active_graph, workload );
-        }
-
         state->reload = false;
         state->render.graph_reload = true;
     }
