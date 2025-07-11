@@ -103,6 +103,9 @@ net_socket_h net_socket_create ( const net_socket_params_t* params ) {
     SOCKET win32_socket = socket ( af, type, protocol );
     std_assert_m ( win32_socket != INVALID_SOCKET );
 
+    char reuse = 1;
+    setsockopt ( win32_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof ( reuse ) );
+
     std_mutex_lock ( &net_socket_state.sockets_mutex );
     net_socket_t* sock = std_list_pop_m ( &net_socket_state.sockets_freelist );
     std_mutex_unlock ( &net_socket_state.sockets_mutex );
@@ -203,6 +206,7 @@ bool net_socket_connect ( net_socket_h socket_handle, const net_socket_address_t
     }
 
     if ( error ) {
+        std_log_os_error_m();
         return false;
     }
 

@@ -503,10 +503,6 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     stage_tag = "rhc";
                 }
 
-                //std_str_append ( binary_path, &array, "-" );
-                //std_str_append ( binary_path, &array, stage_tag );
-                //std_str_append ( binary_path, &array, ".spv" );
-
                 std_stack_string_append ( &stack, "-" );
                 std_stack_string_append ( &stack, stage_tag );
                 std_stack_string_append ( &stack, ".spv" );

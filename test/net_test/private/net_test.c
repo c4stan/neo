@@ -7,6 +7,7 @@
 
 #include <std_log.h>
 #include <std_string.h>
+#include <std_file.h>
 
 std_warnings_ignore_m ( "-Wunused-variable" )
 std_warnings_ignore_m ( "-Wunused-function" )
@@ -131,26 +132,59 @@ static void test_tcp_msg ( void ) {
     }
 }
 
-#if 0
 void test_http_server ( void ) {
     net_i* net = std_module_get_m ( net_module_name_m );
 
-    net_socket_h server_socket;
+    net_socket_h server_socket = net->create_socket ( &net_socket_params_m() );
     net_socket_address_t server_address;
+    net->ip_string_to_bytes ( &server_address.ip, "127.0.0.1", net_address_family_ip4_m );
+    server_address.port = 8080;
+    net->bind_socket ( server_socket, &server_address );
 
-    {
-        net_socket_params_t socket_params;
+    std_log_info_m ( "Listening on http://localhost:" std_fmt_u16_m, server_address.port );
+    net->listen_for_connections ( server_socket );
+
+    while ( 1 ) {
+        net_socket_address_t client_address;
+        net_socket_h client_socket = net->accept_pending_connection ( &client_address, server_socket );
+        char client_ip[32];
+        net->ip_bytes_to_string ( client_ip, &client_address.ip, net_address_family_ip4_m );
+
+        std_log_info_m ( "Serving HTTP client " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, client_address.port );
+
+        char buffer[1024];
+        net->read_connected_socket ( buffer, sizeof ( buffer ), client_socket );
+        //std_log_info_m ( std_fmt_str_m, buffer );
+
+        char path[std_path_size_m];
+        std_stack_t stack = std_static_stack_m ( path );
+        std_stack_string_append ( &stack, std_module_path_m );
+        std_stack_string_append ( &stack, "private/www/index.html" );
+
+        std_buffer_t file = std_file_read_to_virtual_heap ( path );
+
+        stack = std_static_stack_m ( buffer );
+        std_stack_string_append ( &stack, "HTTP/1.1 200 OK\r\n" );
+        std_stack_string_append ( &stack, "Content-Type: text/html\r\n" );
+        std_stack_string_append_format ( &stack, "Content-Length: " std_fmt_u64_m "\r\n", file.size );
+        std_stack_string_append ( &stack, "Connection: close\r\n\r\n" );
+        std_stack_free ( &stack, 1 );
+        std_stack_write ( &stack, file.base, file.size );
+        std_stack_string_append_char ( &stack, 0 );
+
+        net->write_connected_socket ( client_socket, stack.begin, std_stack_used_size ( &stack ) + 1 );
+
+        std_log_info_m ( std_fmt_str_m ":" std_fmt_u16_m " closed", client_ip, client_address.port );
+        net->destroy_socket ( client_socket );
+
+        std_virtual_heap_free ( file.base );
     }
 }
-#endif
 
 void std_main ( void ) {
     std_module_load_m ( net_module_name_m );
-#if 1
     test_udp_msg();
     test_tcp_msg();
-#else
     test_http_server();
-#endif
     std_log_info_m ( "NET_TEST COMPLETE!" );
 }

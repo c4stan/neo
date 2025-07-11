@@ -580,7 +580,7 @@ void std_stack_string_pop ( std_stack_t* stack ) {
     if ( top - begin >= 2 ) {
         top -= 2;
         *top = '\0';
-        stack->top = top;
+        stack->top = top + 1;
     }
 }
 

@@ -26,6 +26,10 @@ typedef struct {
 #endif
 } aud_device_submit_context_t;
 
+typedef struct {
+    aud_device_submit_context_t submit_contexts[aud_device_max_submit_contexts_m];
+} aud_device_context_t;
+
 typedef enum {
     aud_devuce_existing_m = 1 << 0,
     aud_device_active_m   = 1 << 1,
@@ -41,7 +45,7 @@ typedef struct {
     aud_device_f flags;
     aud_device_params_t params;
 
-    aud_device_submit_context_t* submit_contexts;
+    aud_device_context_t* context;
     std_ring_t submit_ring;
 
     /*std_memory_h submit_blocks_handle;
@@ -62,17 +66,19 @@ typedef struct {
 #if defined(std_platform_linux_m)
     char** os_device_names;
 #endif
+
+    aud_device_context_t* device_contexts_array;
 } aud_device_state_t;
 
 static aud_device_state_t aud_device_state;
 
 void aud_device_init ( void ) {
-    static aud_device_t devices_array[aud_device_max_devices_m];
-
-    aud_device_state.devices_array = devices_array;
-    aud_device_state.devices_freelist = std_static_freelist_m ( devices_array );
+    aud_device_state.devices_array = std_virtual_heap_alloc_array_m ( aud_device_t, aud_device_max_devices_m );
+    aud_device_state.devices_freelist = std_freelist_m ( aud_device_state.devices_array, aud_device_max_devices_m );
     std_mutex_init ( &aud_device_state.devices_mutex );
     aud_device_state.guid = 0;
+
+    aud_device_state.device_contexts_array = std_virtual_heap_alloc_array_m ( aud_device_context_t, aud_device_max_devices_m );
 
     // TODO allow for dynamic updating of devices instead of just caching them all at the start
 #if defined(std_platform_win32_m)
@@ -140,6 +146,8 @@ void aud_device_init ( void ) {
 }
 
 void aud_device_shutdown ( void ) {
+    std_virtual_heap_free ( aud_device_state.devices_array );
+    std_virtual_heap_free ( aud_device_state.device_contexts_array );
     std_mutex_deinit ( &aud_device_state.devices_mutex );
 }
 
@@ -207,7 +215,7 @@ bool aud_device_get_info ( aud_device_info_t* info, aud_device_h device_handle )
 
 bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t* params ) {
     // TODO avoid static, alloc new mem on activate?
-    static aud_device_submit_context_t submit_contexts_array [aud_device_max_devices_m] [aud_device_max_submit_contexts_m];
+    //static aud_device_submit_context_t submit_contexts_array [aud_device_max_devices_m] [aud_device_max_submit_contexts_m];
 
     aud_device_t* device = &aud_device_state.devices_array[device_handle];
 
@@ -258,8 +266,6 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
 #elif defined(std_platform_linux_m)
     std_not_implemented_m();
 
-
-
     result = false;
     os_handle = 0;
 #endif
@@ -279,14 +285,14 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
         */
 
         size_t device_idx = ( size_t ) device_handle;
-        device->submit_contexts = submit_contexts_array[device_idx];
+        device->context = &aud_device_state.device_contexts_array[device_idx];
 
         uint64_t submit_block_size = aud_device_submit_block_max_ms_m * params->sample_frequency * params->bits_per_sample / 8;
         std_assert_m ( submit_block_size % 1000 == 0 );
         submit_block_size = submit_block_size / 1000;
 
         for ( uint64_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
-            aud_device_submit_context_t* context = &device->submit_contexts[i];
+            aud_device_submit_context_t* context = &device->context->submit_contexts[i];
             std_mem_zero_m ( context );
             context->data = std_virtual_heap_alloc_m ( submit_block_size, 16 );
             context->size = submit_block_size;
@@ -309,7 +315,7 @@ static void aud_device_recycle_submission_contexts ( aud_device_t* device, bool 
     bool stall_begin = false;
 
     while ( count > 0 ) {
-        aud_device_submit_context_t* submit_context = &device->submit_contexts[std_ring_bot_idx ( &device->submit_ring )];
+        aud_device_submit_context_t* submit_context = &device->context->submit_contexts[std_ring_bot_idx ( &device->submit_ring )];
 
         if ( !submit_context->is_submitted ) {
             break;
@@ -355,7 +361,7 @@ void aud_device_play ( aud_device_h device_handle, void* data, size_t size ) {
 
     aud_device_recycle_submission_contexts ( device, true );
 
-    aud_device_submit_context_t* submit_context = &device->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
+    aud_device_submit_context_t* submit_context = &device->context->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
     std_ring_push ( &device->submit_ring, 1 );
 
 #if defined(std_platform_win32_m)
@@ -379,7 +385,7 @@ char* aud_device_get_buffer ( aud_device_h device_handle ) {
     aud_device_t* device = &aud_device_state.devices_array[device_handle];
     std_assert_m ( ( device->flags & aud_devuce_existing_m ) );
 
-    aud_device_submit_context_t* submit_context = &device->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
+    aud_device_submit_context_t* submit_context = &device->context->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
 
     return submit_context->data;
 }
@@ -390,7 +396,7 @@ void aud_device_push_buffer ( aud_device_h device_handle, uint64_t buffer_size )
 
     aud_device_recycle_submission_contexts ( device, true );
 
-    aud_device_submit_context_t* submit_context = &device->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
+    aud_device_submit_context_t* submit_context = &device->context->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
     std_assert_m ( buffer_size <= submit_context->size );
     std_ring_push ( &device->submit_ring, 1 );
 

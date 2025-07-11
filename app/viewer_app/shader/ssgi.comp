@@ -40,6 +40,69 @@ uint getRandomSeed(vec2 uv, vec2 resolution, float time) {
     return seed;
 }
 
+// HBAO
+float hbao ( vec2 screen_uv ) {
+    float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
+    if ( depth == 1 ) {
+        return 0;
+    }
+    vec3 position = view_from_depth ( screen_uv, depth );
+    vec3 normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1 );
+
+    float sample_radius = 0.1;
+
+    float sum = 0;
+
+    int slice_count = 1;
+    float slice_angle = PI*2.0 / slice_count;
+    for ( int slice_it = 0; slice_it < slice_count; ++slice_it ) {
+        float sample_angle = slice_angle * slice_it;
+        vec3 sample_dir = vec3 ( cos ( sample_angle ), sin ( sample_angle ), 0 );
+
+#if 0
+        vec3 view_sample_rad = position + sample_dir * sample_radius;
+        vec3 screen_sample_rad = screen_from_view ( frame_uniforms.proj_from_view, view_sample_rad );
+        float screen_rad = length ( screen_sample_rad - position );
+#else
+        float tangent_angle = acos ( dot ( sample_dir, normal ) ) - PI*0.5;
+        //sum += abs(tangent_angle);// tangent_angle / PI;
+        //continue;
+#endif
+
+        int sample_count = 1;
+        float sample_step = 0.04;//screen_rad / sample_count;
+        float max_horizon_angle = 0;
+        vec3 max_sample_vec = vec3 ( 0 );
+        for ( int sample_it = 0; sample_it < sample_count; ++sample_it ) {
+            vec2 sample_uv = screen_uv + sample_step * ( sample_it + 1 ) * sample_dir.xy;
+            float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
+            if ( sample_depth == 1 ) {
+                continue;
+            }
+            vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
+            vec3 sample_vec = sample_position - position;
+            //if ( length ( sample_vec ) < sample_radius ) 
+            {
+                max_sample_vec = sample_vec;
+                float horizon_angle = atan ( sample_vec.z / length ( sample_vec.xy ) );
+                max_horizon_angle = max ( max_horizon_angle, horizon_angle );
+            }
+            //vec3 horizon = normalize ( sample_position - position );
+            //float horizon_angle = atan ( horizon.z / sqrt ( horizon.x * horizon.x - horizon.y * horizon.y ) );
+            //max_horizon_angle = max ( max_horizon_angle, horizon_angle );
+        }
+
+        float d = length ( max_sample_vec ) / sample_radius;
+        float att = 1 - d * d;
+        float occlusion = clamp ( att * ( sin ( max_horizon_angle ) - sin ( tangent_angle ) ), 0.0, 1.0 );
+        sum += abs ( max_horizon_angle );
+        //sum += 1 - occlusion;
+    }
+
+    sum /= slice_count;
+    return sum;
+}
+
 // GTAO
 // https://www.activision.com/cdn/research/Practical_Real_Time_Strategies_for_Accurate_Indirect_Occlusion_NEW%20VERSION_COLOR.pdf
 float gtao ( vec2 screen_uv ) {
@@ -99,11 +162,6 @@ float gtao ( vec2 screen_uv ) {
 // SSILVB
 // https://arxiv.org/pdf/2301.11376
 // https://cybereality.com/screen-space-indirect-lighting-with-visibility-bitmask-improvement-to-gtao-ssao-real-time-ambient-occlusion-algorithm-glsl-shader-implementation/
-const float sample_count = 4;
-const float sample_radius = 4;
-const float slice_count = 2;
-const float hit_thickness = 0.5;
-
 const uint sector_count = 32u;
 uint make_bitmask ( float min_horizon, float max_horizon ) {
     uint start_bit = uint ( min_horizon * float ( sector_count ) );
@@ -114,6 +172,11 @@ uint make_bitmask ( float min_horizon, float max_horizon ) {
 }
 
 vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
+    float sample_count = 4;
+    float sample_radius = 4;
+    float slice_count = 2;
+    float hit_thickness = 0.5;
+
     uint indirect = 0;
     uint occlusion = 0;
     float visibility = 0;
@@ -262,6 +325,7 @@ void main ( void ) {
     vec4 indirect_occlusion = ssilvb ( rng_state, screen_uv );
     vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( indirect_occlusion.xyz * base_color, 1 ) );
-
+    //float ao = hbao ( screen_uv );
+    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( ao.xxx, 1 ) );
 #endif
 }

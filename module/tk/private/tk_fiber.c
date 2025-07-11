@@ -127,7 +127,7 @@ static void tk_fiber_entry_point ( void* arg ) {
     while ( !thread_context->join_flag && !tk_fiber_state->join_flag ) {
 
         // TODO which one is better? should prioritize picking up new tasks or finishing up old ones?
-#if 1
+#if 0
         // try running a new task
         if ( std_queue_mpmc_pop_m ( &tk_fiber_state->dispatch_queue, &dispatch ) ) {
             dispatch.task.routine ( dispatch.task.arg );
@@ -143,7 +143,6 @@ static void tk_fiber_entry_point ( void* arg ) {
                 std_thread_this_yield();
             }
         }
-
 #else
         uint32_t ready_context_idx;
 
@@ -158,7 +157,6 @@ static void tk_fiber_entry_point ( void* arg ) {
             // yield if there's nothing to run
             std_thread_this_yield();
         }
-
 #endif
         // Refresh thread context pointer
         thread_context = tk_fiber_thread_context();
@@ -194,7 +192,7 @@ static void tk_fiber_create ( tk_fiber_context_t* context, void ( routine ) ( vo
 
 static void tk_fiber_destroy ( tk_fiber_context_t* context ) {
 #if defined(std_platform_win32_m)
-    DeleteFiber ( context->os_handle );
+    DeleteFiber ( ( void* ) context->os_handle );
 #elif defined(std_platform_linux_m)
     std_virtual_heap_free ( context->stack );
 #endif
