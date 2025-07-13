@@ -10,6 +10,8 @@ std_module_export_m void aud_unload ( void );
 typedef uint64_t aud_device_h;
 typedef uint64_t aud_source_h;
 
+#define aud_null_handle_m UINT64_MAX
+
 typedef struct {
     size_t channels;
     size_t sample_frequency;
@@ -17,7 +19,7 @@ typedef struct {
 } aud_device_params_t;
 
 typedef struct {
-    uint64_t capacity_ms; // TODO sample_count ?
+    uint64_t sample_count;
     uint64_t sample_frequency;
     uint64_t bits_per_sample;
     uint64_t channels;
@@ -41,6 +43,7 @@ typedef struct {
 typedef struct {
     uint64_t sample_frequency;
     uint64_t bits_per_sample;
+    uint64_t sample_count;
     double time_played;
 } aud_source_info_t;
 

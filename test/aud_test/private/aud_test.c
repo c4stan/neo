@@ -53,10 +53,6 @@ static void run_aud_test ( void ) {
     }
 
     aud_device_h device = devices[0];
-    aud_device_info_t info;
-    aud->get_device_info ( &info, device );
-    std_log_info_m ( "Picking device 0: " std_fmt_str_m, info.name );
-
     {
         aud_device_params_t params;
         params.channels = 2;
@@ -69,6 +65,10 @@ static void run_aud_test ( void ) {
         std_log_info_m ( "\tbpp: " std_fmt_size_m, params.bits_per_sample );
     }
 
+    aud_device_info_t device_info;
+    aud->get_device_info ( &device_info, device );
+    std_log_info_m ( "Picking device 0: " std_fmt_str_m, device_info.name );
+
     // source0
     aud_source_h source0;
     {
@@ -76,18 +76,18 @@ static void run_aud_test ( void ) {
         aud_source_params_t params = {
             .sample_frequency = 8000,
             .bits_per_sample = 8,
-            .capacity_ms = 100 * 1000,
+            .sample_count = 8000 * 60,
             .channels = 1,
         };
         source0 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
         std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
         std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
-    }
 
-    char buffer0[8000 * 60] = {0};
-    write_source_wave ( buffer0, sizeof ( buffer0 ), 0 );
-    aud->feed_source ( source0, buffer0, sizeof ( buffer0 ) );
+        char buffer[8000 * 60] = {0};
+        write_source_wave ( buffer, sizeof ( buffer ), 0 );
+        aud->feed_source ( source0, buffer, sizeof ( buffer ) );
+    }
 
     // source1
     aud_source_h source1;
@@ -96,75 +96,71 @@ static void run_aud_test ( void ) {
         aud_source_params_t params = {
             .sample_frequency = 8000,
             .bits_per_sample = 8,
-            .capacity_ms = 100 * 1000,
+            .sample_count = 8000 * 60,
             .channels = 1,
         };
         source1 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
         std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
         std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
-    }
 
-    char buffer1[8000 * 60] = {0};
-    write_source_wave ( buffer1, sizeof ( buffer1 ), 1 );
-    aud->feed_source ( source1, buffer1, sizeof ( buffer1 ) );
+        char buffer[8000 * 60] = {0};
+        write_source_wave ( buffer, sizeof ( buffer ), 1 );
+        aud->feed_source ( source1, buffer, sizeof ( buffer ) );
+    }
 
     // source2
-    const char* input_filename = "c.a.n.d.y..mp3";
-    //const char* input_filename = "output.mp3";
-    mp3dec_ex_t mp3dec;
-    std_verify_m ( mp3dec_ex_open ( &mp3dec, input_filename, MP3D_SEEK_TO_SAMPLE ) == 0 );
-
-    aud_source_h source2;
+    aud_source_h source2 = aud_null_handle_m;
     {
-        std_log_info_m ( "Creating audio source 2..." );
-        aud_source_params_t params = {
-            .sample_frequency = mp3dec.info.hz,
-            .bits_per_sample = 16,
-            .capacity_ms = 100 * 1000,
-            .channels = 2,
-        };
-        source2 = aud->create_source ( &params );
-        std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
-        std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
-        std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
+        const char* input_filename = "c.a.n.d.y..mp3";
+        //const char* input_filename = "output.mp3";
+        mp3dec_ex_t mp3dec;
+        if ( mp3dec_ex_open ( &mp3dec, input_filename, MP3D_SEEK_TO_SAMPLE ) == 0 ) {
+            std_log_info_m ( "Creating audio source 2..." );
+            aud_source_params_t params = {
+                .sample_frequency = mp3dec.info.hz,
+                .bits_per_sample = 16,
+                .sample_count = mp3dec.samples,
+                .channels = 2,
+            };
+            source2 = aud->create_source ( &params );
+            std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
+            std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
+            std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
+
+            int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, mp3dec.samples );
+            uint64_t samples_read = mp3dec_ex_read ( &mp3dec, buffer, mp3dec.samples );
+            std_verify_m ( samples_read == mp3dec.samples );
+            aud->feed_source ( source2, buffer, sizeof ( int16_t ) * mp3dec.samples );
+            std_virtual_heap_free ( buffer );
+            mp3dec_ex_close ( &mp3dec );
+        }
     }
 
-    int16_t* buffer2 = std_virtual_heap_alloc_array_m ( int16_t, mp3dec.samples );
-    uint64_t samples_read = mp3dec_ex_read ( &mp3dec, buffer2, mp3dec.samples );
-    std_verify_m ( samples_read == mp3dec.samples );
-    aud->feed_source ( source2, buffer2, sizeof ( int16_t ) * 4000000 );
-
-    // Optional: write to a .raw file for verification (16-bit signed PCM)
-    //FILE *fout = fopen("output.pcm", "wb");
-    //if (fout) {
-    //    fwrite(buffer2, sizeof(short), samples_read, fout);
-    //    fclose(fout);
-    //    printf("PCM data written to output.pcm\n");
-    //}
-    
     // play
     std_log_info_m ( "Playing sources..." );
-    aud->play_source ( source0 );
-    aud->set_source_volume ( source0, 0.2f );
-
-    aud->play_source ( source1 );
-    aud->set_source_volume ( source1, 0.2f );
-
-    aud->play_source ( source2 );
-    aud->set_source_volume ( source2, 1.f );
+    if ( source2 != aud_null_handle_m ) {
+        aud->play_source ( source2 );
+        aud->set_source_volume ( source2, 1.f );
+    } else {
+        aud->play_source ( source0 );
+        aud->set_source_volume ( source0, 0.2f );
+        aud->play_source ( source1 );
+        aud->set_source_volume ( source1, 0.2f );
+        source2 = source0;
+    }
 
     const std_ring_t* device_ring = aud->get_device_ring ( device );
     uint64_t ring_capacity = std_ring_capacity ( device_ring );
-
-    aud_source_info_t source_info;
-    aud->get_source_info ( &source_info, source2 );
 
     bool first_print = true;
     uint64_t step_ms = 50;
 
     while ( true ) {
+        aud_source_info_t source_info;
         aud->get_source_info ( &source_info, source2 );
+        float total_duration = source_info.sample_count / source_info.sample_frequency / device_info.channels;
+        float bar_tick = total_duration * 1000.f / 60.f;
 
         aud->update_device_ring ( device );
         uint64_t ring_count = std_ring_count ( device_ring );
@@ -177,9 +173,9 @@ static void run_aud_test ( void ) {
 
             uint64_t ms = ( uint64_t ) ( source_info.time_played * 1000.f );
 
-            while ( ms > 1000 && i < 60 ) {
+            while ( ms > bar_tick && i < 60 ) {
                 bar[i++] = '=';
-                ms -= 1000;
+                ms -= bar_tick;
             }
 
             while ( i < 60 ) {
@@ -199,7 +195,7 @@ static void run_aud_test ( void ) {
             std_log_m ( 0, std_fmt_str_m std_fmt_prevline_m std_fmt_str_m " " std_fmt_u64_pad_m ( 2 ) "/" std_fmt_u64_m, prefix, bar, ring_count, ring_capacity );
         }
 
-        if ( source_info.time_played < 60 ) {
+        if ( source_info.time_played < total_duration ) {
             if ( ring_count < ring_capacity ) {
                 aud->output_to_device ( device, step_ms );
             }

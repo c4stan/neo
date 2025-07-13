@@ -1,5 +1,7 @@
 #include <aud.h>
 
+#include <std_list.h>
+#include <std_mutex.h>
 #include <std_allocator.h>
 
 typedef struct {
@@ -11,7 +13,18 @@ typedef struct {
     float volume;
 } aud_source_t;
 
-void aud_source_init ( void );
+typedef struct {
+    aud_source_t* sources_array;
+    aud_source_t* sources_freelist;
+    std_mutex_t sources_mutex;
+
+    aud_source_t* active_sources[aud_source_max_playing_sources_m];
+    uint64_t active_sources_count;
+} aud_source_state_t;
+
+void aud_source_load ( aud_source_state_t* state );
+void aud_source_reload ( aud_source_state_t* state );
+void aud_source_unload ( void );
 
 aud_source_h aud_source_create ( const aud_source_params_t* params );
 void aud_source_feed ( aud_source_h source, const void* data, uint64_t size );
