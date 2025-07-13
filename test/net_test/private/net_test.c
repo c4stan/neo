@@ -186,5 +186,6 @@ void std_main ( void ) {
     test_udp_msg();
     test_tcp_msg();
     test_http_server();
+    std_module_unload_m ( net_module_name_m );
     std_log_info_m ( "NET_TEST COMPLETE!" );
 }

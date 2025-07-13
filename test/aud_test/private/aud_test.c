@@ -32,7 +32,7 @@ static void write_source_wave ( char* buffer, size_t size, uint32_t id ) {
 }
 
 static void run_aud_test ( void ) {
-    aud_i* aud = std_module_load_m ( aud_module_name_m );
+    aud_i* aud = std_module_get_m ( aud_module_name_m );
     std_assert_m ( aud );
 
     // device
@@ -202,11 +202,11 @@ static void run_aud_test ( void ) {
 
         std_thread_this_sleep ( step_ms / 2 );
     }
-
-    std_module_unload_m ( aud );
 }
 
 void std_main ( void ) {
+    std_module_load_m ( aud_module_name_m );
     run_aud_test();
+    std_module_unload_m ( aud_module_name_m );
     std_log_info_m ( "AUD_TEST COMPLETE!" );
 }
