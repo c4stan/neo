@@ -17,6 +17,7 @@ typedef struct {
     aud_source_t* sources_array;
     aud_source_t* sources_freelist;
     std_mutex_t sources_mutex;
+    uint64_t* sources_bitset;
 
     aud_source_t* active_sources[aud_source_max_playing_sources_m];
     uint64_t active_sources_count;

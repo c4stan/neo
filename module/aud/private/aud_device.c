@@ -82,6 +82,10 @@ void aud_device_reload ( aud_device_state_t* state ) {
 }
 
 void aud_device_unload ( void ) {
+    for ( uint32_t i = 0; i < aud_device_max_devices_m; ++i ) {
+        aud_device_deactivate ( i );
+    }
+
     std_virtual_heap_free ( aud_device_state->devices_array );
     std_virtual_heap_free ( aud_device_state->device_contexts_array );
     std_mutex_deinit ( &aud_device_state->devices_mutex );
@@ -114,11 +118,11 @@ bool aud_device_get_info ( aud_device_info_t* info, aud_device_h device_handle )
     info->is_active = is_active;
 
     if ( is_active ) {
-        info->channels = device->params.channels;
+        info->channel_count = device->params.channel_count;
         info->sample_frequency = device->params.sample_frequency;
         info->bits_per_sample = device->params.bits_per_sample;
     } else {
-        info->channels = 0;
+        info->channel_count = 0;
         info->sample_frequency = 0;
         info->bits_per_sample = 0;
     }
@@ -150,9 +154,6 @@ bool aud_device_get_info ( aud_device_info_t* info, aud_device_h device_handle )
 }
 
 bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t* params ) {
-    // TODO avoid static, alloc new mem on activate?
-    //static aud_device_submit_context_t submit_contexts_array [aud_device_max_devices_m] [aud_device_max_submit_contexts_m];
-
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
 
     if ( std_unlikely_m ( ( device->flags & aud_devuce_existing_m ) == 0 ) ) {
@@ -163,17 +164,17 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
     uint64_t os_handle;
 
 #if defined(std_platform_win32_m)
-    WORD channel_count = ( WORD ) params->channels;
+    WORD channel_count = ( WORD ) params->channel_count;
     WORD frequency = ( WORD ) params->sample_frequency;
     WORD bits_per_sample = ( WORD ) params->bits_per_sample;
     WORD channel_mask = 0;
 
-    // TODO
     if ( channel_count == 1 ) {
         channel_mask = SPEAKER_FRONT_CENTER;
     } else if ( channel_count == 2 ) {
         channel_mask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
     } else {
+        // TODO
         std_not_implemented_m();
     }
 
@@ -211,15 +212,6 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
         device->flags |= aud_device_active_m;
         device->params = *params;
 
-        /*
-        size_t device_idx = ( size_t ) device_handle;
-        std_buffer_t submit_contexts_buffer = std_static_buffer_m ( submit_contexts_array );
-        size_t submit_contexts_slice_size = sizeof ( aud_device_submit_context_t ) * aud_device_max_submit_contexts_m;
-        std_buffer_t pool_buffer = std_buffer_slice ( submit_contexts_buffer, device_idx * submit_contexts_slice_size, submit_contexts_slice_size );
-        std_mem_zero ( pool_buffer.base, pool_buffer.size );
-        device->submit_contexts = std_circular_pool ( pool_buffer, sizeof ( aud_device_submit_context_t ) );
-        */
-
         size_t device_idx = ( size_t ) device_handle;
         device->context = &aud_device_state->device_contexts_array[device_idx];
 
@@ -227,7 +219,7 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
         std_assert_m ( submit_block_size % 1000 == 0 );
         submit_block_size = submit_block_size / 1000;
 
-        for ( uint64_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
+        for ( uint32_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
             aud_device_submit_context_t* context = &device->context->submit_contexts[i];
             std_mem_zero_m ( context );
             context->data = std_virtual_heap_alloc_m ( submit_block_size, 16 );
@@ -240,10 +232,19 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
     return result;
 }
 
-bool aud_device_deactivate ( aud_device_h device ) {
-    std_unused_m ( device );
-    std_not_implemented_m();
-    return false;
+bool aud_device_deactivate ( aud_device_h device_handle ) {
+    aud_device_t* device = &aud_device_state->devices_array[device_handle];
+
+    if ( !( device->flags & aud_device_active_m ) ) {
+        return false;
+    }
+
+    for ( uint32_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
+        aud_device_submit_context_t* context = &device->context->submit_contexts[i];
+        std_virtual_heap_free ( context->data );
+    }
+
+    return true;
 }
 
 static void aud_device_recycle_submission_contexts ( aud_device_t* device, bool block_if_full ) {
@@ -286,35 +287,6 @@ static void aud_device_recycle_submission_contexts ( aud_device_t* device, bool 
         std_unused_m ( stall_begin );
 #endif
     }
-}
-
-void aud_device_play ( aud_device_h device_handle, void* data, size_t size ) {
-    aud_device_t* device = &aud_device_state->devices_array[device_handle];
-
-    if ( std_unlikely_m ( ( device->flags & aud_devuce_existing_m ) == 0 ) ) {
-        return;
-    }
-
-    aud_device_recycle_submission_contexts ( device, true );
-
-    aud_device_submit_context_t* submit_context = &device->context->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
-    std_ring_push ( &device->submit_ring, 1 );
-
-#if defined(std_platform_win32_m)
-    submit_context->device = device_handle;
-    submit_context->win32_header.lpData = ( char* ) data;
-    submit_context->win32_header.dwBufferLength = ( DWORD ) size;
-    submit_context->is_submitted = true;
-
-    MMRESULT result = waveOutPrepareHeader ( ( HWAVEOUT ) device->os_handle, &submit_context->win32_header, sizeof ( WAVEHDR ) );
-    std_assert_m ( result == MMSYSERR_NOERROR );
-
-    result = waveOutWrite ( ( HWAVEOUT ) device->os_handle, &submit_context->win32_header, sizeof ( WAVEHDR ) );
-    std_assert_m ( result == MMSYSERR_NOERROR );
-#elif defined(std_platform_linux_m)
-    std_not_implemented_m();
-    std_unused_m ( submit_context );
-#endif
 }
 
 char* aud_device_get_buffer ( aud_device_h device_handle ) {

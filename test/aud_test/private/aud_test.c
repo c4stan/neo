@@ -8,9 +8,6 @@
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3_ex.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 // http://countercomplex.blogspot.com/2011/10/algorithmic-symphonies-from-one-line-of.html
 static void write_source_wave ( char* buffer, size_t size, uint32_t id ) {
     for ( uint32_t t = 0; t < size; ++t ) {
@@ -55,12 +52,12 @@ static void run_aud_test ( void ) {
     aud_device_h device = devices[0];
     {
         aud_device_params_t params;
-        params.channels = 2;
+        params.channel_count = 2;
         params.sample_frequency = 48000;
         params.bits_per_sample = 32;
         bool result = aud->activate_device ( device, &params );
         std_assert_m ( result );
-        std_log_info_m ( "\tChannels: " std_fmt_size_m, params.channels );
+        std_log_info_m ( "\tChannels: " std_fmt_size_m, params.channel_count );
         std_log_info_m ( "\tSample frequency: " std_fmt_size_m, params.sample_frequency );
         std_log_info_m ( "\tbpp: " std_fmt_size_m, params.bits_per_sample );
     }
@@ -77,12 +74,12 @@ static void run_aud_test ( void ) {
             .sample_frequency = 8000,
             .bits_per_sample = 8,
             .sample_count = 8000 * 60,
-            .channels = 1,
+            .channel_count = 1,
         };
         source0 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
         std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
-        std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
+        std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channel_count );
 
         char buffer[8000 * 60] = {0};
         write_source_wave ( buffer, sizeof ( buffer ), 0 );
@@ -97,12 +94,12 @@ static void run_aud_test ( void ) {
             .sample_frequency = 8000,
             .bits_per_sample = 8,
             .sample_count = 8000 * 60,
-            .channels = 1,
+            .channel_count = 1,
         };
         source1 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
         std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
-        std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
+        std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channel_count );
 
         char buffer[8000 * 60] = {0};
         write_source_wave ( buffer, sizeof ( buffer ), 1 );
@@ -121,12 +118,12 @@ static void run_aud_test ( void ) {
                 .sample_frequency = mp3dec.info.hz,
                 .bits_per_sample = 16,
                 .sample_count = mp3dec.samples,
-                .channels = 2,
+                .channel_count = 2,
             };
             source2 = aud->create_source ( &params );
             std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
             std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
-            std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channels );
+            std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channel_count );
 
             int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, mp3dec.samples );
             uint64_t samples_read = mp3dec_ex_read ( &mp3dec, buffer, mp3dec.samples );
@@ -141,7 +138,7 @@ static void run_aud_test ( void ) {
     std_log_info_m ( "Playing sources..." );
     if ( source2 != aud_null_handle_m ) {
         aud->play_source ( source2 );
-        aud->set_source_volume ( source2, 1.f );
+        aud->set_source_volume ( source2, 0.2f );
     } else {
         aud->play_source ( source0 );
         aud->set_source_volume ( source0, 0.2f );
@@ -159,7 +156,7 @@ static void run_aud_test ( void ) {
     while ( true ) {
         aud_source_info_t source_info;
         aud->get_source_info ( &source_info, source2 );
-        float total_duration = source_info.sample_count / source_info.sample_frequency / device_info.channels;
+        float total_duration = source_info.sample_count / source_info.sample_frequency / device_info.channel_count;
         float bar_tick = total_duration * 1000.f / 60.f;
 
         aud->update_device_ring ( device );
@@ -205,9 +202,11 @@ static void run_aud_test ( void ) {
 
         std_thread_this_sleep ( step_ms / 2 );
     }
+
+    std_module_unload_m ( aud );
 }
 
 void std_main ( void ) {
     run_aud_test();
-    std_log_info_m ( "aud_test_m COMPLETE!" );
+    std_log_info_m ( "AUD_TEST COMPLETE!" );
 }

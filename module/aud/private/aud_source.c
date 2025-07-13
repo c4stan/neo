@@ -9,6 +9,7 @@ void aud_source_load ( aud_source_state_t* state ) {
 
     state->sources_array = std_virtual_heap_alloc_array_m ( aud_source_t, aud_source_max_sources_m );
     state->sources_freelist = std_freelist_m ( state->sources_array, aud_source_max_sources_m );
+    state->sources_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( aud_source_max_sources_m ) );
     std_mutex_init ( &state->sources_mutex );
     state->active_sources_count = 0;
 }
@@ -18,7 +19,13 @@ void aud_source_reload ( aud_source_state_t* state ) {
 }
 
 void aud_source_unload ( void ) {
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, aud_source_state->sources_bitset, idx, std_bitset_u64_count_m ( aud_source_max_sources_m ) ) ) {
+        aud_source_destroy ( idx );
+    }
+
     std_virtual_heap_free ( aud_source_state->sources_array );
+    std_virtual_heap_free ( aud_source_state->sources_bitset );
 }
 
 aud_source_h aud_source_create ( const aud_source_params_t* params ) {
@@ -33,15 +40,13 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
     source->active_idx = UINT64_MAX;
 
     aud_source_h handle = ( aud_source_h ) ( source - aud_source_state->sources_array );
+    std_bitset_set ( aud_source_state->sources_bitset, handle );
     return handle;
 }
 
 void aud_source_feed ( aud_source_h source_handle, const void* data, uint64_t size ) {
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
-    //void* base = source->buffer.base + source->buffer.top;
-    //std_virtual_buffer_push ( &source->buffer, size );
-    //std_mem_copy ( base, data, size );
-    std_stack_write ( &source->stack, data, size );
+    std_verify_m ( std_stack_write ( &source->stack, data, size ) );
 }
 
 void aud_source_play ( aud_source_h source_handle ) {
@@ -77,9 +82,12 @@ void aud_source_destroy ( aud_source_h source_handle ) {
     std_mutex_lock ( &aud_source_state->sources_mutex );
 
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
-    aud_source_state->active_sources[source->active_idx] = aud_source_state->active_sources[aud_source_state->active_sources_count--];
+    if ( source->active_idx != UINT64_MAX ) {
+        aud_source_state->active_sources[source->active_idx] = aud_source_state->active_sources[aud_source_state->active_sources_count--];
+    }
     std_virtual_heap_free ( source->stack.begin );
     std_list_push ( &aud_source_state->sources_freelist, source );
+    std_bitset_clear ( aud_source_state->sources_bitset, source_handle );
 
     std_mutex_unlock ( &aud_source_state->sources_mutex );
 }
@@ -111,14 +119,14 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
     aud_device_get_info ( &device_info, device_handle );
     uint64_t frame_count = ( uint64_t ) ( seconds * device_info.sample_frequency );
     double frame_period = 1.0 / device_info.sample_frequency;
-    uint64_t sample_count = frame_count * device_info.channels;
+    uint64_t sample_count = frame_count * device_info.channel_count;
 
     std_mutex_lock ( &aud_source_state->sources_mutex );
 
     // TODO set a source to inactive once it's played all its samples
     for ( uint64_t source_it = 0; source_it < aud_source_state->active_sources_count; ++source_it ) {
         aud_source_t* source = aud_source_state->active_sources[source_it];
-        uint64_t source_sample_stride = source->params.bits_per_sample / 8;
+        uint32_t source_sample_stride = source->params.bits_per_sample / 8;
 
         uint64_t write_idx = 0;
         for ( uint64_t frame_it = 0; frame_it < frame_count; ++frame_it ) {
@@ -130,12 +138,12 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
             uint64_t source_frame_idx_b = ( uint64_t ) ( source_frame + 1 );
 
             float sample_value = 0;
-            for ( uint64_t channel_it = 0; channel_it < device_info.channels; ++channel_it ) {
+            for ( uint32_t channel_it = 0; channel_it < device_info.channel_count; ++channel_it ) {
                 // simple repeat of first sample if source has less channels than device
                 // TODO better remap/force sources to be compatible with device
-                if ( source->params.channels >= channel_it + 1 ) {
-                    void* source_sample_a = source->stack.begin + source_frame_idx_a * source_sample_stride * source->params.channels + source_sample_stride * channel_it;
-                    void* source_sample_b = source->stack.begin + source_frame_idx_b * source_sample_stride * source->params.channels + source_sample_stride * channel_it;
+                if ( source->params.channel_count >= channel_it + 1 ) {
+                    void* source_sample_a = source->stack.begin + source_frame_idx_a * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
+                    void* source_sample_b = source->stack.begin + source_frame_idx_b * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
                     double sample_a = 0;
                     double sample_b = 0;
 
@@ -165,7 +173,6 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
                     }
 
                     sample_value = ( float ) ( sample_a * ( 1 - decimal ) + sample_b * decimal );
-                    // TODO zero the buffer at some point
                     buffer[write_idx++] += sample_value * source->volume;
                 } else {
                     buffer[write_idx++] += sample_value * source->volume;

@@ -32,7 +32,6 @@ static void aud_api_init ( aud_i* aud ) {
     aud->get_source_info = aud_source_get_info;
     aud->set_source_volume = aud_source_set_volume_scale;
 
-    aud->play = aud_device_play;
     aud->output_to_device = aud_source_output_to_device;
 }
 
@@ -61,4 +60,5 @@ void aud_reload ( void* std_runtime, void* api ) {
 void aud_unload ( void ) {
     aud_source_unload();
     aud_device_unload();
+    aud_state_free();
 }

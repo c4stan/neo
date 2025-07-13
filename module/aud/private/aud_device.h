@@ -82,9 +82,6 @@ bool        aud_device_get_info ( aud_device_info_t* info, aud_device_h device )
 bool        aud_device_activate ( aud_device_h device, const aud_device_params_t* params );
 bool        aud_device_deactivate ( aud_device_h device );
 
-// TODO delete this?
-void        aud_device_play ( aud_device_h device, void* data, size_t size );
-
 char*       aud_device_get_buffer ( aud_device_h device );
 void        aud_device_push_buffer ( aud_device_h device, uint64_t buffer_size );
 
