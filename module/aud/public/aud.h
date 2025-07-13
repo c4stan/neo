@@ -17,10 +17,15 @@ typedef struct {
 } aud_device_params_t;
 
 typedef struct {
-    uint64_t capacity_ms;
+    uint64_t capacity_ms; // TODO sample_count ?
     uint64_t sample_frequency;
     uint64_t bits_per_sample;
+    uint64_t channels;
 } aud_source_params_t;
+
+#define aud_source_params_m( ... ) ( aud_source_params_t ) { \
+    __VA_ARGS__ \
+}
 
 typedef struct {
     // TODO find a way to query for supported activation params

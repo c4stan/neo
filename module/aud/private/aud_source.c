@@ -111,7 +111,7 @@ bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source_handle )
 }
 
 void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
-    // TODO avoid allocating on stack?
+    // TODO avoid allocating on stack
     float buffer[aud_device_submit_block_max_ms_m * 44100 / 1000] = {0};
 
     double seconds = ms / 1000.0;
@@ -128,6 +128,7 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
         aud_source_t* source = aud_source_state.active_sources[source_it];
         uint64_t source_sample_stride = source->params.bits_per_sample / 8;
 
+        uint64_t write_idx = 0;
         for ( uint64_t sample_it = 0; sample_it < sample_count; ++sample_it ) {
             double t = sample_it * sample_period + source->time_played;
 
@@ -144,13 +145,13 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
             // source range -> [0,1]
             switch ( source_sample_stride ) {
                 case 1:
-                    sample_a = ( ( uint8_t ) ( *source_sample_a ) ) / ( ( float ) UINT8_MAX );
-                    sample_b = ( ( uint8_t ) ( *source_sample_b ) ) / ( ( float ) UINT8_MAX );
+                    sample_a = ( *( ( int8_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT8_MAX );
+                    sample_b = ( *( ( int8_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT8_MAX );
                     break;
 
                 case 2:
-                    sample_a = ( ( int16_t ) ( *source_sample_a ) ) / ( ( float ) UINT16_MAX );
-                    sample_b = ( ( int16_t ) ( *source_sample_b ) ) / ( ( float ) UINT16_MAX );
+                    sample_a = ( *( ( int16_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT16_MAX );
+                    sample_b = ( *( ( int16_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT16_MAX );
                     break;
 
                 case 3:
@@ -158,8 +159,8 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
                     break;
 
                 case 4:
-                    sample_a = ( ( int32_t ) ( *source_sample_a ) ) / ( ( float ) UINT32_MAX );
-                    sample_b = ( ( int32_t ) ( *source_sample_b ) ) / ( ( float ) UINT32_MAX );
+                    sample_a = ( *( ( int32_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT32_MAX );
+                    sample_b = ( *( ( int32_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT32_MAX );
                     break;
 
                 default:
@@ -168,7 +169,7 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
 
             float sample_value = ( float ) ( sample_a * ( 1 - decimal ) + sample_b * decimal );
             // TODO zero the buffer at some point
-            buffer[sample_it] += sample_value * source->volume;
+            buffer[write_idx++] += sample_value * source->volume;
         }
 
         source->time_played += seconds;
