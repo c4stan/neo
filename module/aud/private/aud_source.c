@@ -118,8 +118,9 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
 
     aud_device_info_t device_info;
     aud_device_get_info ( &device_info, device_handle );
-    uint64_t sample_count = ( uint64_t ) ( seconds * device_info.sample_frequency );
-    double sample_period = 1.0 / device_info.sample_frequency;
+    uint64_t frame_count = ( uint64_t ) ( seconds * device_info.sample_frequency );
+    double frame_period = 1.0 / device_info.sample_frequency;
+    uint64_t sample_count = frame_count * device_info.channels;
 
     std_mutex_lock ( &aud_source_state.sources_mutex );
 
@@ -129,47 +130,57 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
         uint64_t source_sample_stride = source->params.bits_per_sample / 8;
 
         uint64_t write_idx = 0;
-        for ( uint64_t sample_it = 0; sample_it < sample_count; ++sample_it ) {
-            double t = sample_it * sample_period + source->time_played;
+        for ( uint64_t frame_it = 0; frame_it < frame_count; ++frame_it ) {
+            double t = frame_it * frame_period + source->time_played;
 
-            double source_sample = t * source->params.sample_frequency;
-            uint64_t source_sample_idx_a = ( uint64_t ) source_sample;
-            double decimal = source_sample - source_sample_idx_a;
-            uint64_t source_sample_idx_b = ( uint64_t ) ( source_sample + 1 );
+            double source_frame = t * source->params.sample_frequency;
+            uint64_t source_frame_idx_a = ( uint64_t ) source_frame;
+            double decimal = source_frame - source_frame_idx_a;
+            uint64_t source_frame_idx_b = ( uint64_t ) ( source_frame + 1 );
 
-            char* source_sample_a = source->stack.begin + source_sample_idx_a * source_sample_stride;
-            char* source_sample_b = source->stack.begin + source_sample_idx_b * source_sample_stride;
-            double sample_a = 0;
-            double sample_b = 0;
+            float sample_value = 0;
+            for ( uint64_t channel_it = 0; channel_it < device_info.channels; ++channel_it ) {
+                // simple repeat of first sample if source has less channels than device
+                // TODO better remap/force sources to be compatible with device
+                if ( source->params.channels >= channel_it + 1 ) {
+                    void* source_sample_a = source->stack.begin + source_frame_idx_a * source_sample_stride * source->params.channels + source_sample_stride * channel_it;
+                    void* source_sample_b = source->stack.begin + source_frame_idx_b * source_sample_stride * source->params.channels + source_sample_stride * channel_it;
+                    double sample_a = 0;
+                    double sample_b = 0;
 
-            // source range -> [0,1]
-            switch ( source_sample_stride ) {
-                case 1:
-                    sample_a = ( *( ( int8_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT8_MAX );
-                    sample_b = ( *( ( int8_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT8_MAX );
-                    break;
+                    // source range -> [0,1]
+                    switch ( source_sample_stride ) {
+                        case 1:
+                            sample_a = ( *( ( int8_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT8_MAX );
+                            sample_b = ( *( ( int8_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT8_MAX );
+                            break;
 
-                case 2:
-                    sample_a = ( *( ( int16_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT16_MAX );
-                    sample_b = ( *( ( int16_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT16_MAX );
-                    break;
+                        case 2:
+                            sample_a = ( *( ( int16_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT16_MAX );
+                            sample_b = ( *( ( int16_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT16_MAX );
+                            break;
 
-                case 3:
-                    std_not_implemented_m();
-                    break;
+                        case 3:
+                            std_not_implemented_m();
+                            break;
 
-                case 4:
-                    sample_a = ( *( ( int32_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT32_MAX );
-                    sample_b = ( *( ( int32_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT32_MAX );
-                    break;
+                        case 4:
+                            sample_a = ( *( ( int32_t* ) ( source_sample_a ) ) ) / ( ( float ) UINT32_MAX );
+                            sample_b = ( *( ( int32_t* ) ( source_sample_b ) ) ) / ( ( float ) UINT32_MAX );
+                            break;
 
-                default:
-                    std_not_implemented_m();
+                        default:
+                            std_not_implemented_m();
+                    }
+
+                    sample_value = ( float ) ( sample_a * ( 1 - decimal ) + sample_b * decimal );
+                    // TODO zero the buffer at some point
+                    buffer[write_idx++] += sample_value * source->volume;
+                } else {
+                    buffer[write_idx++] += sample_value * source->volume;
+                }
+
             }
-
-            float sample_value = ( float ) ( sample_a * ( 1 - decimal ) + sample_b * decimal );
-            // TODO zero the buffer at some point
-            buffer[write_idx++] += sample_value * source->volume;
         }
 
         source->time_played += seconds;

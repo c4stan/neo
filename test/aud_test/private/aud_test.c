@@ -59,7 +59,7 @@ static void run_aud_test ( void ) {
 
     {
         aud_device_params_t params;
-        params.channels = 1;
+        params.channels = 2;
         params.sample_frequency = 48000;
         params.bits_per_sample = 32;
         bool result = aud->activate_device ( device, &params );
@@ -110,7 +110,8 @@ static void run_aud_test ( void ) {
     aud->feed_source ( source1, buffer1, sizeof ( buffer1 ) );
 
     // source2
-    const char* input_filename = "output.mp3";
+    const char* input_filename = "c.a.n.d.y..mp3";
+    //const char* input_filename = "output.mp3";
     mp3dec_ex_t mp3dec;
     std_verify_m ( mp3dec_ex_open ( &mp3dec, input_filename, MP3D_SEEK_TO_SAMPLE ) == 0 );
 
@@ -121,7 +122,7 @@ static void run_aud_test ( void ) {
             .sample_frequency = mp3dec.info.hz,
             .bits_per_sample = 16,
             .capacity_ms = 100 * 1000,
-            .channels = 1,
+            .channels = 2,
         };
         source2 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
@@ -144,11 +145,11 @@ static void run_aud_test ( void ) {
     
     // play
     std_log_info_m ( "Playing sources..." );
-    //aud->play_source ( source0 );
-    //aud->set_source_volume ( source0, 0.2f );
+    aud->play_source ( source0 );
+    aud->set_source_volume ( source0, 0.2f );
 
-    //aud->play_source ( source1 );
-    //aud->set_source_volume ( source1, 0.2f );
+    aud->play_source ( source1 );
+    aud->set_source_volume ( source1, 0.2f );
 
     aud->play_source ( source2 );
     aud->set_source_volume ( source2, 1.f );
