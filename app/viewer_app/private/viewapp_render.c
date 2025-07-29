@@ -12,7 +12,7 @@
 
 #include "viewapp_state.h"
 
-static void viewapp_boot_workload_resources_layout ( void ) {
+void viewapp_boot_workload_resources_layout ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
 
@@ -215,7 +215,7 @@ void viewapp_boot_mouse_pick_graph ( void ) {
     xf->finalize_graph ( graph );
 }
 
-static void viewapp_boot_raytrace_graph ( void ) {
+void viewapp_boot_raytrace_graph ( void ) {
 #if xg_enable_raytracing_m
     viewapp_state_t* state = viewapp_state_get();
     xg_device_h device = state->render.device;    

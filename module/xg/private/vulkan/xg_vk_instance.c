@@ -158,7 +158,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL xg_vk_instance_debug_callback ( VkDebugUti
     //    return VK_FALSE;
     //}
 
-    if ( severity == VK_DEBUG_REPORT_INFORMATION_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT ) {
+    if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT || severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT ) {
         std_log_info_m ( data->pMessage );
     } else if ( severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT ) {
         //std_log_warn_m ( data->pMessage );

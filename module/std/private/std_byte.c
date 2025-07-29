@@ -221,12 +221,10 @@ uint64_t std_align_u64 ( uint64_t value, uint64_t align ) {
 }
 
 size_t std_pow2_round_up ( size_t value ) {
-#if std_pointer_size_m == 8
+#if defined ( std_build_x64_m )
     return std_pow2_round_up_u64 ( value );
-#elif std_pointer_size_m == 4
+#elif defined ( std_build_x86_m )
     return std_pow2_round_up_u32 ( value );
-#else
-#error
 #endif
 }
 
@@ -254,12 +252,10 @@ uint64_t std_pow2_round_up_u64 ( uint64_t v ) {
 }
 
 size_t std_pow2_round_down ( size_t value ) {
-#if std_pointer_size_m == 8
+#if defined ( std_build_x64_m )
     return std_pow2_round_down_u64 ( value );
-#elif std_pointer_size_m == 4
+#elif defined ( std_build_x86_m )
     return std_pow2_round_down_u32 ( value );
-#else
-#error
 #endif
 }
 

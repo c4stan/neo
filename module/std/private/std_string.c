@@ -4,10 +4,8 @@
 #include <std_log.h>
 #include <std_allocator.h>
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
-#include <string.h>
+#include <stdlib.h>
 
 #include "std_state.h"
 
@@ -41,6 +39,10 @@ bool std_utf8_is_quadruple_byte ( char c ) {
     return ( c & 0xf8 ) == 0xf0;
 }
 
+bool std_utf8_is_first_byte ( char c ) {
+    return ( c & 0xc0 ) != 0x80;
+}
+
 size_t std_utf8_char_size ( char c ) {
     if ( std_utf8_is_single_byte ( c ) ) {
         return 1;
@@ -48,29 +50,30 @@ size_t std_utf8_char_size ( char c ) {
         return 2;
     } else if ( std_utf8_is_triple_byte ( c ) ) {
         return 3;
-    } else {
+    } else if ( std_utf8_is_quadruple_byte ( c ) ) {
         return 4;
+    } else {
+        std_log_error_m ( "Malformed UTF8 character" );
+        return 0;
     }
 }
 
-size_t std_utf8_char_size_reverse ( const char* c, size_t back_len ) {
-    std_assert_m ( c != NULL );
-#if std_log_assert_enabled_m
-    const char* base = c - back_len;
-#endif
-    const char* ptr = c;
+size_t std_utf8_char_size_reverse ( const char* last_byte, const char* base ) {
+    std_assert_m ( last_byte != NULL );
+    const char* ptr = last_byte;
 
-    for ( ;; ) {
-        std_assert_m ( ptr >= base );
-
-        if ( std_utf8_is_single_byte ( *ptr ) ) {
-            break;
-        }
-
+    bool found = std_utf8_is_first_byte ( *ptr );
+    while ( !found && ptr > base ) {
         --ptr;
+        found = std_utf8_is_first_byte ( *ptr );
     }
 
-    return ( size_t ) ( c - ptr ) + 1;
+    if ( found ) {
+        return std_utf8_char_size ( *ptr );
+    } else {
+        std_log_error_m ( "Malformed UTF8 character" );
+        return 0;
+    }
 }
 
 size_t std_str_count_utf8 ( const char* str ) {
@@ -85,7 +88,7 @@ size_t std_str_count_utf8 ( const char* str ) {
 }
 
 size_t std_str_len ( const char* str ) {
-    return strlen ( str );  // TODO
+    return strlen ( str );
 }
 
 size_t std_str_copy ( char* dest, size_t cap, const char* src ) {
@@ -148,7 +151,7 @@ bool std_str_starts_with ( const char* str, const char* token ) {
 size_t std_str_format ( char* dest, size_t cap, const char* src, ... ) {
     va_list va;
     va_start ( va, src );
-    int result = vsnprintf ( dest, cap, src, va );
+    int result = __builtin_vsnprintf ( dest, cap, src, va );
     va_end ( va );
 
     if ( result < 0 ) {
@@ -159,7 +162,7 @@ size_t std_str_format ( char* dest, size_t cap, const char* src, ... ) {
 }
 
 size_t std_str_format_valist ( char* dest, size_t cap, const char* src, va_list valist ) {
-    int result = vsnprintf ( dest, cap, src, valist );
+    int result = __builtin_vsnprintf ( dest, cap, src, valist );
 
     if ( result < 0 ) {
         result = 0;
@@ -169,7 +172,7 @@ size_t std_str_format_valist ( char* dest, size_t cap, const char* src, va_list 
 }
 
 size_t std_u32_to_str ( char* str, size_t size, uint32_t u32, uint32_t pad ) {
-    int len = snprintf ( NULL, 0, "%u", u32 );
+    int len = __builtin_snprintf ( NULL, 0, "%u", u32 );
     if ( len >= size ) {
         return SIZE_MAX;
     }
@@ -179,12 +182,12 @@ size_t std_u32_to_str ( char* str, size_t size, uint32_t u32, uint32_t pad ) {
 
     std_mem_set ( str, pad, ' ' );
     str[pad] = '\0';    
-    snprintf ( str + pad - len, size, "%u", u32 );
+    __builtin_snprintf ( str + pad - len, size, "%u", u32 );
     return ( size_t ) len;
 }
 
 size_t std_u64_to_str ( char* str, size_t size, uint64_t u64 ) {
-    int len = snprintf ( str, size, "%llu", ( unsigned long long ) u64 );
+    int len = __builtin_snprintf ( str, size, "%llu", ( unsigned long long ) u64 );
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }
 
@@ -273,7 +276,7 @@ float std_str_to_f32 ( const char* str ) {
 
 size_t std_f32_to_str ( float f32, char* str, size_t cap ) {
     // TODO take decimals # as param
-    int len = snprintf ( str, cap, "%.2f", f32 );
+    int len = __builtin_snprintf ( str, cap, "%.2f", f32 );
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }
 
@@ -465,11 +468,11 @@ static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint
         int retval;
 
         if ( u64 % multiplier == 0 ) {
-            retval = snprintf ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
+            retval = __builtin_snprintf ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
         } else {
             // The ~ character breaks a number of fonts when used for text rendering... better if avoided
             //retval = snprintf ( dest, cap, "~" std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
-            retval = snprintf ( dest, cap, std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
+            retval = __builtin_snprintf ( dest, cap, std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
         }
 
         std_assert_m ( retval >= 0 );

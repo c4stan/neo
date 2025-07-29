@@ -1788,6 +1788,8 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                         vk_barrier->image = texture->vk_handle;
                         vk_barrier->subresourceRange = range;
 
+                        std_assert_m ( vk_barrier->newLayout != VK_IMAGE_LAYOUT_UNDEFINED );
+
                         //vk_barrier->srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
                         //vk_barrier->dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
                         //vk_barrier->srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;

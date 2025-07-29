@@ -47,6 +47,20 @@ static void xg_test_frame ( xg_device_h device, xg_swapchain_h swapchain, bool c
         ),
     ) );
 
+    xg_graphics_pipeline_params_t p = xg_graphics_pipeline_params_m (
+        .state = xg_graphics_pipeline_state_m(),
+        //.state.vertex_shader = xg_pipeline_state_shader_m(),
+        //.state.fragment_shader = xg_pipeline_state_shader_m(),
+        //.state.input_layout = xg_input_layout_m(),
+        //.state.rasterizer_state = xg_rasterizer_state_m(),
+        //.state.depth_stencil_state = xg_depth_stencil_state_m(),
+        //.state.blend_state = xg_blend_state_m(),
+        //.state.viewport_state = xg_viewport_state_m(),
+        //.state.scissor_state = xg_scissor_state_m(),
+        //.state.dynamic_state = 0,
+    );
+    std_unused_m ( p );
+
     xg_color_clear_t color_clear;
     const uint64_t t = 500;
     uint64_t tick = std_tick_now();

@@ -315,10 +315,18 @@ uint32_t std_thread_index ( std_thread_h thread_handle ) {
 
 //==============================================================================
 
+std_thread_h std_thread_this ( void ) {
+    std_thread_h thread_handle;
+#if defined(std_platform_win32_m)
+    thread_handle = ( std_thread_h ) ( TlsGetValue ( ( DWORD ) std_thread_state->tls_alloc ) );
+#elif defined(std_platform_linux_m)
+    thread_handle = ( std_thread_h ) pthread_getspecific ( ( pthread_key_t ) std_thread_state->tls_alloc );
+#endif
+    return thread_handle;
+}
+
 void std_thread_this_yield ( void ) {
 #if defined(std_platform_win32_m)
-    // TODO use sleep?
-    //Sleep ( 0 );
     YieldProcessor();
 #elif defined(std_platform_linux_m)
     sched_yield();
@@ -340,16 +348,6 @@ void std_thread_this_exit ( void ) {
 #elif defined(std_platform_linux_m)
     pthread_exit ( NULL );
 #endif
-}
-
-std_thread_h std_thread_this ( void ) {
-    std_thread_h thread_handle;
-#if defined(std_platform_win32_m)
-    thread_handle = ( std_thread_h ) ( TlsGetValue ( ( DWORD ) std_thread_state->tls_alloc ) );
-#elif defined(std_platform_linux_m)
-    thread_handle = ( std_thread_h ) pthread_getspecific ( ( pthread_key_t ) std_thread_state->tls_alloc );
-#endif
-    return thread_handle;
 }
 
 //==============================================================================

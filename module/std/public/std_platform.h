@@ -15,32 +15,24 @@
     //#define WIN32_DEFAULT_LIBS
     #include <Windows.h>
     #include <windowsx.h>
-    //#include <memoryapi.h>
-    #include <dbghelp.h>
-    #include <synchapi.h>
 
+    #include <stddef.h>
     #include <stdint.h>
-    #include <uchar.h>
     #include <stdbool.h>
-    #include <stdarg.h>
-    #include <intrin.h>
-    #include <float.h>
     #include <inttypes.h>
+    #include <limits.h>
 
     #if defined _WIN64
-        #define std_cpu_x64_m
+        #define std_build_x64_m
     #else
-        #define std_cpu_x86_m
+        #define std_build_x86_m
     #endif
-
 #elif defined(__linux__)
     #define std_platform_linux_m
 
     #define _GNU_SOURCE
     #include <stdint.h>
-    #include <uchar.h>
     #include <stdbool.h>
-    #include <stdarg.h>
     #include <float.h>
     #include <inttypes.h>
     #include <string.h>
@@ -64,13 +56,12 @@
     #include <sys/stat.h>
 
     #if defined(__x86_64__)
-        #define std_cpu_x64_m
+        #define std_build_x64_m
     #elif #defined (__i386__)
-        #define std_cpu_x86_m
+        #define std_build_x86_m
     #else
-        #error "Unexpected CPU architecture detected on Linux platform"
+        #error "Building for unexpected CPU architecture"
     #endif
-
 #else
     #error "Unsupported platform"
 #endif
@@ -84,14 +75,10 @@
 #endif
 */
 
-#if UINTPTR_MAX == UINT32_MAX
-    #define std_pointer_size_m 4
-    #define std_size_wide_m    0
-#elif UINTPTR_MAX == UINT64_MAX
+#if defined ( std_build_x64_m )
     #define std_pointer_size_m 8
-    #define std_size_wide_m    1
-#else
-    #error "Unexpected pointer size"
+#elif defined ( std_build_x86_m )
+    #define std_pointer_size_m 4
 #endif
 
 //==============================================================================

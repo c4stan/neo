@@ -48,6 +48,9 @@ static xg_shading_stage_bit_e xs_parser_default_shading_stage ( xs_parser_parsin
         return xg_shading_stage_bit_compute_m;
     case xg_pipeline_raytrace_m:
         return xg_shading_stage_bit_ray_gen_m; // TODO is this right?
+    default:
+        std_log_error_m ( "Can't determine a default shading stage" );
+        return xg_shading_stage_bit_none_m;
     }
 }
 

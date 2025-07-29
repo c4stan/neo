@@ -2,6 +2,7 @@
 
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
+#include <assimp/material.h>
 #include <assimp/postprocess.h>
 
 #include "viewapp_state.h"
@@ -1039,8 +1040,10 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                     std_virtual_heap_free ( normal_texture.data );
                 }
 
-                aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );
-                aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &mesh_material.metalness );
+                //aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );
+                //aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &mesh_material.metalness );
+                mesh_material.roughness = 0;
+                mesh_material.metalness = 0;
             }
 
             viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
@@ -1115,7 +1118,7 @@ void update_raytrace_world ( void ) {
 #endif
 }
 
-static void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time ) {
+void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
     se_i* se = state->modules.se;

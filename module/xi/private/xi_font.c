@@ -11,7 +11,7 @@
 std_warnings_save_state_m()
 std_warnings_ignore_m ( "-Wsign-conversion" )
 std_warnings_ignore_m ( "-Wbad-function-cast" )
-std_warnings_ignore_m ( "-Wcomma" )
+//std_warnings_ignore_m ( "-Wcomma" )
 std_warnings_ignore_m ( "-Wunused-function" )
 #include "stb_rect_pack.h"
 #include "stb_truetype.h"

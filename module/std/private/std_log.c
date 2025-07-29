@@ -8,7 +8,9 @@
 
 #include "std_state.h"
 
-#if defined(std_platform_linux_m)
+#if defined ( std_platform_win32_m )
+    #include <dbghelp.h> // SynInitialize, ...
+#elif defined ( std_platform_linux_m )
     #include <sys/ptrace.h>
     #include <ctype.h>
 

@@ -217,7 +217,7 @@ size_t std_path_pop ( char* path ) {
     }
 
     size_t i = len - 1;
-    size_t char_size = std_utf8_char_size_reverse ( path + i, i );
+    size_t char_size = std_utf8_char_size_reverse ( path + i, path );
     i -= char_size;
 
     for ( ;; ) {
@@ -232,7 +232,7 @@ size_t std_path_pop ( char* path ) {
             return i + 1;
         }
 
-        char_size = std_utf8_char_size_reverse ( path + i, i );
+        char_size = std_utf8_char_size_reverse ( path + i, path );
 
         if ( char_size >= i ) {
             break;

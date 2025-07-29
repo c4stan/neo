@@ -484,38 +484,6 @@ bool std_hash_map_try_insert ( uint64_t* out_payload, std_hash_map_t* map, uint6
     return false;
 }
 
-bool std_hash_map_insert_shared ( std_hash_map_t* map, uint64_t hash, uint64_t payload ) {
-    // Load
-    size_t      mask = map->mask;
-    uint64_t*   hashes = map->hashes;
-    uint64_t*   payloads = map->payloads;
-
-    // Compute idx
-    size_t      idx = hash & mask;
-
-    // Try insert until success (linear probing)
-    spin:
-    for ( uint64_t i = 0; i < mask + 1; ++i ) {
-        uint64_t slot = hashes[idx];
-        if ( slot == UINT64_MAX ) {
-            if ( std_compare_and_swap_u64 ( &hashes[idx], &slot, hash ) ) {
-                payloads[idx] = payload;
-                std_atomic_increment_u64 ( &map->count );
-                return true;
-            } else {
-                goto spin;
-            }
-        } else if ( slot == hash) {
-            return false;
-        }
-
-        idx = ( idx + 1 ) & mask;
-    }
-
-    std_log_error_m ( "hash map is full!" );
-    return false;
-}
-
 uint64_t* std_hash_map_lookup ( std_hash_map_t* map, uint64_t hash ) {
     // Load
     size_t          mask = map->mask;
@@ -687,6 +655,74 @@ remove: {
 bool std_hash_map_remove_payload ( std_hash_map_t* map, uint64_t* payload ) {
     size_t idx = payload - map->payloads;
     return std_hash_map_remove_at_idx ( map, idx );
+}
+
+// ------
+
+std_hash_map_shared_t std_hash_map_shared ( uint64_t* keys, uint64_t* payloads, uint64_t capacity ) {
+    std_hash_map_shared_t map = {
+        .hashes = keys,
+        .payloads = payloads,
+        .count = 0,
+        .mask = capacity - 1,
+    };
+    return map;
+}
+
+bool std_hash_map_shared_insert ( std_hash_map_shared_t* map, uint64_t hash, uint64_t payload ) {
+    // Load
+    uint64_t    mask = map->mask;
+    uint64_t*   hashes = map->hashes;
+    uint64_t*   payloads = map->payloads;
+
+    // Compute idx
+    uint64_t    idx = hash & mask;
+
+    // Try insert until success (linear probing)
+    for ( uint64_t i = 0; i < mask + 1; ++i ) {
+        uint64_t slot = hashes[idx];
+        if ( slot == UINT64_MAX ) {
+            if ( std_compare_and_swap_u64 ( &hashes[idx], &slot, hash ) ) {
+                payloads[idx] = payload;
+                std_atomic_increment_u64 ( &map->count );
+                return true;
+            }
+        } else if ( slot == hash) {
+            return false;
+        }
+
+        idx = ( idx + 1 ) & mask;
+    }
+
+    std_log_error_m ( "hash map is full!" );
+    return false;
+}
+
+uint64_t* std_hash_map_shared_lookup ( std_hash_map_shared_t* map, uint64_t hash ) {
+    uint64_t mask = map->mask;
+    const uint64_t* hashes = map->hashes;
+    uint64_t* payloads = map->payloads;
+
+    uint64_t idx = hash & mask;
+    uint64_t map_hash = hashes[idx];
+
+    // Try compare until success or empty slot (linear probing)
+    for ( uint64_t i = 0; i < mask + 1; ++i ) {
+        if ( map_hash == UINT64_MAX ) {
+            // Empty
+            return NULL;
+        }
+
+        if ( hash == map_hash ) {
+            // Success
+            return &payloads[idx];
+        }
+
+        idx = ( idx + 1 ) & mask;
+        map_hash = hashes[idx];
+    }
+
+    return NULL;
 }
 
 // ------

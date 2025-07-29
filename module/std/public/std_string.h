@@ -27,8 +27,9 @@ bool std_utf8_is_single_byte    ( char c );
 bool std_utf8_is_double_byte    ( char c );
 bool std_utf8_is_triple_byte    ( char c );
 bool std_utf8_is_quadruple_byte ( char c );
+bool std_utf8_is_first_byte     ( char c );
 size_t std_utf8_char_size         ( char first_byte );
-size_t std_utf8_char_size_reverse ( const char* last_byte, size_t back_len );  // back_len is distance from string base to last_byte
+size_t std_utf8_char_size_reverse ( const char* last_byte, const char* str_base );  // back_len is distance from string base to last_byte
 
 size_t std_str_count_ascii ( const char* str );
 size_t std_str_count_utf8  ( const char* str );

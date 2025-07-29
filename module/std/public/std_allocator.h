@@ -147,48 +147,6 @@ uint64_t    std_virtual_stack_used_size ( const std_virtual_stack_t* stack );
 #define std_virtual_stack_write_array_m( stack, base, count ) std_virtual_stack_write ( stack, base, sizeof ( *base ) * count )
 
 /*
-    Linear stack allocator
-*/
-#if 0
-typedef enum {
-    std_arena_allocator_heap_m,
-    std_arena_allocator_virtual_m,
-    std_arena_allocator_none_m,
-} std_arena_allocator_e;
-
-typedef struct {
-    std_buffer_t buffer;
-    void* virtual_end;
-    std_arena_allocator_e allocator;
-} std_arena_t;
-
-std_arena_t std_arena_create ( std_arena_allocator_e allocator, size_t size );
-std_arena_t std_arena ( void* base, size_t size, size_t virtual_size, std_arena_allocator_e allocator );
-void        std_arena_destroy ( std_arena_t* arena );
-void*       std_arena_alloc ( std_arena_t* arena, size_t size );
-bool        std_arena_write ( std_arena_t* arena, const void* data, size_t size );
-bool        std_arena_align ( std_arena_t* arena, size_t align );
-bool        std_arena_align_zero ( std_arena_t* arena, size_t align );
-void*       std_arena_alloc_align ( std_arena_t* arena, size_t size, size_t align );
-bool        std_arena_write_align ( std_arena_t* arena, const void* data, size_t size, size_t align );
-void        std_arena_free ( std_arena_t* arena, size_t size );
-void        std_arena_clear ( std_arena_t* arena );
-size_t      std_arena_used_size ( std_arena_t* arena );
-
-char*       std_arena_string_copy ( std_arena_t* arena, const char* str );
-char*       std_arena_string_append ( std_arena_t* arena, const char* str );
-
-#define     std_static_arena_m( array ) std_arena ( array, sizeof ( array ), sizeof ( array ), std_arena_allocator_none_m );
-#define     std_fixed_arena_m( base, size ) std_arena ( base, size, 0, std_arena_allocator_none_m );
-#define     std_heap_arena_m( base, size ) std_arena ( base, size, 0, std_arena_allocator_heap_m );
-#define     std_virtual_arena_m( buffer ) std_arena ( buffer.base, buffer.mapped_size, buffer.reserved_size, std_arena_allocator_virtual_m );
-
-#define     std_arena_write_noalign_m( arena, data ) std_arena_write ( arena, data, sizeof ( *data ) )
-#define     std_arena_alloc_m( arena, type ) ( type* ) std_arena_alloc_align ( arena, sizeof ( type ) , std_alignof_m ( type ) )
-#define     std_arena_alloc_array_m( arena, type, count ) ( type* ) std_arena_alloc_align ( arena, sizeof ( type ) * (count), std_alignof_m ( type ) )
-#endif
-
-/*
     Tagged allocator
     // TODO remove?
 */

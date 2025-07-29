@@ -10,7 +10,7 @@
 #include <std_module.h>
 
 #include <malloc.h>
-#include <stdio.h> // TODO include in std_log only and expose vsnprintf from there?
+#include <stdio.h> // TODO include in std_log only and expose vsprintf from there?
 
 #include "std_state.h"
 
@@ -115,7 +115,7 @@ bool std_virtual_free ( void* from, void* to ) {
     Using this over allocating a number of raw virtual pages through the virtual page allocator has the only advantage that
     unused memory within the page boundary can get reused in later allocations that also go through this allocator, instead of being wasted.
 
-    // TODO rename to something else (first fit heap? ffh?), this heap is not currently used
+    // TODO rename to something else (first fit heap? ffh?), remove/change? this is not currently used
 */
 
 #if 0
@@ -398,51 +398,6 @@ void std_tagged_free ( uint64_t tag ) {
     std_mutex_lock ( &std_allocator_state->tagged_heap.mutex );
     std_list_push ( &std_allocator_state->tagged_heap.bins_freelist, bin );
     std_mutex_unlock ( &std_allocator_state->tagged_heap.mutex );
-}
-#endif
-
-//==============================================================================
-// TODO delete this
-
-#if 0
-std_virtual_buffer_t std_virtual_buffer_reserve ( size_t size ) {
-    size_t page_size = std_virtual_page_size();
-
-    std_virtual_buffer_t buffer;
-    std_alloc_t alloc = std_virtual_reserve ( size );
-    buffer.handle = alloc.handle;
-    buffer.base = alloc.buffer.base;
-    buffer.reserved_size = alloc.buffer.size;
-    buffer.mapped_size = page_size;
-    std_virtual_map ( buffer.handle, 0, page_size );
-    buffer.top = 0;
-
-    return buffer;
-}
-
-char* std_virtual_buffer_push ( std_virtual_buffer_t* buffer, size_t size ) {
-    size_t page_size = std_virtual_page_size();
-
-    size_t old_top = buffer->top;
-    size_t top = old_top + size;
-    std_assert_m ( top < buffer->reserved_size );
-    size_t mapped_size = buffer->mapped_size;
-
-    if ( top > mapped_size ) {
-        size_t extra_size = top - mapped_size;
-        size_t map_size = std_align ( extra_size, page_size );
-
-        std_assert_m ( std_virtual_map ( buffer->handle, mapped_size, map_size ) );
-        buffer->mapped_size += map_size;
-    }
-
-    buffer->top = top;
-    return buffer->base + old_top;
-}
-
-void std_virtual_buffer_free ( std_virtual_buffer_t* buffer ) {
-    std_virtual_free ( buffer->handle );
-    buffer->handle = std_null_memory_handle_m;
 }
 #endif
 
@@ -730,227 +685,6 @@ char* std_virtual_stack_string_append ( std_virtual_stack_t* stack, const char* 
     std_stack_string_pop_terminator ( &stack->mapped );
     return std_virtual_stack_string_copy ( stack, str );
 }
-
-#if 0
-std_arena_t std_arena ( void* base, size_t size, size_t virtual_size, std_arena_allocator_e allocator ) {
-    std_arena_t arena;
-    arena.base = base;
-    arena.size = size;
-    arena.virtual_size = virtual_size;
-    arena.used_size = 0;
-    arena.allocator = allocator;
-    return arena;
-}
-
-#define std_allocator_arena_growth_factor_m 2
-
-std_arena_t std_arena_create ( std_arena_allocator_e allocator, size_t size ) {
-    std_arena_t arena;
-    arena.allocator = allocator;
-    arena.used_size = 0;
-    
-    if ( allocator == std_arena_allocator_none_m ) {
-        std_log_error_m ( "Tried to initialize arena with null allocator and no pre-allocated memory" );
-        arena.base = NULL;
-        arena.size = 0;
-        arena.virtual_size = 0;
-    } else if ( allocator == std_arena_allocator_heap_m ) {
-        arena.base = std_virtual_heap_alloc ( size, 16 );
-        arena.size = size;
-        arena.virtual_size = 0;
-    } else if ( allocator == std_arena_allocator_virtual_m ) {
-        size_t reserved_size = std_align ( size, std_allocator_state->virtual_page_size );
-        void* base = std_virtual_reserve ( reserved_size );// * std_allocator_arena_growth_factor_m );
-        std_virtual_map ( &buffer, std_allocator_state->virtual_page_size );
-        arena.base = buffer.base;
-        arena.size = buffer.mapped_size;
-        arena.virtual_size = buffer.reserved_size;
-    }
-
-    return arena;
-}
-
-void std_arena_destroy ( std_arena_t* arena ) {
-    std_arena_allocator_e allocator = arena->allocator;
-
-    if ( allocator == std_arena_allocator_heap_m ) {
-        std_virtual_heap_free ( arena->base );
-    } else if ( allocator == std_arena_allocator_virtual_m ) {
-        std_virtual_buffer_t buffer = std_virtual_buffer ( arena->base, arena->size, arena->virtual_size );
-        std_virtual_free ( &buffer );
-    }
-}
-
-static bool std_arena_grow_check ( std_arena_t* arena, size_t alloc_size ) {
-    size_t required_size = arena->used_size + alloc_size;
-
-    if ( required_size <= arena->size ) {
-        return true;
-    }
-
-    if ( arena->allocator == std_arena_allocator_none_m ) {
-        return false;
-    } else if ( arena->allocator == std_arena_allocator_heap_m ) {
-        size_t new_size = std_max ( alloc_size, arena->size * std_allocator_arena_growth_factor_m );
-        void* buffer = std_virtual_heap_alloc ( new_size, 16 );
-        if ( !buffer ) {
-            return false;
-        }
-        
-        std_mem_copy ( buffer, arena->base, arena->used_size );
-        std_verify_m ( std_virtual_heap_free ( arena->base ) );
-        arena->base = buffer;
-        arena->size = new_size;
-        return true;
-    } else if ( arena->allocator == std_arena_allocator_virtual_m ) {
-        std_virtual_buffer_t buffer = std_virtual_buffer ( arena->base, arena->size, arena->virtual_size );
-        size_t required_page_size = std_align ( required_size, std_allocator_state->virtual_page_size );
-        
-        if ( required_page_size <= arena->virtual_size ) {
-            size_t map_size = std_align ( alloc_size, std_allocator_state->virtual_page_size );
-            
-            if ( !std_virtual_map ( &buffer, map_size ) ) {
-                return false;
-            }
-            
-            arena->size = buffer.mapped_size;
-        } else {
-            size_t new_size = std_max ( alloc_size, arena->size * std_allocator_arena_growth_factor_m );
-            new_size = std_align ( new_size, std_allocator_state->virtual_page_size );
-            std_virtual_buffer_t new_buffer = std_virtual_alloc ( new_size );
-            if ( !new_buffer.base ) {
-                return false;
-            }
-            
-            std_mem_copy ( new_buffer.base, arena->base, arena->used_size );
-            std_verify_m ( std_virtual_free ( &buffer ) );
-            arena->base = new_buffer.base;
-            arena->size = new_buffer.mapped_size;
-            arena->virtual_size = new_buffer.reserved_size;
-        }
-        return true;
-    }
-    return false;
-}
-
-void* std_arena_alloc ( std_arena_t* arena, size_t size ) {
-    if ( !std_arena_grow_check ( arena, size ) ) {
-        return NULL;
-    }
-
-    return std_buffer_alloc ( &arena->buffer );
-}
-
-static void* std_arena_alloc_zero ( std_arena_t arena, size_t size ) {
-    void* alloc = std_arena_alloc ( arena, size );
-
-    if ( alloc ) {
-        std_mem_zero ( alloc, size );
-    }
-
-    return alloc;
-}
-
-void* std_arena_alloc_align ( std_arena_t* arena, size_t size, size_t align ) {
-    void* top = arena->buffer.top;
-    size_t align_size = std_align_size_ptr ( top, align );
-    return std_arena_alloc ( arena, align_size + size );
-}
-
-void* std_arena_write_align ( std_arena_t* arena, const void* data, size_t size, size_t align ) {
-    void* alloc = std_arena_alloc_align ( arena, size, align );
-    
-    if ( alloc ) {
-        std_mem_copy ( alloc, data, size );
-    }
-
-    return alloc;
-}
-
-bool std_arena_write ( std_arena_t* arena, const void* data, size_t size ) {
-    void* alloc = std_arena_alloc ( arena, size );
-
-    if ( alloc ) {
-        std_mem_copy ( alloc, data, size );
-    }
-
-    return alloc;
-}
-
-bool std_arena_align ( std_arena_t* arena, size_t align ) {
-    void* top = arena->buffer.top;
-    size_t align_size = std_align_size_ptr ( top, align );
-    return std_arena_alloc ( arena, align_size ) != NULL;
-}
-
-bool std_arena_align_zero ( std_arena_t* arena, size_t align ) {
-    void* top = arena->buffer.top;
-    size_t align_size = std_align_size_ptr ( top, align );
-    return std_arena_alloc_zero ( arena, align_size ) != NULL;
-}
-
-void std_arena_free ( std_arena_t* arena, size_t size ) {
-    std_buffer_free ( &arena->buffer, size );
-}
-
-void std_arena_clear ( std_arena_t* arena ) {
-    std_buffer_clear ( &arena->buffer );
-}
-
-char* std_arena_string_copy ( std_arena_t* arena, const char* str ) {
-    size_t len = std_str_len ( str ) ;
-
-    if ( !std_arena_grow_check ( arena, len + 1 ) ) {
-        return NULL;
-    }
-
-    return std_buffer_string_copy_n ( &arena->buffer, str, len + 1 );
-}
-
-char* std_arena_string_append ( std_arena_t* arena, const char* str ) {
-    std_buffer_string_pop_terminator ( &arena->buffer );
-    return std_arena_string_copy ( arena, str );
-}
-#endif
-
-#if 0
-static std_alloc_t std_arena_allocator_alloc ( void* allocator, size_t size, size_t align ) {
-    std_auto_m stack = ( std_arena_t* ) allocator;
-    char* base = stack->buffer.base;
-    size_t old_top = stack->top;
-    char* user_ptr = ( char* ) std_align_ptr ( base + old_top, align );
-    size_t new_top = ( size_t ) ( user_ptr - base ) + size;
-    stack->top = new_top;
-    std_assert_m ( stack->top <= stack->buffer.size );
-    std_alloc_t alloc;
-    alloc.handle.id = ( uint64_t ) old_top;
-    alloc.handle.size = new_top - old_top;
-    alloc.buffer.base = user_ptr;
-    alloc.buffer.size = size;
-    return alloc;
-}
-
-static bool std_arena_allocator_free ( void* allocator, std_memory_h memory ) {
-    std_auto_m stack = ( std_arena_t* ) allocator;
-    size_t top = ( size_t ) ( memory.id + memory.size );
-
-    if ( top == stack->top ) {
-        std_assert_m ( memory.id < stack->top );
-        stack->top = ( size_t ) memory.id;
-        return true;
-    } else {
-        return false;
-    }
-}
-
-std_allocator_i std_arena_allocator ( std_arena_t* allocator ) {
-    std_allocator_i i;
-    i.alloc = std_arena_allocator_alloc;
-    i.free = std_arena_allocator_free;
-    i.impl = allocator;
-    return i;
-}
-#endif
 
 //==============================================================================
 // TLSF allocator
@@ -1537,7 +1271,6 @@ void std_allocator_boot ( void ) {
         state.virtual_page_size = getpagesize();
 #endif
         std_assert_m ( std_pow2_test ( state.virtual_page_size ) );
-        //std_assert_m ( std_bit_scan_64 ( state.virtual_page_size, &state.virtual_page_size_bit_idx ) );
     }
 
     // Query RAM size, for later usage
@@ -1562,7 +1295,7 @@ void std_allocator_boot ( void ) {
     // Will be used by the following virtual heap init code and by the incoming std_allocator_init call
     std_allocator_attach ( &state );
 
-    // Virtual heap
+    // Virtual heap - unused
     // This reserves virtual space for total_ram_size/virtual_page_size nodes, which on a 8GiB
     // system is about 2 million nodes, but only commits memory that's actually used.
     #if 0
@@ -1579,7 +1312,7 @@ void std_allocator_boot ( void ) {
     }
     #endif
 
-    // Tagged heap
+    // Tagged heap - unused
 #if 0
     {
         uint64_t tagged_page_size = 1024 * 1024 * 2; // TODO take as param?
@@ -1594,7 +1327,7 @@ void std_allocator_boot ( void ) {
     }
 #endif
 
-    // tlsf heap
+    // TLSF heap
     {
         uint64_t initial_size = 1024ull * 1024 * 1024 * 4;
         std_allocator_tlsf_heap_init ( &state.tlsf_heap, initial_size );
@@ -1627,61 +1360,3 @@ void std_allocator_shutdown ( void ) {
     }
 #endif
 }
-
-/*
-TODO implement realloc?
-
-std_alloc_t std_atomic_stack_alloc_i ( void* allocator, size_t size, size_t align ) {
-    return std_atomic_stack_alloc ( ( std_atomic_stack_allocator_t* ) allocator, size, align );
-}
-
-std_alloc_t std_atomic_stack_realloc_i ( void* allocator, std_memory_h old_memory, size_t new_size, size_t align ) {
-    return std_atomic_stack_realloc ( ( std_atomic_stack_allocator_t* ) allocator, old_memory, new_size, align );
-}
-
-bool std_atomic_stack_free_i ( void* allocator, std_memory_h memory ) {
-    return std_atomic_stack_free ( ( std_atomic_stack_allocator_t* ) allocator, memory );
-}
-
-std_allocator_i std_atomic_stack_i ( std_atomic_stack_allocator_t* allocator ) {
-    std_allocator_i i;
-    i.alloc = std_atomic_stack_alloc_i;
-    i.realloc = std_atomic_stack_realloc_i;
-    i.free = std_atomic_stack_free_i;
-    i.impl = allocator;
-    return i;
-}
-*/
-
-/*
-#if std_enabled_m(std_memory_track_m)
-
-// ====================o=============================
-// Memory tracker
-// =================================================
-// The only aim for this is to help with tracking leaking allocations.
-// Every allocator that wants to use this has to register itself as user,
-// de-register itself on destruction, and record all memory allocations and frees.
-//
-// ( allocator ) -> ( allocations list )
-// allocations number can grow indefinitely and items are likely to be removed sparsely
-// they also don't require any order and can be defragmented
-// the API must support multi threaded operations
-
-typedef struct {
-    char name[std_memory_track_user_name_size_m];
-    void* allocator;
-    std_list_t freelist;
-    std_buffer_t allocations;
-    std_mutex_t mutex;
-} std_memory_tracker_user_t;
-
-typedef struct {
-    void* map_keys[std_memory_track_max_users_m * 2];                             // allocator ptr
-    std_memory_tracker_user_t map_payloads[std_memory_track_max_users_m * 2];     // user
-    std_map_t map;                                                              // ( allocator ) -> ( user )
-    std_mutex_t mutex;
-} std_memory_tracker_t;
-
-#endif
-*/

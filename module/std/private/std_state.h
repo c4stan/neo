@@ -122,8 +122,6 @@ typedef struct {
 
 typedef struct {
     size_t                          virtual_page_size;
-    //uint32_t                        virtual_page_size_bit_idx; // idx of the top bit in the page size value
-    // TODO remove
     //std_allocator_virtual_heap_t    virtual_heap;
     // TODO remove? rework?
     std_allocator_tagged_heap_t     tagged_heap;
@@ -158,12 +156,6 @@ typedef struct {
     std_timestamp_t program_start_timestamp_utc;
     std_timestamp_t program_start_timestamp_local;
 } std_time_state_t;
-
-//==============================================================================
-
-//typedef struct {
-//    std_virtual_buffer_t static_string_table_buffer;
-//} std_string_state_t;
 
 //==============================================================================
 

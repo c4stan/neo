@@ -1061,7 +1061,7 @@ typedef struct {
     .viewport_state = xg_viewport_state_m(), \
     .scissor_state = xg_scissor_state_m(), \
     .dynamic_state = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1078,7 +1078,7 @@ typedef struct {
     .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
     .constant_layout = xg_constant_bindings_layout_m(), \
     .debug_name = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

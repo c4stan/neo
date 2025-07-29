@@ -48,6 +48,7 @@ void std_atomic_ring_clear ( std_atomic_ring_t* ring );
 #endif
 
 // Single thread access queue
+// TODO rename to std_queue_t?
 typedef struct {
     void* base;
     void* alias;

@@ -103,7 +103,7 @@ const char*     std_thread_name         ( std_thread_h thread );
 
 std_thread_h    std_thread_this         ( void );
 void            std_thread_this_yield   ( void );
-std_no_return_m std_thread_this_exit    ( void );
 void            std_thread_this_sleep   ( size_t milliseconds );
+std_no_return_m std_thread_this_exit    ( void );
 
 bool            std_thread_info         ( std_thread_info_t* info, std_thread_h thread );

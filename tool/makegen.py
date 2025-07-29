@@ -20,40 +20,6 @@ BUILD_CHANGES_OUTPUT_PIPE_NAME = 'std_module_update_pipe'
 # https://learn.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt
 WINNT_VERSION = '0x0A000005' # win10
 
-# -- Warnings
-CORE_WARNING_FLAGS = (
-    '-Wno-switch-enum'                          # Having a _COUNT enum not explicitly handled in a switch throws this
-    ' -Wno-gnu-zero-variadic-macro-arguments'   # Allow 0 args variadic macros and ending ', ##__VA_ARGS__' trick (std_log uses this extensively)
-    ' -Wno-reserved-id-macro'                   # Allow e.g. names starting with __. Although not using it is probably a good idea, the Win32 API does, so.
-    #' -Wno-strict-prototypes'                   # Allow declaring foo() without having to explicit the (void).
-    #' -Wno-missing-prototypes'                  # Also complains about missing prototypes on 0 params functions not declared as (void)
-    ' -Wno-cast-qual'                           # Allow casting away const
-    ' -Wno-cast-align'                          # Allow casting from different alignments. Needed e.g. when casting an aligned allocation to the actual type.
-    ' -Wno-covered-switch-default'              # Allow having a default switch tag even after having handled all declared values of e.g. an enum, to catch weird values
-    ' -Wno-nonportable-system-include-path'     # Vulkan headers throw this for windows.h
-    ' -Wno-gnu-statement-expression'            # Allow multiline macros to return values, more similarly to how an inlined functions would behave
-    ' -Wno-assign-enum'                         # Allow to composite flag enums to form values that were not explicitly declared
-    ' -Wno-format-security'                     # Allow to pass a non-literal to printf
-    ' -Wno-format-nonliteral'                   # Allow to pass a non-literal to vsprintf
-    ' -Wno-double-promotion'                    # printing floats promotes them automatically to doubles and throws a warning if it's implicit
-    ' -Wno-parentheses'
-    ' -Wno-undef'                               # Allow treating undefined macros as 0 (C99 compliant)
-    ' -Wno-float-equal'                         # Don't warn when comparing float values with ==
-    ' -Wfatal-errors'                           # Stop after first error
-    ' -Wno-disabled-macro-expansion'
-    ' -Wno-gnu-designator'                      # allow for int array[100] = { [0...99] = 1 };
-    #' -Wno-void-pointer-to-enum-cast'           # allow casting void* to enum
-    ' -Wno-initializer-overrides'               # allow assigning same member multiple times in initializer lists. Used in constructor macros for optional non-default params
-    ' -Wno-unused-but-set-variable'
-    ' -Wno-comment'
-    ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
-    ' -Wno-missing-braces'                      # suggested braces warnings?
-)
-
-EXTENDED_WARNING_FLAGS = (
-    '-Werror'                                   # Treat warnings as errors
-)
-
 # -- Build output types
 OUTPUT_LIB = 1
 OUTPUT_DLL = 2
@@ -85,6 +51,46 @@ MAKE_TARGETS = [TARGET_ALL]#, TARGET_CLEAN]
 # -- Compilers
 COMPILER_CLANG = 1
 COMPILER_GCC = 2
+COMPILER = COMPILER_CLANG
+
+# -- Warnings
+CORE_WARNING_FLAGS = (
+    '-Wno-switch-enum'                          # Having a _COUNT enum not explicitly handled in a switch throws this
+    ' -Wno-gnu-zero-variadic-macro-arguments'   # Allow 0 args variadic macros and ending ', ##__VA_ARGS__' trick (std_log uses this extensively)
+    ' -Wno-reserved-id-macro'                   # Allow e.g. names starting with __. Although not using it is probably a good idea, the Win32 API does, so.
+    #' -Wno-strict-prototypes'                   # Allow declaring foo() without having to explicit the (void).
+    #' -Wno-missing-prototypes'                  # Also complains about missing prototypes on 0 params functions not declared as (void)
+    ' -Wno-cast-qual'                           # Allow casting away const
+    ' -Wno-cast-align'                          # Allow casting from different alignments. Needed e.g. when casting an aligned allocation to the actual type.
+    ' -Wno-covered-switch-default'              # Allow having a default switch tag even after having handled all declared values of e.g. an enum, to catch weird values
+    ' -Wno-nonportable-system-include-path'     # Vulkan headers throw this for windows.h
+    ' -Wno-gnu-statement-expression'            # Allow multiline macros to return values, more similarly to how an inlined functions would behave
+    ' -Wno-assign-enum'                         # Allow to composite flag enums to form values that were not explicitly declared
+    ' -Wno-format-security'                     # Allow to pass a non-literal to printf
+    ' -Wno-format-nonliteral'                   # Allow to pass a non-literal to vsprintf
+    ' -Wno-double-promotion'                    # printing floats promotes them automatically to doubles and throws a warning if it's implicit
+    ' -Wno-parentheses'
+    ' -Wno-undef'                               # Allow treating undefined macros as 0 (C99 compliant)
+    ' -Wno-float-equal'                         # Don't warn when comparing float values with ==
+    ' -Wfatal-errors'                           # Stop after first error
+    ' -Wno-disabled-macro-expansion'
+    ' -Wno-gnu-designator'                      # allow for int array[100] = { [0...99] = 1 };
+    #' -Wno-void-pointer-to-enum-cast'           # allow casting void* to enum
+    ' -Wno-initializer-overrides'               # allow assigning same member multiple times in initializer lists. Used in constructor macros for optional non-default params
+    ' -Wno-unused-but-set-variable'
+    ' -Wno-comment'
+    ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
+    ' -Wno-missing-braces'                      # suggested braces warnings?
+)
+
+if COMPILER == COMPILER_GCC:
+    CORE_WARNING_FLAGS += (
+        ' -Wno-override-init-side-effects'          # GCC seems to flag initializer list side effects even when there's none? need to investigate more
+    )
+
+EXTENDED_WARNING_FLAGS = (
+    '-Werror'                                   # Treat warnings as errors
+)
 
 """
     todos:
@@ -698,15 +704,14 @@ class Project:
         compiler_defs_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/defines')
         compiler_defs_file.write(def_cmd)
 
-        compiler = COMPILER_CLANG
-
-        if compiler == COMPILER_CLANG:
+        global COMPILER
+        if COMPILER == COMPILER_CLANG:
             std = 'c99'
-        elif compiler == COMPILER_GCC:
+        elif COMPILER == COMPILER_GCC:
             std = 'gnu23'
 
         main_target.cmd = ''
-        if compiler == COMPILER_CLANG:
+        if COMPILER == COMPILER_CLANG:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
@@ -733,7 +738,7 @@ class Project:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
                     # -lX11 -lvulkan -lpthread -lm -ldl
                     main_target.cmd += '\t@clang -rdynamic ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
-        elif compiler == COMPILER_GCC:
+        elif COMPILER == COMPILER_GCC:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
@@ -760,14 +765,14 @@ class Project:
         if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP: # or self.output == OUTPUT_LIB:
             if platform.system() == 'Windows':
                 for lib in self.external_libs:
-                    if compiler == COMPILER_CLANG:
+                    if COMPILER == COMPILER_CLANG:
                         main_target.cmd += ' -l' + '"' + lib + '"'
-                    elif compiler == COMPILER_GCC:
+                    elif COMPILER == COMPILER_GCC:
                         base, name, ext = parse_path(lib)
                         if base == '':
                             main_target.cmd += ' -l' + '' + name + ''
                         else:
-                            main_target.cmd += ' -L' + '' + base + '' + ' -l' + '' + name + ''
+                            main_target.cmd += ' -L' + '"' + base + '"' + ' -l' + '' + name + ''
             elif platform.system() == 'Linux': # TODO not sure if this is a win32/linux or clang/gcc thing... ?
                 for lib in self.external_libs:
                     base, name, ext = parse_path(lib)
@@ -826,7 +831,7 @@ class Project:
             src_def_cmd = '-Dstd_file_name_m=' + name + ext
             src_def_cmd += ' -Dstd_file_name_hash_m=' + str(string_hash(name))
 
-            if compiler == COMPILER_CLANG:
+            if COMPILER == COMPILER_CLANG:
                 if platform.system() == 'Windows':
                     # TODO make asm output optional?
                     #target.cmd = '\t@clang-cl ' + config_flags + ' -Zi -Fa' + normpath(output_path + '/' + name + '.asm') + ' '
@@ -870,7 +875,7 @@ class Project:
                     #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
-            elif compiler == COMPILER_GCC:
+            elif COMPILER == COMPILER_GCC:
                 if platform.system() == 'Windows':
                     # TODO make asm output optional?
                     target.cmd = '\t@gcc -std=' + std + ' -gcodeview'# --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
@@ -918,9 +923,9 @@ class Project:
             #TODO test this, is it working?
             if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP):
                 #if platform.system() == 'Linux':
-                if compiler == COMPILER_CLANG:
+                if COMPILER == COMPILER_CLANG:
                     target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
-                elif compiler == COMPILER_GCC:
+                elif COMPILER == COMPILER_GCC:
                     target.cmd = '\t@gcc -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
 
                 for path in self.project_paths:
