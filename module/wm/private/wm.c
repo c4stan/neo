@@ -23,6 +23,7 @@ static void wm_api_init ( wm_i* wm ) {
 #endif
 
     wm->get_window_input_buffer = wm_window_input_buffer_get;
+    wm->get_console_window = wm_window_console_get;
 
     wm->get_displays_count = wm_display_get_count;
     wm->get_displays = wm_display_get;

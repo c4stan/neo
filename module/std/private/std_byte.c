@@ -22,8 +22,8 @@ void std_mem_copy ( void* dest, const void* source, size_t size ) {
 void std_mem_set ( void* dest, size_t size, char value ) {
     memset ( dest, value, size );
 }
-bool std_mem_cmp ( const void* a, const void* b, size_t size ) {
-    return memcmp ( a, b, size ) == 0;
+int std_mem_cmp ( const void* a, const void* b, size_t size ) {
+    return memcmp ( a, b, size );
 }
 void std_mem_zero ( void* dest, size_t size ) {
     memset ( dest, 0, size );
@@ -221,9 +221,9 @@ uint64_t std_align_u64 ( uint64_t value, uint64_t align ) {
 }
 
 size_t std_pow2_round_up ( size_t value ) {
-#if defined ( std_build_x64_m )
+#if defined std_build_x64_m
     return std_pow2_round_up_u64 ( value );
-#elif defined ( std_build_x86_m )
+#elif defined std_build_x86_m
     return std_pow2_round_up_u32 ( value );
 #endif
 }
@@ -252,9 +252,9 @@ uint64_t std_pow2_round_up_u64 ( uint64_t v ) {
 }
 
 size_t std_pow2_round_down ( size_t value ) {
-#if defined ( std_build_x64_m )
+#if defined std_build_x64_m
     return std_pow2_round_down_u64 ( value );
-#elif defined ( std_build_x86_m )
+#elif defined std_build_x86_m
     return std_pow2_round_down_u32 ( value );
 #endif
 }

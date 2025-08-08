@@ -36,7 +36,7 @@ static void viewapp_boot ( void ) {
         window = wm->create_window ( &window_params );
     }
     state->render.window = window;
-    wm->get_window_info ( window, &state->render.window_info );
+    wm->get_window_info ( &state->render.window_info, window );
     wm->get_window_input_state ( window, &state->render.input_state );
 
     xg_device_h device;
@@ -527,7 +527,7 @@ static std_app_state_e viewapp_update ( void ) {
     }
 
     wm_window_info_t new_window_info;
-    wm->get_window_info ( window, &new_window_info );
+    wm->get_window_info ( &new_window_info, window );
 
     viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
 

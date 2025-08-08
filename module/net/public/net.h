@@ -33,6 +33,8 @@ typedef struct {
     };
 } net_address_bytes_t; // network byte order
 
+#define net_address_any_m() ( net_address_bytes_t ) {}
+
 // IP Protocol
 typedef enum {
     net_ip_protocol_tcp_m,
@@ -53,6 +55,12 @@ typedef struct {
     net_address_bytes_t ip; // network byte order
     net_socket_port_t port; // host byte order
 } net_socket_address_t;
+
+#define net_socket_address_m( ... ) ( net_socket_address_t ) { \
+    .ip = net_address_any_m(), \
+    .port = 0, \
+    __VA_ARGS__ \
+}
 
 typedef struct {
     net_address_family_e family;

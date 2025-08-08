@@ -48,6 +48,7 @@ typedef struct {
     size_t borders_height;
     bool is_focus;
     bool is_minimized;
+    bool is_console;
     char title[wm_window_title_max_len_m];
 } wm_window_info_t;
 
@@ -188,7 +189,7 @@ typedef enum {
 } wm_input_flags_bit_e;
 
 typedef struct {
-    uint32_t keycode;
+    uint32_t keycode; // wm_keyboard_state_e
     uint32_t flags; // wm_input_flags_bit_e
     uint32_t character;
 } wm_keyboard_event_args_t;
@@ -307,7 +308,7 @@ typedef struct {
     bool ( *destroy_window ) ( wm_window_h window );
 
     bool ( *is_window_alive ) ( wm_window_h window );
-    bool ( *get_window_info ) ( wm_window_h window, wm_window_info_t* info );
+    bool ( *get_window_info ) ( wm_window_info_t* info, wm_window_h window );
     void ( *update_window ) ( const wm_window_h window );
 
 #if wm_enable_input_events_m
@@ -321,6 +322,7 @@ typedef struct {
 #endif
 
     void ( *get_window_input_buffer ) ( wm_window_h window, wm_input_buffer_t* buffer );
+    wm_window_h ( *get_console_window ) ( void );
 
     size_t ( *get_displays_count ) ( void );
     size_t ( *get_displays ) ( wm_display_h* displays, size_t cap );

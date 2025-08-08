@@ -449,7 +449,7 @@ static void xs_test ( void ) {
     ) );
 
     wm_window_info_t window_info;
-    wm->get_window_info ( window, &window_info );
+    wm->get_window_info ( &window_info, window );
     wm_input_state_t input_state;
     wm->get_window_input_state ( window, &input_state );
 
@@ -476,7 +476,7 @@ static void xs_test ( void ) {
         }
 
         wm_window_info_t new_window_info;
-        wm->get_window_info ( window, &new_window_info );
+        wm->get_window_info ( &new_window_info, window );
 
         if ( window_info.width != new_window_info.width || window_info.height != new_window_info.height ) {
             xg->resize_swapchain ( swapchain, new_window_info.width, new_window_info.height );

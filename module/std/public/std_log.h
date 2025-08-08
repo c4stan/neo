@@ -44,6 +44,7 @@ typedef enum {
     std_log_level_warn_m = 2,
     std_log_level_error_m = 3,
     std_log_level_crash_m = 4,
+    std_log_level_custom_m = 5, // Removes all headers
 } std_log_level_e;
 
 #define std_log_level_bit_info_m  ( 1 << std_log_level_info_m )
@@ -51,11 +52,13 @@ typedef enum {
 #define std_log_level_bit_warn_m  ( 1 << std_log_level_warn_m )
 #define std_log_level_bit_error_m ( 1 << std_log_level_error_m )
 #define std_log_level_bit_crash_m ( 1 << std_log_level_crash_m )
+#define std_log_level_bit_custom_m ( 1 << std_log_level_custom_m )
 #define std_log_level_bit_all_m   ( std_log_level_bit_info_m  | \
                                     std_log_level_bit_debug_m | \
                                     std_log_level_bit_warn_m  | \
                                     std_log_level_bit_error_m | \
-                                    std_log_level_bit_crash_m )
+                                    std_log_level_bit_crash_m | \
+                                    std_log_level_custom_m )
 
 // Boolean values that can be tested for code that should only be executed
 // depending on which logging is enabled.

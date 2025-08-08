@@ -19,7 +19,7 @@ typedef enum {
     std_process_io_capture_m      // Need this for std_process_get_io() to return non NULL handles.
 } std_process_io_e;
 
-typedef struct {
+typedef struct { // TODO use _h "typed" handles? 
     uint64_t stdin_handle;
     uint64_t stdout_handle;
     uint64_t stderr_handle;

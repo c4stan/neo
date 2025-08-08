@@ -94,8 +94,8 @@ static void  test_allocator ( void ) {
         std_mem_copy ( b, a, sizeof ( uint32_t ) * 10 );
         std_mem_copy_array_m ( c, b, 10 );
 
-        std_verify_m ( std_mem_cmp ( a, c, sizeof ( uint32_t ) * 10 ) );
-        std_verify_m ( std_mem_cmp_array_m ( a, c, 10 ) );
+        std_verify_m ( std_mem_cmp ( a, c, sizeof ( uint32_t ) * 10 ) == 0 );
+        std_verify_m ( std_mem_cmp_array_m ( a, c, 10 ) == 0 );
 
         std_verify_m ( std_virtual_heap_free ( a ) );
         std_verify_m ( std_virtual_heap_free ( b ) );
@@ -1183,7 +1183,7 @@ void std_main ( void ) {
     std_process_info ( &process_info, std_process_this() );
 
     if ( process_info.args_count == 1 ) {
-        if ( std_mem_cmp ( process_info.args[0], CHILD_PROCESS_MAGIC_NUMBER, sizeof ( CHILD_PROCESS_MAGIC_NUMBER ) - 1 ) ) {
+        if ( std_mem_cmp ( process_info.args[0], CHILD_PROCESS_MAGIC_NUMBER, sizeof ( CHILD_PROCESS_MAGIC_NUMBER ) - 1 ) == 0 ) {
             test_process_child();
             return;
         }

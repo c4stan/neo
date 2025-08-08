@@ -31,6 +31,7 @@ static void aud_api_init ( aud_i* aud ) {
     aud->destroy_source = aud_source_destroy;
     aud->get_source_info = aud_source_get_info;
     aud->set_source_volume = aud_source_set_volume_scale;
+    aud->skip_source = aud_source_skip;
 
     aud->output_to_device = aud_source_output_to_device;
 }

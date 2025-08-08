@@ -43,9 +43,15 @@ def pop_path():
     PATH_STACK.pop()
     os.chdir(PATH_STACK[-1])
 
+def update_subprocess():
+    global SUBPROCESS
+    if SUBPROCESS is not None and SUBPROCESS.poll() is not None:
+        SUBPROCESS = None
+
 def hook_signal_handler():
     original_sigint = signal.getsignal(signal.SIGINT)
     def sigint_handler(signum, frame):
+        print("sig")
         global SUBPROCESS
         if SUBPROCESS is not None and SUBPROCESS.poll() is None:
             SUBPROCESS.kill()
@@ -402,13 +408,15 @@ def run_app(name, flags, params):
 
     if makedef['output'] == ['app']:
         cmd = './build/' + config + '/output/std_launcher.exe'
-        SUBPROCESS = subprocess.Popen([cmd, name], env = env_vars, creationflags = process_flags)
+        SUBPROCESS = subprocess.Popen([cmd, name] + params, env = env_vars, creationflags = process_flags, stdin=subprocess.PIPE)
     else:
         cmd = './build/' + config + '/output/' + name + '.exe'
-        SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars, creationflags = process_flags)
+        SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars, creationflags = process_flags, stdin=subprocess.PIPE)
 
     if ('-a' in flags):
         debug_process()
+        print(Color.OKBLUE + 'Press Enter to resume process...' + Color.ENDC)
+        psutil.Process(SUBPROCESS.pid).resume()
 
     pop_path()
 
@@ -521,13 +529,17 @@ def create_local_workspace(root, name):
     os.system('mkdir public')
     os.system('mkdir private')
 
+    output = 'dll'
+    if root == 'app':
+        output = 'exe'
+
     makedef_file = open('makedef', 'w')
     makedef_file.write(
         "name = " + name + "\n"\
         "code = public, private\n"\
         "defs = public.def\n"\
         "configs = debug, release\n"\
-        "output = dll\n"\
+        "output = " + output + "\n"\
         "deps = std\n"\
     )
     makedef_file.close()
@@ -638,36 +650,33 @@ def execute(string):
     tokens = string.split(' ')
     cmd = tokens[0]
 
-    if cmd == 'help':
-        print_help()
-    elif cmd == 'open':
-        open_workspace(tokens[1])
-    elif cmd == 'list':
-        list_workspaces()
-    elif cmd == 'build':
-        build_workspace(tokens[1], tokens[2:])
-    elif cmd == 'clear' and len(tokens) == 1:
-        clear_console()
-    elif cmd == 'clean' or cmd == 'clear':
-        clear_workspace(tokens[1])
-    elif cmd == 'explorer':
-        explorer_workspace(tokens[1])
-    elif cmd == 'cmd':
-        cmd_workspace(tokens[1], tokens[2:])
-    elif cmd == 'run':
-        args = tokens[2:]
-        if '--' in args:
-            split = args.index('--')
-            flags = args[0:split]
-            params = args[split + 1:]
-        else:
-            flags = args[0:]
-            params = []
-        run_app(tokens[1], flags, params)
-    elif cmd == 'debug':
-        if len(tokens) == 1:
-            debug_process()
-        else:
+    if cmd == '':
+        return
+
+    global SUBPROCESS
+    update_subprocess()
+    if SUBPROCESS is not None:
+        print(Color.OKBLUE + 'Redirecting to subprocess stdin' + Color.ENDC)
+        SUBPROCESS.stdin.write(string.encode('ascii'))
+        SUBPROCESS.stdin.flush()
+    else:
+        if cmd == 'help':
+            print_help()
+        elif cmd == 'open':
+            open_workspace(tokens[1])
+        elif cmd == 'list':
+            list_workspaces()
+        elif cmd == 'build':
+            build_workspace(tokens[1], tokens[2:])
+        elif cmd == 'clear' and len(tokens) == 1:
+            clear_console()
+        elif cmd == 'clean' or cmd == 'clear':
+            clear_workspace(tokens[1])
+        elif cmd == 'explorer':
+            explorer_workspace(tokens[1])
+        elif cmd == 'cmd':
+            cmd_workspace(tokens[1], tokens[2:])
+        elif cmd == 'run':
             args = tokens[2:]
             if '--' in args:
                 split = args.index('--')
@@ -676,31 +685,44 @@ def execute(string):
             else:
                 flags = args[0:]
                 params = []
-            debug_app(tokens[1], flags, params)
-    elif cmd == 'resume':
-        resume_subprocess()
-    elif cmd == 'create':
-        create_local_workspace(tokens[1], tokens[2])
-    elif cmd == 'gitpush':
-        git_push(tokens[1:])
-    elif cmd == 'gitpull':
-        git_pull()
-    elif cmd == 'gitstatus':
-        git_status()
-    elif cmd == 'title':
-        make_title(tokens[1:])
-    elif cmd == 'makegen':
-        makegen_workspace(tokens[1], tokens[2:])
-    elif cmd == 'debug-fixup':
-        fixup_debug_app(tokens[1], tokens[2:])
-    elif cmd == 'showremote':
-        show_committed_version(tokens[1], tokens[2])
-    elif cmd == 'showstash':
-        show_stash_version(tokens[1], tokens[2])
-    elif cmd == 'killeditor':
-        kill_editor()
-    elif cmd == '':
-        pass
-    else:
-        print(Color.FAIL + 'Can\'t do that.' + Color.ENDC)
-        print_help()
+            run_app(tokens[1], flags, params)
+        elif cmd == 'debug':
+            if len(tokens) == 1:
+                debug_process()
+            else:
+                args = tokens[2:]
+                if '--' in args:
+                    split = args.index('--')
+                    flags = args[0:split]
+                    params = args[split + 1:]
+                else:
+                    flags = args[0:]
+                    params = []
+                debug_app(tokens[1], flags, params)
+        elif cmd == 'resume':
+            resume_subprocess()
+        elif cmd == 'create':
+            create_local_workspace(tokens[1], tokens[2])
+        elif cmd == 'gitpush':
+            git_push(tokens[1:])
+        elif cmd == 'gitpull':
+            git_pull()
+        elif cmd == 'gitstatus':
+            git_status()
+        elif cmd == 'title':
+            make_title(tokens[1:])
+        elif cmd == 'makegen':
+            makegen_workspace(tokens[1], tokens[2:])
+        elif cmd == 'debug-fixup':
+            fixup_debug_app(tokens[1], tokens[2:])
+        elif cmd == 'showremote':
+            show_committed_version(tokens[1], tokens[2])
+        elif cmd == 'showstash':
+            show_stash_version(tokens[1], tokens[2])
+        elif cmd == 'killeditor':
+            kill_editor()
+        elif cmd == '':
+            pass
+        else:
+            print(Color.FAIL + 'Can\'t do that.' + Color.ENDC)
+            print_help()

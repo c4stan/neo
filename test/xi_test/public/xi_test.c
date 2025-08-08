@@ -195,7 +195,7 @@ static void xi_test ( void ) {
     ) );
 
     wm_window_info_t window_info;
-    wm->get_window_info ( window, &window_info );
+    wm->get_window_info ( &window_info, window );
 
     // ui
     xi_window_state_t ui_window = xi_window_state_m (
@@ -384,7 +384,7 @@ static void xi_test ( void ) {
         }
 
         wm_window_info_t new_window_info;
-        wm->get_window_info ( window, &new_window_info );
+        wm->get_window_info ( &new_window_info, window );
 
         window_info = new_window_info;
 

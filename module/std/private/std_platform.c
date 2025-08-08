@@ -8,13 +8,13 @@ static std_platform_state_t* std_platform_state;
 
 //==============================================================================
 
-#if defined(std_platform_linux_m)
+#if defined std_platform_linux_m
     #include <sys/types.h>
     #include <dirent.h>
 #endif
 
 void std_platform_load_state_info ( std_platform_state_t* state ) {
-#if defined(std_platform_win32_m)
+#if defined std_platform_win32_m
     std_mem_zero_m ( state );
     //state->logical_cores_mask = 0;
     //state->caches_count = 0;
@@ -135,7 +135,7 @@ void std_platform_load_state_info ( std_platform_state_t* state ) {
     state->memory_info.total_swap_size = 0; // TODO
     //state->memory_info.lowest_user_memory_address = 0;
     //state->memory_info.highest_user_memory_address = 0;
-#elif defined(std_platform_linux_m)
+#elif defined std_platform_linux_m
     // parse /sys/devices/system/cpu
     const char* base = "/sys/devices/system/cpu/";
 

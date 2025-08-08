@@ -185,7 +185,7 @@ bool net_socket_connect ( net_socket_h socket_handle, const net_socket_address_t
     net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
-    std_assert_m ( sock->state == net_socket_state_bound_m );
+    std_assert_m ( sock->state == net_socket_state_unbound_m || sock->state == net_socket_state_bound_m );
 
     int error;
 

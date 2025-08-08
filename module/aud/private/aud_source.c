@@ -38,6 +38,7 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
     source->time_played = 0;
     source->volume = 1;
     source->active_idx = UINT64_MAX;
+    source->total_time = params->sample_count / ( params->sample_frequency * params->channel_count );
 
     aud_source_h handle = ( aud_source_h ) ( source - aud_source_state->sources_array );
     std_bitset_set ( aud_source_state->sources_bitset, handle );
@@ -105,8 +106,17 @@ bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source_handle )
     info->bits_per_sample = source->params.bits_per_sample;
     info->sample_count = source->params.sample_count;
     info->time_played = source->time_played;
+    info->total_time = source->total_time;
 
     return true;
+}
+
+void aud_source_skip ( aud_source_h source_handle, float seconds ) {
+    aud_source_t* source = &aud_source_state->sources_array[source_handle];
+    source->time_played += seconds;
+    if ( source->time_played < 0 ) {
+        source->time_played = 0;
+    }
 }
 
 void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {

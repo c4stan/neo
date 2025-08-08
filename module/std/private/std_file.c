@@ -49,8 +49,7 @@ size_t std_path_to_str ( const WCHAR* path, char* str, size_t cap ) {
 #if std_log_assert_enabled_m
 
     if ( size == 0 ) {
-        DWORD error = GetLastError();
-        std_log_warn_m ( "Conversion from wide string to unicode failed, possible error code: " std_fmt_int_m, error );
+        std_log_os_error_m();
     }
 
 #endif
@@ -173,7 +172,7 @@ static size_t std_path_token_len ( const char* path, const char* cursor ) {
     return ( size_t ) ( cursor - start );
 }
 
-// appends to path first n characters from append, adds a / if necessary
+// appends to path first n characters from append, adds a / in between if necessary
 static size_t std_path_append_n ( char* path, size_t cap, const char* append, size_t n ) {
     std_assert_m ( path != NULL );
     std_assert_m ( append != NULL );
@@ -189,18 +188,51 @@ static size_t std_path_append_n ( char* path, size_t cap, const char* append, si
     size_t append_len = n;
     size_t new_path_len = path_len + append_len + extra;
     std_assert_m ( new_path_len < cap );
-    std_mem_copy ( path + path_len, append, append_len );
-    path[new_path_len] = '\0';
+    if ( new_path_len < cap ) {
+        std_mem_copy ( path + path_len, append, append_len );
+        path[new_path_len] = '\0';
+    }
     return new_path_len;
 }
 
 size_t std_path_append ( char* path, size_t cap, const char* append ) {
-    // compute append length
-    // call append_n
     std_assert_m ( path != NULL );
     std_assert_m ( append != NULL );
     size_t append_len = std_str_len ( append );
-    return std_path_append_n ( path, cap, append, append_len );
+    size_t new_len = std_path_append_n ( path, cap, append, append_len );
+    if ( path[new_len - 1] != '/' ) {
+        std_path_info_t path_info;
+        std_path_info ( &path_info, path );
+        if ( path_info.flags & std_path_is_directory_m ) {
+            std_assert_m ( cap > new_len + 1 );
+            if ( cap > new_len + 1 ) {
+                path[new_len++] = '/';
+                path[new_len] = '\0';
+            }
+        }
+    }
+    return new_len;
+}
+
+size_t std_path_append_dir ( char* path, size_t cap, const char* append ) {
+    std_assert_m ( path != NULL );
+    std_assert_m ( append != NULL );
+    size_t append_len = std_str_len ( append );
+    size_t new_len = std_path_append_n ( path, cap, append, append_len );
+    std_assert_m ( cap > new_len + 1 );
+    if ( cap > new_len + 1 ) {
+        path[new_len++] = '/';
+        path[new_len] = '\0';
+    }
+    return new_len;
+}
+
+size_t std_path_append_file ( char* path, size_t cap, const char* append ) {
+    std_assert_m ( path != NULL );
+    std_assert_m ( append != NULL );
+    size_t append_len = std_str_len ( append );
+    size_t new_len = std_path_append_n ( path, cap, append, append_len );
+    return new_len;
 }
 
 size_t std_path_pop ( char* path ) {
@@ -227,7 +259,7 @@ size_t std_path_pop ( char* path ) {
             return i + 2;
         }
 
-        if ( path[i] == '/' ) {
+        if ( path[i] == '/' && i < len - 1 ) {
             path[i + 1] = '\0';
             return i + 1;
         }
@@ -256,19 +288,17 @@ size_t std_path_normalize ( char* dest, size_t cap, const char* path ) {
 
     // On linux preserve initial '/'
     // TODO does win32 require a branch to ignore it?
-#if defined(std_platform_linux_m)
-
+#if defined std_platform_linux_m
     if ( *token == '/' ) {
         len = std_path_append_n ( dest, cap, "/", 1 );
         ++token;
     }
-
 #endif
 
     do {
-        if ( std_mem_cmp ( token, "./", 2 ) ) {
+        if ( std_mem_cmp ( token, "./", 2 ) == 0 ) {
             // Skip
-        } else if ( std_mem_cmp ( token, "../", 3 ) ) {
+        } else if ( std_mem_cmp ( token, "../", 3 ) == 0 ) {
             std_path_pop ( dest );
         } else {
             size_t token_len = std_path_token_len ( path, token );
@@ -361,9 +391,7 @@ bool std_path_info ( std_path_info_t* info, const char* path ) {
         std_filetime_to_timestamp ( creation_time, &info->creation_time );
         info->flags = 0;
 
-        if ( data.dwFileAttributes & INVALID_FILE_ATTRIBUTES ) {
-            info->flags |= std_path_non_existent_m;
-        } else if ( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
+        if ( data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) {
             info->flags |= std_path_is_directory_m;
         } else {
             info->flags |= std_path_is_file_m;
@@ -383,9 +411,7 @@ bool std_path_info ( std_path_info_t* info, const char* path ) {
         info->creation_time.count = 0;
         info->flags = 0;
 
-        if ( stat_result == -1 && errno == ENOENT ) {
-            info->flags |= std_path_non_existent_m;
-        } else if ( S_ISREG ( stat_info.st_mode ) ) {
+        if ( S_ISREG ( stat_info.st_mode ) ) {
             info->flags |= std_path_is_file_m;
         } else if ( S_ISDIR ( stat_info.st_mode ) ) {
             info->flags |= std_path_is_directory_m;
@@ -931,8 +957,7 @@ bool std_file_path_create ( const char* path, std_file_access_t access, std_path
     }
 
     DWORD create = already_existing == std_path_already_existing_overwrite_m ? CREATE_ALWAYS : CREATE_NEW;
-    size_t len;
-    len = std_to_path_buffer ( path );
+    size_t len = std_to_path_buffer ( path );
     std_assert_m ( len > 0 && len < std_path_size_m );
     HANDLE h = CreateFileW ( t_path_buffer, os_access, 0, NULL, create, FILE_ATTRIBUTE_NORMAL, NULL );
 
@@ -1091,7 +1116,9 @@ std_file_h std_file_open ( const char* path, std_file_access_t access ) {
         os_sharemode = FILE_SHARE_READ;
     }
 
-    HANDLE h = CreateFile ( path, os_access, os_sharemode, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+    size_t len = std_to_path_buffer ( path );
+    std_assert_m ( len > 0 && len < std_path_size_m );
+    HANDLE h = CreateFileW ( t_path_buffer, os_access, os_sharemode, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
 
     if ( h == INVALID_HANDLE_VALUE ) {
         std_log_os_error_m();

@@ -199,7 +199,7 @@ static void xf_test ( void ) {
     ) );
 
     wm_window_info_t window_info;
-    wm->get_window_info ( window, &window_info );
+    wm->get_window_info ( &window_info, window );
 
     while ( true ) {
         wm->update_window ( window );
@@ -220,7 +220,7 @@ static void xf_test ( void ) {
         }
 
         wm_window_info_t new_window_info;
-        wm->get_window_info ( window, &new_window_info );
+        wm->get_window_info ( &new_window_info, window );
 
         window_info = new_window_info;
 

@@ -10,7 +10,6 @@ typedef uint64_t std_file_h;
 typedef enum {
     std_path_is_file_m      = 1 << 0,
     std_path_is_directory_m = 1 << 1,
-    std_path_non_existent_m = 1 << 2,
 } std_path_flags_t;
 
 typedef struct {
@@ -82,17 +81,20 @@ typedef void ( std_directory_iterator_callback_f ) ( const char* name, std_path_
 // normalized path: either start with a drive or a /
 //                  always end with a / if folder path, without if not
 //                      cannot be reliably enforced when appending to path -> never end with a /
+//                          or add _append_file and _append_folder, and modify simple append to test final path and add / when needed
 //                  remove all ./ and ../
 //                  TODO make this be the case everywhere
 
-size_t      std_path_append     ( char* path, size_t cap, const char* append );
-size_t      std_path_pop        ( char* path );
-size_t      std_path_normalize  ( char* dest, size_t cap, const char* path );
-bool        std_path_is_drive   ( const char* path );
-size_t      std_path_name       ( char* name, size_t cap, const char* path );
-const char* std_path_name_ptr   ( const char* path );
-bool        std_path_info       ( std_path_info_t* info, const char* path );
-size_t      std_path_absolute   ( char* dest, size_t dest_cap, const char* path );
+size_t      std_path_append      ( char* path, size_t cap, const char* append );
+size_t      std_path_append_dir  ( char* path, size_t cap, const char* dir );
+size_t      std_path_append_file ( char* path, size_t cap, const char* filename );
+size_t      std_path_pop         ( char* path );
+size_t      std_path_normalize   ( char* dest, size_t cap, const char* path );
+bool        std_path_is_drive    ( const char* path );
+size_t      std_path_name        ( char* name, size_t cap, const char* path );
+const char* std_path_name_ptr    ( const char* path );
+bool        std_path_info        ( std_path_info_t* info, const char* path );
+size_t      std_path_absolute    ( char* dest, size_t dest_cap, const char* path );
 
 bool        std_directory_create ( const char* path );
 bool        std_directory_destroy ( const char* path );

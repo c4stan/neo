@@ -58,7 +58,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     // Get WM info
     wm_window_info_t window_info;
     wm_i* wm = std_module_get_m ( wm_module_name_m );
-    wm->get_window_info ( params->window, &window_info );
+    wm->get_window_info ( &window_info, params->window );
 
     // Get device
     const xg_vk_device_t* device = xg_vk_device_get ( params->device );
@@ -532,7 +532,7 @@ static bool xg_vk_swapchain_resize_check ( xg_swapchain_h swapchain_handle ) {
     }
     
     wm_window_info_t window_info;
-    wm->get_window_info ( swapchain->window, &window_info );
+    wm->get_window_info ( &window_info, swapchain->window );
 
     if ( swapchain->width != window_info.width || swapchain->height != window_info.height ) {
         std_log_info_m ( "Swapchain window resize detected, proceeding with the swapchain resize..." );

@@ -4,7 +4,7 @@
 #include <std_compiler.h>
 
 void        std_mem_copy ( void* dest, const void* source, size_t size );
-bool        std_mem_cmp  ( const void* a, const void* b, size_t size );
+int         std_mem_cmp  ( const void* a, const void* b, size_t size );
 void        std_mem_set  ( void* dest, size_t size, char value );
 void        std_mem_zero ( void* dest, size_t size );
 bool        std_mem_test ( const void* base, size_t size, char value );

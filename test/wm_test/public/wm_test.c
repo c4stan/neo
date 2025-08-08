@@ -50,6 +50,7 @@ static void wm_test_run ( void ) {
 
     wm_window_params_t params = { .name = "wm_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &params );
+    //wm_window_h window = wm->get_console_window();
 
 #if wm_enable_input_state_m
     bool first_print = true;

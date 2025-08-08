@@ -51,6 +51,7 @@ size_t std_u32_to_str ( char* str, size_t cap, uint32_t u32, uint32_t pad );
 size_t std_u64_to_str ( char* str, size_t cap, uint64_t u64 );
 size_t std_f32_to_str ( float f32, char* str, size_t cap );
 
+uint16_t std_str_to_u16 ( const char* str );
 uint32_t std_str_to_u32 ( const char* str );
 uint64_t std_str_to_u64 ( const char* str );
 int32_t std_str_to_i32 ( const char* str );

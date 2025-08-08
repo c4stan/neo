@@ -156,7 +156,8 @@ static void run_aud_test ( void ) {
     while ( true ) {
         aud_source_info_t source_info;
         aud->get_source_info ( &source_info, source2 );
-        float total_duration = source_info.sample_count / source_info.sample_frequency / device_info.channel_count;
+        //float total_duration = source_info.sample_count / source_info.sample_frequency / device_info.channel_count;
+        float total_duration = source_info.total_time;
         float bar_tick = total_duration * 1000.f / 60.f;
 
         aud->update_device_ring ( device );

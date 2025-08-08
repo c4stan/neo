@@ -57,7 +57,7 @@ void wm_window_unload ( void );
 wm_window_h wm_window_create ( const wm_window_params_t* params );
 bool mw_window_is_alive ( wm_window_h window );
 bool wm_window_destroy ( wm_window_h window );
-bool wm_window_get_info ( wm_window_h window, wm_window_info_t* info );
+bool wm_window_get_info ( wm_window_info_t* info, wm_window_h window );
 void wm_window_update ( wm_window_h window );
 
 #if wm_enable_input_events_m
@@ -71,3 +71,5 @@ void wm_window_update ( wm_window_h window );
 #endif
 
 void wm_window_input_buffer_get ( wm_window_h window, wm_input_buffer_t* buffer );
+
+wm_window_h wm_window_console_get ( void );

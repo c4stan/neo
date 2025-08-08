@@ -191,6 +191,10 @@ size_t std_u64_to_str ( char* str, size_t size, uint64_t u64 ) {
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }
 
+uint16_t std_str_to_u16 ( const char* str ) {
+    return ( uint16_t ) strtoul ( str, NULL, 10 );
+}
+
 uint32_t std_str_to_u32 ( const char* str ) {
     return ( uint32_t ) strtoul ( str, NULL, 10 );
 }
@@ -318,7 +322,7 @@ size_t std_str_trim_left ( char* str, const char** tokens, size_t n ) {
                 continue;
             }
 
-            if ( std_mem_cmp ( str + str_begin, token, token_len ) ) {
+            if ( std_mem_cmp ( str + str_begin, token, token_len ) == 0 ) {
                 match = true;
                 str_begin += token_len;
                 break;
@@ -346,7 +350,7 @@ size_t std_str_trim_right ( char* str, const char** tokens, size_t n ) {
                 continue;
             }
 
-            if ( std_mem_cmp ( str + str_len - token_len, token, token_len ) ) {
+            if ( std_mem_cmp ( str + str_len - token_len, token, token_len ) == 0 ) {
                 match = true;
                 str_len -= token_len;
                 break;
@@ -370,7 +374,7 @@ size_t std_str_find ( const char* str, const char* token ) {
     }
 
     while ( i <= str_len - token_len ) {
-        if ( std_mem_cmp ( str + i, token, token_len ) ) {
+        if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
             return i;
         }
 
@@ -394,7 +398,7 @@ size_t std_str_find_reverse ( const char* str, size_t offset, const char* token 
     while ( i > 0 ) {
         --i;
 
-        if ( std_mem_cmp ( str + i, token, token_len ) ) {
+        if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
             return i;
         }
     }

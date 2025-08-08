@@ -1720,6 +1720,7 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     window->info.border_left = border_left;
     window->info.borders_width = border_width;
     window->info.borders_height = border_height;
+    window->info.is_console = false;
 #if defined(std_platform_linux_m)
     //window->exit_message_id = ( uint64_t ) exit_message_id;
     window->exit_message_id = exit_message_id;
@@ -1778,18 +1779,22 @@ bool wm_window_destroy ( wm_window_h handle ) {
 
     // Destroy os window
 #if defined(std_platform_win32_m)
-    if ( !DestroyWindow ( ( HWND ) window->info.os_handle.window ) ) {
-        std_log_os_error_m();
+    if ( !window->info.is_console ) {
+        if ( !DestroyWindow ( ( HWND ) window->info.os_handle.window ) ) {
+            std_log_os_error_m();
+        }
+        HINSTANCE instance = GetModuleHandle ( NULL );
+        if ( !UnregisterClassA ( window->params.name, instance ) ) {
+            std_log_os_error_m();
+        }
+        uint64_t hash = std_hash_64_m ( ( uint64_t ) window->info.os_handle.window );
+        bool remove_result = std_hash_map_remove_hash ( &wm_window_state->map, hash );
+        std_verify_m ( remove_result );
     }
-    HINSTANCE instance = GetModuleHandle ( NULL );
-    if ( !UnregisterClassA ( window->params.name, instance ) ) {
-        std_log_os_error_m();
-    }
-    uint64_t hash = std_hash_64_m ( ( uint64_t ) window->info.os_handle.window );
-    bool remove_result = std_hash_map_remove_hash ( &wm_window_state->map, hash );
-    std_verify_m ( remove_result );
 #elif defined(std_platform_linux_m)
-    XDestroyWindow ( ( Display* ) window->info.os_handle.root, ( Window ) window->info.os_handle.window );
+    if ( !window->info.is_console ) {
+        XDestroyWindow ( ( Display* ) window->info.os_handle.root, ( Window ) window->info.os_handle.window );
+    }
 #endif
 
     // Remove window to non-free windows list
@@ -1875,7 +1880,7 @@ bool wm_window_remove_event_handler ( wm_window_h handle, const wm_input_event_h
 }
 #endif // std_enabled_m(wm_input_events_m)
 
-bool wm_window_get_info ( wm_window_h handle, wm_window_info_t* info ) {
+bool wm_window_get_info ( wm_window_info_t* info, wm_window_h handle ) {
     // Lock
     std_mutex_lock ( &wm_window_state->mutex );
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
@@ -1896,4 +1901,75 @@ bool wm_window_get_info ( wm_window_h handle, wm_window_info_t* info ) {
 void wm_window_input_buffer_get ( wm_window_h handle, wm_input_buffer_t* buffer ) {
     wm_window_t* window = &wm_window_state->windows_array[wm_handle_idx_m ( handle )];
     *buffer = window->input_buffer;
+}
+
+wm_window_h wm_window_console_get ( void ) {
+    wm_window_os_h os_handle;
+    os_handle.root = ( uint64_t ) GetModuleHandle ( NULL );
+#if defined std_platform_win32_m
+    // https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/obtain-console-window-handle
+    char new_title[1024];
+    char old_title[1024];
+
+   GetConsoleTitle ( old_title, 1024 );
+   // Format a "unique" NewWindowTitle.
+   wsprintf ( new_title,"%d/%d", GetTickCount(), GetCurrentProcessId() );
+   SetConsoleTitle ( new_title );
+   Sleep(40);
+   os_handle.window = ( uint64_t ) FindWindow ( NULL, new_title );
+   SetConsoleTitle ( old_title );
+#elif defined std_platform_linux_m
+    std_not_implemented_m();
+#endif
+
+    // Lock
+    std_mutex_lock ( &wm_window_state->mutex );
+    // Pop from freelist and write all data
+    wm_window_t* window = std_list_pop_m ( &wm_window_state->windows_freelist );
+    uint64_t window_idx = window - wm_window_state->windows_array;
+    std_bitset_set ( wm_window_state->windows_bitset, window_idx );
+
+#if wm_enable_input_events_m
+    window->handlers_count = 0;
+#endif
+
+#if wm_enable_input_state_m
+    std_mem_zero ( &window->input_state, sizeof ( window->input_state ) );
+#endif
+
+    window->params = wm_window_params_m (
+        .width = 0,
+        .height = 0,
+    );
+    std_str_copy_static_m ( window->params.name, "" );
+    std_str_copy_static_m ( window->info.title, "" );
+    window->info.x = 0;
+    window->info.y = 0;
+    window->info.width = 0;
+    window->info.height = 0;
+    window->info.os_handle = os_handle;
+    window->info.is_focus = 0;
+    window->info.is_minimized = false;
+    window->info.border_top = 0;
+    window->info.border_right = 0;
+    window->info.border_bottom = 0;
+    window->info.border_left = 0;
+    window->info.borders_width = 0;
+    window->info.borders_height = 0;
+    window->info.is_console = true;
+#if defined(std_platform_linux_m)
+#endif
+
+    wm_window_h h = wm_make_handle_m ( window - wm_window_state->windows_array, window->gen );
+#if defined(std_platform_win32_m)
+    uint64_t hash = std_hash_64_m ( ( uint64_t ) os_handle.window );
+    std_hash_map_insert ( &wm_window_state->map, hash, ( uint64_t ) h );
+#endif
+
+    // Add window to non-free windows list
+    std_dlist_push ( &wm_window_state->windows_list, window );
+
+    // Unlock
+    std_mutex_unlock ( &wm_window_state->mutex );
+    return h;
 }

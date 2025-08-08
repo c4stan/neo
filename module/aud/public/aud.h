@@ -19,6 +19,13 @@ typedef struct {
     uint32_t bits_per_sample;
 } aud_device_params_t;
 
+#define aud_device_params_m( ... ) ( aud_device_params_t ) { \
+    .channel_count = 1, \
+    .sample_frequency = 0, \
+    .bits_per_sample = 32, \
+    __VA_ARGS__ \
+}
+
 typedef struct {
     uint64_t sample_count;
     uint32_t sample_frequency;
@@ -45,7 +52,8 @@ typedef struct {
     uint32_t sample_frequency;
     uint32_t bits_per_sample;
     uint64_t sample_count;
-    double time_played;
+    double time_played; // seconds
+    double total_time;  // seconds
 } aud_source_info_t;
 
 typedef struct {
@@ -67,6 +75,8 @@ typedef struct {
     void ( *destroy_source ) ( aud_source_h source );
     bool ( *get_source_info ) ( aud_source_info_t* info, aud_source_h source );
     void ( *set_source_volume ) ( aud_source_h source, float volume_scale );
+
+    void ( *skip_source ) ( aud_source_h source, float seconds );
 
     // samples, mixes and submits audio data to the device for playback
     void ( *output_to_device ) ( aud_device_h device, uint64_t milliseconds );

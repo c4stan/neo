@@ -10,6 +10,7 @@ typedef struct {
     //std_virtual_buffer_t buffer;
     uint64_t active_idx;
     double time_played; // seconds
+    double total_time;  // seconds
     float volume;
 } aud_source_t;
 
@@ -34,6 +35,7 @@ void aud_source_pause ( aud_source_h source );
 void aud_source_reset ( aud_source_h source );
 void aud_source_destroy ( aud_source_h source );
 void aud_source_set_volume_scale ( aud_source_h source, float scale );
+void aud_source_skip ( aud_source_h source_handle, float seconds );
 
 bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source );
 

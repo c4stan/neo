@@ -418,6 +418,18 @@ std_stack_t std_stack ( void* base, size_t size ) {
     return stack;
 }
 
+std_stack_t std_stack_create ( size_t size ) {
+    std_stack_t stack;
+    stack.begin = std_virtual_heap_alloc_m ( size, 16 );
+    stack.top = stack.begin;
+    stack.end = stack.begin + size;
+    return stack;
+}
+
+void std_stack_destroy ( std_stack_t* stack ) {
+    std_virtual_heap_free ( stack->begin );
+}
+
 void* std_stack_alloc ( std_stack_t* stack, size_t size ) {
     void* top = stack->top;
 
@@ -496,6 +508,18 @@ char* std_stack_string_copy ( std_stack_t* stack, const char* str ) {
     return std_stack_string_copy_n ( stack, str, len + 1 );
 }
 
+char* std_stack_string_copy_format ( std_stack_t* stack, const char* str, ... ) {
+    char buffer[2048];
+
+    va_list args;
+    va_start ( args, str );
+    int len = vsnprintf ( buffer, 2048, str, args );
+    va_end ( args );
+    buffer[len] = '\0';
+
+    return std_stack_string_copy ( stack, buffer );
+}
+
 static void std_stack_string_pop_terminator ( std_stack_t* stack ) {
     char* begin = ( char* ) stack->begin;
     char* top = ( char* ) stack->top;
@@ -515,7 +539,7 @@ char* std_stack_string_append_format ( std_stack_t* stack, const char* str, ... 
 
     va_list args;
     va_start ( args, str );
-    int len = vsprintf ( buffer, str, args );
+    int len = vsnprintf ( buffer, 2048, str, args );
     va_end ( args );
     buffer[len] = '\0';
 
@@ -551,6 +575,12 @@ uint64_t std_stack_used_size ( const std_stack_t* stack ) {
     return top - begin;
 }
 
+uint64_t std_stack_unused_size ( const std_stack_t* stack ) {
+    void* top = stack->top;
+    void* end = stack->end;
+    return end - top;
+}
+
 //==============================================================================
 
 std_virtual_stack_t std_virtual_stack ( void* base, size_t mapped_size, size_t virtual_size ) {
@@ -580,7 +610,7 @@ uint64_t std_virtual_stack_used_size ( const std_virtual_stack_t* stack ) {
     return std_stack_used_size ( &stack->mapped );
 }
 
-static bool std_virtual_stack_size_check ( std_virtual_stack_t* stack, size_t alloc_size ) {
+bool std_virtual_stack_map ( std_virtual_stack_t* stack, size_t alloc_size ) {
     void* top = stack->mapped.top;
     void* mapped_end = stack->mapped.end;
     void* new_top = top + alloc_size;
@@ -607,7 +637,7 @@ static bool std_virtual_stack_size_check ( std_virtual_stack_t* stack, size_t al
 void* std_virtual_stack_alloc ( std_virtual_stack_t* stack, size_t size ) {
     void* top = stack->mapped.top;
 
-    if ( !std_virtual_stack_size_check ( stack, size ) ) {
+    if ( !std_virtual_stack_map ( stack, size ) ) {
         return NULL;
     }
 
@@ -674,16 +704,40 @@ void std_virtual_stack_clear ( std_virtual_stack_t* stack ) {
 char* std_virtual_stack_string_copy ( std_virtual_stack_t* stack, const char* str ) {
     size_t len = std_str_len ( str ) ;
 
-    if ( !std_virtual_stack_size_check ( stack, len + 1 ) ) {
+    if ( !std_virtual_stack_map ( stack, len + 1 ) ) {
         return NULL;
     }
 
     return std_stack_string_copy_n ( &stack->mapped, str, len + 1 );
 }
 
+char* std_virtual_stack_string_copy_format ( std_virtual_stack_t* stack, const char* str, ... ) {
+    char buffer[2048];
+
+    va_list args;
+    va_start ( args, str );
+    int len = vsnprintf ( buffer, 2048, str, args );
+    va_end ( args );
+    buffer[len] = '\0';
+
+    return std_virtual_stack_string_copy ( stack, buffer );
+}
+
 char* std_virtual_stack_string_append ( std_virtual_stack_t* stack, const char* str ) {
     std_stack_string_pop_terminator ( &stack->mapped );
     return std_virtual_stack_string_copy ( stack, str );
+}
+
+char* std_virtual_stack_string_append_format ( std_virtual_stack_t* stack, const char* str, ... ) {
+    char buffer[2048];
+
+    va_list args;
+    va_start ( args, str );
+    int len = vsnprintf ( buffer, 2048, str, args );
+    va_end ( args );
+    buffer[len] = '\0';
+
+    return std_virtual_stack_string_append ( stack, buffer );
 }
 
 //==============================================================================

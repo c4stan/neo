@@ -93,6 +93,7 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
     process->stdin_handle = ( uint64_t ) ( GetStdHandle ( STD_INPUT_HANDLE ) );
     process->stdout_handle = ( uint64_t ) ( GetStdHandle ( STD_OUTPUT_HANDLE ) );
     process->stderr_handle = ( uint64_t ) ( GetStdHandle ( STD_ERROR_HANDLE ) );
+    SetConsoleOutputCP ( 65001 ); // CP_UTF8
 #elif defined(std_platform_linux_m)
     process->stdin_handle = ( uint64_t ) STDIN_FILENO;
     process->stdout_handle = ( uint64_t ) STDOUT_FILENO;
@@ -510,7 +511,9 @@ bool std_process_io_read ( void* dest, size_t* out_read_size, size_t size, uint6
 
     if ( read_retcode == FALSE ) {
         DWORD error = GetLastError();
-        if ( error != ERROR_BROKEN_PIPE ) { // Pipe has been already closed from the other side
+        if ( error == ERROR_BROKEN_PIPE ) {
+            //std_log_warn_m ( "Trying to read from a pipe that has been already closed from the other side" );
+        } else {
             std_log_os_error_m();
         }
 
