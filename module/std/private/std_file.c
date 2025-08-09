@@ -173,6 +173,8 @@ static size_t std_path_token_len ( const char* path, const char* cursor ) {
 }
 
 // appends to path first n characters from append, adds a / in between if necessary
+// TODO avoid computing path len every time!
+//      change std_string to use <len, str> strings instead of c string
 static size_t std_path_append_n ( char* path, size_t cap, const char* append, size_t n ) {
     std_assert_m ( path != NULL );
     std_assert_m ( append != NULL );
@@ -312,6 +314,15 @@ size_t std_path_normalize ( char* dest, size_t cap, const char* path ) {
         token = std_path_next_token ( path, token );
     } while ( token != NULL );
 
+    if ( dest [len - 1] != '/' && len < cap ) {
+        std_path_info_t path_info;
+        if ( std_path_info ( &path_info, dest ) ) {
+            if ( path_info.flags & std_path_is_directory_m ) {
+                len = std_path_append ( dest, cap, "\0" );
+            }
+        }
+    }
+
     return len;
 }
 
@@ -441,6 +452,17 @@ size_t std_path_absolute ( char* dest, size_t dest_cap, const char* path ) {
 
     return std_path_normalize ( dest, dest_cap, buffer );
 #endif
+}
+
+char* std_path_relative_to ( char* path, char* relative_to ) {
+    size_t path_len = std_str_len ( path );
+    size_t i = 0;
+    for ( ; i < path_len; ++i ) {
+        if ( path[i] != relative_to[i] ) {
+            break;
+        }
+    }
+    return path + i;
 }
 
 // ======================================================================================= //

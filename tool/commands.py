@@ -51,7 +51,6 @@ def update_subprocess():
 def hook_signal_handler():
     original_sigint = signal.getsignal(signal.SIGINT)
     def sigint_handler(signum, frame):
-        print("sig")
         global SUBPROCESS
         if SUBPROCESS is not None and SUBPROCESS.poll() is None:
             SUBPROCESS.kill()
