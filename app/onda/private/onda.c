@@ -418,19 +418,17 @@ static std_app_state_e onda_update_server ( void ) {
     return std_app_state_tick_m;
 }
 
-#include <stdio.h>
-#include <conio.h>
-
 static aud_source_h create_source_mp3 ( void* data, size_t size ) {
     aud_i* aud = onda_state->client.aud;
     aud_source_h source = aud_null_handle_m;
     mp3dec_ex_t mp3dec;
     if ( mp3dec_ex_open_buf ( &mp3dec, data, size, MP3D_SEEK_TO_SAMPLE ) == 0 ) {
+        std_assert_m ( mp3dec.info.channels == 2 );
         aud_source_params_t params = {
             .sample_frequency = mp3dec.info.hz,
             .bits_per_sample = 16,
             .sample_count = mp3dec.samples,
-            .channel_count = 2, // TODO
+            .channel_count = 2,
         };
         source = aud->create_source ( &params );
 
@@ -453,11 +451,12 @@ static aud_source_h create_source_flac ( void* data, size_t size ) {
     uint64_t sample_count;
     drflac_int16* buffer = drflac_open_memory_and_read_pcm_frames_s16 ( data, size, &channel_count, &sample_frequency, &sample_count, NULL );
     if ( buffer ) {
+        std_assert_m ( channel_count == 2 );
         aud_source_params_t params = {
             .sample_frequency = sample_frequency,
             .bits_per_sample = 16,
             .sample_count = sample_count,
-            .channel_count = 2, // TODO
+            .channel_count = 2,
         };
         source = aud->create_source ( &params );
 
