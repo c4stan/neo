@@ -95,7 +95,8 @@ size_t      std_path_name        ( char* name, size_t cap, const char* path );
 const char* std_path_name_ptr    ( const char* path );
 bool        std_path_info        ( std_path_info_t* info, const char* path );
 size_t      std_path_absolute    ( char* dest, size_t dest_cap, const char* path );
-char*       std_path_relative_to ( char* path, char* relative_to );
+char*       std_path_relative_to ( const char* path, const char* relative_to );
+char*       std_path_ext         ( const char* path ); // no '.'
 
 bool        std_directory_create ( const char* path );
 bool        std_directory_destroy ( const char* path );

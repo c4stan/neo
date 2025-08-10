@@ -168,9 +168,9 @@ static bool onda_boot ( void ) {
         return false;
     }
 
-    onda_state->read_stack = std_virtual_stack_create ( 1024 * 1024 * 64 );
+    onda_state->read_stack = std_virtual_stack_create ( 1024 * 1024 * 256 );
     onda_state->temp_stack = std_virtual_stack_create ( 1024 * 1024 * 64 );
-    onda_state->write_stack = std_virtual_stack_create ( 1024 * 1024 * 64 );
+    onda_state->write_stack = std_virtual_stack_create ( 1024 * 1024 * 256 );
 
     const char* mode_arg = process_info.args[1];
     if ( std_str_cmp ( mode_arg, "-s" ) == 0 ) {
@@ -218,33 +218,62 @@ static void onda_server_drop_client ( void ) {
 #define subdir_max_len_m 128
 #define file_max_len_m 64
 
-static void onda_server_send_list ( void ) {
-    net_i* net = onda_state->net;
-    std_virtual_stack_t* temp_stack = &onda_state->temp_stack;
-    std_virtual_stack_t* write_stack = &onda_state->write_stack;
-    std_virtual_stack_clear ( temp_stack );
-    std_virtual_stack_clear ( write_stack );
+typedef struct {
+    char** subdirs;
+    char** files;
+    uint32_t subdir_count;
+    uint32_t file_count;
+} list_result_t;
 
-    char* subdirs[256];
-    for ( uint32_t i = 0; i < 256; ++i ) {
-        subdirs[i] = std_virtual_stack_alloc ( temp_stack, subdir_max_len_m );
+static list_result_t onda_build_list ( std_virtual_stack_t* stack ) {
+    // TODO dynamic subdir/file count
+    uint32_t max_subdirs = 256;
+    uint32_t max_files = 256;
+
+    char** subdirs = std_virtual_stack_alloc_array_m ( stack, char*, max_subdirs );
+    for ( uint32_t i = 0; i < max_subdirs; ++i ) {
+        subdirs[i] = std_virtual_stack_alloc ( stack, subdir_max_len_m );
     }
-    size_t subdir_count = std_directory_subdirs ( subdirs, 256, subdir_max_len_m, onda_state->server.path );
-    char* files[256];
-    for ( uint32_t i = 0; i < 256; ++i ) {
-        files[i] = std_virtual_stack_alloc ( temp_stack, file_max_len_m );
+    size_t subdir_count = std_directory_subdirs ( subdirs, max_subdirs, subdir_max_len_m, onda_state->server.path );
+    char** raw_files = std_virtual_stack_alloc_array_m ( stack, char*, max_files );
+    for ( uint32_t i = 0; i < max_files; ++i ) {
+        raw_files[i] = std_virtual_stack_alloc ( stack, file_max_len_m );
     }
-    size_t file_count = std_directory_files ( files, 256, file_max_len_m, onda_state->server.path );
-    std_virtual_stack_string_copy_format ( write_stack, std_fmt_u32_m, subdir_count );
-    for ( uint32_t i = 0; i < subdir_count; ++i ) {
-        std_virtual_stack_string_copy ( write_stack, subdirs[i] );
+    size_t raw_file_count = std_directory_files ( raw_files, max_files, file_max_len_m, onda_state->server.path );
+
+    char** files = std_virtual_stack_alloc_array_m ( stack, char*, max_files );
+    uint32_t file_count = 0;
+    for ( uint32_t i = 0; i < raw_file_count; ++i ) {
+        char* ext = std_path_ext ( raw_files[i] );
+        if ( std_str_cmp ( ext, "mp3" ) != 0 && std_str_cmp ( ext, "flac" ) != 0 ) {
+            continue;
+        }
+
+        files[file_count++] = raw_files[i];
     }
-    std_virtual_stack_string_copy_format ( write_stack, std_fmt_u32_m, file_count );
-    for ( uint32_t i = 0; i < file_count; ++i ) {
-        std_virtual_stack_string_copy ( write_stack, files[i] );
+
+    list_result_t result = {
+        .subdirs = subdirs,
+        .files = files,
+        .subdir_count = subdir_count,
+        .file_count = file_count,
+    };
+    return result;
+}
+
+static void onda_server_send_list ( std_virtual_stack_t* stack, const list_result_t* list ) {
+    net_i* net = onda_state->net;
+
+    std_virtual_stack_string_copy_format ( stack, std_fmt_u32_m, list->subdir_count );
+    for ( uint32_t i = 0; i < list->subdir_count; ++i ) {
+        std_virtual_stack_string_copy ( stack, list->subdirs[i] );
     }
-    size_t msg_size = std_virtual_stack_used_size ( write_stack );
-    size_t write_size = net->write_connected_socket ( onda_state->server.client_socket, write_stack->begin, msg_size );
+    std_virtual_stack_string_copy_format ( stack, std_fmt_u32_m, list->file_count );
+    for ( uint32_t i = 0; i < list->file_count; ++i ) {
+        std_virtual_stack_string_copy ( stack, list->files[i] );
+    }
+    size_t msg_size = std_virtual_stack_used_size ( stack );
+    size_t write_size = net->write_connected_socket ( onda_state->server.client_socket, stack->begin, msg_size );
     std_assert_m ( msg_size == write_size );
 }
 
@@ -265,27 +294,46 @@ typedef struct {
     char data[];
 } onda_media_header_t;
 
+static void onda_server_write_media ( std_virtual_stack_t* stack, const char* path ) {
+    std_file_h file = std_file_open ( path, std_file_read_m );
+    std_file_info_t file_info;
+    std_file_info ( &file_info, file );
+    std_auto_m media_header = std_virtual_stack_alloc_m ( stack, onda_media_header_t );
+    char* label = std_path_relative_to ( path, onda_state->server.root_path );
+    size_t label_size = std_str_len ( label ) + 1;
+    media_header->label_size = label_size;
+    media_header->media_size = file_info.size;
+    media_header->media_type = onda_media_type_mp3_m;
+    void* label_data = std_virtual_stack_alloc ( stack, label_size );
+    std_str_copy ( label_data, label_size, label );
+    void* media_data = std_virtual_stack_alloc ( stack, file_info.size );
+    std_file_read ( media_data, file_info.size, file );
+    std_file_close ( file );
+    std_virtual_stack_align_zero ( stack, 8 );
+}
+
 static void onda_server_send_playlist ( void ) {
     net_i* net = onda_state->net;
     std_virtual_stack_t* write_stack = &onda_state->write_stack;
     std_virtual_stack_clear ( write_stack );
 
-    std_file_h file = std_file_open ( onda_state->server.path, std_file_read_m );
-    std_file_info_t file_info;
-    std_file_info ( &file_info, file );
+    list_result_t list = onda_build_list ( &onda_state->temp_stack );
+
     std_auto_m playlist_header = std_virtual_stack_alloc_m ( write_stack, onda_playlist_header_t );
-    playlist_header->media_count = 1;
-    std_auto_m media_header = std_virtual_stack_alloc_m ( write_stack, onda_media_header_t );
-    char* label = std_path_relative_to ( onda_state->server.path, onda_state->server.root_path );
-    size_t label_size = std_str_len ( label ) + 1;
-    media_header->label_size = label_size;
-    media_header->media_size = file_info.size;
-    media_header->media_type = onda_media_type_mp3_m;
-    void* label_data = std_virtual_stack_alloc ( write_stack, label_size );
-    std_str_copy ( label_data, label_size, label );
-    void* media_data = std_virtual_stack_alloc ( write_stack, file_info.size );
-    std_file_read ( media_data, file_info.size, file );
-    std_file_close ( file );
+    playlist_header->media_count = list.file_count;
+
+    std_path_info_t path_info;
+    std_verify_m ( std_path_info ( &path_info, onda_state->server.path ) );
+    if ( path_info.flags & std_path_is_file_m ) {
+        onda_server_write_media ( write_stack, onda_state->server.path );
+    } else {
+        for ( uint32_t i = 0; i < list.file_count; ++i ) {
+            std_path_append_file ( onda_state->server.path, sizeof ( onda_state->server.path ), list.files[i] );
+            onda_server_write_media ( write_stack, onda_state->server.path );
+            std_path_pop ( onda_state->server.path );
+        }
+    }
+
     size_t total_size = std_virtual_stack_used_size ( write_stack );
     playlist_header->total_size = total_size;
     size_t write_size = net->write_connected_socket ( onda_state->server.client_socket, write_stack->begin, total_size );
@@ -324,32 +372,35 @@ static std_app_state_e onda_update_server ( void ) {
     std_virtual_stack_clear ( write_stack );
 
     if ( std_str_starts_with ( client_msg, "list" ) ) {
-        onda_server_send_list();
+        list_result_t list = onda_build_list ( temp_stack );
+        onda_server_send_list ( write_stack, &list );
     } else if ( std_str_starts_with ( client_msg, "open" ) ) {
-        char* subdirs[256];
-        for ( uint32_t i = 0; i < 256; ++i ) {
-            subdirs[i] = std_virtual_stack_alloc ( temp_stack, subdir_max_len_m );
-        }
-        size_t subdir_count = std_directory_subdirs ( subdirs, 256, subdir_max_len_m, onda_state->server.path );
+        list_result_t list = onda_build_list ( temp_stack );
         
         uint32_t id = std_str_to_u32 ( client_msg + 5 );
-        std_assert_m ( id < subdir_count );
-        std_path_append_dir ( onda_state->server.path, sizeof ( onda_state->server.path ), subdirs[id] );
+        std_assert_m ( id < list.subdir_count + list.file_count );
+        if ( id < list.subdir_count ) {
+            std_path_append_dir ( onda_state->server.path, sizeof ( onda_state->server.path ), list.subdirs[id] );
+        } else {
+            std_path_append_file ( onda_state->server.path, sizeof ( onda_state->server.path ), list.files[id - list.subdir_count] );
+        }
         
-        onda_server_send_list();
+        list = onda_build_list ( temp_stack );
+        onda_server_send_list ( write_stack, &list );
     } else if ( std_str_starts_with ( client_msg, "back" ) ) {
         std_path_pop ( onda_state->server.path );
-        onda_server_send_list();
+        list_result_t list = onda_build_list ( temp_stack );
+        onda_server_send_list ( write_stack, &list );
     } else if ( std_str_starts_with ( client_msg, "play" ) ) {
-        char* files[256];
-        for ( uint32_t i = 0; i < 256; ++i ) {
-            files[i] = std_virtual_stack_alloc ( temp_stack, file_max_len_m );
-        }
-        size_t file_count = std_directory_files ( files, 256, file_max_len_m, onda_state->server.path );
+        list_result_t list = onda_build_list ( temp_stack );
         
         uint32_t id = std_str_to_u32 ( client_msg + 5 );
-        std_assert_m ( id < file_count );
-        std_path_append_file ( onda_state->server.path, sizeof ( onda_state->server.path ), files[id] );
+        std_assert_m ( id < list.subdir_count + list.file_count );
+        if ( id < list.subdir_count ) {
+            std_path_append_dir ( onda_state->server.path, sizeof ( onda_state->server.path ), list.subdirs[id] );
+        } else {
+            std_path_append_file ( onda_state->server.path, sizeof ( onda_state->server.path ), list.files[id - list.subdir_count] );
+        }
 
         onda_server_send_playlist ();
 
@@ -370,6 +421,66 @@ static std_app_state_e onda_update_server ( void ) {
 #include <stdio.h>
 #include <conio.h>
 
+static aud_source_h create_source_mp3 ( void* data, size_t size ) {
+    aud_i* aud = onda_state->client.aud;
+    aud_source_h source = aud_null_handle_m;
+    mp3dec_ex_t mp3dec;
+    if ( mp3dec_ex_open_buf ( &mp3dec, data, size, MP3D_SEEK_TO_SAMPLE ) == 0 ) {
+        aud_source_params_t params = {
+            .sample_frequency = mp3dec.info.hz,
+            .bits_per_sample = 16,
+            .sample_count = mp3dec.samples,
+            .channel_count = 2, // TODO
+        };
+        source = aud->create_source ( &params );
+
+        int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, mp3dec.samples );
+        uint64_t samples_read = mp3dec_ex_read ( &mp3dec, buffer, mp3dec.samples );
+        std_verify_m ( samples_read == mp3dec.samples );
+        aud->feed_source ( source, buffer, sizeof ( int16_t ) * mp3dec.samples );
+        std_virtual_heap_free ( buffer );
+        mp3dec_ex_close ( &mp3dec );
+    }
+
+    return source;
+}
+
+static aud_source_h create_source_flac ( void* data, size_t size ) {
+    aud_i* aud = onda_state->client.aud;
+    aud_source_h source = aud_null_handle_m;
+    uint32_t channel_count;
+    uint32_t sample_frequency;
+    uint64_t sample_count;
+    drflac_int16* buffer = drflac_open_memory_and_read_pcm_frames_s16 ( data, size, &channel_count, &sample_frequency, &sample_count, NULL );
+    if ( buffer ) {
+        aud_source_params_t params = {
+            .sample_frequency = sample_frequency,
+            .bits_per_sample = 16,
+            .sample_count = sample_count,
+            .channel_count = 2, // TODO
+        };
+        source = aud->create_source ( &params );
+
+        aud->feed_source ( source, buffer, sizeof ( int16_t ) * sample_count );
+        drflac_free ( buffer, NULL );
+    }
+
+    return source;
+}
+
+static aud_source_h create_source ( char* label, void* data, size_t size ) {
+    char* ext = std_path_ext ( label );
+    if ( ext ) {
+        if ( std_str_cmp ( ext, "mp3" ) == 0 ) {
+            return create_source_mp3 ( data, size );
+        } else if ( std_str_cmp ( ext, "flac" ) == 0 ) {
+            return create_source_flac ( data, size );
+        }
+    }
+
+    return aud_null_handle_m;
+}
+
 static std_app_state_e onda_update_client ( void ) {
     net_i* net = onda_state->net;
 
@@ -387,9 +498,8 @@ static std_app_state_e onda_update_client ( void ) {
 
     size_t write_size = net->write_connected_socket ( onda_state->socket, msg, msg_size );
     std_assert_m ( msg_size == write_size );
-    //std_log_info_m ( "Sent " std_fmt_size_m " bytes to server", msg_size );
 
-    //std_log_info_m ( "Waiting for server..." );
+    std_log_info_m ( "Waiting for server..." );
     std_buffer_t read_buffer = read_socket ( onda_state->socket, &onda_state->read_stack );
 
     std_virtual_stack_t* write_stack = &onda_state->write_stack;
@@ -418,11 +528,17 @@ static std_app_state_e onda_update_client ( void ) {
     } else if ( std_str_starts_with ( msg, "play" ) ) {
         aud_i* aud = onda_state->client.aud;
 
+        bool exit = false;
+
         std_auto_m playlist_header = ( onda_playlist_header_t* ) read_buffer.base;
         std_assert_m ( playlist_header->total_size == read_buffer.size );
         uint32_t media_count = playlist_header->media_count;
         void* p = playlist_header + 1; 
         for ( uint32_t media_it = 0; media_it < media_count; ++media_it ) {
+            if ( exit ) {
+                break;
+            }
+
             std_auto_m media_header = ( onda_media_header_t* ) p;
             uint32_t label_size = media_header->label_size;
             onda_media_type_e media_type = media_header->media_type;
@@ -432,29 +548,14 @@ static std_app_state_e onda_update_client ( void ) {
             char* label = media_header->data;
             void* data = label + label_size;
 
-            p += sizeof ( media_header ) + label_size + media_size; // TODO enforce alighment?
+            p += sizeof ( onda_media_header_t ) + label_size + media_size;
+            p = std_align_ptr ( p, 8 );
 
-            aud_source_h source = aud_null_handle_m;
-            mp3dec_ex_t mp3dec;
-            if ( mp3dec_ex_open_buf ( &mp3dec, data, media_size, MP3D_SEEK_TO_SAMPLE ) == 0 ) {
-                std_log_info_m ( "Creating audio source..." );
-                aud_source_params_t params = {
-                    .sample_frequency = mp3dec.info.hz,
-                    .bits_per_sample = 16,
-                    .sample_count = mp3dec.samples,
-                    .channel_count = 2,
-                };
-                source = aud->create_source ( &params );
-
-                int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, mp3dec.samples );
-                uint64_t samples_read = mp3dec_ex_read ( &mp3dec, buffer, mp3dec.samples );
-                std_verify_m ( samples_read == mp3dec.samples );
-                aud->feed_source ( source, buffer, sizeof ( int16_t ) * mp3dec.samples );
-                std_virtual_heap_free ( buffer );
-                mp3dec_ex_close ( &mp3dec );
-            }
+            aud_source_h source = create_source ( label, data, media_size );
 
             if ( source != aud_null_handle_m ) {
+                std_log_m ( std_log_level_custom_m, "" );
+
                 aud->play_source ( source );
                 aud->set_source_volume ( source, 0.2f );
 
@@ -483,6 +584,7 @@ static std_app_state_e onda_update_client ( void ) {
                     wm_input_state_t new_input_state;
                     wm->get_window_input_state ( onda_state->client.window, &new_input_state );
                     if ( new_input_state.keyboard[wm_keyboard_state_esc_m] && !old_input_state.keyboard[wm_keyboard_state_esc_m] ) {
+                        exit = true;
                         break;
                     }
                     if ( new_input_state.keyboard[wm_keyboard_state_alt_left_m] ) {

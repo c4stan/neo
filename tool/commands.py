@@ -6,6 +6,7 @@ import json
 import platform
 import configparser
 import psutil
+import sys
 
 import importlib
 import makegen
@@ -54,11 +55,13 @@ def hook_signal_handler():
         global SUBPROCESS
         if SUBPROCESS is not None and SUBPROCESS.poll() is None:
             SUBPROCESS.kill()
-            print(Color.OKBLUE + "PID " + str(SUBPROCESS.pid) + " terminated." + Color.ENDC)
+            #print(Color.OKBLUE + "PID " + str(SUBPROCESS.pid) + " terminated." + Color.ENDC)
+            os.write(sys.stdout.fileno(), (Color.OKBLUE + "PID " + str(SUBPROCESS.pid) + " terminated." + Color.ENDC + "\n").encode('ascii'))
             SUBPROCESS = None
         else:
             SUBPROCESS = None
-            print(Color.WARNING + "No process to terminate." + Color.ENDC)
+            #print(Color.WARNING + "No process to terminate." + Color.ENDC)
+            os.write(sys.stdout.fileno(), (Color.WARNING + "No process to terminate." + Color.ENDC + "\n").encode('ascii'))
 
     signal.signal(signal.SIGINT, sigint_handler)
 

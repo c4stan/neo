@@ -10,4 +10,3 @@ if linux
 endif
 output = dll
 deps = std
-ignores = aud_mixer.c

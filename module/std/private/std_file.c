@@ -454,7 +454,7 @@ size_t std_path_absolute ( char* dest, size_t dest_cap, const char* path ) {
 #endif
 }
 
-char* std_path_relative_to ( char* path, char* relative_to ) {
+char* std_path_relative_to ( const char* path, const char* relative_to ) {
     size_t path_len = std_str_len ( path );
     size_t i = 0;
     for ( ; i < path_len; ++i ) {
@@ -462,7 +462,18 @@ char* std_path_relative_to ( char* path, char* relative_to ) {
             break;
         }
     }
-    return path + i;
+    return ( char* ) ( path + i );
+}
+
+char* std_path_ext ( const char* path ) {
+    size_t len = std_str_len ( path );
+    // TODO make this find rev more robust
+    size_t ext_offset = std_str_find_reverse ( path, len, "." );
+    if ( ext_offset != std_str_find_null_m ) {
+        return ( char* ) ( path + ext_offset + 1 ); // skip the '.'
+    } else {
+        return NULL;
+    }
 }
 
 // ======================================================================================= //
@@ -1288,7 +1299,8 @@ uint64_t std_file_read ( void* dest, size_t size, std_file_h file ) {
         BOOL read_retcode = ReadFile ( ( HANDLE ) file, p, remaining_size, &read_size, NULL );
 
         if ( read_retcode == FALSE ) {
-            std_log_warn_m ( "File read failed with code " std_fmt_u32_m, read_retcode );
+            std_log_os_error_m();
+            //std_log_warn_m ( "File read failed with code " std_fmt_u32_m, read_retcode );
             return std_file_read_error_m;
         }
 
