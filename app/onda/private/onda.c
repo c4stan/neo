@@ -569,10 +569,6 @@ static std_app_state_e onda_update_client ( void ) {
     std_process_io_read ( msg, &msg_size, sizeof ( msg ) - 1, process_info.io.stdin_handle );
     msg[msg_size++] = '\0';
 
-    if ( std_str_cmp ( msg, "exit" ) == 0 ) {
-        return std_app_state_exit_m;
-    }
-
     std_virtual_stack_t* write_stack = &onda_state->write_stack;
     std_virtual_stack_clear ( write_stack );
 
@@ -733,6 +729,9 @@ static std_app_state_e onda_update_client ( void ) {
                 aud->destroy_source ( source );
             }
         }
+    } else if ( std_str_cmp ( msg, "exit" ) == 0 ) {
+        net->destroy_socket ( onda_state->socket );
+        return std_app_state_exit_m;
     } else {
         std_log_error_m ( "Bad input" );
         return std_app_state_exit_m;
@@ -769,7 +768,12 @@ std_module_export_m void* onda_load ( void* runtime ) {
 }
 
 std_module_export_m void onda_unload ( void ) {
+    // TODO
     std_module_unload_m ( net_module_name_m );
+    if ( !onda_state->is_server ) {
+        std_module_unload_m ( aud_module_name_m );
+        std_module_unload_m ( wm_module_name_m );
+    }
     onda_state_free();
 }
 

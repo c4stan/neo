@@ -35,15 +35,18 @@ else:
     while True:
         try:
             string = input('> ')
-            if string == 'exit' or string == 'quit':
-                quit()
-            elif (string == 'reload' or string == 'update'):
-                try:
-                    importlib.reload(commands)
-                    commands.reload(root_path, tool_path, workspace_paths)
-                    print('Reload successful.')
-                except Exception as e:
-                    print('Reload error: ' + str(e))
+            if commands.has_subprocess():
+                if string == 'exit' or string == 'quit':
+                    quit()
+                elif string == 'reload' or string == 'update':
+                    try:
+                        importlib.reload(commands)
+                        commands.reload(root_path, tool_path, workspace_paths)
+                        print('Reload successful.')
+                    except Exception as e:
+                        print('Reload error: ' + str(e))
+                else:
+                    commands.execute(string)
             else:
                 commands.execute(string)
         except EOFError as e:

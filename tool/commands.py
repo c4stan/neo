@@ -49,6 +49,10 @@ def update_subprocess():
     if SUBPROCESS is not None and SUBPROCESS.poll() is not None:
         SUBPROCESS = None
 
+def has_subprocess():
+    update_subprocess()
+    return SUBPROCESS is not None
+
 def hook_signal_handler():
     original_sigint = signal.getsignal(signal.SIGINT)
     def sigint_handler(signum, frame):
@@ -656,8 +660,7 @@ def execute(string):
         return
 
     global SUBPROCESS
-    update_subprocess()
-    if SUBPROCESS is not None:
+    if has_subprocess():
         print(Color.OKBLUE + 'Redirecting to subprocess stdin' + Color.ENDC)
         SUBPROCESS.stdin.write(string.encode('ascii'))
         SUBPROCESS.stdin.flush()
