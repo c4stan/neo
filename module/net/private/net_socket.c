@@ -300,23 +300,33 @@ size_t net_socket_get_available_read_size ( net_socket_h socket_handle ) {
     return size;
 }
 
-size_t read_connected_socket ( void* dest, size_t cap,  net_socket_h socket_handle ) {
+size_t net_socket_read_connected ( void* dest, size_t cap, net_socket_h socket_handle, net_connected_socket_read_flags_e flags ) {
     net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_connected_m );
 
-    int read_size = recv ( sock->os_handle, dest, ( int ) cap, 0 );
+    int recv_flags = 0;
+    if ( flags & net_connected_socket_read_flag_read_all_m ) {
+        recv_flags |= MSG_WAITALL;
+    }
 
+    int read_size = recv ( sock->os_handle, dest, ( int ) cap, recv_flags );
+
+    // TODO better error handling
     if ( read_size == SOCKET_ERROR ) {
-        // TODO
+        std_log_os_error_m();
         return 0;
+    }
+
+    if ( flags & net_connected_socket_read_flag_read_all_m ) {
+        std_assert_m ( read_size == cap );
     }
 
     return ( size_t ) read_size;
 }
 
-size_t write_connected_socket ( net_socket_h socket_handle, const void* data, size_t size ) {
+size_t net_socket_write_connected ( net_socket_h socket_handle, const void* data, size_t size ) {
     net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
@@ -324,15 +334,18 @@ size_t write_connected_socket ( net_socket_h socket_handle, const void* data, si
 
     int write_size = send ( sock->os_handle, data, ( int ) size, 0 );
 
+    // TODO better error handling
     if ( write_size == SOCKET_ERROR ) {
-        // TODO
+        std_log_os_error_m();
         return 0;
     }
+
+    std_assert_m ( write_size == size );
 
     return ( size_t ) write_size;
 }
 
-size_t read_socket ( net_socket_address_t* address, void* dest, size_t cap, net_socket_h socket_handle ) {
+size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap, net_socket_h socket_handle ) {
     net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
@@ -369,7 +382,7 @@ size_t read_socket ( net_socket_address_t* address, void* dest, size_t cap, net_
     return ( size_t ) read_size;
 }
 
-size_t write_socket ( net_socket_h socket_handle, const net_socket_address_t* address, const void* data, size_t size ) {
+size_t net_socket_write ( net_socket_h socket_handle, const net_socket_address_t* address, const void* data, size_t size ) {
     net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 

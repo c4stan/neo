@@ -85,7 +85,7 @@ static void test_tcp_msg ( void ) {
     std_log_info_m ( "Sending TCP string '" std_fmt_str_m "' to address " std_fmt_str_m ":" std_fmt_u16_m"...", msg, buffer, client_address.port );
     net->write_connected_socket ( client_socket, msg, msg_size );
 
-    size_t read_size = net->read_connected_socket ( buffer, sizeof ( buffer ), s2 );
+    size_t read_size = net->read_connected_socket ( buffer, sizeof ( buffer ), s2, net_connected_socket_read_flag_none_m );
     std_assert_m ( read_size == msg_size );
     std_log_info_m ( "Received TCP string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, s1_address.port );
 
@@ -116,7 +116,7 @@ void test_http_server ( void ) {
         std_log_info_m ( "Serving HTTP client " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, client_address.port );
 
         char buffer[1024];
-        net->read_connected_socket ( buffer, sizeof ( buffer ), client_socket );
+        net->read_connected_socket ( buffer, sizeof ( buffer ), client_socket, net_connected_socket_read_flag_none_m );
         //std_log_info_m ( std_fmt_str_m, buffer );
 
         char path[std_path_size_m];

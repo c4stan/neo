@@ -20,10 +20,10 @@ static net_i net_api ( void ) {
     net.accept_pending_connection = net_socket_accept_pending_connection;
 
     net.get_socket_available_read_size = net_socket_get_available_read_size;
-    net.read_connected_socket = read_connected_socket;
-    net.write_connected_socket = write_connected_socket;
-    net.read_socket = read_socket;
-    net.write_socket = write_socket;
+    net.read_connected_socket = net_socket_read_connected;
+    net.write_connected_socket = net_socket_write_connected;
+    net.read_socket = net_socket_read;
+    net.write_socket = net_socket_write;
 
     net.ip_string_to_bytes = net_address_ip_string_to_bytes;
     net.ip_bytes_to_string = net_address_ip_bytes_to_string;

@@ -75,6 +75,11 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+typedef enum {
+    net_connected_socket_read_flag_none_m = 0,
+    net_connected_socket_read_flag_read_all_m = 1 << 0,
+} net_connected_socket_read_flags_e;
+
 // API
 typedef struct {
     net_socket_h    ( *create_socket )                      ( const net_socket_params_t* params );
@@ -85,7 +90,7 @@ typedef struct {
     net_socket_h    ( *accept_pending_connection )          ( net_socket_address_t* address, net_socket_h socket );
 
     size_t          ( *get_socket_available_read_size )     ( net_socket_h socket );
-    size_t          ( *read_connected_socket )              ( void* dest, size_t cap, net_socket_h socket );
+    size_t          ( *read_connected_socket )              ( void* dest, size_t cap, net_socket_h socket, net_connected_socket_read_flags_e flags );
     size_t          ( *write_connected_socket )             ( net_socket_h socket, const void* data, size_t size );
     size_t          ( *read_socket )                        ( net_socket_address_t* address, void* dest, size_t cap,  net_socket_h socket );
     size_t          ( *write_socket )                       ( net_socket_h socket, const net_socket_address_t* address, const void* data, size_t size );
