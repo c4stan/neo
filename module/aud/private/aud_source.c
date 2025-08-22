@@ -104,6 +104,7 @@ bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source_handle )
 
     info->sample_frequency = source->params.sample_frequency;
     info->bits_per_sample = source->params.bits_per_sample;
+    info->channel_count = source->params.channel_count;
     info->sample_count = source->params.sample_count;
     info->time_played = source->time_played;
     info->total_time = source->total_time;
@@ -156,6 +157,9 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
                     void* source_sample_b = source->stack.begin + source_frame_idx_b * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
                     double sample_a = 0;
                     double sample_b = 0;
+
+                    std_assert_m ( source_sample_a < source->stack.top );
+                    std_assert_m ( source_sample_b < source->stack.top );
 
                     // source range -> [0,1]
                     switch ( source_sample_stride ) {

@@ -461,16 +461,24 @@ void* std_stack_write ( std_stack_t* stack, const void* data, size_t size ) {
     return alloc;
 }
 
-bool std_stack_align ( std_stack_t* stack, size_t align ) {
+void* std_stack_align ( std_stack_t* stack, size_t align ) {
     void* top = stack->top;
     size_t align_size = std_align_size_ptr ( top, align );
-    return std_stack_alloc ( stack, align_size ) != NULL;
+    if ( std_stack_alloc ( stack, align_size ) ) {
+        return stack->top;
+    } else {
+        return NULL;
+    }
 }
 
-bool std_stack_align_zero ( std_stack_t* stack, size_t align ) {
+void* std_stack_align_zero ( std_stack_t* stack, size_t align ) {
     void* top = stack->top;
     size_t align_size = std_align_size_ptr ( top, align );
-    return std_stack_alloc_zero ( stack, align_size ) != NULL;
+    if ( std_stack_alloc_zero ( stack, align_size ) ) {
+        return stack->top;
+    } else {
+        return NULL;
+    }
 }
 
 void* std_stack_alloc_align ( std_stack_t* stack, size_t size, size_t align ) {
@@ -575,6 +583,11 @@ uint64_t std_stack_used_size ( const std_stack_t* stack ) {
     return top - begin;
 }
 
+uint64_t std_stack_used_size_from ( const std_stack_t* stack, void* base )  {
+    void* top = stack->top;
+    return top > base ? top - base : 0; // TODO check if base < stack->begin ?
+}
+
 uint64_t std_stack_unused_size ( const std_stack_t* stack ) {
     void* top = stack->top;
     void* end = stack->end;
@@ -608,6 +621,10 @@ void std_virtual_stack_destroy ( std_virtual_stack_t* stack ) {
 
 uint64_t std_virtual_stack_used_size ( const std_virtual_stack_t* stack ) {
     return std_stack_used_size ( &stack->mapped );
+}
+
+uint64_t std_virtual_stack_used_size_from ( const std_virtual_stack_t* stack, void* base ) {
+    return std_stack_used_size_from ( &stack->mapped, base );
 }
 
 bool std_virtual_stack_map ( std_virtual_stack_t* stack, size_t alloc_size ) {
@@ -681,16 +698,24 @@ void* std_virtual_stack_write ( std_virtual_stack_t* stack, const void* data, si
     return alloc;
 }
 
-bool std_virtual_stack_align ( std_virtual_stack_t* stack, size_t align ) {
+void* std_virtual_stack_align ( std_virtual_stack_t* stack, size_t align ) {
     void* top = stack->mapped.top;
     size_t align_size = std_align_size_ptr ( top, align );
-    return std_virtual_stack_alloc ( stack, align_size ) != NULL;
+    if ( std_virtual_stack_alloc ( stack, align_size ) ) {
+        return stack->top;
+    } else {
+        return NULL;
+    }
 }
 
-bool std_virtual_stack_align_zero ( std_virtual_stack_t* stack, size_t align ) {
+void* std_virtual_stack_align_zero ( std_virtual_stack_t* stack, size_t align ) {
     void* top = stack->mapped.top;
     size_t align_size = std_align_size_ptr ( top, align );
-    return std_virtual_stack_alloc_zero ( stack, align_size ) != NULL;
+    if ( std_virtual_stack_alloc_zero ( stack, align_size ) ) {
+        return stack->top;
+    } else {
+        return NULL;
+    }
 }
 
 void std_virtual_stack_free ( std_virtual_stack_t* stack, size_t size ) {

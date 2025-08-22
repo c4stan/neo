@@ -95,8 +95,8 @@ std_stack_t std_stack_create ( size_t size );
 void        std_stack_destroy ( std_stack_t* stack );
 void*       std_stack_alloc ( std_stack_t* buffer, size_t size );
 void*       std_stack_write ( std_stack_t* buffer, const void* data, size_t size );
-bool        std_stack_align ( std_stack_t* buffer, size_t align );
-bool        std_stack_align_zero ( std_stack_t* buffer, size_t align );
+void*       std_stack_align ( std_stack_t* buffer, size_t align );
+void*       std_stack_align_zero ( std_stack_t* buffer, size_t align );
 void*       std_stack_alloc_align ( std_stack_t* buffer, size_t size, size_t align );
 void*       std_stack_write_align ( std_stack_t* buffer, const void* data, size_t size, size_t align );
 void        std_stack_clear ( std_stack_t* buffer );
@@ -108,6 +108,7 @@ char*       std_stack_string_append_char ( std_stack_t* stack, char c );
 void        std_stack_string_pop ( std_stack_t* stack );
 void        std_stack_free ( std_stack_t* stack, size_t size );
 uint64_t    std_stack_used_size ( const std_stack_t* stack );
+uint64_t    std_stack_used_size_from ( const std_stack_t* stack, void* base );
 uint64_t    std_stack_unused_size ( const std_stack_t* stack );
 
 #define std_static_stack_m( array ) std_stack ( array, sizeof ( array ) )
@@ -136,8 +137,8 @@ void                std_virtual_stack_destroy ( std_virtual_stack_t* stack );
 bool        std_virtual_stack_map ( std_virtual_stack_t* buffer, size_t size );
 void*       std_virtual_stack_alloc ( std_virtual_stack_t* buffer, size_t size );
 void*       std_virtual_stack_write ( std_virtual_stack_t* buffer, const void* data, size_t size );
-bool        std_virtual_stack_align ( std_virtual_stack_t* buffer, size_t align );
-bool        std_virtual_stack_align_zero ( std_virtual_stack_t* buffer, size_t align );
+void*       std_virtual_stack_align ( std_virtual_stack_t* buffer, size_t align );
+void*       std_virtual_stack_align_zero ( std_virtual_stack_t* buffer, size_t align );
 void*       std_virtual_stack_alloc_align ( std_virtual_stack_t* buffer, size_t size, size_t align );
 void*       std_virtual_stack_write_align ( std_virtual_stack_t* buffer, const void* data, size_t size, size_t align );
 void        std_virtual_stack_clear ( std_virtual_stack_t* buffer );
@@ -147,6 +148,7 @@ char*       std_virtual_stack_string_append ( std_virtual_stack_t* buffer, const
 char*       std_virtual_stack_string_append_format ( std_virtual_stack_t* buffer, const char* str, ... );
 void        std_virtual_stack_free ( std_virtual_stack_t* buffer, size_t size );
 uint64_t    std_virtual_stack_used_size ( const std_virtual_stack_t* stack );
+uint64_t    std_virtual_stack_used_size_from ( const std_virtual_stack_t* stack, void* base );
 
 #define std_virtual_stack_alloc_array_m( stack, type, count ) ( type* ) std_virtual_stack_alloc_align ( stack, sizeof ( type ) * (count), std_alignof_m ( type ) )
 #define std_virtual_stack_alloc_m( stack, type ) std_virtual_stack_alloc_array_m ( stack, type, 1 )

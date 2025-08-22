@@ -17,7 +17,7 @@
 #include "dr_flac.h"
 
 #define onda_subpath_max_len_m 128
-#define onda_client_max_media_m 128
+#define onda_stream_chunk_size_m 1024 * 1024
 
 typedef struct {
     net_socket_h client_socket;
@@ -296,32 +296,96 @@ static void onda_server_send_list ( std_virtual_stack_t* stack, const list_resul
 }
 
 typedef struct {
-    uint32_t total_size;
     uint32_t media_count;
 } onda_playlist_header_t;
 
 typedef struct {
     uint32_t label_size;
     uint32_t media_size;
+    uint32_t sample_count;
+    uint32_t sample_frequency;
+    uint32_t channel_count;
+    uint32_t bits_per_sample;
     char data[];
 } onda_media_header_t;
 
-static void onda_server_write_media ( std_virtual_stack_t* stack, const char* path ) {
+static void onda_server_send_media ( std_virtual_stack_t* stack, const char* path ) {
+    net_i* net = onda_state->net;
     std_file_h file = std_file_open ( path, std_file_read_m );
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
     char* label = std_path_relative_to ( path, onda_state->server.root_path );
     size_t label_size = std_str_len ( label ) + 1;
-        onda_media_header_t media_header = {
-        .label_size = label_size,
-        .media_size = file_info.size,
-    };
-    std_virtual_stack_write_m ( stack, &media_header );
+    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_media_header_t );
+    header->label_size = label_size;
+    header->media_size = file_info.size;
     void* label_data = std_virtual_stack_alloc ( stack, label_size );
     std_str_copy ( label_data, label_size, label );
     void* media_data = std_virtual_stack_alloc ( stack, file_info.size );
     std_file_read ( media_data, file_info.size, file );
     std_file_close ( file );
+    mp3dec_ex_t dec;
+    mp3dec_ex_open_buf ( &dec, media_data, file_info.size, MP3D_SEEK_TO_SAMPLE );
+    header->sample_count = dec.samples;
+    header->sample_frequency = dec.info.hz;
+    header->channel_count = dec.info.channels;
+    header->bits_per_sample = 16;
+    net->write_connected_socket ( onda_state->server.client_socket, header, std_virtual_stack_used_size_from ( stack, header ) );
+}
+
+static void onda_server_stream_media ( std_virtual_stack_t* stack, const char* path ) {
+    net_i* net = onda_state->net;
+    std_file_h file = std_file_open ( path, std_file_read_m );
+    std_file_info_t file_info;
+    std_file_info ( &file_info, file );
+    char* label = std_path_relative_to ( path, onda_state->server.root_path );
+    size_t label_size = std_str_len ( label ) + 1;
+    void* begin = std_virtual_stack_alloc ( stack, sizeof ( onda_media_header_t ) );
+    std_auto_m header = ( onda_media_header_t* ) begin;
+    header->label_size = label_size;
+    header->media_size = file_info.size;
+    void* label_data = std_virtual_stack_alloc ( stack, label_size );
+    std_str_copy ( label_data, label_size, label );
+    void* media_data = std_virtual_stack_alloc ( stack, file_info.size );
+    std_file_read ( media_data, file_info.size, file );
+    std_file_close ( file );
+
+    mp3dec_ex_t dec;
+    mp3dec_ex_open_buf ( &dec, media_data, file_info.size, MP3D_SEEK_TO_SAMPLE );
+    header->sample_frequency = dec.info.hz;
+    header->channel_count = dec.info.channels;
+    header->bits_per_sample = 16;
+#if 0
+    header->sample_count = dec.samples;
+#else
+    uint64_t sample_count = 0;
+    uint32_t decode_offset = 0;
+    mp3dec_t mp3dec;
+    mp3dec_init ( &mp3dec );
+    while ( decode_offset < file_info.size ) {
+        mp3dec_frame_info_t info;
+        int samples = mp3dec_decode_frame ( &mp3dec, media_data + decode_offset, file_info.size - decode_offset, NULL, &info );
+        if ( samples > 0 ) {
+            sample_count += ( uint64_t ) samples * info.channels;
+        }
+        decode_offset += info.frame_bytes;
+    }
+    header->sample_count = sample_count;
+#endif
+
+#if 1
+    uint32_t total_size = std_virtual_stack_used_size_from ( stack, begin );
+    uint32_t stream_size = 0;
+    while ( stream_size < total_size ) {
+        uint32_t chunk_size = onda_stream_chunk_size_m;
+        uint32_t remaining_size = total_size - stream_size;
+        uint32_t write_size = remaining_size < chunk_size ? remaining_size : chunk_size;
+        net->write_connected_socket ( onda_state->server.client_socket, begin + stream_size, write_size );
+        stream_size += write_size;
+    }
+#else
+    net->write_connected_socket ( onda_state->server.client_socket, begin, std_virtual_stack_used_size_from ( stack, begin ) );
+#endif
 }
 
 static void onda_server_send_playlist ( void ) {
@@ -331,25 +395,25 @@ static void onda_server_send_playlist ( void ) {
 
     list_result_t list = onda_build_list ( &onda_state->temp_stack );
 
-    std_auto_m playlist_header = std_virtual_stack_alloc_m ( write_stack, onda_playlist_header_t );
-    playlist_header->media_count = list.file_count;
+    onda_playlist_header_t playlist_header = {
+        .media_count = list.file_count,
+    };
+    net->write_connected_socket ( onda_state->server.client_socket, &playlist_header, sizeof ( playlist_header ) );
 
     std_path_info_t path_info;
     std_verify_m ( std_path_info ( &path_info, onda_state->server.path ) );
     if ( path_info.flags & std_path_is_file_m ) {
-        onda_server_write_media ( write_stack, onda_state->server.path );
+        onda_server_stream_media ( write_stack, onda_state->server.path );
     } else {
         for ( uint32_t i = 0; i < list.file_count; ++i ) {
             std_path_append_file ( onda_state->server.path, sizeof ( onda_state->server.path ), list.files[i] );
-            onda_server_write_media ( write_stack, onda_state->server.path );
+            onda_server_stream_media ( write_stack, onda_state->server.path );
             std_path_pop ( onda_state->server.path );
+            std_virtual_stack_clear ( write_stack );
         }
     }
-
-    size_t total_size = std_virtual_stack_used_size ( write_stack );
-    playlist_header->total_size = total_size;
-    size_t write_size = net->write_connected_socket ( onda_state->server.client_socket, write_stack->begin, total_size );
-    std_assert_m ( write_size == total_size );
+    
+    std_virtual_stack_clear ( write_stack );
 }
 
 typedef struct {
@@ -495,6 +559,38 @@ static aud_source_h create_source ( char* label, void* data, size_t size ) {
     return aud_null_handle_m;
 }
 
+typedef enum {
+    onda_client_stream_type_mp3_m,
+    onda_client_stream_type_flac_m,
+} onda_client_stream_type_e;
+
+typedef struct {
+    uint32_t total_size;
+    uint32_t read_size;
+    uint32_t consumed_size;
+    void* begin;
+    // TODO
+    onda_client_stream_type_e type;
+    mp3dec_t mp3dec;
+} onda_client_stream_state_t;
+
+static aud_source_h create_stream_source ( onda_client_stream_state_t* stream_state, const onda_media_header_t* header ) {
+    aud_i* aud = onda_state->client.aud;
+    aud_source_h source = aud_null_handle_m;
+
+    std_assert_m ( header->channel_count == 2 );
+    std_assert_m ( header->bits_per_sample == 16 );
+    aud_source_params_t params = {
+        .sample_frequency = header->sample_frequency,
+        .bits_per_sample = header->bits_per_sample,
+        .sample_count = header->sample_count,
+        .channel_count = header->channel_count,
+    };
+    source = aud->create_source ( &params );
+
+    return source;
+}
+
 static list_result_t onda_client_read_list ( std_virtual_stack_t* read_stack, std_virtual_stack_t* temp_stack ) {
     net_i* net = onda_state->net;
     net_socket_h socket = onda_state->socket;
@@ -548,6 +644,54 @@ static onda_media_header_t* onda_client_read_media ( std_virtual_stack_t* stack 
     net->read_connected_socket ( data, data_size, socket, net_connected_socket_read_flag_read_all_m );
 
     return header;
+}
+
+static onda_media_header_t* onda_client_read_media_header ( std_virtual_stack_t* stack, onda_client_stream_state_t* state ) {
+    net_i* net = onda_state->net;
+    net_socket_h socket =  onda_state->socket;
+
+    std_virtual_stack_align ( stack, 8 );
+    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_media_header_t );
+    net->read_connected_socket ( header, sizeof ( onda_media_header_t ), socket, net_connected_socket_read_flag_read_all_m );
+
+    // read label
+    uint32_t label_size = header->label_size;
+    char* label = std_virtual_stack_alloc ( stack, label_size );
+    net->read_connected_socket ( label, label_size, socket, net_connected_socket_read_flag_read_all_m );
+
+    // read first chunk
+    //std_virtual_stack_align ( stack, 8 );
+    //uint32_t data_size = std_min ( onda_stream_chunk_size_m, header->media_size );
+    //void* data = std_virtual_stack_alloc ( stack, data_size );
+    //uint32_t read_size = net->read_connected_socket ( data, data_size, socket, net_connected_socket_read_flag_read_all_m );
+    
+    state->begin = std_virtual_stack_align ( stack, 8 );
+    state->total_size = header->media_size;
+    state->read_size = 0;
+    state->consumed_size = 0;
+
+    return header;
+}
+
+static void* onda_client_read_media_chunk ( std_virtual_stack_t* stack, onda_client_stream_state_t* state ) {
+    net_i* net = onda_state->net;
+    net_socket_h socket =  onda_state->socket;
+
+#if 1
+    uint32_t remaining_size = state->total_size - state->read_size;
+    uint32_t alloc_size = remaining_size < onda_stream_chunk_size_m ? remaining_size : onda_stream_chunk_size_m;
+    void* data = std_virtual_stack_alloc ( stack, alloc_size );
+    uint32_t read_size = net->read_connected_socket ( data, alloc_size, socket, net_connected_socket_read_flag_read_all_m );
+    state->read_size += read_size;
+    std_virtual_stack_free ( stack, alloc_size - read_size );
+#else
+    uint32_t alloc_size = state->total_size - state->read_size;
+    void* data = std_virtual_stack_alloc ( stack, alloc_size );
+    uint32_t read_size = net->read_connected_socket ( data, alloc_size, socket, net_connected_socket_read_flag_read_all_m );
+    state->read_size += read_size;
+#endif
+
+    return data;
 }
 
 static bool onda_client_play_source ( aud_source_h source, char* label ) {
@@ -658,6 +802,166 @@ static bool onda_client_play_source ( aud_source_h source, char* label ) {
     return true;
 }
 
+static bool onda_client_stream_source ( aud_source_h source, char* label, onda_client_stream_state_t* stream_state ) {
+    aud_i* aud = onda_state->client.aud;
+
+    std_log_m ( std_log_level_custom_m, "" );
+
+    aud->play_source ( source );
+    aud->set_source_volume ( source, 0.2f );
+
+    const std_ring_t* device_ring = aud->get_device_ring ( onda_state->client.device );
+    uint64_t ring_capacity = std_ring_capacity ( device_ring );
+
+    aud_device_info_t device_info;
+    aud->get_device_info ( &device_info, onda_state->client.device );
+
+    std_virtual_stack_t* read_stack = &onda_state->read_stack;
+    mp3dec_init ( &stream_state->mp3dec );
+
+    wm_i* wm = onda_state->client.wm;
+    bool first_print = true;
+    uint64_t step_ms = 20;
+    std_tick_t frame_tick = std_tick_now();
+    wm_input_state_t old_input_state;
+    wm->get_window_input_state ( onda_state->client.window, &old_input_state );
+    while ( true ) {
+        // input
+        wm->update_window ( onda_state->client.window );
+
+        wm_window_info_t window_info;
+        wm->get_window_info ( &window_info, onda_state->client.window );
+        uint64_t sleep_ms = 0;
+        if ( !window_info.is_focus ) {
+            sleep_ms = step_ms / 2;
+        }
+        
+        wm_input_state_t new_input_state;
+        wm->get_window_input_state ( onda_state->client.window, &new_input_state );
+        if ( new_input_state.keyboard[wm_keyboard_state_esc_m] && !old_input_state.keyboard[wm_keyboard_state_esc_m] ) {
+            return false;
+        }
+        if ( new_input_state.keyboard[wm_keyboard_state_alt_left_m] ) {
+            if ( new_input_state.keyboard[wm_keyboard_state_right_m] && !old_input_state.keyboard[wm_keyboard_state_right_m] ) {
+                aud->skip_source ( source, 10 );
+            }
+            if ( new_input_state.keyboard[wm_keyboard_state_left_m] && !old_input_state.keyboard[wm_keyboard_state_left_m] ) {
+                aud->skip_source ( source, -10 );
+            }
+        }
+
+        old_input_state = new_input_state;
+
+        // time
+        std_tick_t new_tick = std_tick_now();
+        float delta_ms = std_tick_to_milli_f32 ( new_tick - frame_tick );
+        if ( delta_ms < step_ms / 2 ) {
+            std_thread_this_sleep ( sleep_ms );
+            continue;
+        }
+        
+        frame_tick = new_tick;
+
+        // feed
+        aud_source_info_t source_info;
+        aud->get_source_info ( &source_info, source );
+#if 1
+        if ( stream_state->read_size < stream_state->total_size ) {
+            onda_client_read_media_chunk ( read_stack, stream_state );
+        }
+
+        int16_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
+        while ( stream_state->consumed_size < stream_state->read_size ) {
+            void* decode_base = stream_state->begin + stream_state->consumed_size;
+            uint32_t decode_size = stream_state->read_size - stream_state->consumed_size;
+            mp3dec_frame_info_t info;
+            int samples = mp3dec_decode_frame ( &stream_state->mp3dec, decode_base, decode_size, pcm, &info );
+
+            if ( info.frame_bytes == 0 ) {
+                stream_state->consumed_size += 1;
+                continue;
+            }
+
+            stream_state->consumed_size += info.frame_bytes;
+        
+            if ( samples > 0 && info.hz > 0 && info.channels > 0 ) {
+                aud->feed_source ( source, pcm, sizeof ( int16_t ) * samples * info.channels );
+            }
+        }
+#else
+        if ( stream_state->read_size < stream_state->total_size ) {
+            onda_client_read_media_chunk ( read_stack, stream_state );
+            int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, source_info.sample_count );
+            mp3dec_ex_t mp3dec;
+            mp3dec_ex_open_buf ( &mp3dec, stream_state->begin, stream_state->read_size, MP3D_SEEK_TO_SAMPLE );
+            uint64_t samples_read = mp3dec_ex_read ( &mp3dec, buffer, mp3dec.samples );
+            std_verify_m ( samples_read == mp3dec.samples );
+            aud->feed_source ( source, buffer, sizeof ( int16_t ) * mp3dec.samples );
+            std_virtual_heap_free ( buffer );
+            stream_state->consumed_size = stream_state->read_size;
+        }
+#endif
+
+        // print
+        float total_duration = source_info.total_time;
+        float bar_tick = total_duration * 1000.f / 60.f;
+
+        aud->update_device_ring ( onda_state->client.device );
+        uint64_t ring_count = std_ring_count ( device_ring );
+
+        {
+            char bar[100];
+            size_t i = 0;
+
+            bar[i++] = '[';
+
+            uint64_t ms = ( uint64_t ) ( source_info.time_played * 1000.f );
+
+            while ( ms > bar_tick && i < 60 ) {
+                bar[i++] = '=';
+                ms -= bar_tick;
+            }
+
+            uint64_t streamed_ms = ( uint64_t ) ( ( float ) stream_state->read_size / stream_state->total_size * total_duration * 1000.f );
+
+            while ( streamed_ms > bar_tick && i < 60 ) {
+                bar[i++] = '-';
+                streamed_ms -= bar_tick;
+            }
+
+            while ( i < 60 ) {
+                bar[i++] = ' ';
+            }
+
+            bar[i++] = ']';
+
+            const char* prefix = "";
+
+            if ( first_print ) {
+                prefix = "\n";
+            }
+
+            first_print = false;
+
+            std_log_m ( std_log_level_custom_m, std_fmt_str_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_str_m "\n" std_fmt_str_m " " std_fmt_u64_pad_m ( 2 ) "/" std_fmt_u64_m, 
+                prefix, label, bar, ring_count, ring_capacity );
+        }
+
+        // output
+        if ( source_info.time_played < total_duration ) {
+            if ( ring_count < ring_capacity ) {
+                aud->output_to_device ( onda_state->client.device, step_ms );
+            }
+        } else if ( ring_count == 0 && stream_state->read_size >= stream_state->total_size ) {
+            break;
+        }
+        
+        std_thread_this_sleep ( sleep_ms );
+    }
+
+    return true;
+}
+
 static std_app_state_e onda_update_client ( void ) {
     net_i* net = onda_state->net;
 
@@ -709,17 +1013,17 @@ static std_app_state_e onda_update_client ( void ) {
         bool exit = false;
 
         onda_playlist_header_t* playlist_header = onda_client_read_playlist_header ( read_stack );
-        uint32_t total_read_size = sizeof ( onda_playlist_header_t );
         uint32_t media_count = playlist_header->media_count;
-        for ( uint32_t media_it = 0; media_it < media_count; ++media_it ) {
+        uint32_t media_it = 0;
+        for ( ; media_it < media_count; ++media_it ) {
             if ( exit ) {
                 break;
             }
 
+#if 0
             onda_media_header_t* media_header = onda_client_read_media ( read_stack );
             uint32_t label_size = media_header->label_size;
             uint32_t media_size = media_header->media_size;
-            total_read_size += sizeof ( onda_media_header_t ) + label_size + media_size;
 
             char* label = media_header->data;
             void* data = label + label_size;
@@ -732,13 +1036,35 @@ static std_app_state_e onda_update_client ( void ) {
                 }
                 aud->destroy_source ( source );
             }
+#else
+
+            onda_client_stream_state_t stream_state;
+            onda_media_header_t* media_header = onda_client_read_media_header ( read_stack, &stream_state );
+            //uint32_t label_size = media_header->label_size;
+            //uint32_t media_size = media_header->media_size;
+
+            char* label = media_header->data;
+            //void* data = label + label_size;
+
+            aud_source_h source = create_stream_source ( &stream_state, media_header );
+
+            if ( source != aud_null_handle_m ) {
+                //if ( !onda_client_play_source ( source, label ) ) {
+                if ( !onda_client_stream_source ( source, label, &stream_state ) ) {
+                    exit = true;
+                }
+                aud->destroy_source ( source );
+            }
+#endif
+            std_virtual_stack_clear ( read_stack );
         }
 
         if ( exit ) {
             // flush
-            uint32_t flush_size = playlist_header->total_size - total_read_size;
-            void* alloc = std_virtual_stack_alloc ( read_stack, flush_size );
-            net->read_connected_socket ( alloc, flush_size, onda_state->socket, net_connected_socket_read_flag_none_m );
+            for ( ; media_it < media_count; ++media_it ) {
+                onda_client_read_media ( read_stack );
+                std_virtual_stack_clear ( read_stack );
+            }
         }
     } else if ( std_str_cmp ( msg, "exit" ) == 0 ) {
         net->destroy_socket ( onda_state->socket );

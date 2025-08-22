@@ -51,6 +51,7 @@ typedef struct {
 typedef struct {
     uint32_t sample_frequency;
     uint32_t bits_per_sample;
+    uint32_t channel_count;
     uint64_t sample_count;
     double time_played; // seconds
     double total_time;  // seconds
