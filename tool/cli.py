@@ -36,6 +36,8 @@ else:
         try:
             string = input('> ')
             if commands.has_subprocess():
+                commands.execute(string)
+            else:
                 if string == 'exit' or string == 'quit':
                     quit()
                 elif string == 'reload' or string == 'update':
@@ -47,8 +49,6 @@ else:
                         print('Reload error: ' + str(e))
                 else:
                     commands.execute(string)
-            else:
-                commands.execute(string)
         except EOFError as e:
             pass
         except Exception as e:

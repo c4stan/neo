@@ -81,6 +81,7 @@ CORE_WARNING_FLAGS = (
     ' -Wno-comment'
     ' -Wno-unused-value'                        # allows ignoring the result of an expression (e.g. a comparison), useful e.g. when using std_verify_m to check the return value of a function call
     ' -Wno-missing-braces'                      # suggested braces warnings?
+    ' -Wno-c23-extensions'                      # label at end of compound statement, and possibly something else
 )
 
 if COMPILER == COMPILER_GCC:

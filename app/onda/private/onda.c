@@ -13,11 +13,13 @@
 #define MINIMP3_IMPLEMENTATION
 #include "minimp3_ex.h"
 
- #define DR_FLAC_IMPLEMENTATION
-#include "dr_flac.h"
+//#define DR_FLAC_IMPLEMENTATION
+//#include "dr_flac.h"
+
+#include "foxen-flac.h"
 
 #define onda_subpath_max_len_m 128
-#define onda_stream_chunk_size_m 1024 * 1024
+#define onda_stream_chunk_size_m 1024 * 1024 * 1
 
 typedef struct {
     net_socket_h client_socket;
@@ -299,6 +301,12 @@ typedef struct {
     uint32_t media_count;
 } onda_playlist_header_t;
 
+typedef enum {
+    onda_client_stream_type_mp3_m,
+    onda_client_stream_type_flac_m,
+    onda_client_stream_type_unknown_m,
+} onda_client_stream_type_e;
+
 typedef struct {
     uint32_t label_size;
     uint32_t media_size;
@@ -306,9 +314,11 @@ typedef struct {
     uint32_t sample_frequency;
     uint32_t channel_count;
     uint32_t bits_per_sample;
+    onda_client_stream_type_e type;
     char data[];
 } onda_media_header_t;
 
+#if 0
 static void onda_server_send_media ( std_virtual_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
     std_file_h file = std_file_open ( path, std_file_read_m );
@@ -324,14 +334,28 @@ static void onda_server_send_media ( std_virtual_stack_t* stack, const char* pat
     void* media_data = std_virtual_stack_alloc ( stack, file_info.size );
     std_file_read ( media_data, file_info.size, file );
     std_file_close ( file );
-    mp3dec_ex_t dec;
-    mp3dec_ex_open_buf ( &dec, media_data, file_info.size, MP3D_SEEK_TO_SAMPLE );
-    header->sample_count = dec.samples;
-    header->sample_frequency = dec.info.hz;
-    header->channel_count = dec.info.channels;
-    header->bits_per_sample = 16;
+
+    char* ext = std_path_ext ( path );
+    if ( ext ) {
+        if ( std_str_cmp ( ext, "mp3" ) == 0 ) {
+            header->type = onda_client_stream_type_mp3_m;
+            mp3dec_ex_t dec;
+            mp3dec_ex_open_buf ( &dec, media_data, file_info.size, MP3D_SEEK_TO_SAMPLE );
+            header->sample_count = dec.samples;
+            header->sample_frequency = dec.info.hz;
+            header->channel_count = dec.info.channels;
+            header->bits_per_sample = 16;
+        } else if ( std_str_cmp ( ext, "flac" ) == 0 ) {
+            header->type = onda_client_stream_type_flac_m;
+            header->bits_per_sample = 32;
+            // TODO            
+        } else {
+            header->type = onda_client_stream_type_unknown_m;
+        }
+    }
     net->write_connected_socket ( onda_state->server.client_socket, header, std_virtual_stack_used_size_from ( stack, header ) );
 }
+#endif
 
 static void onda_server_stream_media ( std_virtual_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
@@ -350,28 +374,52 @@ static void onda_server_stream_media ( std_virtual_stack_t* stack, const char* p
     std_file_read ( media_data, file_info.size, file );
     std_file_close ( file );
 
-    mp3dec_ex_t dec;
-    mp3dec_ex_open_buf ( &dec, media_data, file_info.size, MP3D_SEEK_TO_SAMPLE );
-    header->sample_frequency = dec.info.hz;
-    header->channel_count = dec.info.channels;
-    header->bits_per_sample = 16;
+    char* ext = std_path_ext ( path );
+    if ( ext ) {
+        if ( std_str_cmp ( ext, "mp3" ) == 0 ) {
+            header->type = onda_client_stream_type_mp3_m;
+
+            mp3dec_ex_t dec;
+            mp3dec_ex_open_buf ( &dec, media_data, file_info.size, MP3D_SEEK_TO_SAMPLE );
+            header->sample_frequency = dec.info.hz;
+            header->channel_count = dec.info.channels;
+            header->bits_per_sample = 16;
 #if 0
-    header->sample_count = dec.samples;
+            header->sample_count = dec.samples;
 #else
-    uint64_t sample_count = 0;
-    uint32_t decode_offset = 0;
-    mp3dec_t mp3dec;
-    mp3dec_init ( &mp3dec );
-    while ( decode_offset < file_info.size ) {
-        mp3dec_frame_info_t info;
-        int samples = mp3dec_decode_frame ( &mp3dec, media_data + decode_offset, file_info.size - decode_offset, NULL, &info );
-        if ( samples > 0 ) {
-            sample_count += ( uint64_t ) samples * info.channels;
-        }
-        decode_offset += info.frame_bytes;
-    }
-    header->sample_count = sample_count;
+            uint64_t sample_count = 0;
+            uint32_t decode_offset = 0;
+            mp3dec_t mp3dec;
+            mp3dec_init ( &mp3dec );
+            while ( decode_offset < file_info.size ) {
+                mp3dec_frame_info_t info;
+                int samples = mp3dec_decode_frame ( &mp3dec, media_data + decode_offset, file_info.size - decode_offset, NULL, &info );
+                if ( samples > 0 ) {
+                    sample_count += ( uint64_t ) samples * info.channels;
+                }
+                decode_offset += info.frame_bytes;
+            }
+            header->sample_count = sample_count;
 #endif
+        } else if ( std_str_cmp ( ext, "flac" ) == 0 ) {
+            header->type = onda_client_stream_type_flac_m;
+        
+            fx_flac_t* flac = FX_FLAC_ALLOC_DEFAULT();
+            uint32_t decode_offset = 0;
+            uint32_t decode_size = file_info.size - decode_offset;
+            while ( fx_flac_process ( flac, media_data + decode_offset, &decode_size, NULL, NULL) < FLAC_END_OF_METADATA ) {
+                decode_offset += decode_size;
+                decode_size = file_info.size - decode_offset;
+            }
+
+            header->sample_frequency = fx_flac_get_streaminfo ( flac, FLAC_KEY_SAMPLE_RATE );
+            header->channel_count = fx_flac_get_streaminfo ( flac, FLAC_KEY_N_CHANNELS );
+            header->bits_per_sample = 32;
+            header->sample_count = fx_flac_get_streaminfo ( flac, FLAC_KEY_N_SAMPLES ) * header->channel_count;
+        } else {
+            header->type = onda_client_stream_type_unknown_m;
+        }
+    }
 
 #if 1
     uint32_t total_size = std_virtual_stack_used_size_from ( stack, begin );
@@ -497,6 +545,7 @@ static std_app_state_e onda_update_server ( void ) {
     return std_app_state_tick_m;
 }
 
+#if 0
 static aud_source_h create_source_mp3 ( void* data, size_t size ) {
     aud_i* aud = onda_state->client.aud;
     aud_source_h source = aud_null_handle_m;
@@ -558,11 +607,7 @@ static aud_source_h create_source ( char* label, void* data, size_t size ) {
 
     return aud_null_handle_m;
 }
-
-typedef enum {
-    onda_client_stream_type_mp3_m,
-    onda_client_stream_type_flac_m,
-} onda_client_stream_type_e;
+#endif
 
 typedef struct {
     uint32_t total_size;
@@ -571,7 +616,10 @@ typedef struct {
     void* begin;
     // TODO
     onda_client_stream_type_e type;
-    mp3dec_t mp3dec;
+    union {
+        mp3dec_t mp3dec;
+        fx_flac_t* flac;
+    };
 } onda_client_stream_state_t;
 
 static aud_source_h create_stream_source ( onda_client_stream_state_t* stream_state, const onda_media_header_t* header ) {
@@ -579,7 +627,7 @@ static aud_source_h create_stream_source ( onda_client_stream_state_t* stream_st
     aud_source_h source = aud_null_handle_m;
 
     std_assert_m ( header->channel_count == 2 );
-    std_assert_m ( header->bits_per_sample == 16 );
+    //std_assert_m ( header->bits_per_sample == 16 );
     aud_source_params_t params = {
         .sample_frequency = header->sample_frequency,
         .bits_per_sample = header->bits_per_sample,
@@ -669,6 +717,7 @@ static onda_media_header_t* onda_client_read_media_header ( std_virtual_stack_t*
     state->total_size = header->media_size;
     state->read_size = 0;
     state->consumed_size = 0;
+    state->type = header->type;
 
     return header;
 }
@@ -677,7 +726,7 @@ static void* onda_client_read_media_chunk ( std_virtual_stack_t* stack, onda_cli
     net_i* net = onda_state->net;
     net_socket_h socket =  onda_state->socket;
 
-#if 1
+#if 0
     uint32_t remaining_size = state->total_size - state->read_size;
     uint32_t alloc_size = remaining_size < onda_stream_chunk_size_m ? remaining_size : onda_stream_chunk_size_m;
     void* data = std_virtual_stack_alloc ( stack, alloc_size );
@@ -687,13 +736,15 @@ static void* onda_client_read_media_chunk ( std_virtual_stack_t* stack, onda_cli
 #else
     uint32_t alloc_size = state->total_size - state->read_size;
     void* data = std_virtual_stack_alloc ( stack, alloc_size );
-    uint32_t read_size = net->read_connected_socket ( data, alloc_size, socket, net_connected_socket_read_flag_read_all_m );
+    uint32_t read_size = net->read_connected_socket ( data, alloc_size, socket, net_connected_socket_read_flag_none_m );
     state->read_size += read_size;
+    std_virtual_stack_free ( stack, alloc_size - read_size );
 #endif
 
     return data;
 }
 
+#if 0
 static bool onda_client_play_source ( aud_source_h source, char* label ) {
     aud_i* aud = onda_state->client.aud;
 
@@ -758,7 +809,7 @@ static bool onda_client_play_source ( aud_source_h source, char* label ) {
         uint64_t ring_count = std_ring_count ( device_ring );
 
         {
-            char bar[100];
+            char bar[100] = { 0 };
             size_t i = 0;
 
             bar[i++] = '[';
@@ -801,6 +852,58 @@ static bool onda_client_play_source ( aud_source_h source, char* label ) {
 
     return true;
 }
+#endif
+
+static void onda_client_feed_stream ( aud_source_h source, onda_client_stream_state_t* stream_state ) {
+    aud_i* aud = onda_state->client.aud;
+    std_virtual_stack_t* read_stack = &onda_state->read_stack;
+    
+    if ( stream_state->read_size < stream_state->total_size ) {
+        onda_client_read_media_chunk ( read_stack, stream_state );
+    }
+
+    if ( stream_state->type == onda_client_stream_type_mp3_m ) {
+        int16_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
+        while ( stream_state->consumed_size < stream_state->read_size ) {
+            void* decode_base = stream_state->begin + stream_state->consumed_size;
+            uint32_t decode_size = stream_state->read_size - stream_state->consumed_size;
+            mp3dec_frame_info_t info;
+            int samples = mp3dec_decode_frame ( &stream_state->mp3dec, decode_base, decode_size, pcm, &info );
+            stream_state->consumed_size += info.frame_bytes;
+            aud->feed_source ( source, pcm, sizeof ( int16_t ) * samples * info.channels );
+        }
+    } else if ( stream_state->type == onda_client_stream_type_flac_m ) {
+        int32_t pcm[4096];
+        while ( stream_state->consumed_size < stream_state->read_size ) {
+            void* decode_base = stream_state->begin + stream_state->consumed_size;
+            uint32_t decode_size = stream_state->read_size - stream_state->consumed_size;
+            uint32_t sample_count = std_static_array_capacity_m ( pcm );
+            fx_flac_state_t decode_result = fx_flac_process ( stream_state->flac, decode_base, &decode_size, pcm, &sample_count );
+            if ( decode_result == FLAC_ERR ) {
+                // TODO
+                std_assert_m ( false );
+            }
+            stream_state->consumed_size += decode_size;
+            aud->feed_source ( source, pcm, sizeof ( int32_t ) * sample_count );
+        }
+    } else if ( stream_state->type == onda_client_stream_type_unknown_m ) {
+        std_log_error_m ( "Unknown stream type" );
+    } else {
+        std_log_error_m ( "Malformed stream type" );
+    }
+}
+
+static void onda_client_decode_init ( onda_client_stream_state_t* stream_state ) {
+    if ( stream_state->type == onda_client_stream_type_mp3_m ) {
+        mp3dec_init ( &stream_state->mp3dec );
+    } else if ( stream_state->type == onda_client_stream_type_flac_m ) {
+        stream_state->flac = FX_FLAC_ALLOC_DEFAULT();
+    } else if ( stream_state->type == onda_client_stream_type_unknown_m ) {
+        std_log_error_m ( "Unknown stream type" );
+    } else {
+        std_log_error_m ( "Malformed stream type" );
+    }
+}
 
 static bool onda_client_stream_source ( aud_source_h source, char* label, onda_client_stream_state_t* stream_state ) {
     aud_i* aud = onda_state->client.aud;
@@ -816,12 +919,11 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
     aud_device_info_t device_info;
     aud->get_device_info ( &device_info, onda_state->client.device );
 
-    std_virtual_stack_t* read_stack = &onda_state->read_stack;
-    mp3dec_init ( &stream_state->mp3dec );
+    onda_client_decode_init ( stream_state );
 
     wm_i* wm = onda_state->client.wm;
     bool first_print = true;
-    uint64_t step_ms = 20;
+    uint64_t step_ms = 50;
     std_tick_t frame_tick = std_tick_now();
     wm_input_state_t old_input_state;
     wm->get_window_input_state ( onda_state->client.window, &old_input_state );
@@ -863,32 +965,10 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
         frame_tick = new_tick;
 
         // feed
-        aud_source_info_t source_info;
-        aud->get_source_info ( &source_info, source );
 #if 1
-        if ( stream_state->read_size < stream_state->total_size ) {
-            onda_client_read_media_chunk ( read_stack, stream_state );
-        }
-
-        int16_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
-        while ( stream_state->consumed_size < stream_state->read_size ) {
-            void* decode_base = stream_state->begin + stream_state->consumed_size;
-            uint32_t decode_size = stream_state->read_size - stream_state->consumed_size;
-            mp3dec_frame_info_t info;
-            int samples = mp3dec_decode_frame ( &stream_state->mp3dec, decode_base, decode_size, pcm, &info );
-
-            if ( info.frame_bytes == 0 ) {
-                stream_state->consumed_size += 1;
-                continue;
-            }
-
-            stream_state->consumed_size += info.frame_bytes;
-        
-            if ( samples > 0 && info.hz > 0 && info.channels > 0 ) {
-                aud->feed_source ( source, pcm, sizeof ( int16_t ) * samples * info.channels );
-            }
-        }
+        onda_client_feed_stream ( source, stream_state );
 #else
+        std_virtual_stack_t* read_stack = &onda_state->read_stack;
         if ( stream_state->read_size < stream_state->total_size ) {
             onda_client_read_media_chunk ( read_stack, stream_state );
             int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, source_info.sample_count );
@@ -903,6 +983,8 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
 #endif
 
         // print
+        aud_source_info_t source_info;
+        aud->get_source_info ( &source_info, source );
         float total_duration = source_info.total_time;
         float bar_tick = total_duration * 1000.f / 60.f;
 
@@ -910,7 +992,7 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
         uint64_t ring_count = std_ring_count ( device_ring );
 
         {
-            char bar[100];
+            char bar[100] = { 0 };
             size_t i = 0;
 
             bar[i++] = '[';

@@ -123,11 +123,11 @@ void aud_source_skip ( aud_source_h source_handle, float seconds ) {
 void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
     // TODO avoid allocating on stack
     float buffer[aud_device_submit_block_max_ms_m * 44100 / 1000] = {0};
-
+    
     double seconds = ms / 1000.0;
 
     aud_device_info_t device_info;
-    aud_device_get_info ( &device_info, device_handle );
+    aud_device_get_info ( &device_info, device_handle );    
     uint64_t frame_count = ( uint64_t ) ( seconds * device_info.sample_frequency );
     double frame_period = 1.0 / device_info.sample_frequency;
     uint64_t sample_count = frame_count * device_info.channel_count;
@@ -155,6 +155,11 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
                 if ( source->params.channel_count >= channel_it + 1 ) {
                     void* source_sample_a = source->stack.begin + source_frame_idx_a * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
                     void* source_sample_b = source->stack.begin + source_frame_idx_b * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
+                    if ( source_sample_a >= source->stack.top || source_sample_b >= source->stack.top ) {
+                        // update seconds to reflect the actual play time
+                        seconds = ( double ) frame_it / device_info.sample_frequency;
+                        goto next_source;
+                    }
                     double sample_a = 0;
                     double sample_b = 0;
 
@@ -195,6 +200,7 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
             }
         }
 
+next_source:
         source->time_played += seconds;
     }
 
