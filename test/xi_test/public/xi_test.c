@@ -392,7 +392,7 @@ static void xi_test ( void ) {
 
         // build ui
         {
-            std_f32_to_str ( ui_slider.value, ui_slider_label.text, 32 );
+            std_f32_to_str ( ui_slider_label.text, 32, ui_slider.value );
             std_str_copy_static_m ( ui_switch_label.text, ui_switch.value ? "on" : "off" );
             std_str_copy_static_m ( ui_button_label.text, ui_button.pressed ? "click" : ui_button.down ? "down" : "up" );
             std_str_copy_static_m ( ui_select_label.text, ui_select.items[ui_select.item_idx] );

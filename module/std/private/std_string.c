@@ -278,7 +278,7 @@ float std_str_to_f32 ( const char* str ) {
     return ( float ) ( ( sign == '+' ? 1.0 : -1.0 ) * mantissa * a * b );
 }
 
-size_t std_f32_to_str ( float f32, char* str, size_t cap ) {
+size_t std_f32_to_str ( char* str, size_t cap, float f32 ) {
     // TODO take decimals # as param
     int len = __builtin_snprintf ( str, cap, "%.2f", f32 );
     return len < 0 ? SIZE_MAX : ( size_t ) len;

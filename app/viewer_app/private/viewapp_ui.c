@@ -221,7 +221,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         xi_label_state_t frame_time_label = xi_label_state_m ( .text = "frame time" );
         xi_label_state_t frame_time_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
-        std_f32_to_str ( state->render.delta_time_ms, frame_time_value.text, xi_label_text_size );
+        std_f32_to_str ( frame_time_value.text, xi_label_text_size, state->render.delta_time_ms );
         xi->add_label ( xi_workload, &frame_time_label );
         xi->add_label ( xi_workload, &frame_time_value );
         xi->newline();
@@ -229,7 +229,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xi_label_state_t fps_label = xi_label_state_m ( .text = "fps" );
         xi_label_state_t fps_value = xi_label_state_m ( .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m );
         float fps = 1000.f / state->render.delta_time_ms;
-        std_f32_to_str ( fps, fps_value.text, xi_label_text_size );
+        std_f32_to_str ( fps_value.text, xi_label_text_size, fps );
         xi->add_label ( xi_workload, &fps_label );
         xi->add_label ( xi_workload, &fps_value );
         xi->newline();
@@ -424,7 +424,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             //timestamp_sum += timestamp_diff;
             float ms = xg->timestamp_to_ns ( state->render.device ) * timestamp_diff / 1000000.f;
             char buffer[32];
-            std_f32_to_str ( ms, buffer, 32 );
+            std_f32_to_str ( buffer, 32, ms );
             xi_label_state_t time_label = xi_label_state_m (
                 .style = xi_style_m (
                     .horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
@@ -557,7 +557,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             char buffer[32];
 
             float sum_ms = xg->timestamp_to_ns ( state->render.device ) * timestamp_sum / 1000000.f;
-            std_f32_to_str ( sum_ms, buffer, 32 );
+            std_f32_to_str ( buffer, 32, sum_ms );
             std_stack_string_append ( &stack, buffer );
 
             //std_stack_string_append ( &stack, "/" );

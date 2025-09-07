@@ -1545,7 +1545,7 @@ static bool xi_ui_property_editor_f32 ( xi_workload_h workload, xi_property_edit
     if ( had_focus ) {
         std_str_copy_static_m ( textfield.text, xi_ui_state->property_editor_buffer );
     } else {
-        std_f32_to_str ( *( float* ) ( state->data + data_offset ), textfield.text, xi_textfield_text_size_m );
+        std_f32_to_str ( textfield.text, xi_textfield_text_size_m, *( float* ) ( state->data + data_offset ) );
     }
     
     bool enter = xi_ui_textfield_internal ( workload, &textfield, sub_id );
