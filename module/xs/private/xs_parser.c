@@ -452,15 +452,15 @@ static void xs_parser_parse_input_desc ( xs_parser_parsing_context_t* context ) 
         size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len > 0 );
 
-        if ( std_str_find ( token, "pos" ) == 0 ) {
+        if ( std_str_find ( token, "pos" ) ) {
             attribute->name = xg_vertex_attribute_pos_m;
-        } else if ( std_str_find ( token, "nor" ) == 0 ) {
+        } else if ( std_str_find ( token, "nor" ) ) {
             attribute->name = xg_vertex_attribute_nor_m;
-        } else if ( std_str_find ( token, "tan" ) == 0 ) {
+        } else if ( std_str_find ( token, "tan" ) ) {
             attribute->name = xg_vertex_attribute_tan_m;
-        } else if ( std_str_find ( token, "uv" ) == 0 || std_str_find ( token, "tex" ) == 0 ) {
+        } else if ( std_str_find ( token, "uv" ) || std_str_find ( token, "tex" ) ) {
             attribute->name = xg_vertex_attribute_uv_m;
-        } else if ( std_str_find ( token, "color" ) == 0 ) {
+        } else if ( std_str_find ( token, "color" ) ) {
             attribute->name = xg_vertex_attribute_color_m;
         } else if ( std_str_cmp ( token, "end" ) == 0 ) {
             break;
@@ -1411,12 +1411,12 @@ static size_t xs_parser_extract_token_array ( char* token, size_t len ) {
         return 1;
     }
     
-    size_t i = std_str_find_reverse ( token, len - 1, "[" );
-    std_assert_m ( i != std_str_find_null_m );
+    char* array = std_str_find_reverse ( token, len - 1, "[" );
+    std_assert_m ( array );
 
     token[len - 1] = '\0';
-    uint32_t array_size = std_str_to_u32 ( token + i + 1 );
-    token[i] = '\0';
+    uint32_t array_size = std_str_to_u32 ( array + 1 );
+    *array = '\0';
     return array_size;
 }
 
@@ -1698,12 +1698,12 @@ static void xs_parser_parsing_context_init ( xs_parser_parsing_context_t* contex
     context->head = context->begin;
     context->line_count = 0;
     {
-        size_t result = std_str_find_reverse ( context->begin, 0, "\n" );
+        char* find = std_str_find_reverse ( context->begin, 0, "\n" );
 
-        if ( result == std_str_find_null_m ) {
+        if ( !find ) {
             context->line_begin = context->begin;
         } else {
-            context->line_begin = context->begin + result;
+            context->line_begin = find;
         }
     }
 }

@@ -201,7 +201,7 @@ void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t
     if ( !family ) {
         char buffer[64 * se_component_mask_block_count_m];
         for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
-            std_u64_to_bin ( mask.u64[se_component_mask_block_count_m - i - 1], buffer + 64 * i );
+            std_u64_to_bin_str ( buffer + 64 * i, mask.u64[se_component_mask_block_count_m - i - 1] );
         }
         std_log_error_m ( "Missing family " std_fmt_str_m, buffer );
     }

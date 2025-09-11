@@ -751,10 +751,10 @@ static viewapp_texture_t viewapp_import_texture ( const struct aiScene* scene, c
     xg_format_e format;
     int width, height, channels;
 
-    uint64_t star_idx = std_str_find ( path, "*" );
-    if ( star_idx != std_str_find_null_m ) {
+    char* star = std_str_find ( path, "*" );
+    if ( star ) {
         channels = 4; // TODO
-        uint32_t texture_idx = std_str_to_u32 ( path + star_idx );
+        uint32_t texture_idx = std_str_to_u32 ( star );
         std_assert_m ( texture_idx < scene->mNumTextures );
         struct aiTexture* embedded_texture = scene->mTextures[texture_idx];
         if ( embedded_texture->mHeight == 0 ) {

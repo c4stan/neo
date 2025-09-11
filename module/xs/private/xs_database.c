@@ -107,23 +107,23 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
     bool is_header = false;
     xg_pipeline_e type;
     {
-        size_t extension_base = std_str_find_reverse ( params->base, path_len, "." );
+        char* ext = std_str_find_reverse ( params->base, path_len, "." );
 
-        if ( extension_base == std_str_find_null_m ) {
+        if ( !ext ) {
             std_path_pop ( params->base );
             return;
         }
 
         // TODO remove .xss
-        if ( std_str_cmp ( params->base + extension_base, ".xsg" ) == 0 || std_str_cmp ( params->base + extension_base, ".xss" ) == 0 ) {
+        if ( std_str_cmp ( ext, ".xsg" ) == 0 || std_str_cmp ( ext, ".xss" ) == 0 ) {
             type = xg_pipeline_graphics_m;
-        } else if ( std_str_cmp ( params->base + extension_base, ".xsc" ) == 0 ) {
+        } else if ( std_str_cmp ( ext, ".xsc" ) == 0 ) {
             type = xg_pipeline_compute_m;
 #if xg_enable_raytracing_m
-        } else if ( std_str_cmp ( params->base + extension_base, ".xsr" ) == 0 ) {
+        } else if ( std_str_cmp ( ext, ".xsr" ) == 0 ) {
             type = xg_pipeline_raytrace_m;
 #endif
-        } else if ( std_str_cmp ( params->base + extension_base, ".glsl" ) == 0 ) {
+        } else if ( std_str_cmp ( ext, ".glsl" ) == 0 ) {
             is_header = true;
         } else {
             std_path_pop ( params->base );
@@ -147,11 +147,15 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
         pipeline_state->old_pipeline_workload = xg_null_handle_m;
         pipeline_state->last_build_timestamp = std_timestamp_zero_m;
 
-        size_t name_len = std_str_len ( pipeline_state->name );
-        name_len = std_str_find_reverse ( pipeline_state->name, name_len, "." );
-        std_assert_m ( name_len != std_str_find_null_m );
-        xs_string_hash_t hash = xs_hash_string_m ( pipeline_state->name, name_len );
+        //size_t name_len = std_str_len ( pipeline_state->name );
+        //name_len = std_str_find_reverse ( pipeline_state->name, name_len, "." );
+        //std_assert_m ( name_len != std_str_find_null_m );
+        //xs_string_hash_t hash = xs_hash_string_m ( pipeline_state->name, name_len );
 
+        char* name = std_path_name_ptr ( pipeline_state->name );
+        char* ext = std_path_ext ( name );
+        size_t name_len = ext ? ext - name - 1 : std_str_len ( name );
+        xs_string_hash_t hash = xs_hash_string_m ( name, name_len );
         pipeline_state->name_hash = hash;
 
         // TODO insert here when the shader is built
@@ -477,10 +481,10 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 std_str_copy ( binary_path, std_path_size_m, output_path );
                 std_path_append ( binary_path, std_path_size_m, shader->name );
                 size_t len = std_str_len ( binary_path );
-                size_t len2 = std_str_find_reverse ( binary_path, len, "." );
+                char* ext = std_str_find_reverse ( binary_path, len, "." );
 
-                if ( len2 != std_str_find_null_m ) {
-                    len = len2;
+                if ( ext ) {
+                    len = ext - binary_path;
                 }
 
                 std_stack_t stack = std_static_stack_m ( binary_path );

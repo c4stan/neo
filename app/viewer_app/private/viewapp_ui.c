@@ -368,7 +368,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             ++node_id;
 
             // skip mip generation passes...
-            if ( std_str_find ( node_info.debug_name, "_mip_" ) != std_str_find_null_m ) {
+            if ( std_str_find ( node_info.debug_name, "_mip_" ) ) {
                 continue;
             }
 

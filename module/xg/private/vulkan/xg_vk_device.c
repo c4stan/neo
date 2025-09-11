@@ -266,7 +266,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         uint32_t timestap_bits = device->queue_family_properties[i].timestampValidBits;
         VkExtent3D copy_granularity = device->queue_family_properties[i].minImageTransferGranularity;
         char buffer[32];
-        std_u32_to_bin ( device->queue_checkpoint_properties[i].checkpointExecutionStageMask, buffer );
+        std_u32_to_bin_str ( buffer, device->queue_checkpoint_properties[i].checkpointExecutionStageMask );
         const char* desc = xg_vk_device_queue_str ( flags );
         std_log_info_m ( "Queue family " std_fmt_u32_m ": " std_fmt_u32_m " queues - " std_fmt_str_m " - <" std_fmt_u32_m
             "," std_fmt_u32_m "," std_fmt_u32_m "> copy granulatity - " std_fmt_u32_m " bits timestamps - " std_fmt_str_m " checkpoint stages",

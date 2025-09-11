@@ -91,8 +91,8 @@ size_t      std_path_append_file ( char* path, size_t cap, const char* filename 
 size_t      std_path_pop         ( char* path );
 size_t      std_path_normalize   ( char* dest, size_t cap, const char* path );
 bool        std_path_is_drive    ( const char* path );
-size_t      std_path_name        ( char* name, size_t cap, const char* path );
-const char* std_path_name_ptr    ( const char* path );
+//size_t      std_path_name        ( char* name, size_t cap, const char* path );
+char*       std_path_name_ptr    ( const char* path );
 bool        std_path_info        ( std_path_info_t* info, const char* path );
 size_t      std_path_absolute    ( char* dest, size_t dest_cap, const char* path );
 char*       std_path_relative_to ( const char* path, const char* relative_to );

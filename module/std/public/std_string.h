@@ -21,8 +21,6 @@
             doesn't let the client know how much size is required to complete successfully
 */
 
-// TODO add a string view (char* begin, char* end) type and use that in most places when taking in a string as param instead of a single null terminated char*
-
 bool std_utf8_is_single_byte    ( char c );
 bool std_utf8_is_double_byte    ( char c );
 bool std_utf8_is_triple_byte    ( char c );
@@ -58,22 +56,19 @@ int32_t std_str_to_i32 ( const char* str );
 int64_t std_str_to_i64 ( const char* str );
 float std_str_to_f32 ( const char* str );
 
-// TODO add _str_ somewhere in the functions name
-void std_u32_to_bin ( uint32_t u32, char* str );
-void std_u64_to_bin ( uint64_t u64, char* str );
+void std_u32_to_bin_str ( char* str, uint32_t u32 );
+void std_u64_to_bin_str ( char* str, uint64_t u64 );
 
-size_t std_str_trim_left  ( char* str, const char** tokens, size_t n );
-size_t std_str_trim_right ( char* str, const char** tokens, size_t n );
+size_t std_str_trim_left  ( char* str, size_t str_len, const char** tokens, size_t tokens_count );
+size_t std_str_trim_right ( char* str, size_t str_len, const char** tokens, size_t tokens_count );
 
-// TODO return ptr?
-size_t std_str_find         ( const char* str, const char* token );
-size_t std_str_find_reverse ( const char* str, size_t start, const char* token );   // offset in byte count
+char* std_str_find         ( const char* str, const char* token );
+char* std_str_find_reverse ( const char* str, size_t str_start, const char* token );   // offset in byte count
 
 size_t std_str_count ( const char* str, const char* token );
 
 size_t std_str_replace ( char* str, const char* token, const char* new_token );
-// TODO
-//size_t std_str_copy_replace ( char* new_str, size_t cap, const char* str, const char* token, const char* new_token );
+size_t std_str_copy_replace ( char* str, size_t cap, const char* source, const char* token, const char* new_token );
 
 size_t std_size_to_str_approx ( char* dest, size_t cap, size_t size_value );
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value );

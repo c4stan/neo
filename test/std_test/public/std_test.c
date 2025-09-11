@@ -53,7 +53,7 @@ static void test_platform ( void ) {
 
     for ( size_t i = 0; i < physical_cores_count; ++i ) {
         char mask[65];
-        std_u64_to_bin ( physical_cores_info[i].logical_cores_mask, mask );
+        std_u64_to_bin_str ( mask, physical_cores_info[i].logical_cores_mask );
         std_log_info_m ( "Physical core " std_fmt_size_m": logical cores mask " std_fmt_str_m, i, mask + 64 - logical_cores_count );
     }
 

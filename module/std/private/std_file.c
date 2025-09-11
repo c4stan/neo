@@ -353,37 +353,38 @@ bool std_path_is_drive ( const char* path ) {
 #endif
 }
 
+#if 0
 size_t std_path_name ( char* name, size_t cap, const char* path ) {
-    std_assert_m ( path != NULL );
     size_t len = std_str_len ( path );
     std_assert_m ( len > 0 );
-    size_t i = std_str_find_reverse ( path, len, "/" );
 
-    if ( i == std_str_find_null_m ) {
+    char* find = std_str_find_reverse ( path, len, "/" );
+    if ( !find ) {
         return 0;
     }
 
-    size_t name_len = std_str_len ( path + i ) - 1;
+    size_t name_len = std_str_len ( find ) - 1;
 
     if ( name_len < cap ) {
-        std_mem_copy ( name, path + i + 1, name_len );
+        std_mem_copy ( name, find + 1, name_len );
         name[name_len] = '\0';
     }
 
     return name_len;
 }
+#endif
 
-const char* std_path_name_ptr ( const char* path ) {
+char* std_path_name_ptr ( const char* path ) {
     std_assert_m ( path != NULL );
     size_t len = std_str_len ( path );
     std_assert_m ( len > 0 );
-    size_t i = std_str_find_reverse ( path, len, "/" );
-
-    if ( i == std_str_find_null_m ) {
-        return path;
+    
+    char* find = std_str_find_reverse ( path, len, "/" );
+    if ( !find ) {
+        return ( char* ) path;
     }
 
-    return path + i + 1;
+    return ( char* ) ( find + 1 );
 }
 
 bool std_path_info ( std_path_info_t* info, const char* path ) {
@@ -468,12 +469,13 @@ char* std_path_relative_to ( const char* path, const char* relative_to ) {
 char* std_path_ext ( const char* path ) {
     size_t len = std_str_len ( path );
     // TODO make this find rev more robust
-    size_t ext_offset = std_str_find_reverse ( path, len, "." );
-    if ( ext_offset != std_str_find_null_m ) {
-        return ( char* ) ( path + ext_offset + 1 ); // skip the '.'
-    } else {
-        return NULL;
+    char* ext = std_str_find_reverse ( path, len, "." );
+    
+    if ( ext ) {
+        return ext + 1; // skip the '.'
     }
+
+    return NULL;
 }
 
 // ======================================================================================= //

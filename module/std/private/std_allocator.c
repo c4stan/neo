@@ -456,7 +456,7 @@ void* std_stack_write ( std_stack_t* stack, const void* data, size_t size ) {
 
     if ( alloc ) {
         std_mem_copy ( alloc, data, size );
-    }   
+    }
 
     return alloc;
 }

@@ -284,7 +284,7 @@ size_t std_f32_to_str ( char* str, size_t cap, float f32 ) {
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }
 
-void std_u32_to_bin ( uint32_t u32, char* str ) {
+void std_u32_to_bin_str ( char* str, uint32_t u32 ) {
     str += 32;
     *str-- = '\0';
 
@@ -295,7 +295,7 @@ void std_u32_to_bin ( uint32_t u32, char* str ) {
     }
 }
 
-void std_u64_to_bin ( uint64_t u64, char* str ) {
+void std_u64_to_bin_str ( char* str, uint64_t u64 ) {
     str += 64;
     *str-- = '\0';
 
@@ -306,15 +306,14 @@ void std_u64_to_bin ( uint64_t u64, char* str ) {
     }
 }
 
-size_t std_str_trim_left ( char* str, const char** tokens, size_t n ) {
-    size_t str_len = std_str_len ( str );
+size_t std_str_trim_left ( char* str, size_t str_len, const char** tokens, size_t tokens_count ) {
     size_t str_begin = 0;
     bool match;
 
     do {
         match = false;
 
-        for ( size_t i = 0; i < n; ++i ) {
+        for ( size_t i = 0; i < tokens_count; ++i ) {
             const char* token = tokens[i];
             size_t token_len = std_str_len ( token );
 
@@ -335,14 +334,13 @@ size_t std_str_trim_left ( char* str, const char** tokens, size_t n ) {
     return str_len - str_begin;
 }
 
-size_t std_str_trim_right ( char* str, const char** tokens, size_t n ) {
-    size_t str_len = std_str_len ( str );
+size_t std_str_trim_right ( char* str, size_t str_len, const char** tokens, size_t tokens_count ) {
     bool match;
 
     do {
         match = false;
 
-        for ( size_t i = 0; i < n; ++i ) {
+        for ( size_t i = 0; i < tokens_count; ++i ) {
             const char* token = tokens[i];
             size_t token_len = std_str_len ( token );
 
@@ -363,33 +361,28 @@ size_t std_str_trim_right ( char* str, const char** tokens, size_t n ) {
     return str_len;
 }
 
-size_t std_str_find ( const char* str, const char* token ) {
+char* std_str_find ( const char* str, const char* token ) {
     // Naive token match for every char in str
-    size_t str_len = std_str_len ( str );
-    size_t token_len = std_str_len ( token );
     size_t i = 0;
 
-    if ( token_len > str_len ) {
-        return std_str_find_null_m;
-    }
-
-    while ( i <= str_len - token_len ) {
-        if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
-            return i;
+    while ( str[i] != '\0' ) {
+        if ( std_str_cmp ( str + i, token ) == 0 ) {
+        //if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
+            return ( char* ) ( str + i );
         }
 
         ++i;
     }
 
-    return std_str_find_null_m;
+    return NULL;
 }
 
-size_t std_str_find_reverse ( const char* str, size_t offset, const char* token ) {
+char* std_str_find_reverse ( const char* str, size_t offset, const char* token ) {
     // Naive token match for every char in str
     size_t token_len = std_str_len ( token );
 
     if ( offset < token_len ) {
-        return std_str_find_null_m;
+        return NULL;
     }
 
     // add 1 to account for the initial sub inside the following while
@@ -399,21 +392,21 @@ size_t std_str_find_reverse ( const char* str, size_t offset, const char* token 
         --i;
 
         if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
-            return i;
+            return ( char* ) ( str + i );
         }
     }
 
-    return std_str_find_null_m;
+    return NULL;
 }
 
 size_t std_str_count ( const char* str, const char* token ) {
     size_t token_len = std_str_len ( token );
     size_t count = 0;
-    size_t i = 0;
 
-    while ( ( i = std_str_find ( str + i, token ) ) != std_str_find_null_m ) {
+    char* find = ( char* ) str;
+    while ( ( find = std_str_find ( find, token ) ) ) {
+        find += token_len;
         ++count;
-        i += token_len;
     }
 
     return count;
@@ -423,43 +416,40 @@ size_t std_str_replace ( char* str, const char* token, const char* new_token ) {
     size_t token_len = std_str_len ( token );
     size_t new_token_len = std_str_len ( new_token );
 
-    // TODO support this?
     if ( token_len != new_token_len ) {
+        // TODO do better?
+        std_log_error_m ( "Trying to call std_str_replace with different sized tokens. Use std_str_copy_replace instead." );
         return 0;
     }
 
     size_t count = 0;
-    size_t i = 0;
-    size_t find_result;
 
-    while ( ( find_result = std_str_find ( str + i, token ) ) != std_str_find_null_m ) {
-        //std_str_copy ( str + i, token_len, new_token );
-        i += find_result;
-        std_mem_copy ( str + i, new_token, token_len );
-        i += token_len;
+    char* find = str;
+    while ( find = std_str_find ( find, token ) ) {
+        std_mem_copy ( find, new_token, token_len );
+        find += token_len;
     }
 
     return count;
 }
 
-#if 0
-// TODO
-size_t std_str_copy_replace ( char* new_str, size_t cap, const char* str, const char* token, const char* new_token ) {
+size_t std_str_copy_replace ( char* dest, size_t cap, const char* source, const char* token, const char* new_token ) {
     size_t token_len = std_str_len ( token );
     size_t new_token_len = std_str_len ( new_token );
-    size_t count = 0;
-    size_t find_idx = 0;
-    size_t str_idx = 0;
-    size_t new_str_idx = 0;
 
-    while ( ( find_idx = std_str_find ( str + find_idx, token ) ) != std_str_find_null_m ) {
-        std_mem_copy ( new_str + new_str_idx, cap - new_str_idx,  );
-        i += token_len;
+    size_t count = 0;
+
+    char* find;
+    while ( find = std_str_find ( source, token ) ) {
+        size_t offset = find - source;
+        std_mem_copy ( dest, source, offset );
+        std_mem_copy ( dest + offset, new_token, new_token_len );
+        dest += offset + new_token_len;
+        source += offset + token_len;
     }
 
     return count;
 }
-#endif
 
 static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint32_t token_count, const char** tokens, const uint64_t u64_max ) {
     uint64_t multiplier = u64_max;
