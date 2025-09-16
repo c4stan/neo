@@ -365,9 +365,9 @@ typedef struct {
     xf_graph_segment_t segments_array[xf_graph_max_nodes_m];
     uint32_t segments_count;
 
-    std_virtual_stack_t resource_dependencies_allocator;
-    std_virtual_stack_t physical_resource_dependencies_allocator;
-    std_virtual_stack_t node_user_arg_allocator;
+    std_stack_t resource_dependencies_allocator;
+    std_stack_t physical_resource_dependencies_allocator;
+    std_stack_t node_user_arg_allocator;
 
     xf_graph_query_context_t query_contexts_array[16];
     std_ring_t query_contexts_ring;

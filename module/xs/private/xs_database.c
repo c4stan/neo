@@ -87,7 +87,7 @@ static char* xs_database_alloc_string ( xs_database_t* db, size_t size ) {
 
     return dest;
 #endif
-    void* alloc = std_virtual_stack_alloc ( &db->stack, size );
+    void* alloc = std_stack_alloc ( &db->stack, size );
     return ( char* ) alloc;
 }
 
@@ -222,7 +222,7 @@ void xs_database_clear ( xs_database_h db_handle ) {
     // TODO is this ever used? missing some stuff?
     xs_database_t* db = &xs_database_state->database_array[db_handle];
     
-    std_virtual_stack_clear ( &db->stack );
+    std_stack_clear ( &db->stack );
 
     db->folders_count = 0;
     db->pipeline_states_count = 0;
@@ -771,7 +771,7 @@ xs_database_h xs_database_create ( const xs_database_params_t* params ) {
 
     std_mem_zero_m ( db );
     db->device = params->device;
-    db->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
+    db->stack = std_stack_create ( xs_database_memory_pool_max_size_m );
     db->pipeline_name_hash_to_state_map = std_hash_map_create ( xs_database_max_pipeline_states_m * 2 );
     db->pipeline_state_headers_array = std_virtual_heap_alloc_array_m ( xs_database_pipeline_state_header_t, xs_database_max_pipeline_state_headers_m );
     std_str_copy_static_m ( db->debug_name, params->debug_name );
@@ -820,7 +820,7 @@ void xs_database_destroy ( xs_database_h db_handle ) {
 
     std_virtual_heap_free ( db->pipeline_state_headers_array );
     std_hash_map_destroy ( &db->pipeline_name_hash_to_state_map );
-    std_virtual_stack_destroy ( &db->stack );
+    std_stack_destroy ( &db->stack );
 
     std_bitset_clear ( xs_database_state->database_bitset, db_handle );
 }

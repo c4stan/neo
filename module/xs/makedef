@@ -5,3 +5,4 @@ configs = debug, release
 output = dll
 deps = std, xg
 bindings = shader_compiler
+ignores = xs_generator.c

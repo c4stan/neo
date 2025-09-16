@@ -410,44 +410,60 @@ std_buffer_t std_buffer ( void* base, size_t size ) {
     return buffer;
 }
 
-std_stack_t std_stack ( void* base, size_t size ) {
+std_stack_t std_stack ( void* base, size_t mapped_size, size_t virtual_size ) {
     std_stack_t stack;
     stack.begin = base;
     stack.top = base;
-    stack.end = base + size;
+    stack.end = base + mapped_size;
+    stack.virtual_end = base + virtual_size;
     return stack;
 }
 
-std_stack_t std_stack_create ( size_t size ) {
-    std_stack_t stack;
-    stack.begin = std_virtual_heap_alloc_m ( size, 16 );
-    stack.top = stack.begin;
-    stack.end = stack.begin + size;
-    return stack;
+std_stack_t std_stack_create ( size_t virtual_size ) {
+    size_t page_size = std_virtual_page_size();
+    virtual_size = std_max ( virtual_size, page_size );
+    virtual_size = std_align ( virtual_size, page_size );
+    void* base = std_virtual_reserve ( virtual_size );
+    std_virtual_map ( base, base + page_size );
+    return std_stack ( base, page_size, virtual_size );
 }
 
 void std_stack_destroy ( std_stack_t* stack ) {
-    std_virtual_heap_free ( stack->begin );
+    std_virtual_free ( stack->begin, stack->virtual_end );
+}
+
+static bool std_stack_map ( std_stack_t* stack, size_t alloc_size ) {
+    void* top = stack->top;
+    void* mapped_end = stack->end;
+    void* new_top = top + alloc_size;
+
+    if ( new_top <= mapped_end ) {
+        return true;
+    }
+
+    void* virtual_end = stack->virtual_end;
+
+    if ( new_top <= virtual_end ) {
+        size_t page_size = std_virtual_page_size();
+        void* new_mapped_end = std_align_ptr ( new_top, page_size );
+        std_assert_m ( new_mapped_end <= virtual_end );
+        std_virtual_map ( mapped_end, new_mapped_end );
+        stack->end = new_mapped_end;
+        return true;
+    }
+
+    // The stack ran out of virtual memory.
+    return false;
 }
 
 void* std_stack_alloc ( std_stack_t* stack, size_t size ) {
     void* top = stack->top;
 
-    if ( top + size > stack->end ) {
+    if ( !std_stack_map ( stack, size ) ) {
         return NULL;
     }
 
     stack->top = top + size;
-    return top;
-}
-
-static void* std_stack_alloc_zero ( std_stack_t* stack, size_t size ) {
-    void* top = std_stack_alloc ( stack, size );
-
-    if ( top ) {
-        std_mem_zero ( top, size );
-    }
-
     return top;
 }
 
@@ -459,6 +475,16 @@ void* std_stack_write ( std_stack_t* stack, const void* data, size_t size ) {
     }
 
     return alloc;
+}
+
+static void* std_stack_alloc_zero ( std_stack_t* stack, size_t size ) {
+    void* top = std_stack_alloc ( stack, size );
+
+    if ( top ) {
+        std_mem_zero ( top, size );
+    }
+
+    return top;
 }
 
 void* std_stack_align ( std_stack_t* stack, size_t align ) {
@@ -592,177 +618,6 @@ uint64_t std_stack_unused_size ( const std_stack_t* stack ) {
     void* top = stack->top;
     void* end = stack->end;
     return end - top;
-}
-
-//==============================================================================
-
-std_virtual_stack_t std_virtual_stack ( void* base, size_t mapped_size, size_t virtual_size ) {
-    std_virtual_stack_t stack;
-    stack.mapped = std_stack ( base, mapped_size );
-    stack.virtual_end = base + virtual_size;
-    return stack;
-}
-
-std_virtual_stack_t std_virtual_stack_create ( size_t virtual_size ) {
-    size_t page_size = std_virtual_page_size();
-    virtual_size = std_max ( virtual_size, page_size );
-    virtual_size = std_align ( virtual_size, page_size );
-    void* base = std_virtual_reserve ( virtual_size );
-    std_virtual_map ( base, base + page_size );
-    std_virtual_stack_t stack;
-    stack.mapped = std_stack ( base, page_size );
-    stack.virtual_end = base + virtual_size;
-    return stack;
-}
-
-void std_virtual_stack_destroy ( std_virtual_stack_t* stack ) {
-    std_virtual_free ( stack->mapped.begin, stack->virtual_end );
-}
-
-uint64_t std_virtual_stack_used_size ( const std_virtual_stack_t* stack ) {
-    return std_stack_used_size ( &stack->mapped );
-}
-
-uint64_t std_virtual_stack_used_size_from ( const std_virtual_stack_t* stack, void* base ) {
-    return std_stack_used_size_from ( &stack->mapped, base );
-}
-
-bool std_virtual_stack_map ( std_virtual_stack_t* stack, size_t alloc_size ) {
-    void* top = stack->mapped.top;
-    void* mapped_end = stack->mapped.end;
-    void* new_top = top + alloc_size;
-
-    if ( new_top <= mapped_end ) {
-        return true;
-    }
-
-    void* virtual_end = stack->virtual_end;
-
-    if ( new_top <= virtual_end ) {
-        size_t page_size = std_virtual_page_size();
-        void* new_mapped_end = std_align_ptr ( new_top, page_size );
-        std_assert_m ( new_mapped_end <= virtual_end );
-        std_virtual_map ( mapped_end, new_mapped_end );
-        stack->mapped.end = new_mapped_end;
-        return true;
-    }
-
-    // The stack ran out of virtual memory.
-    return false;
-}
-
-void* std_virtual_stack_alloc ( std_virtual_stack_t* stack, size_t size ) {
-    void* top = stack->mapped.top;
-
-    if ( !std_virtual_stack_map ( stack, size ) ) {
-        return NULL;
-    }
-
-    stack->mapped.top = top + size;
-    return top;
-}
-
-static void* std_virtual_stack_alloc_zero ( std_virtual_stack_t* stack, size_t size ) {
-    void* alloc = std_virtual_stack_alloc ( stack, size );
-
-    if ( alloc ) {
-        std_mem_zero ( alloc, size );
-    }
-
-    return alloc;
-}
-
-void* std_virtual_stack_alloc_align ( std_virtual_stack_t* stack, size_t size, size_t align ) {
-    void* top = stack->mapped.top;
-    size_t align_size = std_align_size_ptr ( top, align );
-    return std_virtual_stack_alloc ( stack, align_size + size );
-}
-
-void* std_virtual_stack_write_align ( std_virtual_stack_t* stack, const void* data, size_t size, size_t align ) {
-    void* alloc = std_virtual_stack_alloc_align ( stack, size, align );
-    
-    if ( alloc ) {
-        std_mem_copy ( alloc, data, size );
-    }
-
-    return alloc;
-}
-
-void* std_virtual_stack_write ( std_virtual_stack_t* stack, const void* data, size_t size ) {
-    void* alloc = std_virtual_stack_alloc ( stack, size );
-
-    if ( alloc ) {
-        std_mem_copy ( alloc, data, size );
-    }
-
-    return alloc;
-}
-
-void* std_virtual_stack_align ( std_virtual_stack_t* stack, size_t align ) {
-    void* top = stack->mapped.top;
-    size_t align_size = std_align_size_ptr ( top, align );
-    if ( std_virtual_stack_alloc ( stack, align_size ) ) {
-        return stack->top;
-    } else {
-        return NULL;
-    }
-}
-
-void* std_virtual_stack_align_zero ( std_virtual_stack_t* stack, size_t align ) {
-    void* top = stack->mapped.top;
-    size_t align_size = std_align_size_ptr ( top, align );
-    if ( std_virtual_stack_alloc_zero ( stack, align_size ) ) {
-        return stack->top;
-    } else {
-        return NULL;
-    }
-}
-
-void std_virtual_stack_free ( std_virtual_stack_t* stack, size_t size ) {
-    std_stack_free ( &stack->mapped, size );
-}
-
-void std_virtual_stack_clear ( std_virtual_stack_t* stack ) {
-    std_stack_clear ( &stack->mapped );
-}
-
-char* std_virtual_stack_string_copy ( std_virtual_stack_t* stack, const char* str ) {
-    size_t len = std_str_len ( str ) ;
-
-    if ( !std_virtual_stack_map ( stack, len + 1 ) ) {
-        return NULL;
-    }
-
-    return std_stack_string_copy_n ( &stack->mapped, str, len + 1 );
-}
-
-char* std_virtual_stack_string_copy_format ( std_virtual_stack_t* stack, const char* str, ... ) {
-    char buffer[2048];
-
-    va_list args;
-    va_start ( args, str );
-    int len = vsnprintf ( buffer, 2048, str, args );
-    va_end ( args );
-    buffer[len] = '\0';
-
-    return std_virtual_stack_string_copy ( stack, buffer );
-}
-
-char* std_virtual_stack_string_append ( std_virtual_stack_t* stack, const char* str ) {
-    std_stack_string_pop_terminator ( &stack->mapped );
-    return std_virtual_stack_string_copy ( stack, str );
-}
-
-char* std_virtual_stack_string_append_format ( std_virtual_stack_t* stack, const char* str, ... ) {
-    char buffer[2048];
-
-    va_list args;
-    va_start ( args, str );
-    int len = vsnprintf ( buffer, 2048, str, args );
-    va_end ( args );
-    buffer[len] = '\0';
-
-    return std_virtual_stack_string_append ( stack, buffer );
 }
 
 //==============================================================================
@@ -997,7 +852,7 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
     void* top = heap->stack.top;
     bool empty = top == heap->stack.begin;
-    void* new_segment = std_virtual_stack_alloc ( &heap->stack, size );
+    void* new_segment = std_stack_alloc ( &heap->stack, size );
     //uint64_t prev_top = heap->arena.used_size;
     //bool empty = prev_top == 0;
     //void* new_segment = std_arena_alloc ( &heap->arena, size );
@@ -1061,7 +916,7 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
     heap->allocated_size = 0;
     heap->total_size = 0;
 
-    heap->stack = std_virtual_stack_create ( std_allocator_tlsf_max_segment_size_m );
+    heap->stack = std_stack_create ( std_allocator_tlsf_max_segment_size_m );
     std_allocator_tlsf_heap_grow ( heap, size );
 
 #if std_build_debug_m
@@ -1282,7 +1137,7 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
 }
 
 void std_allocator_tlsf_heap_deinit ( std_allocator_tlsf_heap_t* heap ) {
-    std_virtual_stack_destroy ( &heap->stack );
+    std_stack_destroy ( &heap->stack );
 }
 
 void std_allocator_info ( std_allocator_info_t* info ) {

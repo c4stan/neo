@@ -15,15 +15,15 @@
 static xg_resource_cmd_buffer_state_t* xg_resource_cmd_buffer_state;
 
 static void xg_resource_cmd_buffer_alloc_memory ( xg_resource_cmd_buffer_t* cmd_buffer ) {
-    cmd_buffer->cmd_headers_allocator = std_virtual_stack_create ( xg_cmd_buffer_resource_cmd_buffer_size_m );
-    cmd_buffer->cmd_args_allocator = std_virtual_stack_create ( xg_cmd_buffer_resource_cmd_buffer_size_m );
+    cmd_buffer->cmd_headers_allocator = std_stack_create ( xg_cmd_buffer_resource_cmd_buffer_size_m );
+    cmd_buffer->cmd_args_allocator = std_stack_create ( xg_cmd_buffer_resource_cmd_buffer_size_m );
 }
 
 static void xg_resource_cmd_buffer_free_memory ( xg_resource_cmd_buffer_t* cmd_buffer ) {
-    std_virtual_stack_destroy ( &cmd_buffer->cmd_headers_allocator );
-    std_virtual_stack_destroy ( &cmd_buffer->cmd_args_allocator );
-    cmd_buffer->cmd_headers_allocator = ( std_virtual_stack_t ) {};
-    cmd_buffer->cmd_args_allocator = ( std_virtual_stack_t ) {};
+    std_stack_destroy ( &cmd_buffer->cmd_headers_allocator );
+    std_stack_destroy ( &cmd_buffer->cmd_args_allocator );
+    cmd_buffer->cmd_headers_allocator = ( std_stack_t ) {};
+    cmd_buffer->cmd_args_allocator = ( std_stack_t ) {};
 }
 
 void xg_resource_cmd_buffer_load ( xg_resource_cmd_buffer_state_t* state ) {
@@ -85,8 +85,8 @@ void xg_resource_cmd_buffer_destroy ( xg_resource_cmd_buffer_h* cmd_buffer_handl
         xg_resource_cmd_buffer_h handle = cmd_buffer_handles[i];
         xg_resource_cmd_buffer_t* cmd_buffer = &xg_resource_cmd_buffer_state->cmd_buffers_array[handle];
 
-        std_virtual_stack_clear ( &cmd_buffer->cmd_headers_allocator );
-        std_virtual_stack_clear ( &cmd_buffer->cmd_args_allocator );
+        std_stack_clear ( &cmd_buffer->cmd_headers_allocator );
+        std_stack_clear ( &cmd_buffer->cmd_args_allocator );
 
         std_list_push ( &xg_resource_cmd_buffer_state->cmd_buffers_freelist, cmd_buffer );
     }
@@ -101,11 +101,11 @@ xg_resource_cmd_buffer_t* xg_resource_cmd_buffer_get ( xg_resource_cmd_buffer_h 
 //
 
 static void* xg_resource_cmd_buffer_record_cmd ( xg_resource_cmd_buffer_t* cmd_buffer, xg_resource_cmd_type_e type, size_t args_size ) {
-    std_virtual_stack_align ( &cmd_buffer->cmd_headers_allocator, xg_resource_cmd_buffer_cmd_alignment_m );
-    std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, xg_resource_cmd_buffer_cmd_alignment_m );
+    std_stack_align ( &cmd_buffer->cmd_headers_allocator, xg_resource_cmd_buffer_cmd_alignment_m );
+    std_stack_align ( &cmd_buffer->cmd_args_allocator, xg_resource_cmd_buffer_cmd_alignment_m );
 
-    xg_resource_cmd_header_t* cmd_header = std_virtual_stack_alloc_m ( &cmd_buffer->cmd_headers_allocator, xg_resource_cmd_header_t );
-    void* cmd_args = std_virtual_stack_alloc ( &cmd_buffer->cmd_args_allocator, args_size );
+    xg_resource_cmd_header_t* cmd_header = std_stack_alloc_m ( &cmd_buffer->cmd_headers_allocator, xg_resource_cmd_header_t );
+    void* cmd_args = std_stack_alloc ( &cmd_buffer->cmd_args_allocator, args_size );
 
     cmd_header->type = ( uint16_t ) type;
     cmd_header->args = ( uint64_t ) cmd_args;
@@ -204,8 +204,8 @@ void xg_resource_cmd_buffer_resource_bindings_update ( xg_resource_cmd_buffer_h 
     cmd_args->raytrace_world_count = raytrace_world_count;
 
     if ( buffer_count > 0 ) {
-        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_buffer_resource_binding_t ) );
-        xg_buffer_resource_binding_t* buffers = ( xg_buffer_resource_binding_t* ) std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_buffer_resource_binding_t, buffer_count );
+        std_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_buffer_resource_binding_t ) );
+        xg_buffer_resource_binding_t* buffers = ( xg_buffer_resource_binding_t* ) std_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_buffer_resource_binding_t, buffer_count );
 
         for ( uint32_t i = 0; i < buffer_count; ++i ) {
             buffers[i] = bindings->buffers[i];
@@ -213,8 +213,8 @@ void xg_resource_cmd_buffer_resource_bindings_update ( xg_resource_cmd_buffer_h 
     }
 
     if ( texture_count > 0 ) {
-        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_texture_resource_binding_t ) );
-        xg_texture_resource_binding_t* textures = ( xg_texture_resource_binding_t* ) std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_texture_resource_binding_t, texture_count );
+        std_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_texture_resource_binding_t ) );
+        xg_texture_resource_binding_t* textures = ( xg_texture_resource_binding_t* ) std_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_texture_resource_binding_t, texture_count );
 
         for ( uint32_t i = 0; i < texture_count; ++i ) {
             textures[i] = bindings->textures[i];
@@ -222,8 +222,8 @@ void xg_resource_cmd_buffer_resource_bindings_update ( xg_resource_cmd_buffer_h 
     }
 
     if ( sampler_count > 0 ) {
-        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_sampler_resource_binding_t ) );
-        xg_sampler_resource_binding_t* samplers = ( xg_sampler_resource_binding_t* ) std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_sampler_resource_binding_t, sampler_count );
+        std_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_sampler_resource_binding_t ) );
+        xg_sampler_resource_binding_t* samplers = ( xg_sampler_resource_binding_t* ) std_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_sampler_resource_binding_t, sampler_count );
 
         for ( uint32_t i = 0; i < sampler_count; ++i ) {
             samplers[i] = bindings->samplers[i];
@@ -231,8 +231,8 @@ void xg_resource_cmd_buffer_resource_bindings_update ( xg_resource_cmd_buffer_h 
     }
 
     if ( raytrace_world_count > 0 ) {
-        std_virtual_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_raytrace_world_resource_binding_t ) );
-        xg_raytrace_world_resource_binding_t* worlds = ( xg_raytrace_world_resource_binding_t* ) std_virtual_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_raytrace_world_resource_binding_t, raytrace_world_count );
+        std_stack_align ( &cmd_buffer->cmd_args_allocator, std_alignof_m ( xg_raytrace_world_resource_binding_t ) );
+        xg_raytrace_world_resource_binding_t* worlds = ( xg_raytrace_world_resource_binding_t* ) std_stack_alloc_array_m ( &cmd_buffer->cmd_args_allocator, xg_raytrace_world_resource_binding_t, raytrace_world_count );
 
         for ( uint32_t i = 0; i < raytrace_world_count; ++i ) {
             worlds[i] = bindings->raytrace_worlds[i];

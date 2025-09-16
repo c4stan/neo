@@ -54,7 +54,7 @@ typedef struct {
 //==============================================================================
 
 typedef struct {
-    std_virtual_stack_t nodes_stack;
+    std_stack_t nodes_stack;
     //std_virtual_buffer_t nodes_buffer;
     //std_alloc_t nodes_alloc;
     //size_t      nodes_mapped_size;
@@ -73,7 +73,7 @@ typedef struct {
 typedef struct {
     //std_alloc_t bins_alloc;
     //std_virtual_buffer_t bins_buffer;
-    std_virtual_stack_t bins_stack;
+    std_stack_t bins_stack;
     size_t bin_size;
     size_t bin_capacity;
     void* bins_freelist;
@@ -107,7 +107,7 @@ typedef struct {
 
 typedef struct {
     std_mutex_t mutex;
-    std_virtual_stack_t stack; // raw memory
+    std_stack_t stack; // raw memory
     void* freelists[std_allocator_tlsf_x_size_m][std_allocator_tlsf_y_size_m]; // table of freelists
     uint16_t available_freelists[std_allocator_tlsf_x_size_m]; // one bit per table entry. uint16_t because y_size is 16
     uint64_t available_rows; // one bit per table row (x dimension). 1 if at least one freelist on that row is available, 0 otherwise

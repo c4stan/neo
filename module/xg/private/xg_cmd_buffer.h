@@ -40,8 +40,8 @@ typedef struct {
 
 typedef struct {
     xg_workload_h workload;
-    std_virtual_stack_t cmd_headers_allocator; // xg_cmd_header_t
-    std_virtual_stack_t cmd_args_allocator;
+    std_stack_t cmd_headers_allocator; // xg_cmd_header_t
+    std_stack_t cmd_args_allocator;
 } xg_cmd_buffer_t;
 
 typedef enum {

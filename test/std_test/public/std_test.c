@@ -103,7 +103,7 @@ static void  test_allocator ( void ) {
     }
     {
         void* buffer = std_virtual_heap_alloc_m ( 1024 * 32, 16 );
-        std_stack_t stack = std_stack ( buffer, 1024 * 32 );
+        std_stack_t stack = std_fixed_stack_m ( buffer, 1024 * 32 );
         void* a = std_stack_alloc_align ( &stack, 1024 * 16, 16 );
         void* b = std_stack_alloc_align ( &stack, 1024 * 8, 16 );
         void* c = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );

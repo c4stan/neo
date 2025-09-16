@@ -36,7 +36,7 @@ typedef struct {
 
 typedef struct {
     xg_device_h device;
-    std_virtual_stack_t stack;
+    std_stack_t stack;
 
     // Build params
     bool dirty_build_params;

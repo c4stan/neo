@@ -57,9 +57,9 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     graph->export_node = xf_null_handle_m;
     graph->nodes_freelist = std_static_freelist_m ( graph->nodes_array );
     graph->query_contexts_ring = std_ring ( std_static_array_capacity_m ( graph->query_contexts_array ) );
-    graph->resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
-    graph->physical_resource_dependencies_allocator = std_virtual_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * 2 * xf_resource_max_mip_levels_m ) );
-    graph->node_user_arg_allocator = std_virtual_stack_create ( 128 * xf_graph_max_nodes_m );
+    graph->resource_dependencies_allocator = std_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
+    graph->physical_resource_dependencies_allocator = std_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * 2 * xf_resource_max_mip_levels_m ) );
+    graph->node_user_arg_allocator = std_stack_create ( 128 * xf_graph_max_nodes_m );
 
     xf_graph_h handle = ( xf_graph_h ) ( graph - xf_graph_state->graphs_array );
     std_bitset_set ( xf_graph_state->graphs_bitset, handle );
@@ -97,7 +97,7 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     }
 
     if ( copy_args && user_args.base ) {
-        void* alloc = std_virtual_stack_alloc_align ( &graph->node_user_arg_allocator, user_args.size, 16 );
+        void* alloc = std_stack_alloc_align ( &graph->node_user_arg_allocator, user_args.size, 16 );
         std_mem_copy ( alloc, user_args.base, user_args.size );
         node->user_alloc = alloc;
     } else {
@@ -819,7 +819,7 @@ static xf_graph_resource_dependencies_t xf_graph_alloc_physical_texture_resource
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
     uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? physical_texture->info.mip_levels : view.mip_count;
-    deps.subresources = std_virtual_stack_alloc_array_m ( &graph->physical_resource_dependencies_allocator, xf_graph_subresource_dependencies_t, mip_count );
+    deps.subresources = std_stack_alloc_array_m ( &graph->physical_resource_dependencies_allocator, xf_graph_subresource_dependencies_t, mip_count );
     std_mem_zero_array_m ( deps.subresources, mip_count );
     deps.subresource_count = mip_count;
     return deps;
@@ -866,7 +866,7 @@ static void xf_graph_alloc_texture_resource_dependencies ( xf_graph_h graph_hand
     //uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? info.mip_levels : view.mip_count;
     std_assert_m ( graph_texture->subresources_bitset != 0 );
     uint32_t mip_count = 64 - std_bit_scan_rev_64 ( graph_texture->subresources_bitset );
-    deps.subresources = std_virtual_stack_alloc_array_m ( &graph->resource_dependencies_allocator, xf_graph_subresource_dependencies_t, mip_count );
+    deps.subresources = std_stack_alloc_array_m ( &graph->resource_dependencies_allocator, xf_graph_subresource_dependencies_t, mip_count );
     std_mem_zero_array_m ( deps.subresources, mip_count );
     deps.subresource_count = mip_count;
     //return deps;
@@ -877,7 +877,7 @@ static xf_graph_resource_dependencies_t xf_graph_alloc_buffer_resource_dependenc
     xf_graph_resource_dependencies_t deps;
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     uint32_t mip_count = 1;
-    deps.subresources = std_virtual_stack_alloc_array_m ( &graph->resource_dependencies_allocator, xf_graph_subresource_dependencies_t, mip_count );
+    deps.subresources = std_stack_alloc_array_m ( &graph->resource_dependencies_allocator, xf_graph_subresource_dependencies_t, mip_count );
     std_mem_zero_array_m ( deps.subresources, mip_count );
     deps.subresource_count = mip_count;
     return deps;
@@ -2422,8 +2422,8 @@ void xf_graph_clear ( xf_graph_h graph_handle, xg_workload_h workload ) {
         node->buffer_releases.count = 0;
     }
 
-    std_virtual_stack_clear ( &graph->resource_dependencies_allocator );
-    std_virtual_stack_clear ( &graph->physical_resource_dependencies_allocator );
+    std_stack_clear ( &graph->resource_dependencies_allocator );
+    std_stack_clear ( &graph->physical_resource_dependencies_allocator );
 }
 
 //
@@ -2510,7 +2510,7 @@ static void xf_graph_clear_physical_resources ( xf_graph_h graph_handle ) {
 
     graph->physical_textures_count = 0;
 
-    std_virtual_stack_clear ( &graph->physical_resource_dependencies_allocator );
+    std_stack_clear ( &graph->physical_resource_dependencies_allocator );
 }
 
 void xf_graph_finalize ( xf_graph_h graph_handle ) {
@@ -2866,9 +2866,9 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
         xg->free_memory ( graph->heap.memory_handle );
     }
 
-    std_virtual_stack_destroy ( &graph->resource_dependencies_allocator );
-    std_virtual_stack_destroy ( &graph->physical_resource_dependencies_allocator );
-    std_virtual_stack_destroy ( &graph->node_user_arg_allocator );
+    std_stack_destroy ( &graph->resource_dependencies_allocator );
+    std_stack_destroy ( &graph->physical_resource_dependencies_allocator );
+    std_stack_destroy ( &graph->node_user_arg_allocator );
 
     std_list_push ( &xf_graph_state->graphs_freelist, graph );
     std_bitset_clear ( xf_graph_state->graphs_bitset, graph_handle );

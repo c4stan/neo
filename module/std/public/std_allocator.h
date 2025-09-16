@@ -82,16 +82,17 @@ typedef struct {
 #define std_buffer_struct_m( item ) std_buffer_m ( .base = item, .size = sizeof ( *item ) )
 #define std_buffer_static_array_m( array ) std_buffer_m ( .base = array, .size = sizeof ( array ) )
 
-// TODO split the stacks out to new file std_stack?
-// Linear fixed size allocator. Can be manually resized by cloning to a bigger separate stack and freeing the old one. 
+// TODO pass len as param to str functions instead of computing it inside
+// Linear allocator based on virtual memory. The mapped segment will grow until the whole reserved range is full. It will not grow further.
 typedef struct {
     void* begin;
     void* top;
     void* end;
+    void* virtual_end;
 } std_stack_t;
 
-std_stack_t std_stack ( void* base, size_t size );
-std_stack_t std_stack_create ( size_t size );
+std_stack_t std_stack ( void* base, size_t mapped_size, size_t virtual_size );
+std_stack_t std_stack_create ( size_t virtual_size );
 void        std_stack_destroy ( std_stack_t* stack );
 void*       std_stack_alloc ( std_stack_t* buffer, size_t size );
 void*       std_stack_write ( std_stack_t* buffer, const void* data, size_t size );
@@ -111,49 +112,13 @@ uint64_t    std_stack_used_size ( const std_stack_t* stack );
 uint64_t    std_stack_used_size_from ( const std_stack_t* stack, void* base );
 uint64_t    std_stack_unused_size ( const std_stack_t* stack );
 
-#define std_static_stack_m( array ) std_stack ( array, sizeof ( array ) )
+#define std_fixed_stack_m( base, size ) std_stack ( base, size, size )
+#define std_static_stack_m( array ) std_fixed_stack_m ( array, sizeof ( array ) )
 #define std_stack_alloc_array_m( stack, type, count ) ( type* ) std_stack_alloc_align ( stack, sizeof ( type ) * (count), std_alignof_m ( type ) )
 #define std_stack_alloc_m( stack, type ) std_stack_alloc_array_m ( stack, type, 1 )
 #define std_stack_write_m( stack, data ) std_stack_write ( stack, data, sizeof ( *data ) )
 #define std_stack_write_array_m( stack, base, count ) std_stack_write ( stack, base, sizeof ( *base ) * count )
 #define std_stack_array_count_m( stack, type ) ( ( (stack)->top - (stack)->begin ) / sizeof ( type ) )
-
-// Linear allocator based on virtual memory. The mapped segment will grow until the whole reserved range is full. It will not grow further.
-typedef struct {
-    union {
-        std_stack_t mapped;
-        struct {
-            void* begin;
-            void* top;
-            void* end;
-        };
-    };
-    void* virtual_end;
-} std_virtual_stack_t;
-
-std_virtual_stack_t std_virtual_stack ( void* base, size_t mapped_size, size_t virtual_size );
-std_virtual_stack_t std_virtual_stack_create ( size_t virtual_size );
-void                std_virtual_stack_destroy ( std_virtual_stack_t* stack );
-bool        std_virtual_stack_map ( std_virtual_stack_t* buffer, size_t size );
-void*       std_virtual_stack_alloc ( std_virtual_stack_t* buffer, size_t size );
-void*       std_virtual_stack_write ( std_virtual_stack_t* buffer, const void* data, size_t size );
-void*       std_virtual_stack_align ( std_virtual_stack_t* buffer, size_t align );
-void*       std_virtual_stack_align_zero ( std_virtual_stack_t* buffer, size_t align );
-void*       std_virtual_stack_alloc_align ( std_virtual_stack_t* buffer, size_t size, size_t align );
-void*       std_virtual_stack_write_align ( std_virtual_stack_t* buffer, const void* data, size_t size, size_t align );
-void        std_virtual_stack_clear ( std_virtual_stack_t* buffer );
-char*       std_virtual_stack_string_copy ( std_virtual_stack_t* buffer, const char* std );
-char*       std_virtual_stack_string_copy_format ( std_virtual_stack_t* buffer, const char* str, ... );
-char*       std_virtual_stack_string_append ( std_virtual_stack_t* buffer, const char* str );
-char*       std_virtual_stack_string_append_format ( std_virtual_stack_t* buffer, const char* str, ... );
-void        std_virtual_stack_free ( std_virtual_stack_t* buffer, size_t size );
-uint64_t    std_virtual_stack_used_size ( const std_virtual_stack_t* stack );
-uint64_t    std_virtual_stack_used_size_from ( const std_virtual_stack_t* stack, void* base );
-
-#define std_virtual_stack_alloc_array_m( stack, type, count ) ( type* ) std_virtual_stack_alloc_align ( stack, sizeof ( type ) * (count), std_alignof_m ( type ) )
-#define std_virtual_stack_alloc_m( stack, type ) std_virtual_stack_alloc_array_m ( stack, type, 1 )
-#define std_virtual_stack_write_m( stack, data ) std_virtual_stack_write ( stack, data, sizeof ( *data ) )
-#define std_virtual_stack_write_array_m( stack, base, count ) std_virtual_stack_write ( stack, base, sizeof ( *base ) * count )
 
 /*
     Tagged allocator
