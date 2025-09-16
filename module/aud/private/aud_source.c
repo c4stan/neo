@@ -34,7 +34,7 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
     source->params = *params;
     uint64_t size = params->sample_count * params->bits_per_sample / 8;
     void* buffer = std_virtual_heap_alloc_m ( size, 8 );
-    source->stack = std_stack ( buffer, size );
+    source->stack = std_fixed_stack_m ( buffer, size );
     source->time_played = 0;
     source->volume = 1;
     source->active_idx = UINT64_MAX;

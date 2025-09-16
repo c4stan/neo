@@ -41,9 +41,9 @@ typedef struct {
     bool is_server;
     net_i* net;
     net_socket_h socket;
-    std_virtual_stack_t read_stack;
-    std_virtual_stack_t temp_stack;
-    std_virtual_stack_t write_stack;
+    std_stack_t read_stack;
+    std_stack_t temp_stack;
+    std_stack_t write_stack;
     union {
         onda_server_state_t server;
         onda_client_state_t client;
@@ -173,9 +173,9 @@ static bool onda_boot ( void ) {
         return false;
     }
 
-    onda_state->read_stack = std_virtual_stack_create ( 1024 * 1024 * 512 );
-    onda_state->temp_stack = std_virtual_stack_create ( 1024 * 1024 * 64 );
-    onda_state->write_stack = std_virtual_stack_create ( 1024 * 1024 * 512 );
+    onda_state->read_stack = std_stack_create ( 1024 * 1024 * 512 );
+    onda_state->temp_stack = std_stack_create ( 1024 * 1024 * 64 );
+    onda_state->write_stack = std_stack_create ( 1024 * 1024 * 512 );
 
     const char* mode_arg = process_info.args[1];
     if ( std_str_cmp ( mode_arg, "-s" ) == 0 ) {
@@ -198,16 +198,16 @@ static bool onda_boot ( void ) {
 }
 
 #if 0
-static std_buffer_t read_socket ( net_socket_h socket, std_virtual_stack_t* stack ) {
+static std_buffer_t read_socket ( net_socket_h socket, std_stack_t* stack ) {
     net_i* net = onda_state->net;
-    std_virtual_stack_clear ( stack );
+    std_stack_clear ( stack );
 
     size_t chunk_size = 1024 * 4;
     void* base = stack->top;
     size_t read_size = 0;
     size_t total_read_size = 0;
     do {
-        void* alloc = std_virtual_stack_alloc ( stack, chunk_size );
+        void* alloc = std_stack_alloc ( stack, chunk_size );
         read_size = net->read_connected_socket ( alloc, chunk_size, socket );
         total_read_size += read_size;
     } while ( net->get_socket_available_read_size ( socket ) > 0 );
@@ -229,23 +229,23 @@ typedef struct {
     uint32_t file_count;
 } list_result_t;
 
-static list_result_t onda_build_list ( std_virtual_stack_t* stack ) {
+static list_result_t onda_build_list ( std_stack_t* stack ) {
     // TODO dynamic subdir/file count
     uint32_t max_subdirs = 256;
     uint32_t max_files = 256;
 
-    char** subdirs = std_virtual_stack_alloc_array_m ( stack, char*, max_subdirs );
+    char** subdirs = std_stack_alloc_array_m ( stack, char*, max_subdirs );
     for ( uint32_t i = 0; i < max_subdirs; ++i ) {
-        subdirs[i] = std_virtual_stack_alloc ( stack, onda_subpath_max_len_m );
+        subdirs[i] = std_stack_alloc ( stack, onda_subpath_max_len_m );
     }
     size_t subdir_count = std_directory_subdirs ( subdirs, max_subdirs, onda_subpath_max_len_m, onda_state->server.path );
-    char** raw_files = std_virtual_stack_alloc_array_m ( stack, char*, max_files );
+    char** raw_files = std_stack_alloc_array_m ( stack, char*, max_files );
     for ( uint32_t i = 0; i < max_files; ++i ) {
-        raw_files[i] = std_virtual_stack_alloc ( stack, onda_subpath_max_len_m );
+        raw_files[i] = std_stack_alloc ( stack, onda_subpath_max_len_m );
     }
     size_t raw_file_count = std_directory_files ( raw_files, max_files, onda_subpath_max_len_m, onda_state->server.path );
 
-    char** files = std_virtual_stack_alloc_array_m ( stack, char*, max_files );
+    char** files = std_stack_alloc_array_m ( stack, char*, max_files );
     uint32_t file_count = 0;
     for ( uint32_t i = 0; i < raw_file_count; ++i ) {
         char* ext = std_path_ext ( raw_files[i] );
@@ -272,26 +272,26 @@ typedef struct {
     char data[];
 } onda_list_header_t;
 
-static void onda_server_send_list ( std_virtual_stack_t* stack, const list_result_t* list ) {
+static void onda_server_send_list ( std_stack_t* stack, const list_result_t* list ) {
     net_i* net = onda_state->net;
-    std_virtual_stack_clear ( stack );
+    std_stack_clear ( stack );
 
-    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_list_header_t );
+    std_auto_m header = std_stack_alloc_m ( stack, onda_list_header_t );
     header->subdir_count = list->subdir_count;
     header->file_count = list->file_count;
 
     // TODO dynamic size paths
     for ( uint32_t i = 0; i < list->subdir_count; ++i ) {
-        char* subdir = std_virtual_stack_alloc ( stack, onda_subpath_max_len_m );
+        char* subdir = std_stack_alloc ( stack, onda_subpath_max_len_m );
         std_str_copy ( subdir, onda_subpath_max_len_m, list->subdirs[i] );
     }
 
     for ( uint32_t i = 0; i < list->file_count; ++i ) {
-        char* file = std_virtual_stack_alloc ( stack, onda_subpath_max_len_m );
+        char* file = std_stack_alloc ( stack, onda_subpath_max_len_m );
         std_str_copy ( file, onda_subpath_max_len_m, list->files[i] );
     }
 
-    size_t msg_size = std_virtual_stack_used_size ( stack );
+    size_t msg_size = std_stack_used_size ( stack );
     header->total_size = msg_size;
 
     net->write_connected_socket ( onda_state->server.client_socket, stack->begin, msg_size );
@@ -319,19 +319,19 @@ typedef struct {
 } onda_media_header_t;
 
 #if 0
-static void onda_server_send_media ( std_virtual_stack_t* stack, const char* path ) {
+static void onda_server_send_media ( std_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
     std_file_h file = std_file_open ( path, std_file_read_m );
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
     char* label = std_path_relative_to ( path, onda_state->server.root_path );
     size_t label_size = std_str_len ( label ) + 1;
-    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_media_header_t );
+    std_auto_m header = std_stack_alloc_m ( stack, onda_media_header_t );
     header->label_size = label_size;
     header->media_size = file_info.size;
-    void* label_data = std_virtual_stack_alloc ( stack, label_size );
+    void* label_data = std_stack_alloc ( stack, label_size );
     std_str_copy ( label_data, label_size, label );
-    void* media_data = std_virtual_stack_alloc ( stack, file_info.size );
+    void* media_data = std_stack_alloc ( stack, file_info.size );
     std_file_read ( media_data, file_info.size, file );
     std_file_close ( file );
 
@@ -353,24 +353,24 @@ static void onda_server_send_media ( std_virtual_stack_t* stack, const char* pat
             header->type = onda_client_stream_type_unknown_m;
         }
     }
-    net->write_connected_socket ( onda_state->server.client_socket, header, std_virtual_stack_used_size_from ( stack, header ) );
+    net->write_connected_socket ( onda_state->server.client_socket, header, std_stack_used_size_from ( stack, header ) );
 }
 #endif
 
-static void onda_server_stream_media ( std_virtual_stack_t* stack, const char* path ) {
+static void onda_server_stream_media ( std_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
     std_file_h file = std_file_open ( path, std_file_read_m );
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
     char* label = std_path_relative_to ( path, onda_state->server.root_path );
     size_t label_size = std_str_len ( label ) + 1;
-    void* begin = std_virtual_stack_alloc ( stack, sizeof ( onda_media_header_t ) );
+    void* begin = std_stack_alloc ( stack, sizeof ( onda_media_header_t ) );
     std_auto_m header = ( onda_media_header_t* ) begin;
     header->label_size = label_size;
     header->media_size = file_info.size;
-    void* label_data = std_virtual_stack_alloc ( stack, label_size );
+    void* label_data = std_stack_alloc ( stack, label_size );
     std_str_copy ( label_data, label_size, label );
-    void* media_data = std_virtual_stack_alloc ( stack, file_info.size );
+    void* media_data = std_stack_alloc ( stack, file_info.size );
     std_file_read ( media_data, file_info.size, file );
     std_file_close ( file );
 
@@ -422,7 +422,7 @@ static void onda_server_stream_media ( std_virtual_stack_t* stack, const char* p
     }
 
 #if 1
-    uint32_t total_size = std_virtual_stack_used_size_from ( stack, begin );
+    uint32_t total_size = std_stack_used_size_from ( stack, begin );
     uint32_t stream_size = 0;
     while ( stream_size < total_size ) {
         uint32_t chunk_size = onda_stream_chunk_size_m;
@@ -432,14 +432,14 @@ static void onda_server_stream_media ( std_virtual_stack_t* stack, const char* p
         stream_size += write_size;
     }
 #else
-    net->write_connected_socket ( onda_state->server.client_socket, begin, std_virtual_stack_used_size_from ( stack, begin ) );
+    net->write_connected_socket ( onda_state->server.client_socket, begin, std_stack_used_size_from ( stack, begin ) );
 #endif
 }
 
 static void onda_server_send_playlist ( void ) {
     net_i* net = onda_state->net;
-    std_virtual_stack_t* write_stack = &onda_state->write_stack;
-    std_virtual_stack_clear ( write_stack );
+    std_stack_t* write_stack = &onda_state->write_stack;
+    std_stack_clear ( write_stack );
 
     list_result_t list = onda_build_list ( &onda_state->temp_stack );
 
@@ -457,11 +457,11 @@ static void onda_server_send_playlist ( void ) {
             std_path_append_file ( onda_state->server.path, sizeof ( onda_state->server.path ), list.files[i] );
             onda_server_stream_media ( write_stack, onda_state->server.path );
             std_path_pop ( onda_state->server.path );
-            std_virtual_stack_clear ( write_stack );
+            std_stack_clear ( write_stack );
         }
     }
     
-    std_virtual_stack_clear ( write_stack );
+    std_stack_clear ( write_stack );
 }
 
 typedef struct {
@@ -485,19 +485,19 @@ static std_app_state_e onda_update_server ( void ) {
     }
 
     net_socket_h client_socket = onda_state->server.client_socket;
-    std_virtual_stack_t* read_stack = &onda_state->read_stack;
-    std_virtual_stack_clear ( read_stack );
-    std_auto_m request = std_virtual_stack_alloc_m ( read_stack, onda_client_request_t );
+    std_stack_t* read_stack = &onda_state->read_stack;
+    std_stack_clear ( read_stack );
+    std_auto_m request = std_stack_alloc_m ( read_stack, onda_client_request_t );
     net->read_connected_socket ( request, sizeof ( onda_client_request_t ), client_socket, net_connected_socket_read_flag_read_all_m );
 
-    char* client_msg = std_virtual_stack_alloc ( read_stack, request->data_size );
+    char* client_msg = std_stack_alloc ( read_stack, request->data_size );
     net->read_connected_socket ( client_msg, request->data_size, client_socket, net_connected_socket_read_flag_read_all_m );
     std_log_info_m ( "Received TCP string '" std_fmt_str_m "'", client_msg );
 
-    std_virtual_stack_t* temp_stack = &onda_state->temp_stack;
-    std_virtual_stack_t* write_stack = &onda_state->write_stack;
-    std_virtual_stack_clear ( temp_stack );
-    std_virtual_stack_clear ( write_stack );
+    std_stack_t* temp_stack = &onda_state->temp_stack;
+    std_stack_t* write_stack = &onda_state->write_stack;
+    std_stack_clear ( temp_stack );
+    std_stack_clear ( write_stack );
 
     if ( std_str_starts_with ( client_msg, "list" ) ) {
         list_result_t list = onda_build_list ( temp_stack );
@@ -639,25 +639,25 @@ static aud_source_h create_stream_source ( onda_client_stream_state_t* stream_st
     return source;
 }
 
-static list_result_t onda_client_read_list ( std_virtual_stack_t* read_stack, std_virtual_stack_t* temp_stack ) {
+static list_result_t onda_client_read_list ( std_stack_t* read_stack, std_stack_t* temp_stack ) {
     net_i* net = onda_state->net;
     net_socket_h socket = onda_state->socket;
 
-    std_auto_m header = std_virtual_stack_alloc_m ( read_stack, onda_list_header_t );
+    std_auto_m header = std_stack_alloc_m ( read_stack, onda_list_header_t );
     net->read_connected_socket ( header, sizeof ( onda_list_header_t ), socket, net_connected_socket_read_flag_read_all_m );
 
     uint32_t subdir_data_size = onda_subpath_max_len_m * header->subdir_count;
     uint32_t file_data_size = onda_subpath_max_len_m * header->file_count;
-    char* subdir_data = std_virtual_stack_alloc ( read_stack, subdir_data_size );
-    char* file_data = std_virtual_stack_alloc ( read_stack, file_data_size );
+    char* subdir_data = std_stack_alloc ( read_stack, subdir_data_size );
+    char* file_data = std_stack_alloc ( read_stack, file_data_size );
     net->read_connected_socket ( header->data, subdir_data_size + file_data_size, socket, net_connected_socket_read_flag_read_all_m );
 
     list_result_t list = {
         .subdir_count = header->subdir_count,
         .file_count = header->file_count,
     };
-    list.subdirs = std_virtual_stack_alloc ( temp_stack, subdir_data_size );
-    list.files = std_virtual_stack_alloc ( temp_stack, file_data_size );
+    list.subdirs = std_stack_alloc ( temp_stack, subdir_data_size );
+    list.files = std_stack_alloc ( temp_stack, file_data_size );
     for ( uint32_t i = 0; i < list.subdir_count; ++i ) {
         list.subdirs[i] = subdir_data + onda_subpath_max_len_m * i;
     }
@@ -668,52 +668,52 @@ static list_result_t onda_client_read_list ( std_virtual_stack_t* read_stack, st
     return list;
 }
 
-static onda_playlist_header_t* onda_client_read_playlist_header ( std_virtual_stack_t* stack ) {
+static onda_playlist_header_t* onda_client_read_playlist_header ( std_stack_t* stack ) {
     net_i* net = onda_state->net;
     net_socket_h socket =  onda_state->socket;
 
-    std_virtual_stack_align ( stack, 8 );
-    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_playlist_header_t );
+    std_stack_align ( stack, 8 );
+    std_auto_m header = std_stack_alloc_m ( stack, onda_playlist_header_t );
     net->read_connected_socket ( header, sizeof ( onda_playlist_header_t ), socket, net_connected_socket_read_flag_read_all_m );
 
     return header;
 }
 
-static onda_media_header_t* onda_client_read_media ( std_virtual_stack_t* stack ) {
+static onda_media_header_t* onda_client_read_media ( std_stack_t* stack ) {
     net_i* net = onda_state->net;
     net_socket_h socket =  onda_state->socket;
 
-    std_virtual_stack_align ( stack, 8 );
-    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_media_header_t );
+    std_stack_align ( stack, 8 );
+    std_auto_m header = std_stack_alloc_m ( stack, onda_media_header_t );
     net->read_connected_socket ( header, sizeof ( onda_media_header_t ), socket, net_connected_socket_read_flag_read_all_m );
 
     uint32_t data_size = header->label_size + header->media_size;
-    void* data = std_virtual_stack_alloc ( stack, data_size );
+    void* data = std_stack_alloc ( stack, data_size );
     net->read_connected_socket ( data, data_size, socket, net_connected_socket_read_flag_read_all_m );
 
     return header;
 }
 
-static onda_media_header_t* onda_client_read_media_header ( std_virtual_stack_t* stack, onda_client_stream_state_t* state ) {
+static onda_media_header_t* onda_client_read_media_header ( std_stack_t* stack, onda_client_stream_state_t* state ) {
     net_i* net = onda_state->net;
     net_socket_h socket =  onda_state->socket;
 
-    std_virtual_stack_align ( stack, 8 );
-    std_auto_m header = std_virtual_stack_alloc_m ( stack, onda_media_header_t );
+    std_stack_align ( stack, 8 );
+    std_auto_m header = std_stack_alloc_m ( stack, onda_media_header_t );
     net->read_connected_socket ( header, sizeof ( onda_media_header_t ), socket, net_connected_socket_read_flag_read_all_m );
 
     // read label
     uint32_t label_size = header->label_size;
-    char* label = std_virtual_stack_alloc ( stack, label_size );
+    char* label = std_stack_alloc ( stack, label_size );
     net->read_connected_socket ( label, label_size, socket, net_connected_socket_read_flag_read_all_m );
 
     // read first chunk
-    //std_virtual_stack_align ( stack, 8 );
+    //std_stack_align ( stack, 8 );
     //uint32_t data_size = std_min ( onda_stream_chunk_size_m, header->media_size );
-    //void* data = std_virtual_stack_alloc ( stack, data_size );
+    //void* data = std_stack_alloc ( stack, data_size );
     //uint32_t read_size = net->read_connected_socket ( data, data_size, socket, net_connected_socket_read_flag_read_all_m );
     
-    state->begin = std_virtual_stack_align ( stack, 8 );
+    state->begin = std_stack_align ( stack, 8 );
     state->total_size = header->media_size;
     state->read_size = 0;
     state->consumed_size = 0;
@@ -722,23 +722,23 @@ static onda_media_header_t* onda_client_read_media_header ( std_virtual_stack_t*
     return header;
 }
 
-static void* onda_client_read_media_chunk ( std_virtual_stack_t* stack, onda_client_stream_state_t* state ) {
+static void* onda_client_read_media_chunk ( std_stack_t* stack, onda_client_stream_state_t* state ) {
     net_i* net = onda_state->net;
     net_socket_h socket =  onda_state->socket;
 
 #if 0
     uint32_t remaining_size = state->total_size - state->read_size;
     uint32_t alloc_size = remaining_size < onda_stream_chunk_size_m ? remaining_size : onda_stream_chunk_size_m;
-    void* data = std_virtual_stack_alloc ( stack, alloc_size );
+    void* data = std_stack_alloc ( stack, alloc_size );
     uint32_t read_size = net->read_connected_socket ( data, alloc_size, socket, net_connected_socket_read_flag_read_all_m );
     state->read_size += read_size;
-    std_virtual_stack_free ( stack, alloc_size - read_size );
+    std_stack_free ( stack, alloc_size - read_size );
 #else
     uint32_t alloc_size = state->total_size - state->read_size;
-    void* data = std_virtual_stack_alloc ( stack, alloc_size );
+    void* data = std_stack_alloc ( stack, alloc_size );
     uint32_t read_size = net->read_connected_socket ( data, alloc_size, socket, net_connected_socket_read_flag_none_m );
     state->read_size += read_size;
-    std_virtual_stack_free ( stack, alloc_size - read_size );
+    std_stack_free ( stack, alloc_size - read_size );
 #endif
 
     return data;
@@ -856,7 +856,7 @@ static bool onda_client_play_source ( aud_source_h source, char* label ) {
 
 static void onda_client_feed_stream ( aud_source_h source, onda_client_stream_state_t* stream_state ) {
     aud_i* aud = onda_state->client.aud;
-    std_virtual_stack_t* read_stack = &onda_state->read_stack;
+    std_stack_t* read_stack = &onda_state->read_stack;
     
     if ( stream_state->read_size < stream_state->total_size ) {
         onda_client_read_media_chunk ( read_stack, stream_state );
@@ -968,7 +968,7 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
 #if 1
         onda_client_feed_stream ( source, stream_state );
 #else
-        std_virtual_stack_t* read_stack = &onda_state->read_stack;
+        std_stack_t* read_stack = &onda_state->read_stack;
         if ( stream_state->read_size < stream_state->total_size ) {
             onda_client_read_media_chunk ( read_stack, stream_state );
             int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, source_info.sample_count );
@@ -1055,12 +1055,12 @@ static std_app_state_e onda_update_client ( void ) {
     std_process_io_read ( msg, &msg_size, sizeof ( msg ) - 1, process_info.io.stdin_handle );
     msg[msg_size++] = '\0';
 
-    std_virtual_stack_t* write_stack = &onda_state->write_stack;
-    std_virtual_stack_t* read_stack = &onda_state->read_stack;
-    std_virtual_stack_t* temp_stack = &onda_state->temp_stack;
-    std_virtual_stack_clear ( write_stack );
-    std_virtual_stack_clear ( temp_stack );
-    std_virtual_stack_clear ( read_stack );
+    std_stack_t* write_stack = &onda_state->write_stack;
+    std_stack_t* read_stack = &onda_state->read_stack;
+    std_stack_t* temp_stack = &onda_state->temp_stack;
+    std_stack_clear ( write_stack );
+    std_stack_clear ( temp_stack );
+    std_stack_clear ( read_stack );
 
     if ( std_str_cmp ( msg, "list" ) == 0 
         || std_str_starts_with ( msg, "open" ) 
@@ -1068,24 +1068,24 @@ static std_app_state_e onda_update_client ( void ) {
         || std_str_starts_with ( msg, "play" ) 
         || std_str_cmp ( msg, "exit" ) == 0 
     ) {
-        onda_client_request_t* request = std_virtual_stack_alloc_m ( write_stack, onda_client_request_t );
+        onda_client_request_t* request = std_stack_alloc_m ( write_stack, onda_client_request_t );
         request->data_size = msg_size;
-        std_virtual_stack_alloc ( write_stack, msg_size );
+        std_stack_alloc ( write_stack, msg_size );
         std_str_copy ( request->data, msg_size, msg );
         net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + msg_size );
-        std_virtual_stack_clear ( write_stack );
+        std_stack_clear ( write_stack );
     }
 
     if ( std_str_cmp ( msg, "list" ) == 0 || std_str_starts_with ( msg, "open" ) || std_str_cmp ( msg, "back" ) == 0  ) {
         list_result_t list = onda_client_read_list ( read_stack, temp_stack );
-        std_virtual_stack_string_append_format ( write_stack, std_fmt_u32_m " dirs\n", list.subdir_count );
+        std_stack_string_append_format ( write_stack, std_fmt_u32_m " dirs\n", list.subdir_count );
         for ( uint32_t i = 0; i < list.subdir_count; ++i ) {
-            std_virtual_stack_string_append_format ( write_stack, std_fmt_tab_m std_fmt_u32_m " - " std_fmt_str_m "\n", i, list.subdirs[i] );
+            std_stack_string_append_format ( write_stack, std_fmt_tab_m std_fmt_u32_m " - " std_fmt_str_m "\n", i, list.subdirs[i] );
         }
 
-        std_virtual_stack_string_append_format ( write_stack, std_fmt_u32_m " files\n", list.file_count );
+        std_stack_string_append_format ( write_stack, std_fmt_u32_m " files\n", list.file_count );
         for ( uint32_t i = 0; i < list.file_count; ++i ) {
-            std_virtual_stack_string_append_format ( write_stack, std_fmt_tab_m std_fmt_u32_m " - " std_fmt_str_m "\n", i, list.files[i] );
+            std_stack_string_append_format ( write_stack, std_fmt_tab_m std_fmt_u32_m " - " std_fmt_str_m "\n", i, list.files[i] );
         }
 
         std_log_info_m ( write_stack->begin );
@@ -1138,14 +1138,14 @@ static std_app_state_e onda_update_client ( void ) {
                 aud->destroy_source ( source );
             }
 #endif
-            std_virtual_stack_clear ( read_stack );
+            std_stack_clear ( read_stack );
         }
 
         if ( exit ) {
             // flush
             for ( ; media_it < media_count; ++media_it ) {
                 onda_client_read_media ( read_stack );
-                std_virtual_stack_clear ( read_stack );
+                std_stack_clear ( read_stack );
             }
         }
     } else if ( std_str_cmp ( msg, "exit" ) == 0 ) {

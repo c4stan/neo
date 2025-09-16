@@ -94,23 +94,24 @@ typedef struct {
 std_stack_t std_stack ( void* base, size_t mapped_size, size_t virtual_size );
 std_stack_t std_stack_create ( size_t virtual_size );
 void        std_stack_destroy ( std_stack_t* stack );
-void*       std_stack_alloc ( std_stack_t* buffer, size_t size );
-void*       std_stack_write ( std_stack_t* buffer, const void* data, size_t size );
-void*       std_stack_align ( std_stack_t* buffer, size_t align );
-void*       std_stack_align_zero ( std_stack_t* buffer, size_t align );
-void*       std_stack_alloc_align ( std_stack_t* buffer, size_t size, size_t align );
-void*       std_stack_write_align ( std_stack_t* buffer, const void* data, size_t size, size_t align );
-void        std_stack_clear ( std_stack_t* buffer );
-char*       std_stack_string_copy ( std_stack_t* buffer, const char* str );
-char*       std_stack_string_copy_format ( std_stack_t* buffer, const char* str, ... );
-char*       std_stack_string_append ( std_stack_t* buffer, const char* str );
-char*       std_stack_string_append_format ( std_stack_t* buffer, const char* str, ... );
-char*       std_stack_string_append_char ( std_stack_t* stack, char c );
-void        std_stack_string_pop ( std_stack_t* stack );
+void*       std_stack_alloc ( std_stack_t* stack, size_t size );
+void*       std_stack_write ( std_stack_t* stack, const void* data, size_t size );
+void*       std_stack_align ( std_stack_t* stack, size_t align );
+void*       std_stack_align_zero ( std_stack_t* stack, size_t align );
+void*       std_stack_alloc_align ( std_stack_t* stack, size_t size, size_t align );
+void*       std_stack_write_align ( std_stack_t* stack, const void* data, size_t size, size_t align );
+void        std_stack_clear ( std_stack_t* stack );
 void        std_stack_free ( std_stack_t* stack, size_t size );
 uint64_t    std_stack_used_size ( const std_stack_t* stack );
 uint64_t    std_stack_used_size_from ( const std_stack_t* stack, void* base );
 uint64_t    std_stack_unused_size ( const std_stack_t* stack );
+
+char*       std_stack_string_copy ( std_stack_t* stack, const char* str );
+char*       std_stack_string_copy_format ( std_stack_t* stack, const char* str, ... );
+char*       std_stack_string_append ( std_stack_t* stack, const char* str );
+char*       std_stack_string_append_format ( std_stack_t* stack, const char* str, ... );
+char*       std_stack_string_append_char ( std_stack_t* stack, char c );
+void        std_stack_string_pop ( std_stack_t* stack );
 
 #define std_fixed_stack_m( base, size ) std_stack ( base, size, size )
 #define std_static_stack_m( array ) std_fixed_stack_m ( array, sizeof ( array ) )
