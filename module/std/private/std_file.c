@@ -221,6 +221,9 @@ size_t std_path_append_dir ( char* path, size_t cap, const char* append ) {
     std_assert_m ( append != NULL );
     size_t append_len = std_str_len ( append );
     size_t new_len = std_path_append_n ( path, cap, append, append_len );
+    if ( append_len == 0 ) {
+        return new_len;
+    }
     std_assert_m ( cap > new_len + 1 );
     if ( cap > new_len + 1 ) {
         path[new_len++] = '/';

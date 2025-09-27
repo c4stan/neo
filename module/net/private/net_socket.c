@@ -315,8 +315,13 @@ size_t net_socket_read_connected ( void* dest, size_t cap, net_socket_h socket_h
 
     // TODO better error handling
     if ( read_size == SOCKET_ERROR ) {
-        std_log_os_error_m();
-        return 0;
+        int error = WSAGetLastError();
+        if ( error == WSAECONNRESET ) {
+            return 0;
+        } else {
+            std_log_os_error_m();
+            return 0;
+        }
     }
 
     if ( flags & net_connected_socket_read_flag_read_all_m ) {

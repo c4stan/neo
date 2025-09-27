@@ -510,7 +510,8 @@ void* std_stack_align_zero ( std_stack_t* stack, size_t align ) {
 void* std_stack_alloc_align ( std_stack_t* stack, size_t size, size_t align ) {
     void* top = stack->top;
     size_t align_size = std_align_size_ptr ( top, align );
-    return std_stack_alloc ( stack, align_size + size );
+    void* alloc = std_stack_alloc ( stack, align_size + size );
+    return alloc + align_size;
 }
 
 void* std_stack_write_align ( std_stack_t* stack, const void* data, size_t size, size_t align ) {
