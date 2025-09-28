@@ -96,15 +96,15 @@ char*       std_path_name_ptr    ( const char* path );
 bool        std_path_info        ( std_path_info_t* info, const char* path );
 size_t      std_path_absolute    ( char* dest, size_t dest_cap, const char* path );
 char*       std_path_relative_to ( const char* path, const char* relative_to );
-char*       std_path_ext         ( const char* path ); // no '.'
+char*       std_path_ext         ( const char* path );  // no '.'
 
 bool        std_directory_create ( const char* path );
 bool        std_directory_destroy ( const char* path );
 bool        std_directory_copy ( const char* path, const char* dest, std_path_already_existing_e already_existing );
 bool        std_directory_move ( const char* path, const char* dest, std_path_already_existing_e already_existing );
 size_t      std_directory_iterate ( const char* path, std_directory_iterator_callback_f cb, void* arg );
-size_t      std_directory_files ( char** files, size_t files_cap, size_t file_cap, const char* path );
-size_t      std_directory_subdirs ( char** subdirs, size_t subdirs_cap, size_t subdir_cap, const char* path );
+size_t      std_directory_files ( char** files, size_t files_cap, size_t file_cap, const char* path );          // pass NULL files to get the total count
+size_t      std_directory_subdirs ( char** subdirs, size_t subdirs_cap, size_t subdir_cap, const char* path );  // pass NULL subdirs to get the total count
 bool        std_directory_info ( std_directory_info_t* info, const char* path );
 
 // TODO automatically create path if missing

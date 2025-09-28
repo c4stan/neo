@@ -746,7 +746,7 @@ size_t std_directory_iterate ( const char* path, std_directory_iterator_callback
 size_t std_directory_files ( char** files, size_t files_cap, size_t file_cap, const char* path ) {
 #if defined(std_platform_win32_m)
     std_assert_m ( path != NULL );
-    std_assert_m ( files != NULL );
+    //std_assert_m ( files != NULL );
     size_t len = std_to_path_buffer ( path );
     t_path_buffer[len++ - 1] = '*';
     t_path_buffer[len++ - 1] = '\0';
@@ -767,8 +767,12 @@ size_t std_directory_files ( char** files, size_t files_cap, size_t file_cap, co
             goto next;
         }
 
-        if ( i < files_cap ) {
-            std_path_to_str ( item.cFileName, files[i], file_cap );
+        if ( files ) {
+            if ( i < files_cap ) {
+                std_path_to_str ( item.cFileName, files[i], file_cap );
+                ++i;
+            }
+        } else {
             ++i;
         }
 
@@ -791,8 +795,15 @@ next:
     struct dirent* item = readdir ( dir );
 
     while ( item ) {
-        if ( item->d_type == DT_REG && i < files_cap ) {
-            std_str_copy ( files[i++], file_cap, item->d_name );
+        if ( item->d_type == DT_REG ) {
+            if ( files ) {
+                if ( i < files_cap ) {
+                    std_str_copy ( files[i], file_cap, item->d_name );
+                    ++i;
+                }
+            } else {
+                ++i;
+            }
         }
 
         item = readdir ( dir );
@@ -809,7 +820,7 @@ next:
 size_t std_directory_subdirs ( char** subdirs, size_t subdirs_cap, size_t subdir_cap, const char* path ) {
 #if defined(std_platform_win32_m)
     std_assert_m ( path != NULL );
-    std_assert_m ( subdirs != NULL );
+    //std_assert_m ( subdirs != NULL );
     size_t len = std_to_path_buffer ( path );
     t_path_buffer[len++ - 1] = '*';
     t_path_buffer[len++ - 1] = '\0';
@@ -830,8 +841,12 @@ size_t std_directory_subdirs ( char** subdirs, size_t subdirs_cap, size_t subdir
             goto next;
         }
 
-        if ( i < subdirs_cap ) {
-            std_path_to_str ( item.cFileName, subdirs[i], subdir_cap );
+        if ( subdirs ) {
+            if ( i < subdirs_cap ) {
+                std_path_to_str ( item.cFileName, subdirs[i], subdir_cap );
+                ++i;
+            }
+        } else {
             ++i;
         }
 
@@ -857,8 +872,15 @@ next:
             goto next;
         }
 
-        if ( item->d_type == DT_DIR && i < subdirs_cap ) {
-            std_str_copy ( subdirs[i++], subdir_cap, item->d_name );
+        if ( item->d_type == DT_DIR ) {
+            if ( subdirs ) {
+                if ( i < subdirs_cap ) {
+                    std_str_copy ( subdirs[i], subdir_cap, item->d_name );
+                    ++i;
+                }
+            } else {
+                ++i;
+            }
         }
 
 next:
