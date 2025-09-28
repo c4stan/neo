@@ -589,8 +589,7 @@ def git_push(tokens):
         comment += token
 
     if not comment:
-        print(Color.FAIL + 'Provide a comment.' + Color.ENDC)
-        return
+        comment = 'sync'
 
     print(Color.OKBLUE + 'git add .' + Color.ENDC)
     os.system('git add .')

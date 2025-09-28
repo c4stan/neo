@@ -190,7 +190,7 @@ static void run_aud_test ( void ) {
 
             first_print = false;
 
-            std_log_m ( 0, std_fmt_str_m std_fmt_prevline_m std_fmt_str_m " " std_fmt_u64_pad_m ( 2 ) "/" std_fmt_u64_m, prefix, bar, ring_count, ring_capacity );
+            std_log_m ( 0, std_fmt_str_m std_fmt_clear_m std_fmt_str_m " " std_fmt_u64_pad_m ( 2 ) "/" std_fmt_u64_m, prefix, bar, ring_count, ring_capacity );
         }
 
         if ( source_info.time_played < total_duration ) {

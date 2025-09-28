@@ -30,13 +30,13 @@
 #define std_fmt_tick_m    std_fmt_u64_m
 #define std_fmt_newline_m "\n"
 #define std_fmt_tab_m     "\t"
-// Causes the print to overwrite the last printed line. Can be stacked to overwrite multiple lines.
-#define std_fmt_prevline_m "\033[F"
 #define std_fmt_f32_dec_m(X) "%." std_pp_string_m(X) "f"
 #define std_fmt_int_pad_m(X) "%0" std_pp_string_m(X) "d"
 #define std_fmt_i64_pad_m(X) "%0" std_pp_string_m(X) PRId64
 #define std_fmt_u32_pad_m(X) "%0" std_pp_string_m(X) PRIu32
 #define std_fmt_u64_pad_m(X) "%0" std_pp_string_m(X) PRIu64
+// Moves the cursor to the beginning of the previous line and clears it. Can be stacked to clear multiple lines.
+#define std_fmt_clear_m "\033[F\033[J"
 
 typedef enum {
     std_log_level_info_m = 0,

@@ -95,8 +95,7 @@ void aud_source_destroy ( aud_source_h source_handle ) {
 
 void aud_source_set_volume_scale ( aud_source_h source_handle, float scale ) {
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
-
-    source->volume = scale;
+    source->volume = scale > 0 ? scale : 0;
 }
 
 bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source_handle ) {
@@ -114,10 +113,16 @@ bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source_handle )
 
 void aud_source_skip ( aud_source_h source_handle, float seconds ) {
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
-    source->time_played += seconds;
-    if ( source->time_played < 0 ) {
-        source->time_played = 0;
+    double time = source->time_played; 
+    time += seconds;
+    if ( time < 0 ) {
+        time = 0;
     }
+    double total_time = source->total_time;
+    if ( time > total_time ) {
+        time = total_time;
+    }
+    source->time_played = time;
 }
 
 void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {

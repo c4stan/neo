@@ -37,6 +37,7 @@ typedef struct {
     aud_device_h device;
     wm_window_h window;
     list_result_t list;
+    float volume;
     char path[std_path_size_m];
 } onda_client_state_t;
 
@@ -163,6 +164,7 @@ static bool onda_boot_client ( const char* server_ip, uint16_t server_port ) {
 
     onda_state->client.path[0] = '\0';
     std_mem_zero_m ( &onda_state->client.list );
+    onda_state->client.volume = 0.2f;
 
     return true;
 }
@@ -924,10 +926,10 @@ static void onda_client_decode_init ( onda_client_stream_state_t* stream_state )
 static bool onda_client_stream_source ( aud_source_h source, char* label, onda_client_stream_state_t* stream_state ) {
     aud_i* aud = onda_state->client.aud;
 
-    std_log_m ( std_log_level_custom_m, "" );
+    //std_log_m ( std_log_level_custom_m, "" );
 
     aud->play_source ( source );
-    aud->set_source_volume ( source, 0.2f );
+    aud->set_source_volume ( source, onda_state->client.volume );
 
     const std_ring_t* device_ring = aud->get_device_ring ( onda_state->client.device );
     uint64_t ring_capacity = std_ring_capacity ( device_ring );
@@ -938,7 +940,6 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
     onda_client_decode_init ( stream_state );
 
     wm_i* wm = onda_state->client.wm;
-    bool first_print = true;
     uint64_t step_ms = 50;
     std_tick_t frame_tick = std_tick_now();
     wm_input_state_t old_input_state;
@@ -961,10 +962,26 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
         }
         if ( new_input_state.keyboard[wm_keyboard_state_alt_left_m] ) {
             if ( new_input_state.keyboard[wm_keyboard_state_right_m] && !old_input_state.keyboard[wm_keyboard_state_right_m] ) {
-                aud->skip_source ( source, 10 );
+                if ( new_input_state.keyboard[wm_keyboard_state_shift_left_m] ) {
+                    aud->skip_source ( source, 60 * 60 * 12 );
+                } else {
+                    aud->skip_source ( source, 10 );
+                }
             }
             if ( new_input_state.keyboard[wm_keyboard_state_left_m] && !old_input_state.keyboard[wm_keyboard_state_left_m] ) {
-                aud->skip_source ( source, -10 );
+                if ( new_input_state.keyboard[wm_keyboard_state_shift_left_m] ) {
+                    aud->skip_source ( source, -60 * 60 * 12 );
+                } else {
+                    aud->skip_source ( source, -10 );
+                }
+            }
+            if ( new_input_state.keyboard[wm_keyboard_state_up_m] && !old_input_state.keyboard[wm_keyboard_state_up_m] ) {
+                onda_state->client.volume = std_min_f32 ( 1, onda_state->client.volume + 0.05 );
+                aud->set_source_volume ( source, onda_state->client.volume );
+            }
+            if ( new_input_state.keyboard[wm_keyboard_state_down_m] && !old_input_state.keyboard[wm_keyboard_state_down_m] ) {
+                onda_state->client.volume = std_max_f32 ( 0, onda_state->client.volume - 0.05 );
+                aud->set_source_volume ( source, onda_state->client.volume );
             }
         }
 
@@ -1033,16 +1050,8 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
 
             bar[i++] = ']';
 
-            const char* prefix = "";
-
-            if ( first_print ) {
-                prefix = "\n";
-            }
-
-            first_print = false;
-
-            std_log_m ( std_log_level_custom_m, std_fmt_str_m std_fmt_prevline_m std_fmt_prevline_m std_fmt_str_m "\n" std_fmt_str_m " " std_fmt_u64_pad_m ( 2 ) "/" std_fmt_u64_m, 
-                prefix, label, bar, ring_count, ring_capacity );
+            std_log_m ( std_log_level_custom_m, std_fmt_clear_m std_fmt_clear_m std_fmt_str_m "\n" std_fmt_str_m " " std_fmt_u64_pad_m(2) "/" std_fmt_u64_m " | " std_fmt_f32_dec_m(2), 
+                label, bar, ring_count, ring_capacity, onda_state->client.volume );
         }
 
         // output
@@ -1272,6 +1281,7 @@ static std_app_state_e onda_update_client ( void ) {
         list_result_t* client_list = &onda_state->client.list;
         uint32_t id = std_str_to_u32 ( msg + 5 );
         std_assert_m ( id < client_list->subdir_count + client_list->file_count );
+        std_log_m ( std_log_level_custom_m, "\n\n" ); // make room for 2 empty lines for the player
         if ( id < client_list->subdir_count ) {
             std_path_append_dir ( onda_state->client.path, std_path_size_m, client_list->subdirs[id] );
             onda_client_request_list ( stack, "" );
