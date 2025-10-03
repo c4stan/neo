@@ -1,6 +1,0 @@
-name = onda
-code = public, private
-defs = public.def
-configs = debug, release
-output = app
-deps = std, net, aud, wm
