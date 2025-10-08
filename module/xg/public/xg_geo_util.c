@@ -197,6 +197,115 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_plane ( float side ) {
 #undef STORE_POS
 #undef STORE_NOR
 #undef STORE_UV
+#undef STORE_TAN
+#undef STORE_BITAN
+#undef STORE_IDX
+#undef STORE_VERTEX
+
+    xg_geo_util_geometry_data_t result;
+    result.pos = pos;
+    result.nor = nor;
+    result.tan = tan;
+    result.bitan = bitan;
+    result.uv = uv;
+    result.idx = idx;
+    result.vertex_count = vert_it;
+    result.index_count = idx_it;
+    return result;
+}
+
+xg_geo_util_geometry_data_t xg_geo_util_generate_cube ( float side ) {
+    const uint32_t face_count = 6;
+    const uint32_t verts_per_face = 6;
+    const uint32_t vertex_capacity = face_count * verts_per_face;
+
+    float* pos   = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    float* nor   = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    float* uv    = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 2 );
+    float* tan   = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    float* bitan = std_virtual_heap_alloc_array_m ( float, vertex_capacity * 3 );
+    uint32_t* idx = std_virtual_heap_alloc_array_m ( uint32_t, vertex_capacity );
+
+    uint32_t vert_it = 0;
+    uint32_t idx_it  = 0;
+
+#define STORE_POS(x, y, z)    pos[vert_it * 3 + 0] = (x); pos[vert_it * 3 + 1] = (y); pos[vert_it * 3 + 2] = (z);
+#define STORE_NOR(x, y, z)    nor[vert_it * 3 + 0] = (x); nor[vert_it * 3 + 1] = (y); nor[vert_it * 3 + 2] = (z);
+#define STORE_UV(u, v)        uv [vert_it * 2 + 0] = (u); uv [vert_it * 2 + 1] = (v);
+#define STORE_TAN(x, y, z)    tan[vert_it * 3 + 0] = (x); tan[vert_it * 3 + 1] = (y); tan[vert_it * 3 + 2] = (z);
+#define STORE_BITAN(x, y, z)  bitan[vert_it * 3 + 0] = (x); bitan[vert_it * 3 + 1] = (y); bitan[vert_it * 3 + 2] = (z);
+#define STORE_IDX(i)          idx[idx_it] = (i); ++idx_it;
+
+#define STORE_VERTEX(x, y, z, nx, ny, nz, tx, ty, tz, bx, by, bz) \
+    STORE_POS(x, y, z); \
+    STORE_NOR(nx, ny, nz); \
+    STORE_UV(0, 0); \
+    STORE_TAN(tx, ty, tz); \
+    STORE_BITAN(bx, by, bz); \
+    STORE_IDX(vert_it); \
+    ++vert_it;
+
+    float h = side * 0.5f;
+
+    // FRONT (+Z)
+    STORE_VERTEX(-h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+    STORE_VERTEX( h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+    STORE_VERTEX( h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+
+    STORE_VERTEX( h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+    STORE_VERTEX(-h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+    STORE_VERTEX(-h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+
+    // BACK (-Z)
+    STORE_VERTEX( h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+    STORE_VERTEX(-h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+    STORE_VERTEX(-h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+
+    STORE_VERTEX(-h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+    STORE_VERTEX( h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+    STORE_VERTEX( h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+
+    // LEFT (-X)
+    STORE_VERTEX(-h, -h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+    STORE_VERTEX(-h, -h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+    STORE_VERTEX(-h,  h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+
+    STORE_VERTEX(-h,  h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+    STORE_VERTEX(-h,  h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+    STORE_VERTEX(-h, -h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+
+    // RIGHT (+X)
+    STORE_VERTEX( h, -h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+    STORE_VERTEX( h, -h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+    STORE_VERTEX( h,  h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+
+    STORE_VERTEX( h,  h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+    STORE_VERTEX( h,  h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+    STORE_VERTEX( h, -h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+
+    // TOP (+Y)
+    STORE_VERTEX(-h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+    STORE_VERTEX( h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+    STORE_VERTEX( h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+
+    STORE_VERTEX( h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+    STORE_VERTEX(-h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+    STORE_VERTEX(-h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+
+    // BOTTOM (-Y)
+    STORE_VERTEX(-h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+    STORE_VERTEX( h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+    STORE_VERTEX( h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+
+    STORE_VERTEX( h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+    STORE_VERTEX(-h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+    STORE_VERTEX(-h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+
+#undef STORE_POS
+#undef STORE_NOR
+#undef STORE_TAN
+#undef STORE_BITAN
+#undef STORE_UV
 #undef STORE_IDX
 #undef STORE_VERTEX
 

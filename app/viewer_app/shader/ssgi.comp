@@ -40,72 +40,10 @@ uint getRandomSeed(vec2 uv, vec2 resolution, float time) {
     return seed;
 }
 
-// HBAO
-float hbao ( vec2 screen_uv ) {
-    float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
-    if ( depth == 1 ) {
-        return 0;
-    }
-    vec3 position = view_from_depth ( screen_uv, depth );
-    vec3 normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1 );
-
-    float sample_radius = 0.1;
-
-    float sum = 0;
-
-    int slice_count = 1;
-    float slice_angle = PI*2.0 / slice_count;
-    for ( int slice_it = 0; slice_it < slice_count; ++slice_it ) {
-        float sample_angle = slice_angle * slice_it;
-        vec3 sample_dir = vec3 ( cos ( sample_angle ), sin ( sample_angle ), 0 );
-
-#if 0
-        vec3 view_sample_rad = position + sample_dir * sample_radius;
-        vec3 screen_sample_rad = screen_from_view ( frame_uniforms.proj_from_view, view_sample_rad );
-        float screen_rad = length ( screen_sample_rad - position );
-#else
-        float tangent_angle = acos ( dot ( sample_dir, normal ) ) - PI*0.5;
-        //sum += abs(tangent_angle);// tangent_angle / PI;
-        //continue;
-#endif
-
-        int sample_count = 1;
-        float sample_step = 0.04;//screen_rad / sample_count;
-        float max_horizon_angle = 0;
-        vec3 max_sample_vec = vec3 ( 0 );
-        for ( int sample_it = 0; sample_it < sample_count; ++sample_it ) {
-            vec2 sample_uv = screen_uv + sample_step * ( sample_it + 1 ) * sample_dir.xy;
-            float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
-            if ( sample_depth == 1 ) {
-                continue;
-            }
-            vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
-            vec3 sample_vec = sample_position - position;
-            //if ( length ( sample_vec ) < sample_radius ) 
-            {
-                max_sample_vec = sample_vec;
-                float horizon_angle = atan ( sample_vec.z / length ( sample_vec.xy ) );
-                max_horizon_angle = max ( max_horizon_angle, horizon_angle );
-            }
-            //vec3 horizon = normalize ( sample_position - position );
-            //float horizon_angle = atan ( horizon.z / sqrt ( horizon.x * horizon.x - horizon.y * horizon.y ) );
-            //max_horizon_angle = max ( max_horizon_angle, horizon_angle );
-        }
-
-        float d = length ( max_sample_vec ) / sample_radius;
-        float att = 1 - d * d;
-        float occlusion = clamp ( att * ( sin ( max_horizon_angle ) - sin ( tangent_angle ) ), 0.0, 1.0 );
-        sum += abs ( max_horizon_angle );
-        //sum += 1 - occlusion;
-    }
-
-    sum /= slice_count;
-    return sum;
-}
-
 // GTAO
 // https://www.activision.com/cdn/research/Practical_Real_Time_Strategies_for_Accurate_Indirect_Occlusion_NEW%20VERSION_COLOR.pdf
-float gtao ( vec2 screen_uv ) {
+// https://github.com/GameTechDev/XeGTAO
+float gtao ( rng_wang_state_t rng_state, vec2 screen_uv ) {
     float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
     if ( depth == 1 ) {
         return 0;
@@ -114,49 +52,272 @@ float gtao ( vec2 screen_uv ) {
     vec3 normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1 );
     vec3 view = normalize ( -position );
 
+    // constants
+    float sample_distribution_power = 2;
+    float thin_occluder_compensation = 0;
+    float effect_radius = 0.58f * 1.457f;
+    float effect_falloff_range = 0.615f;
+    float falloff_range = effect_falloff_range * effect_radius;
+    float final_value_power = 2.2;
+
+    float falloff_from = effect_radius * ( 1 - effect_falloff_range );
+    float falloff_mul = -1 / falloff_range;
+    float falloff_add = falloff_from / falloff_range + 1.0;
+
     float visibility = 0;
 
-    float sample_scale = ( 0.5 * frame_uniforms.proj_from_view[0][0] ) / position.z;
+    // noise
+    float slice_noise = rng_wang ( rng_state );
+    float sample_noise = rng_wang ( rng_state );
 
-    int gtao_slice_count = 1;
+    float pixel_too_close_threshold = 1.3;
+    vec2 uv_pixel_size = 1.0.xx / frame_uniforms.resolution_f32;
+    vec3 view_offsetted_pos = view_from_depth ( screen_uv + uv_pixel_size, depth );
+    vec2 view_pixel_size = view_offsetted_pos.xy - position.xy;
+    float screen_radius = effect_radius / view_pixel_size.x;
+    float min_s = pixel_too_close_threshold / screen_radius;
+
+    visibility += clamp ( ( 10 - screen_radius ) / 100, 0, 1 ) * 0.5;
+
+    int gtao_slice_count = 3;
     for ( int slice_it = 0; slice_it < gtao_slice_count; ++slice_it ) {
-        float phi = ( PI / gtao_slice_count ) * slice_it;
-        vec2 omega = vec2 ( cos ( phi ), sin ( phi ) );
-        vec3 direction = vec3 ( omega.x, omega.y, 0 );
+        float slice_k = ( slice_it + slice_noise ) / gtao_slice_count;
+        float phi = slice_k * PI;
+        float cos_phi = cos ( phi );
+        float sin_phi = sin ( phi );
+        vec2 omega = vec2 ( cos_phi, -sin_phi );
+
+        omega *= screen_radius;
+
+        vec3 direction = vec3 ( cos_phi, sin_phi, 0 );
         vec3 ortho_direction = direction - dot ( direction, view ) * view;
-        vec3 axis = cross ( direction, view );
+        vec3 axis = normalize ( cross ( direction, view ) );
         vec3 proj_normal = normal - dot ( normal, axis ) * axis;
-        float proj_length = length ( proj_normal );
-        float sign_n = sign ( dot ( ortho_direction, proj_normal ) );
-        float cos_n = clamp ( dot ( proj_normal, view ) / proj_length, 0.0, 1.0 );
-        float n = sign_n * acos ( cos_n );
+        float sign_norm = sign ( dot ( ortho_direction, proj_normal ) );
+        float proj_normal_len = length ( proj_normal );
+        float cos_norm = clamp ( dot ( proj_normal, view ) / proj_normal_len, 0, 1 );
+        float n = sign_norm * acos ( cos_norm );
 
-        for ( int side_it = 0; side_it < 2; ++side_it ) {
-            float horizon_cos = -1;
+        float low_horizon_cos_0 = cos ( n + PI / 2 );
+        float low_horizon_cos_1 = cos ( n - PI / 2 );
 
-            int gtao_sample_count = 1;
-            float gtao_scaling = 0.1;
-            for ( int sample_it = 0; sample_it < gtao_sample_count; ++sample_it ) {
-                float s = float ( sample_it ) / gtao_sample_count;
-                float x = -1 + 2 * side_it;
-                vec2 sample_uv = screen_uv + x * s * sample_scale * vec2 ( omega.x, -omega.y );
-                float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
-                if ( sample_depth == 1 ) {
-                    continue;
-                }
-                vec3 sample_position = view_from_depth ( sample_uv, sample_depth );
-                vec3 sample_horizon = normalize ( sample_position - position );
-                horizon_cos = max ( horizon_cos, dot ( sample_horizon, view ) );
-            }
+        float horizon_cos_0 = low_horizon_cos_0;
+        float horizon_cos_1 = low_horizon_cos_1;
 
-            float h = n + clamp ( ( -1 + 2 * side_it ) * acos ( horizon_cos ) - n, -PI/2, PI/2 );
-            visibility = visibility + length ( proj_normal ) * ( cos_n + 2 * h * sin ( n ) - cos ( 2 * h - n) ) / 4;
+        int gtao_steps_per_slice = 3;
+        for ( int step_it = 0; step_it < gtao_steps_per_slice; ++step_it ) {
+            float step_base_noise = float ( slice_it + step_it * gtao_steps_per_slice ) * 0.6180339887498948482;
+            float step_noise = fract ( sample_noise + step_base_noise );
+
+            float s = ( step_it + step_noise ) / gtao_steps_per_slice;
+            s = pow ( s, sample_distribution_power );
+            s += min_s;
+
+            vec2 sample_offset = s * omega;
+            float sample_offset_len = length ( sample_offset );
+
+            float mip_level = 0;
+
+            sample_offset = round ( sample_offset ) * uv_pixel_size;
+
+            vec2 sample_uv_0 = screen_uv + sample_offset;
+            float sample_depth_0 = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv_0, mip_level ).x;
+            vec3 sample_pos_0 = view_from_depth ( sample_uv_0, sample_depth_0 );
+
+            vec2 sample_uv_1 = screen_uv - sample_offset;
+            float sample_depth_1 = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv_1, mip_level ).x;
+            vec3 sample_pos_1 = view_from_depth ( sample_uv_1, sample_depth_1 );
+
+            vec3 sample_delta_0 = sample_pos_0 - position;
+            vec3 sample_delta_1 = sample_pos_1 - position;
+
+            float sample_dist_0 = length ( sample_delta_0 );
+            float sample_dist_1 = length ( sample_delta_1 );
+
+            vec3 sample_horizon_0 = sample_delta_0 / sample_dist_0;
+            vec3 sample_horizon_1 = sample_delta_1 / sample_dist_1;
+
+            float falloff_base_0 = length ( vec3 ( sample_delta_0.xy, sample_delta_0.z * ( 1 + thin_occluder_compensation ) ) );
+            float falloff_base_1 = length ( vec3 ( sample_delta_1.xy, sample_delta_0.z * ( 1 + thin_occluder_compensation ) ) );
+            float weight_0 = clamp ( falloff_base_0 * falloff_mul + falloff_add, 0, 1 );
+            float weight_1 = clamp ( falloff_base_1 * falloff_mul + falloff_add, 0, 1 );
+
+            float shc_0 = dot ( sample_horizon_0, view );
+            float shc_1 = dot ( sample_horizon_1, view );
+
+            shc_0 = mix ( low_horizon_cos_0, shc_0, weight_0 );
+            shc_1 = mix ( low_horizon_cos_1, shc_1, weight_1 );
+
+            horizon_cos_0 = max ( horizon_cos_0, shc_0 );
+            horizon_cos_1 = max ( horizon_cos_1, shc_1 );
         }
+
+        // proj_normal_len = lerp
+
+        float h_0 = -acos ( horizon_cos_1 );
+        float h_1 = acos ( horizon_cos_0 );
+
+        float iarc_0 = ( cos_norm + 2.0 * h_0 * sin ( n ) - cos ( 2 * h_0 - n ) ) / 4;
+        float iarc_1 = ( cos_norm + 2.0 * h_1 * sin ( n ) - cos ( 2 * h_1 - n ) ) / 4;
+        float local_visibility = proj_normal_len * ( iarc_0 + iarc_1 );
+        visibility += local_visibility;
     }
 
     visibility /= gtao_slice_count;
+    visibility = pow ( visibility, final_value_power );
+    visibility = max ( 0.03, visibility );
 
     return visibility;
+}
+
+// https://arxiv.org/pdf/2301.11376
+// https://cdrinmatane.github.io/posts/ssaovb-code/
+// https://github.com/cdrinmatane/SSRT3
+#define SECTOR_COUNT 32
+uint ssilvb_update_sectors ( float minHorizon, float maxHorizon, uint globalOccludedBitfield)
+{
+    uint startHorizonInt = uint ( minHorizon * SECTOR_COUNT );
+    uint angleHorizonInt = uint ( ceil((maxHorizon-minHorizon) * SECTOR_COUNT) );
+    uint angleHorizonBitfield = angleHorizonInt > 0 ? ( uint ( 0xFFFFFFFF ) >> (SECTOR_COUNT-angleHorizonInt)) : 0;
+    uint currentOccludedBitfield = angleHorizonBitfield << startHorizonInt;
+    return globalOccludedBitfield | currentOccludedBitfield;
+}
+
+uint ssilvb_make_bitmask ( float minHorizon, float maxHorizon ) {
+    uint startHorizonInt = uint ( minHorizon * SECTOR_COUNT );
+    uint angleHorizonInt = uint ( ceil((maxHorizon-minHorizon) * SECTOR_COUNT) );
+    uint angleHorizonBitfield = angleHorizonInt > 0 ? ( uint ( 0xFFFFFFFF ) >> (SECTOR_COUNT-angleHorizonInt)) : 0;
+    uint currentOccludedBitfield = angleHorizonBitfield << startHorizonInt;
+    return currentOccludedBitfield;
+}
+
+vec4 ssilvb ( rng_wang_state_t rng_state, vec2 screen_uv ) {
+    float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
+    if ( depth == 1 ) {
+        return vec4 ( 0 );
+    }
+    vec3 position = view_from_depth ( screen_uv, depth );
+    vec3 normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), screen_uv ).xyz * 2 - 1 );
+    vec3 view = normalize ( -position );
+
+    // constants
+    float sample_distribution_power = 2;
+    float thin_occluder_compensation = 0;
+    float effect_radius = 3.58f * 1.457f;
+    float final_value_power = 2.2;
+
+    float visibility = 0;
+    vec3 lighting = vec3 ( 0 );
+
+    // noise
+    float slice_noise = rng_wang ( rng_state );
+    float sample_noise = rng_wang ( rng_state );
+
+    float pixel_too_close_threshold = 1.3;
+    vec2 uv_pixel_size = 1.0.xx / frame_uniforms.resolution_f32;
+    vec3 view_offsetted_pos = view_from_depth ( screen_uv + uv_pixel_size, depth );
+    vec2 view_pixel_size = view_offsetted_pos.xy - position.xy;
+    float screen_radius = effect_radius / view_pixel_size.x;
+    float min_s = pixel_too_close_threshold / screen_radius;
+
+    visibility += clamp ( ( 10 - screen_radius ) / 100, 0, 1 ) * 0.5;
+
+    int slice_count = 3;
+    for ( int slice_it = 0; slice_it < slice_count; ++slice_it ) {
+        float slice_k = ( slice_it + slice_noise ) / slice_count;
+        float phi = slice_k * PI;
+        float cos_phi = cos ( phi );
+        float sin_phi = sin ( phi );
+        vec2 omega = vec2 ( cos_phi, -sin_phi );
+
+        omega *= screen_radius;
+
+        vec3 direction = vec3 ( cos_phi, sin_phi, 0 );
+        vec3 ortho_direction = direction - dot ( direction, view ) * view;
+        vec3 axis = normalize ( cross ( direction, view ) );
+        vec3 proj_normal = normal - dot ( normal, axis ) * axis;
+        float sign_norm = sign ( dot ( ortho_direction, proj_normal ) );
+        float proj_normal_len = length ( proj_normal );
+        float cos_norm = clamp ( dot ( proj_normal, view ) / proj_normal_len, 0, 1 );
+        float n = sign_norm * acos ( cos_norm );
+
+        uint bitfield = 0;
+
+        int steps_per_slice = 3;
+        for ( int step_it = 0; step_it < steps_per_slice; ++step_it ) {
+            float step_base_noise = float ( slice_it + step_it * steps_per_slice ) * 0.6180339887498948482;
+            float step_noise = fract ( sample_noise + step_base_noise );
+
+            float s = ( step_it + step_noise ) / steps_per_slice;
+            s = pow ( s, sample_distribution_power );
+            s += min_s;
+
+            vec2 sample_offset = s * omega;
+            float sample_offset_len = length ( sample_offset );
+
+            float mip_level = 0;
+
+            sample_offset = round ( sample_offset ) * uv_pixel_size;
+
+            vec2 sample_uv_0 = screen_uv + sample_offset;
+            float sample_depth_0 = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv_0, mip_level ).x;
+            vec3 sample_pos_0 = view_from_depth ( sample_uv_0, sample_depth_0 );
+            vec3 sample_normal_0 = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv_0 ).xyz * 2 - 1 );
+            vec3 sample_light_0 = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv_0, 7 ).xyz;
+
+            vec2 sample_uv_1 = screen_uv - sample_offset;
+            float sample_depth_1 = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv_1, mip_level ).x;
+            vec3 sample_pos_1 = view_from_depth ( sample_uv_1, sample_depth_1 );
+            vec3 sample_normal_1 = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv_1 ).xyz * 2 - 1 );
+            vec3 sample_light_1 = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv_1, 7 ).xyz;
+
+            vec3 sample_delta_0 = sample_pos_0 - position;
+            vec3 sample_delta_1 = sample_pos_1 - position;
+
+            float ssilvb_thickness = 0.5;
+
+            vec2 sampling_dir_0 = vec2 ( 1, 1 );
+            vec3 sample_delta_backface_0 = sample_delta_0 - view * ssilvb_thickness;
+            vec2 front_back_horizon_0 = vec2 ( dot ( normalize ( sample_delta_0 ), view ), dot ( normalize ( sample_delta_backface_0 ), view ) );
+            front_back_horizon_0 = acos ( clamp ( front_back_horizon_0, -1, 1 ) );
+            front_back_horizon_0 = clamp ( ( sampling_dir_0 * -front_back_horizon_0 + n + PI / 2 ) / PI, 0, 1 );
+            //bitfield = ssilvb_update_sectors ( front_back_horizon_0.y, front_back_horizon_0.x, bitfield );
+            uint bitfield_0 = ssilvb_make_bitmask ( front_back_horizon_0.y, front_back_horizon_0.x );
+            vec3 lighting_0 = vec3 ( float ( bitCount ( bitfield_0 & ~bitfield ) ) / float ( SECTOR_COUNT ) );
+            lighting_0 *= sample_light_0;
+            lighting_0 *= clamp ( dot ( normal, normalize ( sample_delta_0 ) ), 0, 1 );
+            lighting_0 *= clamp ( dot ( sample_normal_0, -normalize ( sample_delta_0 ) ), 0, 1 );
+            //lighting_0 *= clamp ( dot ( normal, sample_horizon ), 0.0, 1.0 ) * clamp ( dot ( sample_normal, -sample_horizon ), 0.0, 1.0 );
+            lighting += lighting_0;
+            bitfield |= bitfield_0;
+
+            vec2 sampling_dir_1 = -vec2 ( 1, 1 );
+            vec3 sample_delta_backface_1 = sample_delta_1 - view * ssilvb_thickness;
+            vec2 front_back_horizon_1 = vec2 ( dot ( normalize ( sample_delta_1 ), view ), dot ( normalize ( sample_delta_backface_1 ), view ) );
+            front_back_horizon_1 = acos ( clamp ( front_back_horizon_1, -1, 1 ) );
+            front_back_horizon_1 = clamp ( ( sampling_dir_1 * -front_back_horizon_1 + n + PI / 2 ) / PI, 0, 1 );
+            //bitfield = ssilvb_update_sectors ( front_back_horizon_1.x, front_back_horizon_1.y, bitfield );
+            uint bitfield_1 = ssilvb_make_bitmask ( front_back_horizon_1.x, front_back_horizon_1.y );
+            vec3 lighting_1 = vec3 ( float ( bitCount ( bitfield_1 & ~bitfield ) ) / float ( SECTOR_COUNT ) );
+            lighting_1 *= sample_light_1;
+            lighting_1 *= clamp ( dot ( normal, normalize ( sample_delta_1 ) ), 0, 1 );
+            lighting_1 *= clamp ( dot ( sample_normal_1, -normalize ( sample_delta_1 ) ), 0, 1 );
+            lighting += lighting_1;
+            bitfield |= bitfield_1;
+        }
+
+        // proj_normal_len = lerp
+
+        visibility += 1.0 - ( float ( bitCount ( bitfield ) ) / float ( SECTOR_COUNT ) );
+    }
+
+    visibility /= slice_count;
+    visibility = pow ( visibility, final_value_power );
+    visibility = max ( 0.03, visibility );
+
+    lighting /= slice_count;
+
+    return vec4 ( lighting, visibility );
 }
 
 // SSILVB
@@ -171,7 +332,7 @@ uint make_bitmask ( float min_horizon, float max_horizon ) {
     return bitmask;
 }
 
-vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
+vec4 ssilvb2 ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
     float sample_count = 4;
     float sample_radius = 4;
     float slice_count = 2;
@@ -322,10 +483,13 @@ void main ( void ) {
 #else
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / draw_uniforms.resolution_f32 );
     rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
-    vec4 indirect_occlusion = ssilvb ( rng_state, screen_uv );
+    //vec4 indirect_occlusion = ssilvb2 ( rng_state, screen_uv );
+    //vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
+    //vec3 out_color = indirect_occlusion.xyz * base_color;
+    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( 1.0.xxx, indirect_occlusion.w ) );
+    vec4 gi_ao = ssilvb ( rng_state, screen_uv );
     vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
-    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( indirect_occlusion.xyz * base_color, 1 ) );
-    //float ao = hbao ( screen_uv );
-    //imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( ao.xxx, 1 ) );
+    vec3 out_color = gi_ao.xyz * base_color * gi_ao.w;
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( gi_ao.xyz, 1 ) );
 #endif
 }

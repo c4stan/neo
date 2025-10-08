@@ -225,6 +225,54 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
         ) );
     }
 
+    // cube
+    {
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_cube ( 1.f );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
+
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
+            .object_id_pipeline = object_id_pipeline_state,
+            .geometry_pipeline = geometry_pipeline_state,
+            .shadow_pipeline = shadow_pipeline_state,
+            .object_id = state->render.next_object_id++,
+            .material = viewapp_material_data_m (
+                .base_color = { 
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 250 / 255.f, 2.2 )
+                },
+                .ssr = true,
+                .roughness = 0.01,
+                .metalness = 0,
+            )
+        );
+
+        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            .position = { 1, -1.5, -0.1 },
+            .orientation =  { 0, -0.6, 0, 0.7 },
+            .scale = 2,
+        );
+
+        se->create_entity( &se_entity_params_m (
+            .debug_name = "cube",
+            .update = se_entity_update_m (
+                .component_count = 2,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    )
+                }
+            )
+        ) );
+    }
+
     // planes
     float plane_pos[5][3] = {
         { 0, 0, 2.5 },
@@ -244,8 +292,8 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
 
     float plane_col[5][3] = {
         { powf ( 240 / 255.f, 2.2 ), powf ( 240 / 255.f, 2.2 ), powf ( 250 / 255.f, 2.2 ) },
-        { powf ( 176 / 255.f, 2.2 ), powf (  40 / 255.f, 2.2 ), powf (  48 / 255.f, 2.2 ) },
         { powf (  67 / 255.f, 2.2 ), powf ( 149 / 255.f, 2.2 ), powf (  66 / 255.f, 2.2 ) },
+        { powf ( 176 / 255.f, 2.2 ), powf (  40 / 255.f, 2.2 ), powf (  48 / 255.f, 2.2 ) },
         { powf ( 240 / 255.f, 2.2 ), powf ( 240 / 255.f, 2.2 ), powf ( 250 / 255.f, 2.2 ) },
         { powf ( 240 / 255.f, 2.2 ), powf ( 240 / 255.f, 2.2 ), powf ( 250 / 255.f, 2.2 ) },
     };
