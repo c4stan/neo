@@ -1088,10 +1088,10 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                     std_virtual_heap_free ( normal_texture.data );
                 }
 
-                //aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );
-                //aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &mesh_material.metalness );
-                mesh_material.roughness = 0;
-                mesh_material.metalness = 0;
+                // These are just scalars added on top of the texture values...
+                // TODO need a way to take full control from debug view and ignore texture values
+                aiGetMaterialFloat ( material, AI_MATKEY_ROUGHNESS_FACTOR, &mesh_material.roughness );
+                aiGetMaterialFloat ( material, AI_MATKEY_METALLIC_FACTOR, &mesh_material.metalness );
             }
 
             viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
