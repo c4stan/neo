@@ -250,7 +250,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
         );
 
         viewapp_transform_component_t transform_component = viewapp_transform_component_m (
-            .position = { 1, -1.5, -0.1 },
+            .position = { 1, -1.5, 0.5 },
             .orientation =  { 0, -0.6, 0, 0.7 },
             .scale = 2,
         );
@@ -932,13 +932,11 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
     unsigned int flags = 0;
     flags |= aiProcess_ConvertToLeftHanded;
     flags |= aiProcess_JoinIdenticalVertices;
-    //flags |= aiProcess_MakeLeftHanded;
     flags |= aiProcess_Triangulate;
     flags |= aiProcess_ValidateDataStructure;
     //flags |= aiProcess_GenSmoothNormals;
+    //flags |= aiProcess_GenNormals;
     flags |= aiProcess_FindInvalidData;
-    //flags |= aiProcess_GenBoundingBoxes;
-    //flags |= aiProcess_FlipWindingOrder;
     flags |= aiProcess_PreTransformVertices;
     flags |= aiProcess_CalcTangentSpace;
 

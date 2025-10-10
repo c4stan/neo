@@ -161,7 +161,7 @@ void main ( void ) {
 
         float texel_size = ( 1.f / uniform_buffer.shadow_size );
 
-#if 0
+#if 1
         int pcf_radius = 8;
         for ( int dx = -pcf_radius; dx <= pcf_radius; dx += 1 ) {
             for ( int dy = -pcf_radius; dy <= pcf_radius; dy += 1 ) {
@@ -172,7 +172,7 @@ void main ( void ) {
                 shadow_uv *= ( 1.f / uniform_buffer.shadow_size );
                 float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_linear ), shadow_uv ).x;
 
-                float shadow_bias = 0.00005;
+                float shadow_bias = 0.00002;
                 float shadow_contribution = shadow_screen.z - shadow_bias > shadow_depth ? 1.f : 0.f;
 
                 if ( shadow_screen.z > 1.f ) {

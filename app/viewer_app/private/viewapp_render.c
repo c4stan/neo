@@ -624,7 +624,7 @@ void viewapp_boot_raster_graph ( void ) {
     ) );
     state->render.raster_graph = graph;
 
-    uint32_t shadow_size = 1024 * 4;
+    uint32_t shadow_size = 1024 * 8;
     xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
         .width = shadow_size,
         .height = shadow_size,

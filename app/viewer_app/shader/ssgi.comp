@@ -19,27 +19,6 @@ layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform sampler s
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 
-// Fast PRNG (from "Hash without Sine" by David Hoskins)
-uint hash(uint seed) {
-    seed = (seed ^ 61u) ^ (seed >> 16u);
-    seed *= 9u;
-    seed = seed ^ (seed >> 4u);
-    seed *= 0x27d4eb2du;
-    seed = seed ^ (seed >> 15u);
-    return seed;
-}
-
-float randomFloat(inout uint state) {
-    return float(hash(state)) / 4294967296.0; // Normalize to [0, 1]
-}
-
-// Generate a random seed based on pixel and frame
-uint getRandomSeed(vec2 uv, vec2 resolution, float time) {
-    uint seed = uint(uv.x * resolution.x + uv.y) * uint(resolution.x);
-    seed += uint(time); // Temporal variation
-    return seed;
-}
-
 // GTAO
 // https://www.activision.com/cdn/research/Practical_Real_Time_Strategies_for_Accurate_Indirect_Occlusion_NEW%20VERSION_COLOR.pdf
 // https://github.com/GameTechDev/XeGTAO
@@ -191,6 +170,44 @@ uint ssilvb_make_bitmask ( float minHorizon, float maxHorizon ) {
     return currentOccludedBitfield;
 }
 
+vec3 ssilvb_horizon_sample ( bool forward_dir, vec3 position, vec2 sample_uv, vec3 view, vec3 normal, float n, inout uint occlusion_bitfield, out bool is_out ) {
+    if ( is_outside_screen ( sample_uv ) ) {
+        is_out = true;
+        return vec3 ( 0 );
+    }
+
+    float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
+    
+    if ( sample_depth == 1 ) {
+        is_out = true;
+        return vec3 ( 0 );
+    }
+
+    vec3 sample_pos = view_from_depth ( sample_uv, sample_depth );
+    vec3 sample_normal = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv ).xyz * 2 - 1 );
+    vec3 sample_light = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv, 4 ).xyz;
+
+    vec3 sample_delta = sample_pos - position;
+
+    float ssilvb_thickness = 0.5;
+
+    vec2 sampling_dir = forward_dir ? vec2 ( 1, 1 ) : -vec2 ( 1, 1 );
+    vec3 sample_delta_backface = sample_delta - view * ssilvb_thickness;
+    vec2 front_back_horizon = vec2 ( dot ( normalize ( sample_delta ), view ), dot ( normalize ( sample_delta_backface ), view ) );
+    front_back_horizon = acos ( clamp ( front_back_horizon, -1, 1 ) );
+    front_back_horizon = clamp ( ( sampling_dir * -front_back_horizon + n + PI / 2 ) / PI, 0, 1 );
+    front_back_horizon = forward_dir ? front_back_horizon.yx : front_back_horizon.xy;
+    uint bitfield = ssilvb_make_bitmask ( front_back_horizon.x, front_back_horizon.y );
+    vec3 lighting = vec3 ( float ( bitCount ( bitfield & ~occlusion_bitfield ) ) / float ( SECTOR_COUNT ) );
+    lighting = sample_light;
+    lighting *= clamp ( dot ( normal, normalize ( sample_delta ) ), 0, 1 );
+    lighting *= clamp ( dot ( sample_normal, -normalize ( sample_delta ) ), 0, 1 );
+    occlusion_bitfield |= bitfield;
+
+    is_out = false;
+    return lighting;
+}
+
 vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
     float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
     if ( depth == 1 ) {
@@ -203,7 +220,7 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
     // constants
     float sample_distribution_power = 2;
     float thin_occluder_compensation = 0;
-    float effect_radius = 3.58f * 1.457f;
+    float effect_radius = 4;
     float final_value_power = 2.2;
 
     float visibility = 0;
@@ -222,6 +239,7 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
 
     visibility += clamp ( ( 10 - screen_radius ) / 100, 0, 1 ) * 0.5;
 
+    int sample_count = 0;
     int slice_count = 3;
     for ( int slice_it = 0; slice_it < slice_count; ++slice_it ) {
         float slice_k = ( slice_it + slice_noise ) / slice_count;
@@ -259,50 +277,12 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
 
             sample_offset = round ( sample_offset ) * uv_pixel_size;
 
-            vec2 sample_uv_0 = screen_uv + sample_offset;
-            float sample_depth_0 = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv_0, mip_level ).x;
-            vec3 sample_pos_0 = view_from_depth ( sample_uv_0, sample_depth_0 );
-            vec3 sample_normal_0 = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv_0 ).xyz * 2 - 1 );
-            vec3 sample_light_0 = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv_0, 7 ).xyz;
-
-            vec2 sample_uv_1 = screen_uv - sample_offset;
-            float sample_depth_1 = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv_1, mip_level ).x;
-            vec3 sample_pos_1 = view_from_depth ( sample_uv_1, sample_depth_1 );
-            vec3 sample_normal_1 = normalize ( texture ( sampler2D ( tex_normal, sampler_linear ), sample_uv_1 ).xyz * 2 - 1 );
-            vec3 sample_light_1 = textureLod ( sampler2D ( tex_lighting, sampler_linear ), sample_uv_1, 7 ).xyz;
-
-            vec3 sample_delta_0 = sample_pos_0 - position;
-            vec3 sample_delta_1 = sample_pos_1 - position;
-
-            float ssilvb_thickness = 0.5;
-
-            vec2 sampling_dir_0 = vec2 ( 1, 1 );
-            vec3 sample_delta_backface_0 = sample_delta_0 - view * ssilvb_thickness;
-            vec2 front_back_horizon_0 = vec2 ( dot ( normalize ( sample_delta_0 ), view ), dot ( normalize ( sample_delta_backface_0 ), view ) );
-            front_back_horizon_0 = acos ( clamp ( front_back_horizon_0, -1, 1 ) );
-            front_back_horizon_0 = clamp ( ( sampling_dir_0 * -front_back_horizon_0 + n + PI / 2 ) / PI, 0, 1 );
-            //bitfield = ssilvb_update_sectors ( front_back_horizon_0.y, front_back_horizon_0.x, bitfield );
-            uint bitfield_0 = ssilvb_make_bitmask ( front_back_horizon_0.y, front_back_horizon_0.x );
-            vec3 lighting_0 = vec3 ( float ( bitCount ( bitfield_0 & ~bitfield ) ) / float ( SECTOR_COUNT ) );
-            lighting_0 = sample_light_0;
-            lighting_0 *= clamp ( dot ( normal, normalize ( sample_delta_0 ) ), 0, 1 );
-            lighting_0 *= clamp ( dot ( sample_normal_0, -normalize ( sample_delta_0 ) ), 0, 1 );
-            lighting += lighting_0;
-            bitfield |= bitfield_0;
-
-            vec2 sampling_dir_1 = -vec2 ( 1, 1 );
-            vec3 sample_delta_backface_1 = sample_delta_1 - view * ssilvb_thickness;
-            vec2 front_back_horizon_1 = vec2 ( dot ( normalize ( sample_delta_1 ), view ), dot ( normalize ( sample_delta_backface_1 ), view ) );
-            front_back_horizon_1 = acos ( clamp ( front_back_horizon_1, -1, 1 ) );
-            front_back_horizon_1 = clamp ( ( sampling_dir_1 * -front_back_horizon_1 + n + PI / 2 ) / PI, 0, 1 );
-            //bitfield = ssilvb_update_sectors ( front_back_horizon_1.x, front_back_horizon_1.y, bitfield );
-            uint bitfield_1 = ssilvb_make_bitmask ( front_back_horizon_1.x, front_back_horizon_1.y );
-            vec3 lighting_1 = vec3 ( float ( bitCount ( bitfield_1 & ~bitfield ) ) / float ( SECTOR_COUNT ) );
-            lighting_1 = sample_light_1;
-            lighting_1 *= clamp ( dot ( normal, normalize ( sample_delta_1 ) ), 0, 1 );
-            lighting_1 *= clamp ( dot ( sample_normal_1, -normalize ( sample_delta_1 ) ), 0, 1 );
-            lighting += lighting_1;
-            bitfield |= bitfield_1;
+            bool sample_fail;
+            lighting += ssilvb_horizon_sample ( true, position, screen_uv + sample_offset, view, normal, n, bitfield, sample_fail );
+            if ( ! sample_fail ) sample_count += 1;
+            
+            lighting += ssilvb_horizon_sample ( false, position, screen_uv - sample_offset, view, normal, n, bitfield, sample_fail );
+            if ( ! sample_fail ) sample_count += 1;
         }
 
         // proj_normal_len = lerp
@@ -316,12 +296,12 @@ vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
 
     lighting /= slice_count;
 
+    //lighting = lighting * 3 * 2 / sample_count;
+
     return vec4 ( lighting, visibility );
 }
 
-// SSILVB
-// https://arxiv.org/pdf/2301.11376
-// https://cybereality.com/screen-space-indirect-lighting-with-visibility-bitmask-improvement-to-gtao-ssao-real-time-ambient-occlusion-algorithm-glsl-shader-implementation/
+// alternative implementation from: https://cybereality.com/screen-space-indirect-lighting-with-visibility-bitmask-improvement-to-gtao-ssao-real-time-ambient-occlusion-algorithm-glsl-shader-implementation/
 const uint sector_count = 32u;
 uint make_bitmask ( float min_horizon, float max_horizon ) {
     uint start_bit = uint ( min_horizon * float ( sector_count ) );
@@ -414,22 +394,19 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
     // reconstruct position
     vec3 view_pos = view_from_depth ( screen_uv, depth );
 
-#define RAY_COUNT 4
+#define SSRT_RAY_COUNT 4
 
     // init accumulators
-    float sample_distances[RAY_COUNT];
-    vec3 sample_colors[RAY_COUNT];
+    float sample_distances[SSRT_RAY_COUNT];
+    vec3 sample_colors[SSRT_RAY_COUNT];
 
-    for ( uint ray_it = 0; ray_it < RAY_COUNT; ++ray_it ) {
+    for ( uint ray_it = 0; ray_it < SSRT_RAY_COUNT; ++ray_it ) {
         sample_colors[ray_it] = vec3 ( 0, 0, 0 );
         sample_distances[ray_it] = 1;
     }
 
     float ex = rng_wang ( rng_state );
     float ey = rng_wang ( rng_state );
-    uint seed = getRandomSeed(gl_GlobalInvocationID.xy, draw_uniforms.resolution_f32, frame_uniforms.frame_id );
-    //ex = randomFloat ( seed );
-    //ey = randomFloat ( seed );
 
     vec3 hemisphere_normal;
     vec3 hit_normal;
@@ -437,7 +414,7 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
     vec3 sample_color = vec3 ( 0, 0, 0 );
 
     if ( depth < 1 ) {
-        for ( uint ray_it = 0; ray_it < RAY_COUNT; ++ray_it ) {
+        for ( uint ray_it = 0; ray_it < SSRT_RAY_COUNT; ++ray_it ) {
             // sample hemisphere
             vec2 e2 = vec2 ( ex, ey );
             hemisphere_normal = sample_cosine_weighted_hemisphere_normal ( e2, view_normal );
@@ -448,7 +425,7 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
             float hit_depth;
             bool hit;
 
-            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * 0.0, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50 ); 
+            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * 0.01, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50 ); 
 
             if ( hit ) {
                 vec3 hit_lighting = textureLod ( sampler2D ( tex_lighting, sampler_linear ), hit_screen_pos.xy, 5 ).xyz;
@@ -461,17 +438,17 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
         }
     }
 
-    for ( uint ray_it = 0; ray_it < RAY_COUNT; ++ray_it ) {
+    for ( uint ray_it = 0; ray_it < SSRT_RAY_COUNT; ++ray_it ) {
         float d = sample_distances[ray_it];
         float attenuation = 1;
-        //float attenuation = 1 / ( d * d + 1 );
+        //attenuation = 1 / ( d * d + 1 );
         //float attenuation = ( d * d ) / ( ( d * d + 0.1 ) * ( d * d + 0.1 ) );
         //float occlusion = min ( 1.0, sample_distances[ray_it] );
         //if ( d < 0.01 ) attenuation = 0;
         sample_color += sample_colors[ray_it] * base_color * attenuation;// * occlusion;// * attenuation * attenuation;
     }
 
-    sample_color /= float ( RAY_COUNT );
+    sample_color /= float ( SSRT_RAY_COUNT );
     return vec4 ( sample_color,  1 );
 }
 
