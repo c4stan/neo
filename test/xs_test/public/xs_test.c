@@ -468,7 +468,7 @@ static void xs_test ( void ) {
         }
 
         if ( !input_state.keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
-            xs->rebuild_databases();
+            xs->build_databases();
         }
 
         if ( !input_state.keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
@@ -500,7 +500,7 @@ static void xs_test ( void ) {
                     .viewport_state.height = new_window_info.height,
                 ),
             ) );
-            xs->rebuild_databases();
+            xs->build_databases();
         }
 
         window_info = new_window_info;

@@ -256,7 +256,7 @@ static void xi_test ( void ) {
 
     void* select_alloc = std_virtual_heap_alloc_m ( 128, 8 );
     {
-        std_stack_t stack = std_stack ( select_alloc, 128 );
+        std_stack_t stack = std_fixed_stack_m ( select_alloc, 128 );
         char** p1 = std_stack_alloc_m ( &stack, char* );
         char** p2 = std_stack_alloc_m ( &stack, char* );
         char** p3 = std_stack_alloc_m ( &stack, char* );
@@ -380,7 +380,7 @@ static void xi_test ( void ) {
         }
 
         if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
-            xs->rebuild_databases();
+            xs->build_databases();
         }
 
         wm_window_info_t new_window_info;

@@ -460,7 +460,7 @@ static std_app_state_e viewapp_update ( void ) {
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
-        xs->rebuild_databases();
+        xs->build_databases();
         state->reload = true;
     }
 

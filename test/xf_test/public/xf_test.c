@@ -216,7 +216,7 @@ static void xf_test ( void ) {
         }
 
         if ( input_state.keyboard[wm_keyboard_state_f1_m] ) {
-            xs->rebuild_databases();
+            xs->build_databases();
         }
 
         wm_window_info_t new_window_info;
@@ -226,16 +226,13 @@ static void xf_test ( void ) {
 
         xg_workload_h workload = xg->create_workload ( device );
 
-        uint64_t id = 0;
-        id = xf->execute_graph ( graph, workload, id );
-        //id = xf->execute_graph ( graph2, workload, id );
+        uint64_t key = 0;
+        key = xf->execute_graph ( graph, workload, key );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 
         xs->update_pipeline_states ( workload );
     }
-
-    //xf->destroy_unreferenced_resources();
 
     std_module_unload_m ( xf_module_name_m );
     std_module_unload_m ( xs_module_name_m );

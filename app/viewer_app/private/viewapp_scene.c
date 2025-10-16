@@ -930,7 +930,9 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
     xs_i* xs = state->modules.xs;
 
     unsigned int flags = 0;
-    flags |= aiProcess_ConvertToLeftHanded;
+    flags |= aiProcess_MakeLeftHanded;
+    flags |= aiProcess_FlipWindingOrder;
+    flags |= aiProcess_FlipUVs;
     flags |= aiProcess_JoinIdenticalVertices;
     flags |= aiProcess_Triangulate;
     flags |= aiProcess_ValidateDataStructure;
@@ -1229,7 +1231,6 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     viewapp_build_raytrace_world ( workload );
     xg->submit_workload ( workload );
 }
-
 
 se_entity_h spawn_plane ( xg_workload_h workload ) {
     viewapp_state_t* state = viewapp_state_get();

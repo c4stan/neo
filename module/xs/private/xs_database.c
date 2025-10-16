@@ -51,7 +51,7 @@ void xs_database_reload ( xs_database_state_t* state ) {
 
 void xs_database_unload ( void ) {
     uint64_t db_idx = 0;
-    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, xs_database_bitset_u64_count_m ) ) {
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
         xs_database_h db_handle = db_idx;
         xs_database_destroy ( db_handle );
         ++db_idx;
@@ -251,9 +251,9 @@ void xs_database_set_build_params ( xs_database_h db_handle, const xs_database_b
     db->dirty_build_params = true;
 }
 
-void xs_database_rebuild_all ( void ) {
+void xs_database_build_all ( void ) {
     uint64_t db_idx = 0;
-    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, xs_database_bitset_u64_count_m ) ) {
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
         xs_database_h db_handle = db_idx;
         xs_database_build ( db_handle );
         ++db_idx;
@@ -727,7 +727,7 @@ void xs_database_update_pipelines ( xg_workload_h last_workload ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     uint64_t db_idx = 0;
-    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, xs_database_bitset_u64_count_m ) ) {
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
         xs_database_t* db = &xs_database_state->database_array[db_idx];
 
         for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
@@ -746,13 +746,13 @@ void xs_database_update_pipelines ( xg_workload_h last_workload ) {
                 if ( xg->is_workload_complete ( workload ) ) {
                     switch ( pipeline_state->type ) {
                     case xg_pipeline_graphics_m:
-                        xg->destroy_graphics_pipeline ( pipeline_state->old_pipeline_handle );
+                        xg->destroy_graphics_pipeline ( old_pipeline_handle );
                         break;
                     case xg_pipeline_compute_m:
-                        xg->destroy_compute_pipeline ( pipeline_state->old_pipeline_handle );
+                        xg->destroy_compute_pipeline ( old_pipeline_handle );
                         break;
                     case xg_pipeline_raytrace_m:
-                        xg->destroy_raytrace_pipeline ( pipeline_state->old_pipeline_handle );
+                        xg->destroy_raytrace_pipeline ( old_pipeline_handle );
                         break;
                     }
 

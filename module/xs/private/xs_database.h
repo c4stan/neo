@@ -62,12 +62,10 @@ typedef struct {
     char debug_name[32];
 } xs_database_t;
 
-#define xs_database_bitset_u64_count_m std_div_ceil_m ( xs_database_max_databases_m, 64 )
-
 typedef struct {
     xs_database_t* database_array;
     xs_database_t* database_freelist;
-    uint64_t database_bitset[xs_database_bitset_u64_count_m];
+    uint64_t database_bitset[std_bitset_u64_count_m ( xs_database_max_databases_m )];
 } xs_database_state_t;
 
 void xs_database_load ( xs_database_state_t* state );
@@ -83,7 +81,7 @@ void xs_database_clear ( xs_database_h database );
 
 void xs_database_set_build_params ( xs_database_h database, const xs_database_build_params_t* params );
 xs_database_build_result_t xs_database_build ( xs_database_h database );
-void xs_database_rebuild_all ( void );
+void xs_database_build_all ( void );
 xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h database, xs_string_hash_t name_hash );
 xg_graphics_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h state );
 void xs_database_update_pipelines ( xg_workload_h last_workload );

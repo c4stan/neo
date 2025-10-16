@@ -174,7 +174,6 @@ typedef struct {
     xg_cmd_buffer_h cmd_buffer;
     xg_resource_cmd_buffer_h resource_cmd_buffer;
     xg_workload_h workload;
-    //xg_pipeline_state_h pipeline_state;
     xg_renderpass_h renderpass;
     uint64_t base_key;
     const char* debug_name;
