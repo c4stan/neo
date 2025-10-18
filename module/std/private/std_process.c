@@ -14,36 +14,12 @@ static std_process_t* std_process_self;
 
 //==============================================================================
 
-#if 0
-static uint64_t std_process_pipe_hash_name ( const void* _name, void* _ ) {
-    std_unused_m ( _ );
-    const std_process_pipe_name_t* name = ( const std_process_pipe_name_t* ) _name;
-    return name->hash;
-}
-
-static bool std_process_pipe_cmp_name ( uint64_t hash1, const void* _name1, const void* _name2, void* _ ) {
-    std_unused_m ( _ );
-    std_unused_m ( hash1 );
-    const std_process_pipe_name_t* name1 = ( const std_process_pipe_name_t* ) _name1;
-    const std_process_pipe_name_t* name2 = ( const std_process_pipe_name_t* ) _name2;
-
-    if ( name1->hash != name2->hash ) {
-        return false;
-    }
-
-    return std_str_cmp ( name1->name, name2->name ) == 0;
-}
-#endif
-
-//==============================================================================
-
 // Assumes that the thread running this is the main thread
 // NOTE: this function uses the param state instead of the static one, and it cannot
 // call to outside functions that expect a functioning std_xxx_state !
 static void std_process_register_self ( std_process_state_t* state, char** args, size_t args_count ) {
     std_mutex_lock ( &state->mutex );
     std_process_t* process = std_list_pop_m ( &state->processes_freelist );
-    ++state->processes_pop;
 
 #if defined(std_platform_win32_m)
     uint64_t os_handle = ( uint64_t ) ( GetCurrentProcess() );
@@ -52,10 +28,12 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
     uint64_t os_handle = ( uint64_t ) getpid();
     uint64_t os_id = ( uint64_t ) getpid();
 #endif
-    //uint64_t os_thread_handle = ( uint64_t ) syscall ( SYS_gettid );
     process->os_handle = os_handle;
     process->os_id = os_id;
-    //process->os_main_thread_handle = os_thread_handle;
+    
+    std_process_h process_handle = process->handle;
+    process_handle.idx = process - state->processes_array;
+    process->handle = process_handle;
 
     // executable path
 #if defined(std_platform_win32_m)
@@ -143,16 +121,20 @@ static LONG WINAPI std_process_exception_handler_win32 ( PEXCEPTION_POINTERS pEx
 #endif
 
 void std_process_init ( std_process_state_t* state, char** args, size_t args_count ) {
-    std_mem_zero_m ( state->processes_array );
-    state->processes_freelist = std_static_freelist_m ( state->processes_array );
-    state->processes_pop = 0;
-    std_mem_zero_m ( state->pipes_array );
-    state->pipes_freelist = std_static_freelist_m ( state->pipes_array );
-    state->pipes_count = 0;
-#if 0
-    state->pipes_map = std_static_map_m ( state->pipes_map_keys, state->pipes_map_values,
-                                          std_process_pipe_hash_name, NULL, std_process_pipe_cmp_name, NULL );
-#endif
+    state->processes_array = std_virtual_heap_alloc_array_m ( std_process_t, std_process_max_processes_m );
+    state->processes_freelist = std_freelist_m ( state->processes_array, std_process_max_processes_m );
+    std_process_t* processes_array = state->processes_array;
+    for ( uint64_t i = 0; i < std_process_max_processes_m; ++i ) {
+        processes_array[i].handle = std_null_handle_m ( std_process_h );
+    }
+
+    state->pipes_array = std_virtual_heap_alloc_array_m ( std_process_pipe_t, std_process_max_pipes_m );
+    state->pipes_freelist = std_freelist_m ( state->pipes_array, std_process_max_pipes_m );
+    std_process_pipe_t* pipes_array = state->pipes_array;
+    for ( uint64_t i = 0; i < std_process_max_pipes_m; ++i ) {
+        pipes_array[i].gen = 0;
+    }
+
     std_mutex_init ( &state->mutex );
     std_process_register_self ( state, args, args_count );
 
@@ -189,6 +171,8 @@ void std_process_attach ( std_process_state_t* state ) {
 
 void std_process_shutdown ( void ) {
     std_mutex_deinit ( &std_process_state->mutex );
+    std_virtual_heap_free ( std_process_state->processes_array );
+    std_virtual_heap_free ( std_process_state->pipes_array );
 }
 
 //==============================================================================
@@ -252,7 +236,6 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
     uint64_t os_handle;
     uint64_t os_id;
-    //uint64_t os_main_thread_handle;
 
     {
         PROCESS_INFORMATION pi;
@@ -274,12 +257,11 @@ std_process_h std_process ( const char* executable, const char* process_name, co
         BOOL retval = CreateProcess ( NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
         if ( !retval ) {
             std_log_os_error_m();
-            return std_process_null_handle_m;
+            return std_null_handle_m ( std_process_h );
         }
 
         os_handle = ( uint64_t ) pi.hProcess;
         os_id = ( uint64_t ) pi.dwProcessId;
-        //os_main_thread_handle = ( uint64_t ) pi.hThread;
     }
 
     {
@@ -367,16 +349,14 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
 #endif
 
-    // expects: stdin/out_read/write, os_handle, os_id
-
-    // Lock
-    // Pop
-    // Init process
-    // Increase processes pop
     std_mutex_lock ( &std_process_state->mutex );
 
     std_process_t* process = std_list_pop_m ( &std_process_state->processes_freelist );
     std_assert_m ( process );
+
+    std_process_h process_handle = process->handle;
+    process_handle.idx = process - std_process_state->processes_array;
+    process->handle = process_handle;
 
     process->os_handle = os_handle;
     process->os_id = os_id;
@@ -388,26 +368,23 @@ std_process_h std_process ( const char* executable, const char* process_name, co
     std_str_copy ( process->executable_path, std_process_path_max_len_m, executable );
     std_str_copy ( process->name, std_process_name_max_len_m, process_name );
 
-    {
-        std_stack_t stack = std_static_stack_m ( process->args_buffer );
-
-        for ( size_t i = 0; i < args_count; ++i ) {
-            process->args[i] = stack.top;
-            std_stack_string_copy ( &stack, args[i] );
-        }
+    std_stack_t args_stack = std_static_stack_m ( process->args_buffer );
+    for ( size_t i = 0; i < args_count; ++i ) {
+        process->args[i] = args_stack.top;
+        std_stack_string_copy ( &args_stack, args[i] );
     }
 
     process->args_count = args_count;
-    ++std_process_state->processes_pop;
-    // Unlock
-    // Return handle
+
     std_mutex_unlock ( &std_process_state->mutex );
-    std_process_h handle = ( std_process_h ) ( process - std_process_state->processes_array );
-    return handle;
+
+    return process_handle;
 }
 
 std_process_io_t std_process_get_io ( std_process_h process_handle ) {
-    std_process_t* process = &std_process_state->processes_array[process_handle];
+    std_process_t* process = &std_process_state->processes_array[process_handle.idx];
+    std_assert_m ( process->handle.gen == process_handle.gen );
+
     std_process_io_t io;
 
     std_mutex_lock ( &std_process_state->mutex );
@@ -420,7 +397,8 @@ std_process_io_t std_process_get_io ( std_process_h process_handle ) {
 }
 
 bool std_process_wait_for ( std_process_h process_handle ) {
-    std_process_t* process = &std_process_state->processes_array[process_handle];
+    std_process_t* process = &std_process_state->processes_array[process_handle.idx];
+    std_assert_m ( process->handle.gen == process_handle.gen );
 
     bool dead;
 #if defined(std_platform_win32_m)
@@ -432,6 +410,7 @@ bool std_process_wait_for ( std_process_h process_handle ) {
 #endif
 
     if ( dead ) {
+        ++process->handle.gen;
         std_list_push ( &std_process_state->processes_freelist, process );
     }
 
@@ -439,7 +418,8 @@ bool std_process_wait_for ( std_process_h process_handle ) {
 }
 
 bool std_process_kill ( std_process_h process_handle ) {
-    std_process_t* process = &std_process_state->processes_array[process_handle];
+    std_process_t* process = &std_process_state->processes_array[process_handle.idx];
+    std_assert_m ( process->handle.gen == process_handle.gen );
 
     bool dead;
 #if defined(std_platform_win32_m)
@@ -451,6 +431,7 @@ bool std_process_kill ( std_process_h process_handle ) {
 #endif
 
     if ( dead ) {
+        ++process->handle.gen;
         std_list_push ( &std_process_state->processes_freelist, process );
     }
 
@@ -458,23 +439,7 @@ bool std_process_kill ( std_process_h process_handle ) {
 }
 
 std_process_h std_process_this ( void ) {
-#if defined(std_platform_win32_m)
-    uint64_t os_handle = ( uint64_t ) ( GetCurrentProcess() );
-#elif defined(std_platform_linux_m)
-    uint64_t os_handle = ( uint64_t ) getpid();
-#endif
-
-    std_mutex_lock ( &std_process_state->mutex );
-
-    for ( size_t i = 0; i < std_process_state->processes_pop; ++i ) {
-        if ( std_process_state->processes_array[i].os_handle == os_handle ) {
-            std_mutex_unlock ( &std_process_state->mutex );
-            return ( std_process_h ) i;
-        }
-    }
-
-    std_mutex_unlock ( &std_process_state->mutex );
-    return std_process_null_handle_m;
+    return std_process_self->handle;
 }
 
 void std_process_this_exit ( std_process_exit_code_e exit_code ) {
@@ -489,7 +454,8 @@ void std_process_this_exit ( std_process_exit_code_e exit_code ) {
 }
 
 bool std_process_info ( std_process_info_t* info, std_process_h process_handle ) {
-    std_process_t* process = &std_process_state->processes_array[process_handle];
+    std_process_t* process = &std_process_state->processes_array[process_handle.idx];
+    std_assert_m ( process->handle.gen == process_handle.gen );
 
     info->io.stdin_handle = process->stdin_handle;
     info->io.stdout_handle = process->stdout_handle;
@@ -619,7 +585,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
         DWORD error = GetLastError();
         std_unused_m ( error );
         std_log_error_m ( "Pipe creation failed with error code " std_fmt_int_m, error );
-        return std_process_null_handle_m;
+        return std_null_handle_m ( std_pipe_h );
     }
 
     // TODO lock/unlock a mutex
@@ -630,7 +596,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     pipe->params = *params;
     std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, params->name );
 
-    std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
+    std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
     return pipe_handle;
 #else
     char pipe_name[256];
@@ -689,15 +655,16 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     pipe->params = *params;
     std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, params->name );
 
-    std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
+    std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
     return pipe_handle;
 #endif
 }
 
 bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
-#if defined(std_platform_win32_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle.idx];
+    std_assert_m ( pipe->gen == pipe_handle.gen );
 
+#if defined(std_platform_win32_m)
     BOOL connect_result = ConnectNamedPipe ( ( HANDLE ) pipe->os_handle, NULL );
     if ( !connect_result ) {
         if ( GetLastError() == ERROR_PIPE_CONNECTED ) {
@@ -710,8 +677,6 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
 
     return true;
 #elif defined(std_platform_linux_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
-
     char pipe_name[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_name );
@@ -776,7 +741,7 @@ wait_for_pipe_creation:
                 goto wait_for_pipe_creation;
             } else {
                 std_log_os_error_m();
-                return std_process_null_handle_m;
+                return std_null_handle_m ( std_pipe_h );
             }
         }
     }
@@ -791,11 +756,11 @@ wait_for_pipe_creation:
         std_mem_zero_m ( &pipe->params );
         std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, name );
 
-        std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
+        std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
         return pipe_handle;
     } else {
         std_log_os_error_m();
-        return std_process_null_handle_m;
+        return std_null_handle_m ( std_pipe_h );
     }
 
 #elif defined(std_platform_linux_m)
@@ -829,19 +794,20 @@ wait_for_pipe_creation:
         std_mem_zero_m ( &pipe->params );
         std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, name );
 
-        std_pipe_h pipe_handle = ( uint64_t ) ( pipe - std_process_state->pipes_array );
+        std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
         return pipe_handle;
     } else {
         std_log_os_error_m();
-        return std_process_null_handle_m;
+        return std_null_handle_m ( std_pipe_h );
     }
 #endif
 }
 
 bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, const void* data, size_t size ) {
-#if defined(std_platform_win32_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle.idx];
+    std_assert_m ( pipe->gen == pipe_handle.gen );
 
+#if defined(std_platform_win32_m)
     DWORD write_size = 0;
     DWORD data_size = ( DWORD ) size;
     BOOL write_result = WriteFile ( ( HANDLE ) pipe->os_handle, data, data_size, &write_size, NULL );
@@ -857,8 +823,6 @@ bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, co
 
     return true;
 #elif defined(std_platform_linux_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
-
     ssize_t result = write ( pipe->os_handle, data, size );
     if ( result == -1 ) {
         std_log_os_error_m();
@@ -874,9 +838,10 @@ bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, co
 }
 
 bool std_process_pipe_read ( size_t* out_read_size, void* dest, size_t capacity, std_pipe_h pipe_handle ) {
-#if defined(std_platform_win32_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle.idx];
+    std_assert_m ( pipe->gen == pipe_handle.gen );
 
+#if defined(std_platform_win32_m)
     DWORD read_size = 0;
     DWORD dest_capacity = ( DWORD ) capacity;
     BOOL read_result = ReadFile ( ( HANDLE ) pipe->os_handle, dest, dest_capacity, &read_size, NULL );
@@ -891,8 +856,6 @@ bool std_process_pipe_read ( size_t* out_read_size, void* dest, size_t capacity,
 
     return true;
 #elif defined(std_platform_linux_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
-
     ssize_t result = read ( pipe->os_handle, dest, capacity );
     if ( result == -1 ) {
         std_log_os_error_m();
@@ -908,13 +871,16 @@ bool std_process_pipe_read ( size_t* out_read_size, void* dest, size_t capacity,
 }
 
 void std_process_pipe_destroy ( std_pipe_h pipe_handle ) {
+    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle.idx];
+    std_assert_m ( pipe->gen == pipe_handle.gen );
+
+    ++pipe->gen;
+
 #if defined(std_platform_win32_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
     CloseHandle ( ( HANDLE ) pipe->os_handle );
-    std_list_push ( &std_process_state->pipes_freelist, pipe );
 #elif defined(std_platform_linux_m)
-    std_process_pipe_t* pipe = &std_process_state->pipes_array[pipe_handle];
     close ( pipe->os_handle );
-    std_list_push ( &std_process_state->pipes_freelist, pipe );
 #endif
+
+    std_list_push ( &std_process_state->pipes_freelist, pipe );
 }

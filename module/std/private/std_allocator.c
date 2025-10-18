@@ -921,7 +921,7 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
     std_allocator_tlsf_heap_grow ( heap, size );
 
 #if std_build_debug_m
-    heap->debug_records_freelist = NULL;
+    heap->debug_records_freelist = std_static_freelist_m ( heap->debug_records_array );
     std_mem_zero_static_array_m ( heap->debug_records_bitset );
 #endif
 }
@@ -1186,26 +1186,22 @@ bool std_virtual_heap_free ( void* address ) {
 
 //==============================================================================
 
-// This function is supposed to do the minimum necessary to enable virtual memory allocations
-// With the introduction of a shared virtual heap, this function now boots the virtual memory
-// allocator and the virtual heap.
-void std_allocator_boot ( void ) {
-    std_assert_m ( std_allocator_state == NULL );
-    static std_allocator_state_t state;
+void std_allocator_init ( std_allocator_state_t* state ) {
+    std_allocator_state = state;
 
-    state.virtual_reserved_size = 0;
-    state.virtual_mapped_size = 0;
+    state->virtual_reserved_size = 0;
+    state->virtual_mapped_size = 0;
 
     // Get virtual page size
     {
 #ifdef std_platform_win32_m
         SYSTEM_INFO si;
         GetSystemInfo ( &si );
-        state.virtual_page_size = si.dwPageSize;
+        state->virtual_page_size = si.dwPageSize;
 #elif defined(std_platform_linux_m)
-        state.virtual_page_size = getpagesize();
+        state->virtual_page_size = getpagesize();
 #endif
-        std_assert_m ( std_pow2_test ( state.virtual_page_size ) );
+        std_assert_m ( std_pow2_test ( state->virtual_page_size ) );
     }
 
     // Query RAM size, for later usage
@@ -1225,10 +1221,6 @@ void std_allocator_boot ( void ) {
         total_swap_size = ( size_t ) si.totalswap;
 #endif
     }
-
-    // Set up a pointer to the boot state
-    // Will be used by the following virtual heap init code and by the incoming std_allocator_init call
-    std_allocator_attach ( &state );
 
     // Virtual heap - unused
     // This reserves virtual space for total_ram_size/virtual_page_size nodes, which on a 8GiB
@@ -1265,19 +1257,8 @@ void std_allocator_boot ( void ) {
     // TLSF heap
     {
         uint64_t initial_size = 1024ull * 1024 * 1024 * 4;
-        std_allocator_tlsf_heap_init ( &state.tlsf_heap, initial_size );
+        std_allocator_tlsf_heap_init ( &state->tlsf_heap, initial_size );
     }
-}
-
-// This is assumed to be called right after boot
-// Copy the local boot state into the external state
-void std_allocator_init ( std_allocator_state_t* state ) {
-    std_mem_copy_m ( state, std_allocator_state );
-
-#if std_build_debug_m
-    std_allocator_tlsf_heap_t* heap = &state->tlsf_heap;
-    heap->debug_records_freelist = std_static_freelist_m ( heap->debug_records_array );
-#endif
 }
 
 void std_allocator_attach ( std_allocator_state_t* state ) {

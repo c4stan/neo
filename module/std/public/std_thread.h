@@ -2,9 +2,9 @@
 
 #include <std_platform.h>
 #include <std_compiler.h>
+#include <std_handle.h>
 
-typedef uint64_t std_thread_h;
-#define std_thread_null_handle_m UINT64_MAX
+std_define_handle_m ( std_thread_h );
 
 typedef void ( std_thread_routine_f ) ( void* );
 

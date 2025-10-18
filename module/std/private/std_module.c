@@ -213,7 +213,7 @@ static std_module_t* std_module_load_internal ( const char* name ) {
 #endif
 
     std_log_info_m ( "Loading module " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
-    void* api = loader ( std_runtime_state() );
+    void* api = loader ( std_runtime_state_get() );
 
     if ( api == NULL ) {
         std_log_error_m ( "Module " std_fmt_str_m " failed to load - load function " std_fmt_str_m " returned NULL.", name, module_entrypoint_name );
@@ -365,7 +365,7 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
         .read_capacity = output_size,
     };
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
-    std_assert_m ( pipe != std_process_null_handle_m );
+    std_assert_m ( !std_handle_is_null_m ( pipe ) );
 
     // Invoke the builder process and wait for it to finish
     std_log_info_m ( "Running build command for workspace " std_fmt_str_m "...\n", solution_name );
@@ -516,7 +516,7 @@ void std_module_reload ( const char* solution_name ) {
 #endif
 
             std_log_info_m ( "Reloading module " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
-            reloader ( std_runtime_state(), module->api );
+            reloader ( std_runtime_state_get(), module->api );
 
             // Update
             module->handle = ( uint64_t ) handle;
@@ -539,32 +539,10 @@ void std_module_reload ( const char* solution_name ) {
 // ----------------------------------------------------------------------------
 
 void std_module_init ( std_module_state_t* state ) {
-    //state->modules_buffer = std_buffer ( state->modules_array, std_module_max_modules_m * sizeof ( std_module_t ) );
-    //state->modules_freelist = std_freelist ( state->modules_buffer, sizeof ( std_module_t ) );
-    state->modules_freelist = std_static_freelist_m ( state->modules_array );
-    #if 0
-    state->modules_name_map =
-    std_map (
-        std_buffer ( state->modules_name_map_keys, std_module_map_slots_m * sizeof ( std_module_name_t ) ),
-        std_buffer ( state->modules_name_map_payloads, std_module_map_slots_m * sizeof ( std_module_t* ) ),
-        sizeof ( std_module_name_t ),
-        sizeof ( std_module_t* ),
-        std_module_hash_name, NULL,
-        std_module_cmp_name, NULL
-        );
-    state->modules_api_map =
-    std_map (
-        std_buffer ( state->modules_api_map_keys, std_module_map_slots_m * sizeof ( void* ) ),
-        std_buffer ( state->module_api_map_payloads, std_module_map_slots_m * sizeof ( std_module_t* ) ),
-        sizeof ( void* ),
-        sizeof ( std_module_t* ),
-        std_module_hash_api, NULL,
-        std_module_cmp_api, NULL
-        );
-    #else
-    state->modules_name_map = std_hash_map ( state->modules_name_map_keys, state->modules_name_map_payloads, std_module_map_slots_m );
-    state->modules_api_map = std_hash_map ( state->modules_api_map_keys, state->module_api_map_payloads, std_module_map_slots_m );
-    #endif
+    state->modules_array = std_virtual_heap_alloc_array_m ( std_module_t, std_module_max_modules_m );
+    state->modules_freelist = std_freelist_m ( state->modules_array, std_module_max_modules_m );
+    state->modules_name_map = std_hash_map_create ( std_module_map_slots_m );
+    state->modules_api_map = std_hash_map_create ( std_module_map_slots_m );
     std_rwmutex_init ( &state->modules_mutex );
 }
 
@@ -573,5 +551,8 @@ void std_module_attach ( std_module_state_t* state ) {
 }
 
 void std_module_shutdown ( void ) {
+    std_virtual_heap_free ( std_module_state->modules_array );
+    std_hash_map_destroy ( &std_module_state->modules_name_map );
+    std_hash_map_destroy ( &std_module_state->modules_api_map );
     std_rwmutex_deinit ( &std_module_state->modules_mutex );
 }

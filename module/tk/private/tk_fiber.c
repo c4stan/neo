@@ -71,8 +71,8 @@ void tk_fiber_load ( tk_fiber_state_t* state ) {
     }
 
     for ( size_t i = 0; i < tk_max_threads_m; ++i ) {
-        state->acquired_threads_array[i].thread_handle = std_thread_null_handle_m;
-        state->threads_array[i] = std_thread_null_handle_m;
+        state->acquired_threads_array[i].thread_handle = std_null_handle_m ( std_thread_h );
+        state->threads_array[i] = std_null_handle_m ( std_thread_h );
     }
 }
 
@@ -521,7 +521,7 @@ tk_release_condition_b tk_fiber_thread_this_acquire ( tk_release_condition_b rel
     tk_fiber_thread_entry_point ( NULL );
 
     std_mutex_lock ( &tk_fiber_state->acquired_threads_mutex );
-    acquired_thread->thread_handle = std_thread_null_handle_m;
+    acquired_thread->thread_handle = std_null_handle_m ( std_thread_h );
     tk_release_condition_b release_cause = acquired_thread->release_cause;
     std_list_push ( tk_fiber_state->acquired_threads_freelist, acquired_thread );
     std_mutex_unlock ( &tk_fiber_state->acquired_threads_mutex );
@@ -545,7 +545,7 @@ static void acquired_threads_on_all_workloads_done () {
     for ( size_t i = 0; i < tk_max_threads_m; ++i ) {
         tk_acquired_thread_t* acquired_thread = &tk_fiber_state->acquired_threads_array[i];
 
-        if ( acquired_thread->thread_handle != std_thread_null_handle_m && ( acquired_thread->release_condition & tk_release_condition_all_workloads_done_m ) ) {
+        if ( !std_handle_is_null_m ( acquired_thread->thread_handle ) && ( acquired_thread->release_condition & tk_release_condition_all_workloads_done_m ) ) {
             release_acquired_thread ( acquired_thread, tk_release_condition_all_workloads_done_m );
         }
     }
@@ -570,7 +570,7 @@ void tk_fiber_thread_release_all ( void ) {
     for ( size_t i = 0; i < tk_max_threads_m; ++i ) {
         tk_acquired_thread_t* acquired_thread = &tk_fiber_state->acquired_threads_array[i];
 
-        if ( acquired_thread->thread_handle != std_thread_null_handle_m ) {
+        if ( !std_handle_is_null_m ( acquired_thread->thread_handle ) ) {
             release_acquired_thread ( acquired_thread, tk_release_condition_user_request_m );
         }
     }

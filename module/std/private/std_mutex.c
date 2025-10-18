@@ -46,7 +46,7 @@ void std_mutex_deinit ( std_mutex_t* mutex ) {
 void std_rwmutex_init ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
     InitializeSRWLock ( &mutex->os );
-    mutex->write_thread = std_thread_null_handle_m;
+    mutex->write_thread = std_null_handle_m ( std_thread_h );
     mutex->write_thread_count = 0;
 #elif defined(std_platform_linux_m)
     pthread_rwlock_init ( &mutex->os, NULL );
@@ -57,7 +57,7 @@ void std_rwmutex_lock_read ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
     std_thread_h thread = std_thread_this();
 
-    if ( thread == std_thread_this() ) {
+    if ( std_handle_is_equal_m ( thread, mutex->write_thread ) ) {
         return;
     }
 
@@ -72,7 +72,7 @@ void std_rwmutex_lock_write ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
     std_thread_h thread = std_thread_this();
     
-    if ( thread == mutex->write_thread ) {
+    if ( std_handle_is_equal_m ( thread, mutex->write_thread ) ) {
         ++mutex->write_thread_count;
         return;
     }
@@ -91,7 +91,7 @@ void std_rwmutex_unlock_read ( std_rwmutex_t* mutex ) {
 #if defined(std_platform_win32_m)
     std_thread_h thread = std_thread_this();
 
-    if ( thread == std_thread_this() ) {
+    if ( std_handle_is_equal_m ( thread, std_thread_this() ) ) {
         return;
     }
     
@@ -108,7 +108,7 @@ void std_rwmutex_unlock_write ( std_rwmutex_t* mutex ) {
         return;
     }
 
-    mutex->write_thread = std_thread_null_handle_m;
+    mutex->write_thread = std_null_handle_m ( std_thread_h );
 
     ReleaseSRWLockExclusive ( &mutex->os );
 #elif defined(std_platform_linux_m)

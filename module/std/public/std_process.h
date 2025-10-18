@@ -3,10 +3,10 @@
 #include <std_platform.h>
 #include <std_compiler.h>
 #include <std_thread.h>
+#include <std_handle.h>
 
-typedef uint64_t std_process_h;
-typedef uint64_t std_pipe_h;
-#define std_process_null_handle_m UINT64_MAX
+std_define_handle_m ( std_process_h );
+std_define_handle_m ( std_pipe_h );
 
 typedef enum {
     std_process_type_default_m,

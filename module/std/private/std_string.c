@@ -9,15 +9,9 @@
 
 #include "std_state.h"
 
-//==============================================================================
-
-//static std_string_state_t* std_string_state;
+#include <stdio.h>
 
 //==============================================================================
-
-//void std_string_init ( std_string_state_t* state ) {
-//    state->static_string_table_buffer = std_virtual_buffer_reserve ( std_string_static_table_max_size_m );
-//}
 
 size_t std_str_count_ascii ( const char* str ) {
     return strlen ( str );
@@ -151,7 +145,7 @@ bool std_str_starts_with ( const char* str, const char* token ) {
 size_t std_str_format ( char* dest, size_t cap, const char* src, ... ) {
     va_list va;
     va_start ( va, src );
-    int result = __builtin_vsnprintf ( dest, cap, src, va );
+    int result = vsnprintf ( dest, cap, src, va );
     va_end ( va );
 
     if ( result < 0 ) {
@@ -162,7 +156,7 @@ size_t std_str_format ( char* dest, size_t cap, const char* src, ... ) {
 }
 
 size_t std_str_format_valist ( char* dest, size_t cap, const char* src, va_list valist ) {
-    int result = __builtin_vsnprintf ( dest, cap, src, valist );
+    int result = vsnprintf ( dest, cap, src, valist );
 
     if ( result < 0 ) {
         result = 0;
@@ -172,7 +166,7 @@ size_t std_str_format_valist ( char* dest, size_t cap, const char* src, va_list 
 }
 
 size_t std_u32_to_str ( char* str, size_t size, uint32_t u32, uint32_t pad ) {
-    int len = __builtin_snprintf ( NULL, 0, "%u", u32 );
+    int len = snprintf ( NULL, 0, "%u", u32 );
     if ( len >= size ) {
         return SIZE_MAX;
     }
@@ -182,12 +176,12 @@ size_t std_u32_to_str ( char* str, size_t size, uint32_t u32, uint32_t pad ) {
 
     std_mem_set ( str, pad, ' ' );
     str[pad] = '\0';    
-    __builtin_snprintf ( str + pad - len, size, "%u", u32 );
+    snprintf ( str + pad - len, size, "%u", u32 );
     return ( size_t ) len;
 }
 
 size_t std_u64_to_str ( char* str, size_t size, uint64_t u64 ) {
-    int len = __builtin_snprintf ( str, size, "%llu", ( unsigned long long ) u64 );
+    int len = snprintf ( str, size, "%llu", ( unsigned long long ) u64 );
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }
 
@@ -280,7 +274,7 @@ float std_str_to_f32 ( const char* str ) {
 
 size_t std_f32_to_str ( char* str, size_t cap, float f32 ) {
     // TODO take decimals # as param
-    int len = __builtin_snprintf ( str, cap, "%.2f", f32 );
+    int len = snprintf ( str, cap, "%.2f", f32 );
     return len < 0 ? SIZE_MAX : ( size_t ) len;
 }
 
@@ -462,11 +456,11 @@ static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint
         int retval;
 
         if ( u64 % multiplier == 0 ) {
-            retval = __builtin_snprintf ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
+            retval = snprintf ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
         } else {
             // The ~ character breaks a number of fonts when used for text rendering... better if avoided
             //retval = snprintf ( dest, cap, "~" std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
-            retval = __builtin_snprintf ( dest, cap, std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
+            retval = snprintf ( dest, cap, std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
         }
 
         std_assert_m ( retval >= 0 );

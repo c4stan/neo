@@ -3,7 +3,7 @@
 #include "std_state.h"
 
 // Will contain state address on app memory and null (zero) on dll memory.
-static std_runtime_state_t* std_runtime_state_ptr;
+static std_runtime_state_t* std_runtime_state;
 
 static void std_init_log ( void ) {
     std_process_info_t proc_info;
@@ -31,9 +31,12 @@ void std_init ( int argc, char** argv ) {
 #endif
 #endif
 
-    std_allocator_boot();
-
-    std_runtime_state_t* state = std_virtual_heap_alloc_struct_m ( std_runtime_state_t );
+#if defined ( std_platform_win32_m )
+    std_runtime_state_t* state = ( std_runtime_state_t* ) VirtualAlloc ( NULL, sizeof ( std_runtime_state_t ), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE );
+#elif defined ( std_platform_linux_m )
+    std_runtime_state_t* state = ( std_runtime_state_t* ) mmap ( NULL, sizeof ( std_runtime_state_t ), PROT_NONE, PAGE_READWRITE );
+    mprotect ( state, sizeof ( std_runtime_state_t ), PROT_READ | PROT_WRITE );
+#endif
 
     std_allocator_init ( &state->allocator_state );
     std_log_init ( &state->log_state );
@@ -52,28 +55,33 @@ void std_init ( int argc, char** argv ) {
 }
 
 size_t std_runtime_size ( void ) {
-    return sizeof ( std_runtime_state_t );
+    return std_align ( sizeof ( std_runtime_state_t ), std_virtual_page_size() );
 }
 
-void* std_runtime_state ( void ) {
-    return std_runtime_state_ptr;
+void* std_runtime_state_get ( void ) {
+    return std_runtime_state;
 }
 
 void std_runtime_bind ( void* std_runtime ) {
-    std_runtime_state_ptr = std_runtime;
-    std_allocator_attach ( &std_runtime_state_ptr->allocator_state );
-    std_platform_attach ( &std_runtime_state_ptr->platform_state );
-    std_log_attach ( &std_runtime_state_ptr->log_state );
-    std_time_attach ( &std_runtime_state_ptr->time_state );
-    std_process_attach ( &std_runtime_state_ptr->process_state );
-    std_thread_attach ( &std_runtime_state_ptr->thread_state );
-    std_module_attach ( &std_runtime_state_ptr->module_state );
+    std_runtime_state = std_runtime;
+    std_allocator_attach ( &std_runtime_state->allocator_state );
+    std_platform_attach ( &std_runtime_state->platform_state );
+    std_log_attach ( &std_runtime_state->log_state );
+    std_time_attach ( &std_runtime_state->time_state );
+    std_process_attach ( &std_runtime_state->process_state );
+    std_thread_attach ( &std_runtime_state->thread_state );
+    std_module_attach ( &std_runtime_state->module_state );
 }
 
 void std_shutdown ( void ) {
-    std_allocator_shutdown();
     std_module_shutdown();
     std_thread_shutdown();
     std_process_shutdown();
-    std_virtual_heap_free ( std_runtime_state_ptr );
+    std_allocator_shutdown();
+
+#if defined ( std_platform_win32_m )
+    VirtualFree ( std_runtime_state, 0, MEM_RELEASE );
+#elif
+    munmap ( std_runtime_state, std_runtime_size() )
+#endif
 }

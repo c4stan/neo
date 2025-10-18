@@ -9,6 +9,7 @@
 #include <std_process.h>
 #include <std_allocator.h>
 #include <std_time.h>
+#include <std_handle.h>
 
 //==============================================================================
 
@@ -35,20 +36,16 @@ typedef struct {
 typedef struct {
     // TODO use std_module_count_m and std_module_id_m?
     // TODO auto load modules on startup and auto unload on shutdown
-    std_module_t        modules_array[std_module_max_modules_m];
-    std_module_t*       modules_freelist;
+    std_module_t* modules_array;
+    std_module_t* modules_freelist;
 
     // name hash -> std_module_t*
-    uint64_t modules_name_map_keys[std_module_map_slots_m]; // name hash
-    uint64_t modules_name_map_payloads[std_module_map_slots_m]; // std_module_t*
     std_hash_map_t modules_name_map;
 
     // void* api -> std_module_t*
-    uint64_t modules_api_map_keys[std_module_map_slots_m]; // void*
-    uint64_t module_api_map_payloads[std_module_map_slots_m]; // std_module_t*
     std_hash_map_t modules_api_map;
 
-    std_rwmutex_t       modules_mutex;
+    std_rwmutex_t modules_mutex;
 } std_module_state_t;
 
 //==============================================================================
@@ -174,22 +171,20 @@ typedef struct {
     uint64_t                os_id;
     std_thread_routine_f*   routine;
     void*                   arg;
-    size_t                  idx;    // TODO store std_thread_h instead?
+    std_thread_h            handle;
     uint32_t                uid;
     uint64_t                core_mask;
     char                    name[std_thread_name_max_len_m];
     size_t                  stack_size;
 #if defined ( std_platform_linux_m )
-    // because pthread doesn't provide a way to check whether a thread is alive or not, we just flag it as dead after a successful join...
+    // because pthread doesn't provide a way to check whether a thread is alive or not, it gets manually flagged as dead after a successful join
     bool                    is_alive;
 #endif
 } std_thread_t;
 
 typedef struct {
-    std_thread_t            threads_array[std_thread_max_threads_m];
+    std_thread_t*           threads_array;
     std_thread_t*           threads_freelist;
-    //std_list_t              threads_freelist;
-    size_t                  threads_pop;
     uint32_t                uid;
     std_mutex_t             mutex;
     uint64_t                tls_alloc;
@@ -200,10 +195,10 @@ typedef struct {
 typedef struct {
     uint64_t                os_handle;
     uint64_t                os_id;
-    //uint64_t                os_main_thread_handle; // provided by win32, not sure how to get it on linux.
     uint64_t                stdin_handle;
     uint64_t                stdout_handle;
     uint64_t                stderr_handle;
+    std_process_h           handle;
     char                    executable_path[std_process_path_max_len_m];
     char                    name[std_process_name_max_len_m];
     char                    args_buffer[std_process_args_max_len_m + std_process_max_args_m];
@@ -214,6 +209,7 @@ typedef struct {
 typedef struct {
     uint64_t os_handle;
     bool is_owner;
+    std_handle_gen_t gen;
     char name[std_process_pipe_name_max_len_m];
     std_process_pipe_params_t params;
 } std_process_pipe_t;
@@ -224,20 +220,11 @@ typedef struct {
 } std_process_pipe_name_t;
 
 typedef struct {
-    std_process_t           processes_array[std_process_max_processes_m];
+    std_process_t*          processes_array;
     std_process_t*          processes_freelist;
-    size_t                  processes_pop;
 
-    std_process_pipe_t      pipes_array[std_process_max_pipes_m];
+    std_process_pipe_t*     pipes_array;
     std_process_pipe_t*     pipes_freelist;
-    size_t                  pipes_count;
-
-    // std_process_pipe_name_t -> std_pipe_t*
-#if 0
-    std_process_pipe_name_t pipes_map_keys[std_process_max_pipes_m * 2];
-    std_pipe_t*             pipes_map_values[std_process_max_pipes_m * 2];
-    std_map_t               pipes_map;
-#endif
 
     std_mutex_t             mutex;
     char                    working_path[std_process_path_max_len_m];
@@ -263,12 +250,6 @@ typedef struct {
     size_t bss_size;
 } std_app_module_t;
 
-typedef struct {
-    // TODO
-    //std_app_module_t app_module;
-    //std_app_state_e client_state;
-} std_app_state_t;
-
 //==============================================================================
 
 typedef struct {
@@ -279,7 +260,6 @@ typedef struct {
     std_time_state_t        time_state;
     std_thread_state_t      thread_state;
     std_process_state_t     process_state;
-    //std_app_state_t         app_state;
 } std_runtime_state_t;
 
 //==============================================================================
@@ -290,24 +270,20 @@ void std_allocator_boot ( void );
 void std_module_init        ( std_module_state_t* );
 void std_allocator_init     ( std_allocator_state_t* );
 void std_platform_init      ( std_platform_state_t* );
-//void std_string_init        ( std_string_state_t* );
 void std_log_init           ( std_log_state_t* );
 void std_time_init          ( std_time_state_t* );
 void std_thread_init        ( std_thread_state_t* );
 void std_process_init       ( std_process_state_t*, char** args, size_t args_count );
-void std_app_init           ( std_app_state_t* );
 
 //==============================================================================
 
 void std_module_attach      ( std_module_state_t* );
 void std_allocator_attach   ( std_allocator_state_t* );
 void std_platform_attach    ( std_platform_state_t* );
-//void std_string_attach      ( std_string_state_t* );
 void std_log_attach         ( std_log_state_t* );
 void std_time_attach        ( std_time_state_t* );
 void std_thread_attach      ( std_thread_state_t* );
 void std_process_attach     ( std_process_state_t* );
-void std_app_attach         ( std_app_state_t* );
 
 //==============================================================================
 
@@ -319,6 +295,6 @@ void std_app_shutdown ( void );
 
 //==============================================================================
 
-void* std_runtime_state ( void );
+void* std_runtime_state_get ( void );
 
 //==============================================================================

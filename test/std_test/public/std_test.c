@@ -175,7 +175,7 @@ static void test_process ( void ) {
         .read_capacity = 1024,
     };
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
-    std_assert_m ( pipe != std_process_null_handle_m );
+    std_assert_m ( !std_handle_is_null_m ( pipe ) );
 
     // create child process
     const char* process_arg = CHILD_PROCESS_MAGIC_NUMBER;
@@ -248,7 +248,7 @@ static void test_process_child ( void ) {
         .read_capacity = 1024,
     };
     pipe = std_process_pipe_create ( &pipe_params );
-    std_assert_m ( pipe != std_process_null_handle_m );
+    std_assert_m ( !std_handle_is_null_m ( pipe ) );
     std_process_pipe_wait_for_connection ( pipe );
     std_process_pipe_write ( NULL, pipe, buffer, data_size  );
     std_process_pipe_destroy ( pipe );

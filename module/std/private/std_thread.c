@@ -20,20 +20,24 @@ static std_thread_state_t* std_thread_state;
 
 #if defined(std_platform_win32_m)
 static DWORD WINAPI std_thread_launcher ( LPVOID param ) {
-    std_thread_t* thread;
-    thread = ( std_thread_t* ) param;
-    std_thread_h thread_handle = ( std_thread_h ) ( thread - std_thread_state->threads_array );
-    std_verify_m ( TlsSetValue ( ( DWORD ) std_thread_state->tls_alloc, ( LPVOID ) thread_handle ) == TRUE );
+    // lock unlock to ensure execution starts after the thread is fully initialized
+    std_mutex_lock ( &std_thread_state->mutex );
+    std_mutex_unlock ( &std_thread_state->mutex );
+
+    std_thread_t* thread = ( std_thread_t* ) param;
+    std_verify_m ( TlsSetValue ( ( DWORD ) std_thread_state->tls_alloc, ( LPVOID ) thread->handle.u64 ) == TRUE );
     thread->routine ( thread->arg );
     return 0;   // Don't care about letting the OS know what happened at thread runtime
 }
 #elif defined(std_platform_linux_m)
 static void* std_thread_launcher ( void* param ) {
-    std_thread_t* thread;
-    thread = ( std_thread_t* ) param;
-    std_thread_h thread_handle = ( std_thread_h ) ( thread - std_thread_state->threads_array );
+    // lock unlock to ensure execution starts after the thread is fully initialized
+    std_mutex_lock ( &std_thread_state->mutex );
+    std_mutex_unlock ( &std_thread_state->mutex );
+
+    std_thread_t* thread = ( std_thread_t* ) param;
     // TODO test this
-    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) std_thread_state->tls_alloc, ( void* ) thread_handle ) == 0 );
+    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) std_thread_state->tls_alloc, ( void* ) thread->handle.u64 ) == 0 );
     thread->routine ( thread->arg );
     return NULL;
 }
@@ -62,7 +66,6 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
     thread->uid = state->uid++;
     thread->routine = NULL;
     thread->arg = NULL;
-    thread->idx = ( size_t ) ( thread - state->threads_array );
     std_str_copy ( thread->name, std_thread_name_max_len_m, std_pp_eval_string_m ( std_thread_main_thread_name_m ) );
 
 #if defined(std_platform_win32_m)
@@ -76,7 +79,9 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
     std_assert_m ( thread->stack_size == std_thread_stack_size_m );
     thread->core_mask = std_thread_main_thread_core_mask_m;
 
-    ++state->threads_pop;
+#if defined(std_platform_linux_m)
+    thread->is_alive = true;
+#endif
 
     // Unlock
     // Set OS core affinity mask if specified
@@ -97,7 +102,7 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
         pthread_setaffinity_np ( os_handle, sizeof ( cpu_mask ), &cpu_mask );
 #endif
     }
-
+ 
     if ( std_str_cmp ( thread->name, "" ) != 0 ) {
 #if defined(std_platform_win32_m)
         WCHAR unicode_name[std_thread_name_max_len_m];
@@ -108,22 +113,28 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
 #endif
     }
 
-    std_thread_h thread_handle = ( std_thread_h ) ( thread - state->threads_array );
+    std_thread_h thread_handle = thread->handle;
+    thread_handle.idx = thread - state->threads_array;
+    thread->handle = thread_handle;
 
 #if defined(std_platform_win32_m)
-    std_verify_m ( TlsSetValue ( ( DWORD ) state->tls_alloc, ( LPVOID ) thread_handle ) == TRUE );
+    std_verify_m ( TlsSetValue ( ( DWORD ) state->tls_alloc, ( LPVOID ) thread_handle.u64 ) == TRUE );
 #elif defined(std_platform_linux_m)
-    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) state->tls_alloc, ( void* ) thread_handle ) == 0 );
+    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) state->tls_alloc, ( void* ) thread_handle.u64 ) == 0 );
 #endif
 }
 
 //==============================================================================
 
 void std_thread_init ( std_thread_state_t* state ) {
-    std_mem_zero_m ( state->threads_array );
-    state->threads_freelist = std_static_freelist_m ( state->threads_array );
+    state->threads_array = std_virtual_heap_alloc_array_m ( std_thread_t, std_thread_max_threads_m );
+    std_thread_t* threads_array = state->threads_array;
+    for ( uint64_t i = 0; i < std_thread_max_threads_m; ++i ) {
+        threads_array[i].handle = std_null_handle_m ( std_thread_h );
+    }
+
+    state->threads_freelist = std_freelist_m ( state->threads_array, std_thread_max_threads_m );
     state->uid = 0;
-    state->threads_pop = 0;
 #if defined(std_platform_win32_m)
     state->tls_alloc = TlsAlloc();
     std_assert_m ( state->tls_alloc != TLS_OUT_OF_INDEXES );
@@ -140,6 +151,7 @@ void std_thread_attach ( std_thread_state_t* state ) {
 
 void std_thread_shutdown ( void ) {
     std_mutex_deinit ( &std_thread_state->mutex );
+    std_virtual_heap_free ( std_thread_state->threads_array );
 }
 
 //==============================================================================
@@ -157,7 +169,9 @@ std_thread_h std_thread ( std_thread_routine_f* routine, void* arg, const char* 
     std_assert_m ( thread != NULL );
 
     size_t idx = ( size_t ) ( thread - std_thread_state->threads_array );
-    thread->idx = idx;
+    std_thread_h handle = thread->handle;
+    handle.idx = idx;
+    thread->handle = handle;
     thread->routine = routine;
     thread->arg = arg;
     std_str_copy ( thread->name, std_thread_name_max_len_m, name );
@@ -167,10 +181,8 @@ std_thread_h std_thread ( std_thread_routine_f* routine, void* arg, const char* 
     thread->uid = uid;
     thread->stack_size = std_thread_stack_size_m;
 
-    // Unlock -- TODO is it safe to unlock while the thread is half initialized?
     // Create OS thread
     // Set OS core affinity mask if specified
-    //std_mutex_unlock ( &std_thread_state->mutex );
     uint32_t os_id;
 
     // Thread is created suspended
@@ -208,24 +220,20 @@ std_thread_h std_thread ( std_thread_routine_f* routine, void* arg, const char* 
     thread->is_alive = true;
 #endif
 
-    // Lock again
     // Init core mask, OS handle, OS id
-    //std_mutex_lock ( &std_thread_state->mutex );
     thread->core_mask = core_mask;
     thread->os_handle = ( uint64_t ) os_handle;
     thread->os_id = os_id;
-
-    ++std_thread_state->threads_pop;
 
     // Unlock
     // Return handle
     std_mutex_unlock ( &std_thread_state->mutex );
 
-    return ( std_thread_h ) idx;
+    return handle;
 }
 
 bool std_thread_join ( std_thread_h thread_handle ) {
-    std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
+    std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
 #if defined(std_platform_win32_m)
     DWORD result = WaitForSingleObject ( ( HANDLE ) thread->os_handle, INFINITE );
     std_verify_m ( result == WAIT_OBJECT_0 );
@@ -234,58 +242,17 @@ bool std_thread_join ( std_thread_h thread_handle ) {
     std_verify_m ( result == 0 );
     thread->is_alive = false;
 #endif
+    ++thread->handle.gen;
     std_mutex_lock ( &std_thread_state->mutex );
-    std_mem_zero_m ( thread );
     std_list_push ( &std_thread_state->threads_freelist, thread );
-    --std_thread_state->threads_pop;
     std_mutex_unlock ( &std_thread_state->mutex );
     return true;
 }
 
-#if 0
-std_thread_h std_thread_register ( std_thread_routine_f* routine, void* arg, const char* name, uint64_t core_mask, uint64_t os_handle ) {
-    // Get thread OS id
-    // Lock
-    // Pop
-    // Initialize thread
-    // Increate threads pop
-#if defined(std_platform_win32_m)
-    uint64_t os_id = GetThreadId ( ( HANDLE ) os_handle );
-#elif defined(std_platform_linux_m)
-    uint64_t os_id = os_handle;
-#endif
-    std_mutex_lock ( &std_thread_state->mutex );
-
-    std_thread_t* thread = std_list_pop_m ( &std_thread_state->threads_freelist );
-    std_assert_m ( thread != NULL );
-
-    size_t idx = ( size_t ) ( thread - std_thread_state->threads_array );
-    thread->idx = idx;
-    thread->routine = routine;
-    thread->arg = arg;
-    std_str_copy ( thread->name, std_thread_name_max_len_m, name );
-    uint32_t uid = std_thread_state->uid++;
-    std_assert_m ( uid != 0 );
-
-    thread->uid = uid;
-    thread->core_mask = core_mask;
-    thread->os_handle = os_handle;
-    thread->os_id = os_id;
-
-    ++std_thread_state->threads_pop;
-
-    // Unlock
-    // Return handle
-    std_mutex_unlock ( &std_thread_state->mutex );
-
-    return ( std_thread_h ) idx;
-}
-#endif
-
 //==============================================================================
 
 bool std_thread_alive ( std_thread_h thread_handle ) {
-    std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
+    std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
 #if defined(std_platform_win32_m)
     DWORD result = WaitForSingleObject ( ( HANDLE ) thread->os_handle, 0 );
 
@@ -294,23 +261,18 @@ bool std_thread_alive ( std_thread_h thread_handle ) {
     } else {
         return false;
     }
-
 #elif defined(std_platform_linux_m)
-    // TODO make sure this is ok
-    //int result = pthread_kill ( thread->os_handle, 0 );
-    //int result = pthread_tryjoin_np ( thread->os_handle, NULL );
-    //return result == 0;
     return thread->is_alive;
 #endif
 }
 
 uint32_t std_thread_uid ( std_thread_h thread_handle ) {
-    std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
+    std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
     return thread->uid;
 }
 
 uint32_t std_thread_index ( std_thread_h thread_handle ) {
-    return ( uint32_t ) thread_handle;
+    return thread_handle.idx;
 }
 
 //==============================================================================
@@ -318,9 +280,9 @@ uint32_t std_thread_index ( std_thread_h thread_handle ) {
 std_thread_h std_thread_this ( void ) {
     std_thread_h thread_handle;
 #if defined(std_platform_win32_m)
-    thread_handle = ( std_thread_h ) ( TlsGetValue ( ( DWORD ) std_thread_state->tls_alloc ) );
+    thread_handle = ( std_thread_h ) { .u64 = ( uint64_t ) TlsGetValue ( ( DWORD ) std_thread_state->tls_alloc ) };
 #elif defined(std_platform_linux_m)
-    thread_handle = ( std_thread_h ) pthread_getspecific ( ( pthread_key_t ) std_thread_state->tls_alloc );
+    thread_handle = ( std_thread_h ) { .u64 = ( uint64_t ) pthread_getspecific ( ( pthread_key_t ) std_thread_state->tls_alloc ) };
 #endif
     return thread_handle;
 }
@@ -353,7 +315,7 @@ void std_thread_this_exit ( void ) {
 //==============================================================================
 
 bool std_thread_info ( std_thread_info_t* info, std_thread_h thread_handle ) {
-    std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
+    std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
     info->stack_size = thread->stack_size;
     info->core_mask = thread->core_mask;
     std_str_copy ( info->name, std_thread_name_max_len_m, thread->name );
@@ -361,12 +323,12 @@ bool std_thread_info ( std_thread_info_t* info, std_thread_h thread_handle ) {
 }
 
 const char* std_thread_name ( std_thread_h thread_handle ) {
-    std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
+    std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
     return thread->name;
 }
 
 void std_thread_set_core_mask ( std_thread_h thread_handle, uint64_t core_mask ) {
-    std_thread_t* thread = &std_thread_state->threads_array[ ( size_t ) thread_handle];
+    std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
 
 #if defined(std_platform_win32_m)
     SetThreadAffinityMask ( ( HANDLE ) thread->os_handle, core_mask );
