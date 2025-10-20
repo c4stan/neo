@@ -4,8 +4,11 @@
 #include <std_time.h>
 #include <std_allocator.h>
 
-typedef uint64_t std_file_h;
-#define std_file_null_handle_m UINT64_MAX
+typedef struct {
+    uint64_t u64;
+} std_file_h;
+#define std_file_null_handle_m ( std_file_h ) { .u64 = UINT64_MAX }
+#define std_file_handle_is_null_m( h ) ( h.u64 == UINT64_MAX )
 
 typedef enum {
     std_path_is_file_m      = 1 << 0,

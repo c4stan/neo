@@ -321,7 +321,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
         }
 
         std_file_h pipeline_state_file = std_file_open ( pipeline_state->path, std_file_read_m );
-        std_assert_m ( pipeline_state_file != std_file_null_handle_m );
+        std_assert_m ( !std_file_handle_is_null_m ( pipeline_state_file ) );
 
         std_file_info_t pipeline_state_file_info;
         std_verify_m ( std_file_info ( &pipeline_state_file_info, pipeline_state_file ) );

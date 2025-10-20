@@ -6,6 +6,8 @@
 //                                       S H A R E D
 // ======================================================================================= //
 
+#define std_file_handle_m( h ) ( std_file_h ) { .u64 = ( uint64_t ) h }
+
 #if defined(std_platform_win32_m)
 
 static std_thread_local_m char  t_char_buffer[std_path_size_m];
@@ -981,7 +983,7 @@ std_file_h std_file_create ( const char* path, std_file_access_t access, std_pat
         return std_file_null_handle_m;
     }
 
-    return ( std_file_h ) h;
+    return std_file_handle_m ( h );
 #elif defined(std_platform_linux_m)
     int flags = 0;
 
@@ -999,7 +1001,7 @@ std_file_h std_file_create ( const char* path, std_file_access_t access, std_pat
         return std_file_null_handle_m;
     }
 
-    return ( std_file_h ) fd;
+    return std_file_handle_m ( fd );
 #endif
 }
 
@@ -1041,7 +1043,7 @@ bool std_file_path_create ( const char* path, std_file_access_t access, std_path
 
 bool std_file_destroy ( std_file_h file ) {
 #if defined(std_platform_win32_m)
-    HANDLE h = ( HANDLE ) file;
+    HANDLE h = ( HANDLE ) file.u64;
     DWORD len = GetFinalPathNameByHandleW ( h, t_path_buffer, std_path_size_m, 0 );
     std_verify_m ( len > 0 && len < std_path_size_m );
     return DeleteFileW ( t_path_buffer ) == TRUE;
@@ -1069,7 +1071,7 @@ bool std_file_path_destroy ( const char* path ) {
 bool std_file_copy ( std_file_h file, const char* dest, std_path_already_existing_e already_existing ) {
 #if defined(std_platform_win32_m)
     std_assert_m ( dest != NULL );
-    HANDLE h = ( HANDLE ) file;
+    HANDLE h = ( HANDLE ) file.u64;
     size_t len = GetFinalPathNameByHandleW ( h, t_path_buffer, std_path_size_m, 0 );
     std_assert_m ( len > 0 && len < std_path_size_m );
     len = std_to_path_buffer_2 ( dest );
@@ -1081,7 +1083,7 @@ bool std_file_copy ( std_file_h file, const char* dest, std_path_already_existin
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
     off_t copy_offset = 0;
-    ssize_t copy_result = sendfile ( ( int ) dest_file, ( int ) file, &copy_offset, file_info.size );
+    ssize_t copy_result = sendfile ( ( int ) dest_file, ( int ) file.u64, &copy_offset, file_info.size );
     std_assert_m ( copy_result == file_info.size );
     return true;
 #endif
@@ -1099,14 +1101,14 @@ bool std_file_path_copy ( const char* path, const char* dest, std_path_already_e
     return copy_retcode == TRUE;
 #elif defined(std_platform_linux_m)
     std_file_h source_file = std_file_open ( path, std_file_read_m );
-    std_assert_m ( source_file != std_file_null_handle_m );
+    std_assert_m ( !std_file_handle_is_null_m ( source_file ) );
     return std_file_copy ( source_file, dest, already_existing );
 #endif
 }
 
 bool std_file_move ( std_file_h file, const char* dest, std_path_already_existing_e already_existing ) {
 #if defined(std_platform_win32_m)
-    HANDLE h = ( HANDLE ) file;
+    HANDLE h = ( HANDLE ) file.u64;
     DWORD get_retcode;
     get_retcode = GetFinalPathNameByHandleW ( h, t_path_buffer, std_path_size_m, 0 );
     std_assert_m ( get_retcode > 0 && get_retcode < std_path_size_m );
@@ -1185,7 +1187,7 @@ std_file_h std_file_open ( const char* path, std_file_access_t access ) {
         return std_file_null_handle_m;
     }
 
-    return ( std_file_h ) h;
+    return std_file_handle_m ( h );
 #elif defined(std_platform_linux_m)
     int flags = 0;
 
@@ -1204,13 +1206,13 @@ std_file_h std_file_open ( const char* path, std_file_access_t access ) {
         return std_file_null_handle_m;
     }
 
-    return ( std_file_h ) fd;
+    return std_file_handle_m ( fd );
 #endif
 }
 
 bool std_file_close ( std_file_h file ) {
 #if defined(std_platform_win32_m)
-    BOOL close_retcode = CloseHandle ( ( HANDLE ) file );
+    BOOL close_retcode = CloseHandle ( ( HANDLE ) file.u64 );
 
     if ( close_retcode == FALSE ) {
         return false;
@@ -1218,7 +1220,7 @@ bool std_file_close ( std_file_h file ) {
 
     return true;
 #elif defined(std_platform_linux_m)
-    int result = close ( ( int ) file );
+    int result = close ( ( int ) file.u64 );
     return result == 0;
 #endif
 }
@@ -1254,7 +1256,7 @@ void* std_file_map ( std_file_h file, size_t size, std_file_map_permits_t permit
     uint32_t size_high, size_low;
     std_u64_to_2_u32 ( &size_high, &size_low, size );
 
-    HANDLE map_handle = CreateFileMapping ( ( HANDLE ) file, NULL, page_permits, size_high, size_low, NULL );
+    HANDLE map_handle = CreateFileMapping ( ( HANDLE ) file.u64, NULL, page_permits, size_high, size_low, NULL );
 
     if ( map_handle == NULL ) {
         return NULL;
@@ -1323,7 +1325,7 @@ uint64_t std_file_read ( void* dest, size_t size, std_file_h file ) {
     while ( total_read_size < size ) {
         DWORD remaining_size = std_min ( UINT32_MAX, size - total_read_size );
         DWORD read_size;
-        BOOL read_retcode = ReadFile ( ( HANDLE ) file, p, remaining_size, &read_size, NULL );
+        BOOL read_retcode = ReadFile ( ( HANDLE ) file.u64, p, remaining_size, &read_size, NULL );
 
         if ( read_retcode == FALSE ) {
             std_log_os_error_m();
@@ -1342,7 +1344,7 @@ uint64_t std_file_read ( void* dest, size_t size, std_file_h file ) {
 
     return total_read_size;
 #elif defined(std_platform_linux_m)
-    ssize_t result = read ( ( int ) file, dest, size );
+    ssize_t result = read ( ( int ) file.u64, dest, size );
 
     if ( result == -1 ) {
         std_log_warn_m ( "File read failed with code " std_fmt_i32_m ": " std_fmt_str_m, errno, strerror ( errno ) );
@@ -1360,7 +1362,7 @@ bool std_file_write ( std_file_h file, const void* source, size_t size ) {
     while ( total_write_size < size ) {
         DWORD remaining_size = std_min ( UINT32_MAX, size - total_write_size );
         DWORD write_size;
-        BOOL write_retcode = WriteFile ( ( HANDLE ) file, p, remaining_size, &write_size, NULL );
+        BOOL write_retcode = WriteFile ( ( HANDLE ) file.u64, p, remaining_size, &write_size, NULL );
 
         if ( write_retcode == FALSE ) {
             std_log_warn_m ( "File write failed with code " std_fmt_u32_m, write_retcode );
@@ -1377,7 +1379,7 @@ bool std_file_write ( std_file_h file, const void* source, size_t size ) {
 
     return total_write_size == size;
 #elif defined(std_platform_linux_m)
-    ssize_t result = write ( ( int ) file, source, size );
+    ssize_t result = write ( ( int ) file.u64, source, size );
 
     if ( result == -1 ) {
         std_log_warn_m ( "File write failed with code " std_fmt_i32_m ": " std_fmt_str_m, errno, strerror ( errno ) );
@@ -1409,7 +1411,7 @@ bool std_file_seek ( std_file_h file, std_file_point_t base, int64_t offset ) {
 
     LARGE_INTEGER os_offset;
     os_offset.QuadPart = offset;
-    BOOL set_file_pointer_retcode = SetFilePointerEx ( ( HANDLE ) file, os_offset, NULL, method );
+    BOOL set_file_pointer_retcode = SetFilePointerEx ( ( HANDLE ) file.u64, os_offset, NULL, method );
 
     if ( set_file_pointer_retcode == FALSE ) {
         return false;
@@ -1434,7 +1436,7 @@ bool std_file_seek ( std_file_h file, std_file_point_t base, int64_t offset ) {
             break;
     }
 
-    off_t result = lseek ( ( int ) file, ( off_t ) offset, whence );
+    off_t result = lseek ( ( int ) file.u64, ( off_t ) offset, whence );
     return result != -1;
 #endif
 }
@@ -1442,7 +1444,7 @@ bool std_file_seek ( std_file_h file, std_file_point_t base, int64_t offset ) {
 bool std_file_info ( std_file_info_t* info, std_file_h file ) {
 #if defined(std_platform_win32_m)
     BY_HANDLE_FILE_INFORMATION os_file_info;
-    BOOL get_retcode = GetFileInformationByHandle ( ( HANDLE ) file, &os_file_info );
+    BOOL get_retcode = GetFileInformationByHandle ( ( HANDLE ) file.u64, &os_file_info );
 
     if ( get_retcode == FALSE ) {
         return false;
@@ -1482,7 +1484,7 @@ bool std_file_info ( std_file_info_t* info, std_file_h file ) {
     return true;
 #elif defined(std_platform_linux_m)
     struct stat file_info;
-    int fstat_result = fstat ( ( int ) file, &file_info );
+    int fstat_result = fstat ( ( int ) file.u64, &file_info );
     if ( fstat_result != 0 ) {
         std_log_os_error_m();
     }
@@ -1506,7 +1508,7 @@ bool std_file_path_info ( std_file_info_t* info, const char* path ) {
 
     std_file_h file = std_file_open ( path, std_file_read_m );
 
-    if ( file == std_file_null_handle_m ) {
+    if ( std_file_handle_is_null_m ( file ) ) {
         return false;
     }
 
@@ -1521,7 +1523,7 @@ bool std_file_path_info ( std_file_info_t* info, const char* path ) {
 
 size_t std_file_path ( char* path, size_t cap, std_file_h file ) {
 #if defined(std_platform_win32_m)
-    DWORD get_retcode = GetFinalPathNameByHandleW ( ( HANDLE ) file, t_path_buffer, std_path_size_m, 0 );
+    DWORD get_retcode = GetFinalPathNameByHandleW ( ( HANDLE ) file.u64, t_path_buffer, std_path_size_m, 0 );
 
     if ( get_retcode == 0 ) {
         return 0;
@@ -1532,7 +1534,7 @@ size_t std_file_path ( char* path, size_t cap, std_file_h file ) {
     std_assert_m ( len > 0 && len < std_path_size_m );
     return len;
 #elif defined(std_platform_linux_m)
-    int fd = ( int ) file;
+    int fd = ( int ) file.u64;
     char proc[64];
     std_str_format ( proc, 32, "/proc/self/fd/" std_fmt_int_m, fd );
     ssize_t len = readlink ( proc, path, cap );
