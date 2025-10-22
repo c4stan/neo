@@ -36,8 +36,8 @@ std_hash_map_t      std_hash_map_create ( uint64_t capacity ); // Heap allocated
 void                std_hash_map_destroy ( std_hash_map_t* map ); // Call on heap allocated hash maps only
 
 #define std_static_hash_map_m( keys, payloads ) ({ \
-    std_assert_m ( std_static_array_capacity_m ( keys ) == std_static_array_capacity_m ( payloads ) ); \
-    std_hash_map ( keys, payloads, std_static_array_capacity_m ( keys ) ); \
+    std_assert_m ( std_static_array_count_m ( keys ) == std_static_array_count_m ( payloads ) ); \
+    std_hash_map ( keys, payloads, std_static_array_count_m ( keys ) ); \
 })
 
 // Multi thread access hash map
@@ -69,4 +69,4 @@ bool                std_hash_set_remove ( std_hash_set_t* set, uint64_t hash );
 bool                std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash );
 void                std_hash_set_clear ( std_hash_set_t* set );
 
-#define std_static_hash_set_m( array ) std_hash_set ( array, std_static_array_capacity_m ( array ) )
+#define std_static_hash_set_m( array ) std_hash_set ( array, std_static_array_count_m ( array ) )

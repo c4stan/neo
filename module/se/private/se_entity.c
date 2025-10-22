@@ -492,7 +492,7 @@ void se_entity_set_component_properties ( se_component_e component_id, const cha
 }
 
 size_t se_entity_list ( se_entity_h* out_entities, size_t cap ) {
-    size_t block_count = std_static_array_capacity_m ( se_entity_state->entity_meta->used_entities );
+    size_t block_count = std_static_array_count_m ( se_entity_state->entity_meta->used_entities );
     uint64_t entity_idx = 0;
     size_t count = 0;
 

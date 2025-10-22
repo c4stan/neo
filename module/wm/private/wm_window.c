@@ -62,7 +62,7 @@ static wm_window_state_t* wm_window_state;
         when all events are dequeued, event loop terminates and returns
 */
 
-#define wm_window_bitset_u64_count_m std_div_ceil_m ( wm_max_windows_m, 64 )
+#define wm_window_bitset_u64_count_m std_div_round_up_m ( wm_max_windows_m, 64 )
 
 void wm_window_load ( wm_window_state_t* state ) {
     wm_window_state = state;

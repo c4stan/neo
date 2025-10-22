@@ -7,7 +7,7 @@
 
 static xg_vk_buffer_state_t* xg_vk_buffer_state;
 
-#define xg_vk_buffer_bitset_u64_count_m std_div_ceil_m ( xg_vk_max_buffers_m, 64 )
+#define xg_vk_buffer_bitset_u64_count_m std_div_round_up_m ( xg_vk_max_buffers_m, 64 )
 
 void xg_vk_buffer_load ( xg_vk_buffer_state_t* state ) {
     xg_vk_buffer_state = state;

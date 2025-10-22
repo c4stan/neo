@@ -181,8 +181,8 @@ static void xg_vk_workload_context_init ( xg_vk_workload_context_t* context ) {
     context->is_submitted = false;
 }
 
-#define xg_vk_workload_max_uniform_buffers_m std_div_ceil_m ( xg_workload_max_uniform_size_m, xg_workload_uniform_buffer_size_m )
-#define xg_vk_workload_max_staging_buffers_m std_div_ceil_m ( xg_workload_max_staging_size_m, xg_workload_staging_buffer_size_m )
+#define xg_vk_workload_max_uniform_buffers_m std_div_round_up_m ( xg_workload_max_uniform_size_m, xg_workload_uniform_buffer_size_m )
+#define xg_vk_workload_max_staging_buffers_m std_div_round_up_m ( xg_workload_max_staging_size_m, xg_workload_staging_buffer_size_m )
 
 void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );

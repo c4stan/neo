@@ -572,7 +572,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 
     // Finalize
     std_assert_m ( device_queues_count > 0 );
-    std_assert_m ( device_queues_count <= std_static_array_capacity_m ( device->queue_create_info ) );
+    std_assert_m ( device_queues_count <= std_static_array_count_m ( device->queue_create_info ) );
     device->queue_create_info_count = device_queues_count;
 }
 
@@ -868,7 +868,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         // vkGetQueueCheckpointDataNV
         "VK_NV_device_diagnostic_checkpoints",
     };
-    size_t required_extensions_count = std_static_array_capacity_m ( required_extensions );
+    size_t required_extensions_count = std_static_array_count_m ( required_extensions );
 
     const bool fail_on_missing_extension = false;
 #if xg_enable_raytracing_m

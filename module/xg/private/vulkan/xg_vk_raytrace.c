@@ -14,8 +14,8 @@
 static xg_vk_raytrace_state_t* xg_vk_raytrace_state;
 #endif
 
-#define xg_vk_raytrace_geometry_bitset_u64_count_m  std_div_ceil_m ( xg_vk_raytrace_max_geometries_m, 64 )
-#define xg_vk_raytrace_world_bitset_u64_count_m     std_div_ceil_m ( xg_vk_raytrace_max_worlds_m, 64 )
+#define xg_vk_raytrace_geometry_bitset_u64_count_m  std_div_round_up_m ( xg_vk_raytrace_max_geometries_m, 64 )
+#define xg_vk_raytrace_world_bitset_u64_count_m     std_div_round_up_m ( xg_vk_raytrace_max_worlds_m, 64 )
 
 void xg_vk_raytrace_load ( xg_vk_raytrace_state_t* state ) {
 #if xg_enable_raytracing_m

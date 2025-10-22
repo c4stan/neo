@@ -122,10 +122,9 @@ size_t      std_pow2_round_down     ( size_t value );
 uint32_t    std_pow2_round_down_u32 ( uint32_t value );
 uint64_t    std_pow2_round_down_u64 ( uint64_t value );
 
-// todo rename from ceil to roundup
-size_t      std_div_ceil     ( size_t dividend, size_t divisor );
-uint32_t    std_div_ceil_u32 ( uint32_t dividend, uint32_t divisor );
-uint64_t    std_div_ceil_u64 ( uint64_t dividend, uint64_t divisor );
+size_t      std_div_round_up     ( size_t dividend, size_t divisor );
+uint32_t    std_div_round_up_u32 ( uint32_t dividend, uint32_t divisor );
+uint64_t    std_div_round_up_u64 ( uint64_t dividend, uint64_t divisor );
 
 uint64_t    std_add_saturate_u64 ( size_t a, size_t b );
 uint64_t    std_sub_saturate_u64 ( size_t a, size_t b );
@@ -151,7 +150,7 @@ uint64_t    std_2_u32_to_u64 ( uint32_t high, uint32_t low );
 
 uint64_t    std_ring_distance_u64 ( uint64_t from, uint64_t to, uint64_t ring_size );
 
-#define std_bitset_u64_count_m( capacity ) std_div_ceil_m ( capacity, 64 )
+#define std_bitset_u64_count_m( capacity ) std_div_round_up_m ( capacity, 64 )
 // call std_mem_set to initialize the bitset to the desired initial value
 void std_bitset_set ( uint64_t* bitset, size_t idx );
 bool std_bitset_test ( const uint64_t* bitset, size_t idx );

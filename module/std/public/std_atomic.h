@@ -7,7 +7,6 @@ void                            std_compiler_fence ( void );
 void                            std_memory_fence   ( void );
 
 // Returns whether the CAS was successful. The actual read is written into the expected read param.
-// TODO is the _ptr api necessary?
 bool                            std_compare_and_swap_i32 ( int32_t* atomic, int32_t* expected_read, int32_t conditional_write );
 bool                            std_compare_and_swap_i64 ( int64_t* atomic, int64_t* expected_read, int64_t conditional_write );
 bool                            std_compare_and_swap_u32 ( uint32_t* atomic, uint32_t* expected_read, uint32_t conditional_write );

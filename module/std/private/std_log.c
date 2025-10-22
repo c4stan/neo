@@ -270,14 +270,19 @@ void std_log_print ( std_log_msg_t msg, ... ) {
         return;
     }
 
+    // TODO avoid limit?
     char buffer[2048];
 
     va_list args;
     va_start ( args, msg );
     int len = vsprintf ( buffer, msg.payload, args );
     va_end ( args );
-    if ( buffer[len-1] != '\n' ) buffer[len++] = '\n';
-    buffer[len++] = '\0';
+
+    if ( ( ( 1 << msg.level ) & std_log_level_bit_custom_m ) == 0 ) {
+        // TODO check for overflow
+        if ( buffer[len-1] != '\n' ) buffer[len++] = '\n';
+        buffer[len++] = '\0';
+    }
 
     std_log_msg_t formatted_msg = msg;
     formatted_msg.payload = buffer;

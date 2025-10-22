@@ -272,22 +272,22 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
 #endif
     };
 
-    const char* layers[std_static_array_capacity_m ( base_layers ) + std_static_array_capacity_m ( debug_layers ) + std_static_array_capacity_m ( renderdoc_layers )];
-    const char* extensions[std_static_array_capacity_m ( base_extensions ) + std_static_array_capacity_m ( platform_extensions )];
+    const char* layers[std_static_array_count_m ( base_layers ) + std_static_array_count_m ( debug_layers ) + std_static_array_count_m ( renderdoc_layers )];
+    const char* extensions[std_static_array_count_m ( base_extensions ) + std_static_array_count_m ( platform_extensions )];
 
-    size_t layers_count = std_static_array_capacity_m ( base_layers );
-    size_t extensions_count = std_static_array_capacity_m ( base_extensions );
+    size_t layers_count = std_static_array_count_m ( base_layers );
+    size_t extensions_count = std_static_array_count_m ( base_extensions );
 
     // Compute layers/extensions count
     if ( layers_flags & xg_runtime_layer_bit_debug_m ) {
-        layers_count += std_static_array_capacity_m ( debug_layers );
+        layers_count += std_static_array_count_m ( debug_layers );
     }
 
     if ( layers_flags & xg_runtime_layer_bit_renderdoc_m ) {
-        layers_count += std_static_array_capacity_m ( renderdoc_layers );
+        layers_count += std_static_array_count_m ( renderdoc_layers );
     }
 
-    extensions_count += std_static_array_capacity_m ( platform_extensions );
+    extensions_count += std_static_array_count_m ( platform_extensions );
 
     // Allocate layers/extensions names list
     size_t layer_i = 0;
@@ -298,27 +298,27 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
     std_stack_t layers_allocator = std_static_stack_m ( layers_buffer );
     std_stack_t extensions_allocator = std_static_stack_m ( extensions_buffer );
 
-    for ( size_t i = 0; i < std_static_array_capacity_m ( base_layers ); ++i ) {
+    for ( size_t i = 0; i < std_static_array_count_m ( base_layers ); ++i ) {
         layers[layer_i++] = std_stack_string_copy ( &layers_allocator, base_layers[i] );
     }
 
     if ( layers_flags & xg_runtime_layer_bit_debug_m ) {
-        for ( size_t i = 0; i < std_static_array_capacity_m ( debug_layers ); ++i ) {
+        for ( size_t i = 0; i < std_static_array_count_m ( debug_layers ); ++i ) {
             layers[layer_i++] = std_stack_string_copy ( &layers_allocator, debug_layers[i] );
         }
     }
 
     if ( layers_flags & xg_runtime_layer_bit_renderdoc_m ) {
-        for ( size_t i = 0; i < std_static_array_capacity_m ( renderdoc_layers ); ++i ) {
+        for ( size_t i = 0; i < std_static_array_count_m ( renderdoc_layers ); ++i ) {
             layers[layer_i++] = std_stack_string_copy ( &layers_allocator, renderdoc_layers[i] );
         }
     }
 
-    for ( size_t i = 0; i < std_static_array_capacity_m ( base_extensions ); ++i ) {
+    for ( size_t i = 0; i < std_static_array_count_m ( base_extensions ); ++i ) {
         extensions[extension_i++] = std_stack_string_copy ( &extensions_allocator, base_extensions[i] );
     }
 
-    for ( size_t i = 0; i < std_static_array_capacity_m ( platform_extensions ); ++i ) {
+    for ( size_t i = 0; i < std_static_array_count_m ( platform_extensions ); ++i ) {
         extensions[extension_i++] = std_stack_string_copy ( &extensions_allocator, platform_extensions[i] );
     }
 

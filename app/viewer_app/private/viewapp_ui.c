@@ -199,15 +199,15 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xi->newline();
 
         xi->add_label ( xi_workload, &xi_label_state_m ( .text = "target fps" ) );
-        char target_fps_select_strings[std_static_array_capacity_m ( state->ui.target_fps_values )][6];
-        const char* target_fps_select_items[std_static_array_capacity_m ( state->ui.target_fps_values )];
-        for ( uint32_t i = 0; i < std_static_array_capacity_m ( state->ui.target_fps_values ); ++i ) {
+        char target_fps_select_strings[std_static_array_count_m ( state->ui.target_fps_values )][6];
+        const char* target_fps_select_items[std_static_array_count_m ( state->ui.target_fps_values )];
+        for ( uint32_t i = 0; i < std_static_array_count_m ( state->ui.target_fps_values ); ++i ) {
             std_u32_to_str ( target_fps_select_strings[i], 6, state->ui.target_fps_values[i], 0 );
             target_fps_select_items[i] = target_fps_select_strings[i];
         }
         xi_select_state_t target_fps_select = xi_select_state_m (
             .items = target_fps_select_items,
-            .item_count = std_static_array_capacity_m ( target_fps_select_items ),
+            .item_count = std_static_array_count_m ( target_fps_select_items ),
             .item_idx = state->ui.target_fps_idx,
             .width = 30,
             .sort_order = 2,
@@ -304,7 +304,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         const char* scene_select_items[] = { "cornell box", "field", "..." };
         xi_select_state_t scene_select = xi_select_state_m (
             .items = scene_select_items,
-            .item_count = std_static_array_capacity_m ( scene_select_items ),
+            .item_count = std_static_array_count_m ( scene_select_items ),
             .item_idx = state->scene.active_scene,
             .width = 100,
             .sort_order = 2,
@@ -334,7 +334,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 #endif
         xi_select_state_t graph_select = xi_select_state_m (
             .items = graph_select_items,
-            .item_count = std_static_array_capacity_m ( graph_select_items ),
+            .item_count = std_static_array_count_m ( graph_select_items ),
             .item_idx = state->render.active_graph == state->render.raster_graph ? 0 : 1,
             .width = 100,
             .sort_order = 1,
@@ -467,7 +467,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                         const char* channel_select_items[] = { "r", "g", "b", "a", "1", "0" };
                         xi_select_state_t channel_select_0 = xi_select_state_m (
                             .items = channel_select_items,
-                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_count = std_static_array_count_m ( channel_select_items ),
                             .item_idx = state->ui.export_channels[0],
                             .width = 20,
                             .sort_order = node_info.texture_count - j,
@@ -475,7 +475,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                         );
                         xi_select_state_t channel_select_1 = xi_select_state_m (
                             .items = channel_select_items,
-                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_count = std_static_array_count_m ( channel_select_items ),
                             .item_idx = state->ui.export_channels[1],
                             .width = 20,
                             .sort_order = node_info.texture_count - j,
@@ -483,7 +483,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                         );
                         xi_select_state_t channel_select_2 = xi_select_state_m (
                             .items = channel_select_items,
-                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_count = std_static_array_count_m ( channel_select_items ),
                             .item_idx = state->ui.export_channels[2],
                             .width = 20,
                             .sort_order = node_info.texture_count - j,
@@ -491,7 +491,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                         );
                         xi_select_state_t channel_select_3 = xi_select_state_m (
                             .items = channel_select_items,
-                            .item_count = std_static_array_capacity_m ( channel_select_items ),
+                            .item_count = std_static_array_count_m ( channel_select_items ),
                             .item_idx = state->ui.export_channels[3],
                             .width = 20,
                             .sort_order = node_info.texture_count - j,
@@ -608,7 +608,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         uint32_t destroy_list[se_max_entities_m];
         uint32_t destroy_count = 0;
         size_t entity_count = se->get_entity_list ( entity_list, se_max_entities_m );
-        std_assert_m ( entity_count < 64 * std_static_array_capacity_m ( state->ui.expanded_entities_bitset ) );
+        std_assert_m ( entity_count < 64 * std_static_array_count_m ( state->ui.expanded_entities_bitset ) );
 
         bool delete_selected = false;
         if ( !old_input_state->keyboard[wm_keyboard_state_del_m] && input_state->keyboard[wm_keyboard_state_del_m] ) {
@@ -749,7 +749,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             viewapp_destroy_entity_resources ( entity_list[entity_idx], workload, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
             se->destroy_entity ( entity_list[entity_idx] );
             --remaining_entities;
-            std_bitset_shift_left ( state->ui.expanded_entities_bitset, entity_idx, 1, std_static_array_capacity_m ( state->ui.expanded_entities_bitset ) );
+            std_bitset_shift_left ( state->ui.expanded_entities_bitset, entity_idx, 1, std_static_array_count_m ( state->ui.expanded_entities_bitset ) );
         }
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (

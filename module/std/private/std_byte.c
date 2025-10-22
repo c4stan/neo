@@ -278,15 +278,15 @@ uint64_t std_pow2_round_down_u64 ( uint64_t v ) {
     return v - ( v >> 1 );
 }
 
-size_t std_div_ceil ( size_t dividend, size_t divisor ) {
+size_t std_div_round_up ( size_t dividend, size_t divisor ) {
     return ( dividend + divisor - 1 ) / divisor;
 }
 
-uint32_t std_div_ceil_u32 ( uint32_t dividend, uint32_t divisor ) {
+uint32_t std_div_round_up_u32 ( uint32_t dividend, uint32_t divisor ) {
     return ( dividend + divisor - 1 ) / divisor;
 }
 
-uint64_t std_div_ceil_u64 ( uint64_t dividend, uint64_t divisor ) {
+uint64_t std_div_round_up_u64 ( uint64_t dividend, uint64_t divisor ) {
     return ( dividend + divisor - 1 ) / divisor;
 }
 

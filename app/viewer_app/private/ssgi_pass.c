@@ -41,7 +41,7 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = pipeline_state,
-            .workgroup_count = { std_div_ceil_u32 ( dst_info.width, 8 ), std_div_ceil_u32 ( dst_info.height, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( dst_info.width, 8 ), std_div_round_up_u32 ( dst_info.height, 8 ), 1 },
             .uniform_data = std_buffer_struct_m ( &uniform_data ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( graph_info.device, xg_default_sampler_linear_clamp_m ) },

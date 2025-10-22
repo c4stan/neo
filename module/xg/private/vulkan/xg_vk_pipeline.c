@@ -120,8 +120,8 @@ static int xg_vk_pipeline_render_target_blend_state_cmp ( const void* a, const v
     }
 }
 
-#define xg_vk_renderpasses_bitset_u64_count_m std_div_ceil_m ( xg_vk_max_renderpasses_m, 64 )
-#define xg_vk_resource_bindings_layouts_bitset_u64_count_m std_div_ceil_m ( xg_vk_max_resource_bindings_layouts_m, 64 )
+#define xg_vk_renderpasses_bitset_u64_count_m std_div_round_up_m ( xg_vk_max_renderpasses_m, 64 )
+#define xg_vk_resource_bindings_layouts_bitset_u64_count_m std_div_round_up_m ( xg_vk_max_resource_bindings_layouts_m, 64 )
 
 void xg_vk_pipeline_load ( xg_vk_pipeline_state_t* state ) {
     xg_vk_pipeline_state = state;

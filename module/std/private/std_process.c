@@ -10,7 +10,6 @@
 //==============================================================================
 
 static std_process_state_t* std_process_state;
-static std_process_t* std_process_self;
 
 //==============================================================================
 
@@ -78,7 +77,7 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
     process->stderr_handle = ( uint64_t ) STDERR_FILENO;
 #endif
 
-    std_process_self = process;
+    state->process_self = process;
 
     std_mutex_unlock ( &state->mutex );
 }
@@ -439,7 +438,7 @@ bool std_process_kill ( std_process_h process_handle ) {
 }
 
 std_process_h std_process_this ( void ) {
-    return std_process_self->handle;
+    return std_process_state->process_self->handle;
 }
 
 void std_process_this_exit ( std_process_exit_code_e exit_code ) {

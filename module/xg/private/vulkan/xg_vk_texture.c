@@ -21,8 +21,8 @@ void xg_vk_texture_load ( xg_vk_texture_state_t* state ) {
 
     xg_vk_texture_state->textures_array = std_virtual_heap_alloc_array_m ( xg_vk_texture_t, xg_vk_max_textures_m );
     xg_vk_texture_state->textures_freelist = std_freelist_m ( xg_vk_texture_state->textures_array, xg_vk_max_textures_m );
-    xg_vk_texture_state->textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_ceil_m ( xg_vk_max_textures_m, 64 ) );
-    std_mem_zero ( xg_vk_texture_state->textures_bitset, 8 * std_div_ceil_m ( xg_vk_max_textures_m, 64 ) );
+    xg_vk_texture_state->textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_round_up_m ( xg_vk_max_textures_m, 64 ) );
+    std_mem_zero ( xg_vk_texture_state->textures_bitset, 8 * std_div_round_up_m ( xg_vk_max_textures_m, 64 ) );
     std_mutex_init ( &xg_vk_texture_state->textures_mutex );
 }
 
@@ -32,7 +32,7 @@ void xg_vk_texture_reload ( xg_vk_texture_state_t* state ) {
 
 void xg_vk_texture_unload ( void ) {
     uint64_t idx = 0;
-    while ( std_bitset_scan ( &idx, xg_vk_texture_state->textures_bitset, idx, std_div_ceil_m ( xg_vk_max_textures_m, 64) ) ) {
+    while ( std_bitset_scan ( &idx, xg_vk_texture_state->textures_bitset, idx, std_div_round_up_m ( xg_vk_max_textures_m, 64) ) ) {
         xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[idx];
         
         std_log_info_m ( "Destroying texture " std_fmt_u64_m ": " std_fmt_str_m, idx, texture->params.debug_name );

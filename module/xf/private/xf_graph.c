@@ -13,7 +13,7 @@
 
 static xf_graph_state_t* xf_graph_state;
 
-#define xf_graph_bitset_u64_count_m std_div_ceil_m ( xf_graph_max_graphs_m, 8 )
+#define xf_graph_bitset_u64_count_m std_div_round_up_m ( xf_graph_max_graphs_m, 8 )
 
 void xf_graph_load ( xf_graph_state_t* state ) {
     state->graphs_array = std_virtual_heap_alloc_array_m ( xf_graph_t, xf_graph_max_graphs_m );
@@ -56,7 +56,7 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     graph->export_source_node = xf_null_handle_m;
     graph->export_node = xf_null_handle_m;
     graph->nodes_freelist = std_static_freelist_m ( graph->nodes_array );
-    graph->query_contexts_ring = std_ring ( std_static_array_capacity_m ( graph->query_contexts_array ) );
+    graph->query_contexts_ring = std_ring ( std_static_array_count_m ( graph->query_contexts_array ) );
     graph->resource_dependencies_allocator = std_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
     graph->physical_resource_dependencies_allocator = std_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * 2 * xf_resource_max_mip_levels_m ) );
     graph->node_user_arg_allocator = std_stack_create ( 128 * xf_graph_max_nodes_m );
@@ -134,7 +134,7 @@ static void xf_graph_add_texture_dependency ( xf_graph_h graph_handle, xf_node_h
     for ( uint32_t i = 0; i < mip_count; ++i ) {
         std_assert_m ( i < texture->dependencies.subresource_count );
         xf_graph_subresource_dependencies_t* deps = &texture->dependencies.subresources[i + view.mip_base];
-        std_assert_m ( deps->count + 1 < std_static_array_capacity_m ( deps->array ) );
+        std_assert_m ( deps->count + 1 < std_static_array_count_m ( deps->array ) );
         deps->array[deps->count++] = xf_resource_access_m ( .node = node_handle, .resource_idx = resource_idx );
     }
 }
@@ -180,7 +180,7 @@ static void xf_graph_accumulate_physical_resources_dependencies ( xf_graph_h gra
                     xf_resource_access_t* access = &deps->array[access_it];
                     if ( access->node == node_handle ) {
                         xf_graph_subresource_dependencies_t* acc_deps = &graph_physical_texture->dependencies.subresources[mip_it];
-                        std_assert_m ( acc_deps->count + 1 < std_static_array_capacity_m ( acc_deps->array ) );
+                        std_assert_m ( acc_deps->count + 1 < std_static_array_count_m ( acc_deps->array ) );
                         acc_deps->array[acc_deps->count++] = *access;
                     }
                 }
@@ -510,7 +510,7 @@ static void xf_graph_accumulate_node_dependencies ( xf_graph_h graph_handle ) {
         if ( info.view_access == xg_texture_view_access_default_only_m ) {
             xf_graph_add_node_dependencies ( graph_handle, &texture->deps.shared );
         } else if ( info.view_access == xg_texture_view_access_separate_mips_m ) {
-            for ( uint32_t j = 0; j < std_static_array_capacity_m ( texture->deps.mips ); ++j ) {
+            for ( uint32_t j = 0; j < std_static_array_count_m ( texture->deps.mips ); ++j ) {
                 xf_graph_add_node_dependencies ( graph_handle, &texture->deps.mips[j] );
             }
         } else {
@@ -1429,7 +1429,7 @@ static void xf_graph_update_export_node ( xf_graph_h graph_handle ) {
             .type = xf_node_type_compute_pass_m,
             .pass.compute = xf_node_compute_pass_params_m (
                 .pipeline = pipeline,
-                .workgroup_count = { std_div_ceil_u32 ( info.width, 8 ), std_div_ceil_u32 ( info.height, 8 ), 1 },
+                .workgroup_count = { std_div_round_up_u32 ( info.width, 8 ), std_div_round_up_u32 ( info.height, 8 ), 1 },
                 .samplers_count = 1,
                 .samplers = { xg->get_default_sampler ( graph->params.device, xg_default_sampler_linear_clamp_m ) },
                 .uniform_data = std_buffer_struct_m ( &uniform_data ),

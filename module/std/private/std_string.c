@@ -473,14 +473,14 @@ static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value ) {
     static const char*      units[] = { "B", "M", "K", "" };
     static const uint64_t   max = 1024ULL * 1024ULL * 1024ULL * 1024ULL;
-    return std_u64_to_str_approx ( dest, cap, count_value, std_static_array_capacity_m ( units ), units, max );
+    return std_u64_to_str_approx ( dest, cap, count_value, std_static_array_count_m ( units ), units, max );
 }
 
 size_t std_size_to_str_approx ( char* dest, size_t cap, size_t size_value ) {
     //static const char*      units[] = { "EiB", "PiB", "TiB", "GiB", "MiB", "KiB", "B" };
     static const char*      units[] = { "EB", "PB", "TB", "GB", "MB", "KB", "B" };
     static const uint64_t   max = 1024ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL;
-    return std_u64_to_str_approx ( dest, cap, size_value, std_static_array_capacity_m ( units ), units, max );
+    return std_u64_to_str_approx ( dest, cap, size_value, std_static_array_count_m ( units ), units, max );
 }
 
 uint32_t std_str_hash_32 ( const char* str ) {

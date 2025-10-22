@@ -7,6 +7,7 @@ import pprint
 import configparser
 import sys
 import platform
+import time
 
 if platform.system() == 'Windows':
     import win32pipe, win32file, pywintypes
@@ -944,7 +945,9 @@ class Project:
 
         create_dir(relpath(self.path + '/build/' + config_path, rootpath) + '/output/')
 
+    # Rename the target app dll and add the alias token. Allows for the linker to build a new dll file during a reload.
     def alias_target(self):
+        alias_token = str(int(time.time())) + '_' #'___'
         copied_dlls = []
 
         config = config_str(self.config)
@@ -970,14 +973,7 @@ class Project:
             source_dll_path = dll
             copied_dlls.append(name)
 
-            alias_dll_path = normpath(modules_path + '/' + '___' + name + ext)
-
-            # print('\t' + source_dll_path)
-            # this will delete the .dll even if there's a process still running that's loaded it in the past
-            # needed for live reload
-            
-            #log.verbose('Deleting ' + normpath(modules_path + '/' + name + ext))
-            #os.system('rm -f ' + normpath(modules_path + '/' + name + ext))
+            alias_dll_path = normpath(modules_path + '/' + alias_token + name + ext)
             
             if (os.path.exists(alias_dll_path)):
                 log.verbose('Deleting ' + alias_dll_path)
@@ -989,8 +985,9 @@ class Project:
                 # TODO make silent to avoid warning
                 os.system('mv ' + dest_dll_path + ' ' + alias_dll_path)
 
-    # external_dlls are located and copied locally as part of the build process by this script
+    # Gather external dependencies into the target output path
     def gather_dlls(self, path):
+        alias_token = str(int(time.time())) + '_' #'___'
         copied_dlls = []
 
         config = config_str(self.config)
@@ -1037,23 +1034,16 @@ class Project:
             if source_time > dest_time:
                 copied_dlls.append(name)
 
-                alias_dll_path = normpath(modules_path + '/' + '___' + name + ext)
+                # If the dlls already exist in the output path rename them and add the alias token.
+                # Can't delete them during a reload because they're locked by the OS.
+                alias_dll_path = normpath(modules_path + '/' + alias_token + name + ext)
 
-                # print('\t' + source_dll_path)
-                # this will delete the .dll even if there's a process still running that's loaded it in the past
-                # needed for live reload
-                
-                #log.verbose('Deleting ' + normpath(modules_path + '/' + name + ext))
-                #os.system('rm -f ' + normpath(modules_path + '/' + name + ext))
-                
                 if (os.path.exists(alias_dll_path)):
                     log.verbose('Deleting ' + alias_dll_path)
                     os.system('rm -f ' + alias_dll_path)
 
                 if (os.path.exists(dest_dll_path)):
                     log.verbose('Renaming ' + dest_dll_path + ' to ' + alias_dll_path)
-                    #log.verbose('mv ' + normpath(modules_path + '/' + name + ext) + ' ' + normpath(modules_path + '/' + '___' + name + ext))
-                    # TODO make silent to avoid warning
                     os.system('mv ' + dest_dll_path + ' ' + alias_dll_path)
 
                 log.verbose('Copying ' + dll + ' to ' + dest_dll_path)

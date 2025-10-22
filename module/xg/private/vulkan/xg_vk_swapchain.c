@@ -18,7 +18,7 @@
 
 static xg_vk_swapchain_state_t* xg_vk_swapchain_state;
 
-#define xg_vk_swapchain_bitset_u64_count_m std_div_ceil_m ( xg_vk_max_swapchains_m, 64 )
+#define xg_vk_swapchain_bitset_u64_count_m std_div_round_up_m ( xg_vk_max_swapchains_m, 64 )
 
 void xg_vk_swapchain_load ( xg_vk_swapchain_state_t* state ) {
     xg_vk_swapchain_state = state;

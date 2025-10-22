@@ -222,6 +222,7 @@ typedef struct {
 typedef struct {
     std_process_t*          processes_array;
     std_process_t*          processes_freelist;
+    std_process_t*          process_self;
 
     std_process_pipe_t*     pipes_array;
     std_process_pipe_t*     pipes_freelist;

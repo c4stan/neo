@@ -65,7 +65,7 @@ typedef struct {
     uint32_t idx; // entity idx in the family
 } se_entity_t;
 
-#define std_entity_family_bitset_block_count_m ( std_div_ceil_m(se_entity_max_families_m, 64) )
+#define std_entity_family_bitset_block_count_m ( std_div_round_up_m(se_entity_max_families_m, 64) )
 
 // TODO make this debug/tool only
 #if 0
@@ -94,7 +94,7 @@ typedef struct {
 } se_entity_component_metadata_t;
 
 typedef struct {
-    uint64_t used_entities[ std_div_ceil_m ( se_max_entities_m, 64 ) ];    
+    uint64_t used_entities[ std_div_round_up_m ( se_max_entities_m, 64 ) ];    
     se_entity_name_t names[se_max_entities_m];
 } se_entity_metadata_t;
 

@@ -229,7 +229,7 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
 
     std_mutex_init ( &heap->mutex );
 
-    uint64_t segment_count = std_div_ceil ( size, xg_vk_allocator_tlsf_min_segment_size_m );
+    uint64_t segment_count = std_div_round_up ( size, xg_vk_allocator_tlsf_min_segment_size_m );
     heap->segments = std_virtual_heap_alloc_array_m ( xg_vk_allocator_tlsf_segment_t, segment_count );
 
     for (uint32_t i = 0; i < segment_count; ++i ) {

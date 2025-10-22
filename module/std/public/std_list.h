@@ -53,8 +53,8 @@ void std_dlist_remove_offset ( void* item, uint64_t offset );
 // The buffer base and the stride must both be pointer aligned.
 void* std_freelist ( void* base, size_t stride, size_t capacity );
 
-#define std_freelist_m( array, count ) std_array_typecast_m ( array ) std_freelist ( array, std_static_array_stride_m( array ), count )
-#define std_static_freelist_m( array ) std_array_typecast_m ( array ) std_freelist ( array, std_static_array_stride_m( array ), std_static_array_capacity_m( array ) )
+#define std_freelist_m( array, count ) std_array_typecast_m ( array ) std_freelist ( array, std_array_stride_m( array ), count )
+#define std_static_freelist_m( array ) std_array_typecast_m ( array ) std_freelist ( array, std_array_stride_m( array ), std_static_array_count_m( array ) )
 
 // Graph
 #if 0

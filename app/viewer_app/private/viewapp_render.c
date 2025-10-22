@@ -396,7 +396,7 @@ void viewapp_boot_raytrace_graph ( void ) {
                 xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ),
                 xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ),
             },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_buffer_reads_count = 2,
@@ -434,7 +434,7 @@ void viewapp_boot_raytrace_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "restir_di_spatial" ) ) ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_buffer_reads_count = 1,
@@ -468,7 +468,7 @@ void viewapp_boot_raytrace_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "restir_di_lighting" ) ) ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_buffer_reads_count = 1,
@@ -522,7 +522,7 @@ void viewapp_boot_raytrace_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "taa" ) ) ),
             .samplers_count = 2,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
@@ -562,7 +562,7 @@ void viewapp_boot_raytrace_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "tonemap" ) ) ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
@@ -777,7 +777,7 @@ void viewapp_boot_raster_graph ( void ) {
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cluster_build" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
+            .workgroup_count = { std_div_round_up_u32 ( light_cluster_count, 64 ), 1, 1 },
             .uniform_data = std_buffer_static_array_m ( light_grid_size ),
         ),
         .resources = xf_node_resource_params_m (
@@ -795,7 +795,7 @@ void viewapp_boot_raster_graph ( void ) {
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cull" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( light_cluster_count, 64 ), 1, 1 },
+            .workgroup_count = { std_div_round_up_u32 ( light_cluster_count, 64 ), 1, 1 },
             .uniform_data = std_buffer_static_array_m ( light_grid_size ),
         ),
         .resources = xf_node_resource_params_m (
@@ -832,7 +832,7 @@ void viewapp_boot_raster_graph ( void ) {
         .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
             .uniform_data = std_buffer_struct_m ( &lighting_uniforms ),
@@ -995,7 +995,7 @@ void viewapp_boot_raster_graph ( void ) {
         .debug_name = "ssgi_ta",
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssgi_ta" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x / ssgi_scale, 8 ), std_div_ceil_u32 ( resolution_y / ssgi_scale, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssgi_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssgi_scale, 8 ), 1 },
             .samplers_count = 2,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         ),
@@ -1065,7 +1065,7 @@ void viewapp_boot_raster_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssgi_ta" ) ) ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
@@ -1139,7 +1139,7 @@ void viewapp_boot_raster_graph ( void ) {
         .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x / ssr_scale, 8 ), std_div_ceil_u32 ( resolution_y / ssr_scale, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssr_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssr_scale, 8 ), 1 },
             .samplers_count = 2,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         ),
@@ -1177,7 +1177,7 @@ void viewapp_boot_raster_graph ( void ) {
         .debug_name = "combine",
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "combine" ) ) ),
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
         ),
@@ -1214,7 +1214,7 @@ void viewapp_boot_raster_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "taa" ) ) ),
             .samplers_count = 2,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
@@ -1254,7 +1254,7 @@ void viewapp_boot_raster_graph ( void ) {
             .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "tonemap" ) ) ),
             .samplers_count = 1,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
-            .workgroup_count = { std_div_ceil_u32 ( resolution_x, 8 ), std_div_ceil_u32 ( resolution_y, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,

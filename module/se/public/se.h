@@ -48,7 +48,7 @@ typedef struct {
     ##__VA_ARGS__ \
 }
 
-#define se_component_mask_block_count_m std_div_ceil_m ( se_max_component_types_m, sizeof ( uint64_t ) )
+#define se_component_mask_block_count_m std_div_round_up_m ( se_max_component_types_m, sizeof ( uint64_t ) )
 typedef struct {
     uint64_t u64[se_component_mask_block_count_m];
 } se_component_mask_t;

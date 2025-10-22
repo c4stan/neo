@@ -50,6 +50,7 @@ static std_app_state_e std_app_test_tick ( void ) {
         m_state->window = wm->create_window ( &params );
     }
 
+
     {
         wm_i* wm = std_module_get_m ( wm_module_name_m );
 
@@ -73,11 +74,6 @@ static std_app_state_e std_app_test_tick ( void ) {
 
         if ( input_state.keyboard[wm_keyboard_state_f1_m] ) {
             return std_app_state_reload_m;
-            m_state->first_print = true;
-        }
-
-        if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
-            return std_app_state_reboot_m;
             m_state->first_print = true;
         }
 
