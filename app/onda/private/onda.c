@@ -540,6 +540,7 @@ static void onda_client_feed_stream ( aud_source_h source, onda_client_stream_st
 
     if ( stream_state->type == onda_client_stream_type_mp3_m ) {
         int16_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
+        // TODO fix this!!!
         while ( stream_state->consumed_size < stream_state->read_size ) {
             void* decode_base = stream_state->begin + stream_state->consumed_size;
             uint32_t decode_size = stream_state->read_size - stream_state->consumed_size;
@@ -862,6 +863,7 @@ static std_app_state_e onda_update_client ( void ) {
             std_path_append_dir ( onda_state->client.path, std_path_size_m, client_list->subdirs[id] );
             onda_client_request_list ( stack, "" );
             list_result_t subdir_list = onda_client_read_list ( stack );
+            onda_client_print_list ( stack, &subdir_list );
             for ( uint32_t i = 0; i < subdir_list.file_count; ++i ) {
                 bool exit = onda_client_play_media ( stack, subdir_list.files[i] );
                 if ( exit ) break;

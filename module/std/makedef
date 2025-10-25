@@ -6,5 +6,8 @@ if win32
     libs = mincore.lib, dbghelp.lib
 endif
 if linux
-    libs = m #, dl, pthread
+    libs = m
+endif
+if android
+    libs = m, android
 endif

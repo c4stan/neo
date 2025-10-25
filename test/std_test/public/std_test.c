@@ -1182,12 +1182,14 @@ void std_main ( void ) {
     std_process_info_t process_info;
     std_process_info ( &process_info, std_process_this() );
 
+#if !defined std_platform_android_m
     if ( process_info.args_count == 1 ) {
         if ( std_mem_cmp ( process_info.args[0], CHILD_PROCESS_MAGIC_NUMBER, sizeof ( CHILD_PROCESS_MAGIC_NUMBER ) - 1 ) == 0 ) {
             test_process_child();
             return;
         }
     }
+#endif
 
     const char* separator = "------------------------------------------";
 
@@ -1195,8 +1197,10 @@ void std_main ( void ) {
     std_log_info_m ( separator );
     test_allocator();
     std_log_info_m ( separator );
+#if !defined std_platform_android_m
     test_process();
     std_log_info_m ( separator );
+#endif
     test_thread();
     std_log_info_m ( separator );
     test_module();

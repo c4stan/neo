@@ -96,10 +96,14 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
 #if CPU_SETSIZE < std_thread_max_threads_m
 #error "CPU thread affinity mask doesn't fit current std_thread_max_threads_m value"
 #endif
+#if defined std_platform_android_m
+        // TODO
+#else
         cpu_set_t cpu_mask;
         CPU_ZERO ( &cpu_mask );
         CPU_SET ( std_thread_main_thread_core_mask_m, &cpu_mask );
         pthread_setaffinity_np ( os_handle, sizeof ( cpu_mask ), &cpu_mask );
+#endif
 #endif
     }
  
@@ -333,9 +337,14 @@ void std_thread_set_core_mask ( std_thread_h thread_handle, uint64_t core_mask )
 #if defined(std_platform_win32_m)
     SetThreadAffinityMask ( ( HANDLE ) thread->os_handle, core_mask );
 #else
+#if defined std_platform_android_m
+    // TODO
+    std_unused_m ( thread );
+#else
     cpu_set_t cpu_mask;
     CPU_ZERO ( &cpu_mask );
     CPU_SET ( core_mask, &cpu_mask );
     pthread_setaffinity_np ( thread->os_handle, sizeof ( cpu_mask ), &cpu_mask );
+#endif
 #endif
 }

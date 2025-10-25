@@ -601,7 +601,12 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     char pipe_name[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_name );
+#if defined std_platform_android_m
+        // TODO android /sdcard/ FS doesnt' support named pipes - https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+        std_stack_string_append ( &stack, "/data/local/tmp/" );
+#else
         std_stack_string_append ( &stack, "/tmp/" );
+#endif
         std_stack_string_append ( &stack, params->name );
     }
 
@@ -610,7 +615,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     if ( stat ( pipe_name, &st ) == 0 ) {
         if ( !S_ISFIFO ( st.st_mode ) ) {
             std_log_error_m ( "Pipe name " std_fmt_str_m " already exists as path" );
-            return std_process_null_handle_m;
+            return std_null_handle_m ( std_pipe_h );
         }
         if ( unlink ( pipe_name ) != 0 ) {
             std_log_os_error_m();
@@ -649,7 +654,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     // TODO lock/unlock a mutex
     std_process_pipe_t* pipe = std_list_pop_m ( &std_process_state->pipes_freelist );
     std_assert_m ( pipe );
-    pipe->os_handle = std_process_null_handle_m;//( uint64_t ) fd;
+    pipe->os_handle = -1;//( uint64_t ) fd;
     pipe->is_owner = true;
     pipe->params = *params;
     std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, params->name );
@@ -679,7 +684,11 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
     char pipe_name[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_name );
+#if defined std_platform_android_m
+        std_stack_string_append ( &stack, "/data/local/tmp/" );
+#else
         std_stack_string_append ( &stack, "/tmp/" );
+#endif
         std_stack_string_append ( &stack, pipe->params.name );
     }
 
@@ -780,7 +789,11 @@ wait_for_pipe_creation:
     char pipe_path[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_path );
+#if defined std_platform_android_m
+        std_stack_string_append ( &stack, "/data/local/tmp/" );
+#else
         std_stack_string_append ( &stack, "/tmp/" );
+#endif
         std_stack_string_append ( &stack, name );
     }
 

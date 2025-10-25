@@ -9,6 +9,8 @@ import sys
 import platform
 import time
 
+import bindings
+
 if platform.system() == 'Windows':
     import win32pipe, win32file, pywintypes
 
@@ -52,7 +54,14 @@ MAKE_TARGETS = [TARGET_ALL]#, TARGET_CLEAN]
 # -- Compilers
 COMPILER_CLANG = 1
 COMPILER_GCC = 2
+COMPILER_CLANG_ANDROID = 3
 COMPILER = COMPILER_CLANG
+
+# -- Target
+TARGET_WIN32 = 1
+TARGET_LINUX = 2
+TARGET_ANDROID = 3
+TARGET = TARGET_WIN32
 
 # -- Warnings
 CORE_WARNING_FLAGS = (
@@ -335,9 +344,11 @@ def parse_makedef(path, bindings):
                 skip = True
                 exp = line.strip().split()
                 target_platform = exp[1].strip()
-                if target_platform == 'win32' and platform.system() == 'Windows':
+                if target_platform == 'win32' and TARGET == TARGET_WIN32:
                     skip = False
-                if target_platform == 'linux' and platform.system() == 'Linux':
+                if target_platform == 'linux' and TARGET == TARGET_LINUX:
+                    skip = False
+                if target_platform == 'android' and TARGET == TARGET_ANDROID:
                     skip = False
                 continue
 
@@ -711,6 +722,16 @@ class Project:
             std = 'c99'
         elif COMPILER == COMPILER_GCC:
             std = 'gnu23'
+        elif COMPILER == COMPILER_CLANG_ANDROID:
+            std = 'c99'
+
+        comp = ""
+        ar = ""
+
+        # TODO
+        if COMPILER == COMPILER_CLANG_ANDROID:
+            comp = bindings.get("android_clang_path") + "clang.exe"
+            ar = bindings.get("android_clang_path") + "llvm-ar.exe"
 
         main_target.cmd = ''
         if COMPILER == COMPILER_CLANG:
@@ -720,11 +741,9 @@ class Project:
                     main_target.cmd += '\t@llvm-ar crus $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    #main_target.cmd += '\t@clang-cl -Fa -Z7 -LD -o $@ ' + objs_dep
                     main_target.cmd += '\t@clang -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    #main_target.cmd += '\t@clang-cl -Fa -Z7 /entry:mainCRTStartup -o $@ ' + objs_dep
                     main_target.cmd += '\t@clang -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
             elif platform.system() == 'Linux':
                 # -rdynamic preserves code symbols, allows to print callstack
@@ -734,7 +753,6 @@ class Project:
                     main_target.cmd += '\t@ar crs $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    #main_target.cmd += '\t@clang-cl -Fa -Z7 -LD -o $@ ' + objs_dep
                     main_target.cmd += '\t@clang -rdynamic -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
@@ -762,6 +780,20 @@ class Project:
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
                     main_target.cmd += '\t@gcc ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
+        elif COMPILER == COMPILER_CLANG_ANDROID:
+            if platform.system() == 'Windows':
+                if self.output == OUTPUT_LIB:
+                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
+                    main_target.cmd += '\t@' + ar + ' crus $@ ' + objs_dep
+                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
+                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
+                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g --target=aarch64-linux-android31 -shared ' + config_flags + ' -o $@ ' + objs_dep
+                elif self.output == OUTPUT_EXE:
+                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
+                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g --target=aarch64-linux-android31 ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
+            elif platform.system() == 'Linux':
+                # TODO
+                pass                
 
         # When target is LIB, ignore the other .lib dependency. It will get linked in by the final target (DLL or EXE) that also includes this lib
         if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP: # or self.output == OUTPUT_LIB:
@@ -775,6 +807,12 @@ class Project:
                             main_target.cmd += ' -l' + '' + name + ''
                         else:
                             main_target.cmd += ' -L' + '"' + base + '"' + ' -l' + '' + name + ''
+                    elif COMPILER == COMPILER_CLANG_ANDROID:
+                        base, name, ext = parse_path(lib)
+                        if base == '':
+                            main_target.cmd += ' -l' + '' + name + ''
+                        else:
+                            main_target.cmd += ' ' + lib
             elif platform.system() == 'Linux': # TODO not sure if this is a win32/linux or clang/gcc thing... ?
                 for lib in self.external_libs:
                     base, name, ext = parse_path(lib)
@@ -806,11 +844,11 @@ class Project:
 
         # Prepare obj compilation flags
         platform_flags = ''
-        if platform.system() == 'Windows':
+        if TARGET == TARGET_WIN32:
             #platform_flags = '/J' # default char to unsigned
             platform_flags = '-funsigned-char' # default char to unsigned
             platform_flags += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION # TODO remove?
-        elif platform.system() == 'Linux':
+        elif TARGET == TARGET_LINUX:
             platform_flags = '-funsigned-char' # default char to unsigned
 
         compile_flags = concat(['-Wall', platform_flags, config_flags, CORE_WARNING_FLAGS])
@@ -835,7 +873,6 @@ class Project:
 
             if COMPILER == COMPILER_CLANG:
                 if platform.system() == 'Windows':
-                    # TODO make asm output optional?
                     #target.cmd = '\t@clang-cl ' + config_flags + ' -Zi -Fa' + normpath(output_path + '/' + name + '.asm') + ' '
                     target.cmd = '\t@clang -std=' + std + ' -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
@@ -874,12 +911,10 @@ class Project:
                         target.cmd += ' -o $@'
                     target.cmd += ' -fPIC' # needed when building a shared lib, static libs used by the shared lib must also have this...
                     target.cmd += ' ' + src_def_cmd
-                    #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
             elif COMPILER == COMPILER_GCC:
                 if platform.system() == 'Windows':
-                    # TODO make asm output optional?
                     target.cmd = '\t@gcc -std=' + std + ' -gcodeview'# --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
@@ -888,13 +923,8 @@ class Project:
                         #      that way it would be easier to configure external references when sharing the generated makefile
                         #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
-                    #target.cmd += ' -Wall /J ' + CORE_WARNING_FLAGS
-                    #if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                    #    target.cmd += ' ' + EXTENDED_WARNING_FLAGS
                     target.cmd += ' -o $@ -c ' + relpath(src, rootpath + '/' + build_path)
-                    #target.cmd += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION
                     target.cmd += ' ' + src_def_cmd
-                    #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
                 elif platform.system() == 'Linux':
@@ -919,6 +949,22 @@ class Project:
                     #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
+            elif COMPILER == COMPILER_CLANG_ANDROID:
+                if platform.system() == 'Windows':
+                    target.cmd = '\t@' + comp + ' -std=' + std + ' -g --target=aarch64-linux-android31' # 64bit only
+                    for path in self.project_paths:
+                        target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
+                    for path in self.external_paths:
+                        # TODO for each external path create a macro instead of referencing its path directly?
+                        #      that way it would be easier to configure external references when sharing the generated makefile
+                        target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
+                    target.cmd += ' -o $@ -c ' + relpath(src, rootpath + '/' + build_path)
+                    target.cmd += ' ' + src_def_cmd
+                    target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
+                    target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
+                elif platform.system() == 'Linux':
+                    # TODO
+                    pass                
 
             #target.cmd += ' -march=native'
 
@@ -929,6 +975,8 @@ class Project:
                     target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
                 elif COMPILER == COMPILER_GCC:
                     target.cmd = '\t@gcc -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                elif COMPILER == COMPILER_CLANG_ANDROID:
+                    target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
 
                 for path in self.project_paths:
                     target.cmd += ' -I' + path

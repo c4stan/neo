@@ -179,10 +179,9 @@ void std_platform_load_state_info ( std_platform_state_t* state ) {
 
             size_t first = std_str_to_u32 ( buffer );
             size_t last;
-            size_t separator = std_str_find ( buffer, "-" );
-
-            if ( separator != std_str_find_null_m ) {
-                last = std_str_to_u32 ( buffer + separator + 1 );
+            char* separator = std_str_find ( buffer, "-" );
+            if ( separator != NULL ) {
+                last = std_str_to_u32 ( separator + 1 );
             } else {
                 last = first;
             }

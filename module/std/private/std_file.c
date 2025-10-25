@@ -1032,11 +1032,11 @@ bool std_file_path_create ( const char* path, std_file_access_t access, std_path
 #elif defined(std_platform_linux_m)
     std_file_h file = std_file_create ( path, access, already_existing );
 
-    if ( file == std_file_null_handle_m ) {
+    if ( std_file_handle_is_null_m ( file ) ) {
         return false;
     }
 
-    int result = close ( ( int ) file );
+    int result = close ( ( int ) file.u64 );
     return result == 0;
 #endif
 }
@@ -1083,7 +1083,7 @@ bool std_file_copy ( std_file_h file, const char* dest, std_path_already_existin
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
     off_t copy_offset = 0;
-    ssize_t copy_result = sendfile ( ( int ) dest_file, ( int ) file.u64, &copy_offset, file_info.size );
+    ssize_t copy_result = sendfile ( ( int ) dest_file.u64, ( int ) file.u64, &copy_offset, file_info.size );
     std_assert_m ( copy_result == file_info.size );
     return true;
 #endif
@@ -1289,7 +1289,7 @@ void* std_file_map ( std_file_h file, size_t size, std_file_map_permits_t permit
 
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
-    void* map = mmap ( NULL, size, prot, flags, ( int ) file, 0 );
+    void* map = mmap ( NULL, size, prot, flags, ( int ) file.u64, 0 );
 
     if ( map == MAP_FAILED ) {
         return NULL;

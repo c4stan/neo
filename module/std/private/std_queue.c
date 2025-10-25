@@ -10,6 +10,7 @@
 #include <memoryapi.h>
 
 // https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/
+// https://github.com/vitalyvch/rng_buf
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc2#examples
 static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t* size ) {
     size_t queue_size = std_pow2_round_up ( std_virtual_page_align ( *size ) );
@@ -69,6 +70,11 @@ exit:
     if ( view2 ) UnmapViewOfFileEx ( view2, 0 );
 }
 #elif defined ( std_platform_linux_m ) 
+
+#if defined std_platform_android_m
+#include <android/sharedmem.h>
+#endif
+
 static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t* size ) {
     size_t queue_size = std_pow2_round_up ( std_virtual_page_align ( *size ) );
 
@@ -80,7 +86,11 @@ static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t*
     while ( true ) {
         const char* name = "std_aliased_queue";
         snprintf ( seg_name, sizeof ( seg_name ), "/%s-%d-%d", name, getpid(), counter );
+#if defined std_platform_android_m
+        fd = ASharedMemory_create ( seg_name, 2 * queue_size );
+#else
         fd = shm_open ( seg_name, O_RDWR | O_CREAT | O_EXCL, 0600 );
+#endif
 
         if ( fd != -1 ) {
             break;
@@ -94,10 +104,16 @@ static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t*
         goto exit;
     }
 
+#if defined std_platform_android_m
+    if ( ASharedMemory_setProt(fd, PROT_READ | PROT_WRITE) != 0 ) {
+        goto exit;
+    }
+#else
     // Resize and remap the segment
     if ( ftruncate ( fd, 2 * queue_size ) == -1 ) {
         goto exit;
     }
+#endif
 
     void* first_half = mmap ( 0, 2 * queue_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
     if ( base == MAP_FAILED ) {
@@ -111,7 +127,9 @@ static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t*
 
     // Cleanup and return
     close ( fd );
+#if !defined std_platform_android_m
     shm_unlink ( seg_name );
+#endif
 
     *base = first_half;
     *alias = second_half;
@@ -120,7 +138,9 @@ static void std_queue_virtual_alloc_aliased ( void** base, void** alias, size_t*
 
 exit:
     close ( fd );
+#if !defined std_platform_android_m
     shm_unlink ( seg_name );
+#endif
 }
 #endif
 

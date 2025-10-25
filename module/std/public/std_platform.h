@@ -30,6 +30,10 @@
 #elif defined __linux__
     #define std_platform_linux_m
 
+    #if defined __ANDROID__
+        #define std_platform_android_m
+    #endif
+
     #define _GNU_SOURCE
     #include <stdint.h>
     #include <stdbool.h>
@@ -59,6 +63,9 @@
         #define std_build_x64_m
     #elif defined __i386__
         #define std_build_x86_m
+    #elif defined __ANDROID__
+        // API >= 31
+        #define std_build_aarch64_m
     #else
         #error "Building for unexpected CPU architecture"
     #endif
@@ -77,8 +84,14 @@
 
 #if defined std_build_x64_m
     #define std_pointer_size_m 8
+    #define std_arch_64_m
 #elif defined std_build_x86_m
+    // TODO is this even supported properly? remove?
     #define std_pointer_size_m 4
+    #define std_arch_32_m
+#elif defined std_build_aarch64_m
+    #define std_pointer_size_m 8
+    #define std_arch_64_m
 #endif
 
 //==============================================================================

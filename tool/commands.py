@@ -10,7 +10,7 @@ import sys
 
 import importlib
 import makegen
-import bindings_reader
+import bindings
 
 if platform.system() == 'Windows':
     import win32gui
@@ -24,17 +24,12 @@ class Color:
     ENDC    = '\033[0m'
 
 INDEX = makegen.Index()
-BINDINGS = {}
 PATH_STACK = [os.getcwd()]
 SUBPROCESS = None
 
 def get_index():
     global INDEX
     return INDEX
-
-def get_binding(name):
-    global BINDINGS
-    return BINDINGS[name]
 
 def push_path(path):
     PATH_STACK.append(path)
@@ -70,15 +65,13 @@ def hook_signal_handler():
     signal.signal(signal.SIGINT, sigint_handler)
 
 def init(root_path, tool_path, workspace_paths):
-    global BINDINGS
     global INDEX
     global PATH_STACK
     hook_signal_handler()
     PATH_STACK = []
     push_path(root_path)
     INDEX.init(root_path, tool_path, workspace_paths)
-    BINDINGS = bindings_reader.read('tool/bindings')
-    if not BINDINGS:
+    if not bindings.read('tool/bindings'):
         print(Color.FAIL + 'Bindings file not found' + Color.ENDC)
 
 def reload(root_path, tool_path, workspace_paths):
@@ -101,7 +94,7 @@ def print_help():
     print('\t' + Color.OKGREEN + 'clean' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to clean a workspace')
     print('\t' + Color.OKGREEN + 'run' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run an app executable')
     print('\t' + Color.OKGREEN + 'debug' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to debug an app executable using Visual Studio')
-    print('\t' + Color.OKGREEN + 'debug-fixup' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to fixup the debug env of an app')
+    print('\t' + Color.OKGREEN + 'debug-setup' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to setup the vscode debug env of an app')
     print('\t' + Color.OKGREEN + 'explorer' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to run explorer on a workspace')
     print('\t' + Color.OKGREEN + 'cmd' + Color.OKBLUE + ' <name> <cmd>' + Color.ENDC + ' to run a system cmd on a workspace')
     print('\t' + Color.OKGREEN + 'create' + Color.OKBLUE + ' <root> <name>' + Color.ENDC + ' to create a new workspace under the root')
@@ -112,6 +105,9 @@ def print_help():
     print('\t' + Color.OKGREEN + 'showremote' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the remote version of the file')
     print('\t' + Color.OKGREEN + 'showstash' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the latest stash version of the file')
     print('\t' + Color.OKGREEN + 'killeditor' + Color.ENDC + ' to kill the text editor process')
+    print('\t' + Color.OKGREEN + 'adblist' + Color.ENDC + ' to list adb devices')
+    print('\t' + Color.OKGREEN + 'adbpair' + Color.OKBLUE + '<ip:port> <code>' + Color.ENDC + ' to wifi pair an android device')
+    print('\t' + Color.OKGREEN + 'adbrun' + Color.OKBLUE + '<name>' + Color.ENDC + ' to push and run an executable on the paired device')
     print('')
 
 def format_title_string(words):
@@ -233,14 +229,14 @@ def open_workspace(name):
     if not os.path.isdir(path):
         print(Color.FAIL + 'Workspace is registered but not found on filesystem at path ' + path + Color.ENDC)
         return
-    os.system('"' + get_binding('text_editor') + '" ' + path)
+    os.system('"' + bindings.get('text_editor') + '" ' + path)
     if platform.system() == 'Windows':
         # Bring the new window to focus
         win32gui.EnumWindows(enum_window_callback, None)
 
 def kill_editor():
     if platform.system() == 'Windows':
-        os.system('taskkill /f /im ' + get_binding('text_editor_process'))
+        os.system('taskkill /f /im ' + bindings.get('text_editor_process'))
     elif platform.system() == 'Linux':
         # TODO
         skip
@@ -451,17 +447,67 @@ def debug_app(name, flags, params):
     params = ' '.join(params)
     if platform.system() == 'Windows':
         if makedef['output'] == ['app']:
-            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\std_launcher.exe' + ' ' + name + ' ' + params
+            cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\std_launcher.exe' + ' ' + name + ' ' + params
         else:
             #cmd = 'start ..\\remedybg.exe ' + 'output\\debug\\' + name + '.exe'
-            cmd = "start \"cmd\" \"" + get_binding('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\' + name + '.exe' + ' ' + params
+            cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\' + name + '.exe' + ' ' + params
     elif platform.system() == 'Linux':
         # TODD try https://github.com/nakst/gf
         cmd = 'code .'
     os.system(cmd)
     pop_path()
 
-def fixup_debug_app(name, flags):
+def adb_setup_debug_app(name, flags):
+    if not validate_workspace(name):
+        print(Color.FAIL + name + ' is not a registered app workspace.' + Color.ENDC)
+        return False
+    path = get_workspace_path(name)
+    push_path(path)
+
+    makedef_path = makegen.normpath(path + '/' + 'makedef')
+    makedef = makegen.parse_makedef(makedef_path, None)
+
+    config = 'debug'
+    if ('-o' in flags):
+        config = 'release'
+
+    if makedef['output'] == ['app']:
+        program_path = 'build/' + config + '/output/std_launcher.exe'
+        args = name
+    else:
+        program_path = 'build/' + config + '/output/' + name + '.exe'
+        args = ''
+
+    pid = 0 # TODO
+
+    launch_json = '{'\
+        '"version": "0.2.0",'\
+        '"configurations": ['\
+            '{'\
+                '"name": "(lldb) Launch",'\
+                '"type": "lldb",'\
+                '"request": "launch",'\
+                '"program": "${workspaceRoot}/' + program_path + '",'\
+                '"cwd": "${workspaceFolder}",'\
+                '"initCommands": ['\
+                    '"platform select remote-android",'\
+                    '"platform connect connect://localhost:5055",'\
+                    '"platform settings -w /data/local/tmp",'\
+                '],'\
+            '}'\
+        ']'\
+    '}'
+
+    if not os.path.exists('.vscode'):
+        os.system('mkdir .vscode')
+
+    launch_json_file = open('.vscode/launch.json', 'w')
+    launch_json_file.write(launch_json)
+    launch_json_file.close()
+
+    pop_path()
+
+def setup_debug_app(name, flags):
     if not validate_workspace(name):
         print(Color.FAIL + name + ' is not a registered app workspace.' + Color.ENDC)
         return False
@@ -484,39 +530,40 @@ def fixup_debug_app(name, flags):
             args = ''
 
         launch_json = '{'\
-    '"version": "0.2.0",'\
-    '"configurations": ['\
-        '{'\
-            '"name": "(gdb) Launch",'\
-            '"type": "cppdbg",'\
-            '"request": "launch",'\
-            '"program": "${workspaceRoot}/' + program_path + '",'\
-            '"args": ["' + args + '"],'\
-            '"stopAtEntry": false,'\
-            '"cwd": "${workspaceFolder}",'\
-            '"environment": [],'\
-            '"externalConsole": false,'\
-            '"MIMode": "gdb",'\
-            '"setupCommands": ['\
+            '"version": "0.2.0",'\
+            '"configurations": ['\
                 '{'\
-                    '"description": "Enable pretty-printing for gdb",'\
-                    '"text": "-enable-pretty-printing",'\
-                    '"ignoreFailures": true'\
+                    '"name": "(gdb) Launch",'\
+                    '"type": "cppdbg",'\
+                    '"request": "launch",'\
+                    '"program": "${workspaceRoot}/' + program_path + '",'\
+                    '"args": ["' + args + '"],'\
+                    '"stopAtEntry": false,'\
+                    '"cwd": "${workspaceFolder}",'\
+                    '"environment": [],'\
+                    '"externalConsole": false,'\
+                    '"MIMode": "gdb",'\
+                    '"setupCommands": ['\
+                        '{'\
+                            '"description": "Enable pretty-printing for gdb",'\
+                            '"text": "-enable-pretty-printing",'\
+                            '"ignoreFailures": true'\
+                        '}'\
+                        '{'\
+                            '"description": "In this mode GDB will be attached to both processes after a call to fork() or vfork().",'\
+                            '"text": "-gdb-set detach-on-fork true",'\
+                            '"ignoreFailures": true'\
+                      '},'\
+                      '{'\
+                            '"description": "The new process is debugged after a fork. The parent process runs unimpeded.",'\
+                            '"text": "-gdb-set follow-fork-mode parent",'\
+                            '"ignoreFailures": true'\
+                      '}'\
+                    ']'\
                 '}'\
-                '{'\
-                    '"description": "In this mode GDB will be attached to both processes after a call to fork() or vfork().",'\
-                    '"text": "-gdb-set detach-on-fork true",'\
-                    '"ignoreFailures": true'\
-              '},'\
-              '{'\
-                    '"description": "The new process is debugged after a fork. The parent process runs unimpeded.",'\
-                    '"text": "-gdb-set follow-fork-mode parent",'\
-                    '"ignoreFailures": true'\
-              '}'\
             ']'\
-        '}'\
-    ']'\
-'}'
+        '}'
+
         if not os.path.exists('.vscode'):
             os.system('mkdir .vscode')
 
@@ -651,6 +698,85 @@ def clear_console():
     elif platform.system() == 'Linux':
         os.system('clear')
 
+def adb_list():
+    adb_path = bindings.get('android_sdk_path') + 'platform-tools/adb'
+    cmd = '"' + adb_path + '"' + ' devices'
+    os.system(cmd)
+
+def adb_pair(address, code):
+    adb_path = bindings.get('android_sdk_path') + 'platform-tools/adb'
+    cmd = '"' + adb_path + '"' + ' pair ' + address + ' ' + code
+    os.system(cmd)
+
+def adb_run(name, flags, params):
+    adb_path = bindings.get('android_sdk_path') + 'platform-tools/adb'
+    workspace_path = get_workspace_path(name)
+
+    # TODO proper deploy
+    config = 'debug'
+    if ('-o' in flags):
+        config = 'release'
+
+    program_path = 'build/' + config + '/output/' + name + '.exe'
+
+    cmd = '"' + adb_path + '"' + ' push ' + workspace_path + '/' + program_path + ' /data/local/tmp'
+    os.system(cmd)
+    cmd = '"' + adb_path + '"' + ' shell chmod +x ' + '/data/local/tmp/' + name + '.exe' #TODO
+    os.system(cmd)
+    cmd = '"' + adb_path + '"' + ' shell ' + '/data/local/tmp/' + name + '.exe' #TODO
+    os.system(cmd)
+
+def adb_debug(name, flags, params):
+    if not validate_workspace(name):
+        return
+
+    workspace_path = get_workspace_path(name)
+
+    push_path(workspace_path)
+
+    makedef_path = makegen.normpath(workspace_path + '/' + 'makedef')
+    makedef = makegen.parse_makedef(makedef_path, None)
+
+    config = 'debug'
+    if ('-o' in flags):
+        config = 'release'
+
+    params = ' '.join(params)
+    cmd = 'code .'
+    os.system(cmd)
+    pop_path()
+
+    adb_path = bindings.get('android_sdk_path') + 'platform-tools/adb'
+    lldb_path = bindings.get('android_lldb_path') + 'lldb-server'
+
+    program_path = 'build/' + config + '/output/' + name + '.exe'
+
+    # exe
+    subprocess.run([adb_path, 'push', workspace_path + '/' + program_path, '/data/local/tmp'])
+    subprocess.run([adb_path, 'shell', 'chmod +x /data/local/tmp/' + name + '.exe'])
+
+    #lldb
+    subprocess.run([adb_path, 'push', lldb_path, '/data/local/tmp'])
+    subprocess.run([adb_path, 'shell', 'chmod +x /data/local/tmp/lldb-server'])
+
+    #forward
+    subprocess.run([adb_path, 'forward', 'tcp:5055', 'tcp:5055'])
+
+    #start
+    subprocess.run([adb_path, 'shell', '/data/local/tmp/lldb-server', 'platform', '--server', '--listen', '*:5055'])#, '/data/local/tmp/' + name + '.exe'])
+    #cmd = '"' + adb_path + '"' + ' shell /data/local/tmp/lldb-server platform --listen 127.0.0.1:5055 --server ' + '/data/local/tmp/' + name + '.exe'
+    #os.system(cmd)
+
+def split_run_args(args):
+    if '--' in args:
+        split = args.index('--')
+        flags = args[0:split]
+        params = args[split + 1:]
+    else:
+        flags = args[0:]
+        params = []
+    return flags, params
+
 def execute(string):
     tokens = string.split(' ')
     cmd = tokens[0]
@@ -682,26 +808,14 @@ def execute(string):
             cmd_workspace(tokens[1], tokens[2:])
         elif cmd == 'run':
             args = tokens[2:]
-            if '--' in args:
-                split = args.index('--')
-                flags = args[0:split]
-                params = args[split + 1:]
-            else:
-                flags = args[0:]
-                params = []
+            flags, params = split_run_args(args)
             run_app(tokens[1], flags, params)
         elif cmd == 'debug':
             if len(tokens) == 1:
                 debug_process()
             else:
                 args = tokens[2:]
-                if '--' in args:
-                    split = args.index('--')
-                    flags = args[0:split]
-                    params = args[split + 1:]
-                else:
-                    flags = args[0:]
-                    params = []
+                flags, params = split_run_args(args)
                 debug_app(tokens[1], flags, params)
         elif cmd == 'resume':
             resume_subprocess()
@@ -717,14 +831,28 @@ def execute(string):
             make_title(tokens[1:])
         elif cmd == 'makegen':
             makegen_workspace(tokens[1], tokens[2:])
-        elif cmd == 'debug-fixup':
-            fixup_debug_app(tokens[1], tokens[2:])
+        elif cmd == 'debug-setup':
+            setup_debug_app(tokens[1], tokens[2:])
         elif cmd == 'showremote':
             show_committed_version(tokens[1], tokens[2])
         elif cmd == 'showstash':
             show_stash_version(tokens[1], tokens[2])
         elif cmd == 'killeditor':
             kill_editor()
+        elif cmd == 'adblist':
+            adb_list()
+        elif cmd == 'adbpair':
+            adb_pair(tokens[1], tokens[2])
+        elif cmd == 'adbrun':
+            args = tokens[2:]
+            flags, params = split_run_args(args)
+            adb_run(tokens[1], flags, params)
+        elif cmd == 'adbdebug':
+            args = tokens[2:]
+            flags, params = split_run_args(args)
+            adb_debug(tokens[1], flags, params)
+        elif cmd == 'adbdebug-setup':
+            adb_setup_debug_app(tokens[1], tokens[2:])
         elif cmd == '':
             pass
         else:

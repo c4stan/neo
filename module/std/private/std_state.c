@@ -34,7 +34,7 @@ void std_init ( int argc, char** argv ) {
 #if defined ( std_platform_win32_m )
     std_runtime_state_t* state = ( std_runtime_state_t* ) VirtualAlloc ( NULL, sizeof ( std_runtime_state_t ), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE );
 #elif defined ( std_platform_linux_m )
-    std_runtime_state_t* state = ( std_runtime_state_t* ) mmap ( NULL, sizeof ( std_runtime_state_t ), PROT_NONE, PAGE_READWRITE );
+    std_runtime_state_t* state = ( std_runtime_state_t* ) mmap ( NULL, sizeof ( std_runtime_state_t ), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0 );
     mprotect ( state, sizeof ( std_runtime_state_t ), PROT_READ | PROT_WRITE );
 #endif
 
@@ -81,7 +81,7 @@ void std_shutdown ( void ) {
 
 #if defined ( std_platform_win32_m )
     VirtualFree ( std_runtime_state, 0, MEM_RELEASE );
-#elif
-    munmap ( std_runtime_state, std_runtime_size() )
+#elif defined ( std_platform_linux_m )
+    munmap ( std_runtime_state, std_runtime_size() );
 #endif
 }
