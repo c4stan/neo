@@ -348,14 +348,14 @@ static int test_queue_item_compare ( const void* a, const void* b ) {
 }
 
 static int u64_compare ( const void* a, const void* b ) {
-    std_auto_m i = ( uint64_t* ) a;
-    std_auto_m j = ( uint64_t* ) b;
+    uint64_t i = *( uint64_t* ) a;
+    uint64_t j = *( uint64_t* ) b;
     return ( int ) ( i - j );
 }
 
 static int u32_compare ( const void* a, const void* b ) {
-    std_auto_m i = ( uint32_t* ) a;
-    std_auto_m j = ( uint32_t* ) b;
+    uint32_t i = *( uint32_t* ) a;
+    uint32_t j = *( uint32_t* ) b;
     return ( int ) ( i - j );
 }
 

@@ -6,6 +6,12 @@
 void                            std_compiler_fence ( void );
 void                            std_memory_fence   ( void );
 
+#if defined std_platform_android_m
+#define std_acquire_release_fence_m() std_memory_fence()
+#else
+#define std_acquire_release_fence_m() std_compiler_fence()
+#endif
+
 // Returns whether the CAS was successful. The actual read is written into the expected read param.
 bool                            std_compare_and_swap_i32 ( int32_t* atomic, int32_t* expected_read, int32_t conditional_write );
 bool                            std_compare_and_swap_i64 ( int64_t* atomic, int64_t* expected_read, int64_t conditional_write );

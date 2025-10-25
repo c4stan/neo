@@ -525,7 +525,7 @@ void std_queue_spsc_push ( std_queue_shared_t* queue, const void* item, size_t s
     size_t offset = top & mask;
     std_mem_copy ( base + offset, item, size );
 
-    std_compiler_fence();
+    std_acquire_release_fence_m();
     queue->top = top + size;
 }
 
@@ -539,7 +539,7 @@ void std_queue_spsc_pop_discard ( std_queue_shared_t* queue, size_t size ) {
     std_assert_m ( top - bot >= size );
 #endif
 
-    std_compiler_fence();
+    std_acquire_release_fence_m();
     queue->bot = bot + size;
 }
 
@@ -559,7 +559,7 @@ void std_queue_spsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t siz
     size_t offset = bot & mask;
     std_mem_copy ( dest, base + offset, size );
 
-    std_compiler_fence();
+    std_acquire_release_fence_m();
     queue->bot = bot + size;
 }
 
@@ -600,7 +600,7 @@ bool std_queue_mpmc_push ( std_queue_shared_t* queue, const void* item, size_t s
         top += sizeof ( uint32_t );
         offset = top & mask;
         std_mem_copy ( base + offset, item, size );
-        std_compiler_fence();
+        std_acquire_release_fence_m();
         // Write the size to end the pending write
         *tag = ( uint32_t ) size;
         return true;
@@ -633,7 +633,7 @@ size_t std_queue_mpmc_pop_discard ( std_queue_shared_t* queue ) {
     size_t new_bot = bot + sizeof ( uint32_t ) + size;
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
         std_mem_zero ( base + offset, size );
-        std_compiler_fence();
+        std_acquire_release_fence_m();
         // Zero the tag to end the pending read
         *tag = 0;
         return size;
@@ -675,7 +675,7 @@ size_t std_queue_mpmc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
         // the tag bytes might end up located where before was stored some user data, which is likely not to be 0
         // To solve that need to clear all popped data to 0, or establish a stride and just clear the tag on pop
         std_mem_zero ( base + offset, size );
-        std_compiler_fence();
+        std_acquire_release_fence_m();
         // Zero the tag to end the pending read
         *tag = 0;
         return size;
@@ -785,7 +785,7 @@ bool std_queue_mpmc_pop_move_32 ( std_queue_shared_t* queue, void* dest ) {
 
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
         * ( uint32_t* ) dest = *data;
-        std_compiler_fence();
+        std_acquire_release_fence_m();
         *data = std_queue_shared_32_reserved_value_m;
         return true;
     }
@@ -892,7 +892,7 @@ bool std_queue_mpmc_pop_move_64 ( std_queue_shared_t* queue, void* dest ) {
 
     if ( std_compare_and_swap_u64 ( &queue->bot, &bot, new_bot ) ) {
         * ( uint64_t* ) dest = *data;
-        std_compiler_fence();
+        std_acquire_release_fence_m();
         *data = std_queue_shared_64_reserved_value_m;
         return true;
     }
@@ -936,7 +936,7 @@ size_t std_queue_mpsc_pop_discard ( std_queue_shared_t* queue ) {
 
     // Advance bot, set the publish flag to 0
     queue->bot = bot + sizeof ( uint32_t ) + size;
-    std_compiler_fence();
+    std_acquire_release_fence_m();
     *tag = 0;
     return size;
 }
@@ -973,7 +973,7 @@ size_t std_queue_mpsc_pop_move ( std_queue_shared_t* queue, void* dest, size_t d
     bot += sizeof ( uint32_t );
     offset = bot & mask;
     std_mem_copy ( dest, base + offset, size );
-    std_compiler_fence();
+    std_acquire_release_fence_m();
     *tag = 0;
     return size;
 }
@@ -1006,7 +1006,7 @@ void std_queue_spmc_push ( std_queue_shared_t* queue, const void* item, size_t s
     size_t offset = top & mask;
     std_mem_copy ( base + offset, item, size );
 
-    std_compiler_fence();
+    std_acquire_release_fence_m();
     // Push the size
     *tag = ( uint32_t ) size;
 }
