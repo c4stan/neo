@@ -598,15 +598,14 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
     return pipe_handle;
 #else
+#if defined std_platform_android_m
+    // TODO android /sdcard/ FS doesnt' support named pipes - https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    return std_null_handle_m ( std_pipe_h );
+#else
     char pipe_name[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_name );
-#if defined std_platform_android_m
-        // TODO android /sdcard/ FS doesnt' support named pipes - https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
-        std_stack_string_append ( &stack, "/data/local/tmp/" );
-#else
         std_stack_string_append ( &stack, "/tmp/" );
-#endif
         std_stack_string_append ( &stack, params->name );
     }
 
@@ -662,6 +661,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
     return pipe_handle;
 #endif
+#endif
 }
 
 bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
@@ -681,14 +681,13 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
 
     return true;
 #elif defined(std_platform_linux_m)
+#if defined std_platform_android_m
+    return false;
+#else
     char pipe_name[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_name );
-#if defined std_platform_android_m
-        std_stack_string_append ( &stack, "/data/local/tmp/" );
-#else
         std_stack_string_append ( &stack, "/tmp/" );
-#endif
         std_stack_string_append ( &stack, pipe->params.name );
     }
 
@@ -715,6 +714,7 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
     }
 
     return true;
+#endif
 #endif
 }
 
@@ -772,6 +772,10 @@ wait_for_pipe_creation:
     }
 
 #elif defined(std_platform_linux_m)
+#if defined std_platform_android_m
+    // TODO android /sdcard/ FS doesnt' support named pipes - https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    return std_null_handle_m ( std_pipe_h );
+#else
     int open_flags = 0;
 
     if ( ( flags & std_process_pipe_flags_read_m ) && ( flags & std_process_pipe_flags_write_m ) ) {
@@ -789,11 +793,7 @@ wait_for_pipe_creation:
     char pipe_path[256];
     {
         std_stack_t stack = std_static_stack_m ( pipe_path );
-#if defined std_platform_android_m
-        std_stack_string_append ( &stack, "/data/local/tmp/" );
-#else
         std_stack_string_append ( &stack, "/tmp/" );
-#endif
         std_stack_string_append ( &stack, name );
     }
 
@@ -812,6 +812,7 @@ wait_for_pipe_creation:
         std_log_os_error_m();
         return std_null_handle_m ( std_pipe_h );
     }
+#endif
 #endif
 }
 

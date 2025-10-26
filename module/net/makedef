@@ -4,4 +4,6 @@ defs = public.def
 configs = debug, release
 output = dll
 deps = std
-libs = ws2_32.lib
+if win32
+    libs = ws2_32.lib
+endif

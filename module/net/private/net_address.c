@@ -6,7 +6,12 @@
 bool net_address_ip_string_to_bytes ( net_address_bytes_t* bytes_address, const char* string_address, net_address_family_e family ) {
     bytes_address->u64[0] = 0;
     bytes_address->u64[1] = 0;
+
+#if defined std_platform_win32_m
     INT result = InetPton ( net_address_family_to_winsock ( family ), string_address, bytes_address->bytes );
+#elif defined std_platform_linux_m
+    int result = inet_pton ( net_address_family_to_winsock ( family ), string_address, bytes_address->bytes );
+#endif
 
     if ( result != 1 ) {
         return false;
@@ -16,7 +21,11 @@ bool net_address_ip_string_to_bytes ( net_address_bytes_t* bytes_address, const 
 }
 
 bool net_address_ip_bytes_to_string ( char* string_address, const net_address_bytes_t* bytes_address, net_address_family_e family ) {
+#if defined std_platform_win32_m
     const char* result = InetNtop ( net_address_family_to_winsock ( family ), bytes_address->bytes, string_address, net_address_string_size_m );
+#elif defined std_platform_linux_m
+    const char* result = inet_ntop ( net_address_family_to_winsock ( family ), bytes_address->bytes, string_address, net_address_string_size_m );
+#endif
 
     if ( result == NULL ) {
         return false;
@@ -25,7 +34,7 @@ bool net_address_ip_bytes_to_string ( char* string_address, const net_address_by
     return true;
 }
 
-ADDRESS_FAMILY net_address_family_to_winsock ( net_address_family_e family ) {
+int net_address_family_to_winsock ( net_address_family_e family ) {
     switch ( family ) {
         case net_address_family_ip4_m:
             return AF_INET;
@@ -39,7 +48,7 @@ ADDRESS_FAMILY net_address_family_to_winsock ( net_address_family_e family ) {
     }
 }
 
-net_address_family_e net_address_family_from_winsock ( ADDRESS_FAMILY family ) {
+net_address_family_e net_address_family_from_winsock ( int family ) {
     switch ( family ) {
         case AF_INET:
             return net_address_family_ip4_m;

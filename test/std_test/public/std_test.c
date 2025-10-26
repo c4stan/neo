@@ -167,6 +167,7 @@ static void test_process ( void ) {
 #endif
     }
 
+#if !defined std_platform_android_m
     // create named pipe
     std_process_pipe_params_t pipe_params = {
         .name = "std_test_pipe",
@@ -176,12 +177,14 @@ static void test_process ( void ) {
     };
     std_pipe_h pipe = std_process_pipe_create ( &pipe_params );
     std_assert_m ( !std_handle_is_null_m ( pipe ) );
+#endif
 
     // create child process
     const char* process_arg = CHILD_PROCESS_MAGIC_NUMBER;
     const char* process_path = info.executable_path;
     std_process_h process = std_process ( process_path, "std_test", &process_arg, 1, std_process_type_default_m, std_process_io_capture_m );
 
+#if !defined std_platform_android_m
     // wait for child to connect to pipe and write to it
     std_process_pipe_wait_for_connection ( pipe );
     char* write_buffer = "pipe_write_data";
@@ -226,12 +229,14 @@ static void test_process ( void ) {
         bool match = std_str_cmp ( buffer, CHILD_PROCESS_OUTPUT ) == 0;
         std_assert_m ( match );
     }
+#endif
 
     std_process_wait_for ( process );
 
     std_log_info_m ( "std_process test complete." );
 }
 
+#if !defined std_platform_android_m
 static void test_process_child ( void ) {
     std_pipe_h pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
@@ -259,6 +264,7 @@ static void test_process_child ( void ) {
     std_process_io_write ( io.stdout_handle, NULL, buffer, data_size );
     std_process_io_write ( io.stdout_handle, NULL, CHILD_PROCESS_OUTPUT, sizeof ( CHILD_PROCESS_OUTPUT ) );
 }
+#endif
 
 static void test_thread_body ( void* arg ) {
     uint32_t* flag = ( uint32_t* ) arg;
@@ -1182,7 +1188,14 @@ void std_main ( void ) {
     std_process_info_t process_info;
     std_process_info ( &process_info, std_process_this() );
 
-#if !defined std_platform_android_m
+    // Pipes are not supported (for now?) on Android
+#if defined std_platform_android_m
+    if ( process_info.args_count == 1 ) {
+        if ( std_mem_cmp ( process_info.args[0], CHILD_PROCESS_MAGIC_NUMBER, sizeof ( CHILD_PROCESS_MAGIC_NUMBER ) - 1 ) == 0 ) {
+            return;
+        }
+    }
+#else
     if ( process_info.args_count == 1 ) {
         if ( std_mem_cmp ( process_info.args[0], CHILD_PROCESS_MAGIC_NUMBER, sizeof ( CHILD_PROCESS_MAGIC_NUMBER ) - 1 ) == 0 ) {
             test_process_child();
@@ -1197,10 +1210,8 @@ void std_main ( void ) {
     std_log_info_m ( separator );
     test_allocator();
     std_log_info_m ( separator );
-#if !defined std_platform_android_m
     test_process();
     std_log_info_m ( separator );
-#endif
     test_thread();
     std_log_info_m ( separator );
     test_module();

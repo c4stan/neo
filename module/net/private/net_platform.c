@@ -3,6 +3,7 @@
 #include <std_log.h>
 
 void net_platform_init ( void ) {
+#if defined std_platform_win32_m
     WORD wsa_version = MAKEWORD ( net_winsock_version_major_m, net_winsock_version_minor_m );
     WSADATA wsa_info;
 
@@ -31,12 +32,15 @@ void net_platform_init ( void ) {
                            net_winsock_version_major_m, net_winsock_version_minor_m );
         }
     }
+#endif
 }
 
 void net_platform_shutdown ( void ) {
+#if defined std_platform_win32_m
     int error = WSACleanup();
 
     if ( error != 0 ) {
         std_log_error_m ( "Winsock WSACleanup call failed." );
     }
+#endif
 }

@@ -164,6 +164,9 @@ void std_platform_load_state_info ( std_platform_state_t* state ) {
             physical_core_idx = std_str_to_u32 ( buffer );
             physical_core = &state->physical_cores_info[physical_core_idx];
 
+            // TODO take physical core clusters into account
+            // physical cores on different clusters show the same core id
+            // need to check physical_package_id (or whatever works on that system)
             if ( physical_core->logical_cores_mask == 0 ) {
                 ++state->physical_cores_count;
                 new_physical_core = true;

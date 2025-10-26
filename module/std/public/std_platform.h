@@ -119,9 +119,12 @@ typedef struct {
     size_t                      associativity;
 } std_platform_cache_info_t;
 
+// TODO consider separate core clusters (topology/physical_package_id on linux?)
 typedef struct {
     uint64_t    logical_cores_mask;
     //size_t      processor_idx;
+    //uint32_t    cluster_id;
+    //uint32_t    cluster_core_id;
 } std_platform_physical_core_info_t;
 
 typedef struct {
