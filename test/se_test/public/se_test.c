@@ -241,8 +241,8 @@ static void run_se_test_2 ( void ) {
     }
 
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "se_test_sdb" ) );
-    xs->add_database_folder ( sdb, "shader/" );
-    xs->set_output_folder ( sdb, "output/shader/" );
+    xs->add_database_folder ( sdb, "data/se_test/shader/" );
+    xs->set_output_folder ( sdb, "bake/se_test/shader/" );
     xs->build_database ( sdb );
 
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle") );

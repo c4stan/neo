@@ -6,5 +6,5 @@
 !private/**
 !public/
 !public/**
-!assets/
-!assets/**
+!data/
+!data/**

@@ -88,8 +88,7 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             char include_path[256];
             std_stack_t include_path_string = std_static_stack_m ( include_path );
             std_stack_string_append ( &include_path_string, "-I" );
-            std_stack_string_append ( &include_path_string, std_module_path_m );
-            std_stack_string_append ( &include_path_string, "public/shader/" );
+            std_stack_string_append ( &include_path_string, "data/xs/shader/" );
             std_stack_string_copy ( &stack, include_path );
         }
 

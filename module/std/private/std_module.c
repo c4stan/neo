@@ -134,7 +134,7 @@ static std_module_t* std_module_load_internal ( const char* name ) {
     char module_file_name[std_module_name_max_len_m];
     char module_entrypoint_name[std_module_name_max_len_m];
 
-    const char* file_prefix = std_submodules_path_m;
+    const char* file_prefix = "";
     const char* file_postfix = ".dll";
     const char* entrypoint_postfix = "_load";
 
@@ -340,7 +340,8 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
         std_stack_t stack = std_static_stack_m ( args_buffer );
         
         argv[argc++] = stack.top;
-        std_stack_string_copy ( &stack, std_builder_path_m );
+        std_stack_string_copy ( &stack, std_tool_path_m );
+        std_stack_string_append ( &stack, "cli.py" );
 
         argv[argc++] = stack.top;
         std_stack_string_copy ( &stack, "build" );
@@ -469,7 +470,7 @@ void std_module_reload ( const char* solution_name ) {
             char module_file_name[std_module_name_max_len_m];
             char module_entrypoint_name[std_module_name_max_len_m];
 
-            const char* file_prefix = std_submodules_path_m;
+            const char* file_prefix = "";//std_submodules_path_m;
             const char* file_postfix = ".dll";
             const char* entrypoint_postfix = "_reload";
 

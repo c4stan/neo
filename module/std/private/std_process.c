@@ -153,7 +153,6 @@ void std_process_init ( std_process_state_t* state, char** args, size_t args_cou
     }
 #else
     getcwd ( state->working_path, std_process_path_max_len_m );
-    // TODO missing convert? missing wchar -> char?
 #endif
 
     // set exception handler

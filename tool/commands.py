@@ -300,6 +300,7 @@ def build_workspace(name, flags):
     pop_path()
     if result == 0:
         changelist = generator.gather_dlls()
+        generator.gather_data() # TODO probably need to run some kind of data bake here instead of a simple copy
         if '-r' in  flags:
             generator.output_build_changes(changelist)
         print('\n' + Color.OKGREEN + 'Build succeded.' + Color.ENDC + '\n')
@@ -408,12 +409,15 @@ def run_app(name, flags, params):
     if ('-a' in flags):
         process_flags = 4 # CREATE_SUSPENDED
 
+    output_path = path + '/build/' + config + '/output/'
+    push_path(output_path)
     if makedef['output'] == ['app']:
-        cmd = './build/' + config + '/output/std_launcher.exe'
+        cmd = './std_launcher.exe'
         SUBPROCESS = subprocess.Popen([cmd, name] + params, env = env_vars, creationflags = process_flags, stdin=subprocess.PIPE)
     else:
-        cmd = './build/' + config + '/output/' + name + '.exe'
+        cmd = './' + name + '.exe'
         SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars, creationflags = process_flags, stdin=subprocess.PIPE)
+    pop_path()
 
     if ('-a' in flags):
         debug_process()
@@ -575,7 +579,6 @@ def setup_debug_app(name, flags):
 
 def create_local_workspace(root, name):
     path = os.path.join(root, name)
-    #push_path('../')
     print(path)
     os.system('mkdir ' + path)
     push_path(path)
@@ -605,28 +608,16 @@ def create_local_workspace(root, name):
         '*\n'\
         '!.gitignore\n'\
         '!makedef\n'\
-        '!*.def\n'\
+        '!public.def\n'\
         '!private/\n'\
         '!private/**\n'\
         '!public/\n'\
         '!public/**\n'\
+        '!data/\n'\
+        '!data/**\n'\
     )
     gitignore_file.close()
-
-    '''
-    index_file = open('index', 'r')
-    content = index_file.read()
-    parser = configparser.RawConfigParser(allow_no_value=True, delimiters=('\n'))
-    parser.read_string(content)
-    parser.set('LOCAL', name)
-    index_file.close()
-    index_file = open('index', 'w')
-    parser.write(index_file)
-    index_file.close()
-    '''
-
     pop_path()
-    #pop_path()
 
 def git_push(tokens):
     comment = ''

@@ -5,14 +5,14 @@
 static void xf_load_shaders ( xg_device_h device ) {
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
-    char path[std_process_path_max_len_m];
-    std_stack_t stack = std_static_stack_m ( path );
-    std_stack_string_append ( &stack, std_module_path_m );
-    std_stack_string_append ( &stack, "shader/");
+    //char path[std_process_path_max_len_m];
+    //std_stack_t stack = std_static_stack_m ( path );
+    //std_stack_string_append ( &stack, std_module_path_m );
+    //std_stack_string_append ( &stack, "shader/");
     
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "xf_sdb" ) );
-    xs->add_database_folder ( sdb, path );
-    xs->set_output_folder ( sdb, "output/shader/" );
+    xs->add_database_folder ( sdb, "data/xf/shader/" );
+    xs->set_output_folder ( sdb, "bake/xf/shader/" );
     xf_graph_load_shaders ( xs, sdb );
     xs->build_database ( sdb );
     xf_state_set_sdb ( sdb );

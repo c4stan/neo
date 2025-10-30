@@ -154,6 +154,8 @@ static void test_process ( void ) {
     std_process_info_t info;
     std_process_info ( &info, std_process_this() );
 
+    std_log_info_m ( "Working path: " std_fmt_str_m, info.working_path );
+
     {
         std_process_io_t io = std_process_get_io ( std_process_this() );
 #if defined(std_platform_win32_m)
@@ -1152,7 +1154,7 @@ static void test_file ( void ) {
     std_log_info_m ( "std_file test complete" );
 }
 
-#if 0
+#if defined std_compiler_gcc_m
 static void test_array_fun ( std_array_type_m ( int )* int_array ) {
     int_array->data[int_array->count++] = 2;
 }
@@ -1160,7 +1162,9 @@ static void test_array_fun ( std_array_type_m ( int )* int_array ) {
 static void test_array ( void ) {
     std_log_info_m ( "testing std_array..." );
     int a[3];
+    int b[3];
     std_auto_m static_int_array = std_static_array_m ( int, a );
+    std_auto_m static_int_array2 = std_static_array_m ( int, b );
     std_auto_m heap_int_array = std_heap_array_create_m ( int, 3 );
     std_array_push_m ( &static_int_array, 1 );
     test_array_fun ( &static_int_array );

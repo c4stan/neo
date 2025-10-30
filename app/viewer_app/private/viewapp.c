@@ -151,8 +151,8 @@ static void viewapp_boot ( void ) {
     xs_i* xs = state->modules.xs;
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "viewapp_sdb" ) );
     state->render.sdb = sdb;
-    xs->add_database_folder ( sdb, "shader/" );
-    xs->set_output_folder ( sdb, "output/shader/" );
+    xs->add_database_folder ( sdb, "data/viewer_app/shader/" );
+    xs->set_output_folder ( sdb, "bake/viewer_app/shader/" );
     xs_database_build_result_t build_result = xs->build_database ( sdb );
     std_assert_m ( build_result.failed_pipeline_states == 0 );
 

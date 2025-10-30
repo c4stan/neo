@@ -421,8 +421,8 @@ static void xs_test ( void ) {
         .device = device,
         .debug_name = "shader_db"
     ) );
-    xs->add_database_folder ( sdb, "shader/" );
-    xs->set_output_folder ( sdb, "output/shader/" );
+    xs->add_database_folder ( sdb, "data/xs_test/shader/" );
+    xs->set_output_folder ( sdb, "shader/" );
     xs->set_build_params ( sdb, &xs_database_build_params_m (
         .base_graphics_state = &xg_graphics_pipeline_state_m ( 
             .viewport_state.width = 600,

@@ -6,5 +6,5 @@
 !private/**
 !public/
 !public/**
-!shader
-!shader/**
+!data
+!data/**

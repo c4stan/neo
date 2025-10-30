@@ -18,7 +18,7 @@ void viewapp_boot_ui ( xg_device_h device ) {
     xi->load_shaders ( device );
     xi->init_geos ( device, workload );
 
-    std_file_h font_file = std_file_open ( "assets/ProggyVector-Regular.ttf", std_file_read_m );
+    std_file_h font_file = std_file_open ( "data/viewer_app/ProggyVector-Regular.ttf", std_file_read_m );
     std_file_info_t font_file_info;
     std_file_info ( &font_file_info, font_file );
     void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );

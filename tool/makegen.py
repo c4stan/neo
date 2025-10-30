@@ -483,7 +483,7 @@ class Project:
                         self.src.append(filepath)
         log.pop_verbose()
 
-    # Resolve module dependencies by converting them to 'normal' dependencies
+    # Resolve module dependencies by converting them to external dll/lib/exe dependencies
     # TODO instead of adding them to external_, make new lists module_libs module_dlls module_execs,
     #       and leave the external ones for actual non-module external dlls/...
     def gather_module_dependencies(self):
@@ -683,16 +683,16 @@ class Project:
             main_target.dependencies.append(' ' + relpath(dep, rootpath + '/' + build_path))
 
         def_cmd = '-Dstd_module_name_m=' + self.name
-        def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
+        #def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
         def_cmd += ' -Dstd_solution_module_name_m=' + solution.name
-        def_cmd += ' -Dstd_builder_path_m=\\"' + normpath(self.index.tool_path) + '/cli.py\\"'
+        def_cmd += ' -Dstd_tool_path_m=\\"' + normpath(self.index.tool_path) + '/\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_build_debug_m=1'
         elif self.config == CONFIG_RELEASE:
             def_cmd += ' -Dstd_build_debug_m=0'
-        def_cmd += ' -Dstd_rootpath_m=\\"' + normpath(self.index.root_path) + '/\\"'
-        submodule_path = 'build/' + config_path + '/output/'
-        def_cmd += ' -Dstd_submodules_path_m=\\"' + submodule_path + '\\"'
+        #def_cmd += ' -Dstd_rootpath_m=\\"' + normpath(self.index.root_path) + '/\\"'
+        #submodule_path = 'build/' + config_path + '/output/'
+        #def_cmd += ' -Dstd_submodules_path_m=\\"' + submodule_path + '\\"'
         stack_size = '1000000'
         # Parse all def files
         for path in self.defines:
@@ -1039,19 +1039,13 @@ class Project:
         copied_dlls = []
 
         config = config_str(self.config)
-        modules_path = path# normpath(path + '/' + config)
+        modules_path = path
 
         # TODO remove this, use external_exes instead
         if self.output == OUTPUT_APP and not (BUILD_FLAGS & BUILD_FLAG_RELOAD):
             shutil.copy(self.launcher_path, modules_path)
-            #create_dir(modules_path)
-            #base, name, ext = parse_path(self.launcher_path)
-            #shutil.copy(self.launcher_path, modules_path)
-            #output_path = self.path + '/build/' + config + '/output'
-            #dll = output_path + '/' + self.name + '.dll'
-            #shutil.copy(dll, modules_path)
 
-        dlls_to_copy = self.external_dlls.copy()
+        dlls_to_copy = self.external_dlls
         if self.output == OUTPUT_APP:
             copied_dlls.append(self.name)
         #    output_path = self.path + '/build/' + config + '/output'
@@ -1105,6 +1099,23 @@ class Project:
                         shutil.copy(source_pdb_path, normpath(modules_path + '/' + name + '.pdb'))
         return copied_dlls
 
+    def gather_data(self, path):
+        dest_base_path = normpath(path + '/data/')
+        create_dir(dest_base_path)
+
+        for module in [self.name] + self.module_dependencies:
+            project = self.solution.get_project(module)
+            source_data_path = normpath(project.path + '/data/')
+            if (os.path.exists(source_data_path)):
+                dest_path = normpath(dest_base_path + '/' + module + '/')
+                if (os.path.exists(dest_path)):
+                    log.verbose('Deleting ' + dest_path)
+                    shutil.rmtree(dest_path)
+                log.verbose('Copying ' + source_data_path + ' to ' + dest_path)
+                shutil.copytree(source_data_path, dest_path)
+            else:
+                log.verbose(source_data_path + ' does not exist')
+
 # A solution contains the main module and all its dependencies as projects.
 class Solution:
     def __init__(self, root, name):
@@ -1139,9 +1150,13 @@ class Solution:
 
     def gather_dlls(self):
         config_path = config_str(self.config)
-        gather_path = self.main_project.path + '/submodules'
         gather_path = self.main_project.path + '/build/' + config_path + '/output/'
         return self.main_project.gather_dlls(normpath(gather_path))
+
+    def gather_data(self):
+        config_path = config_str(self.config)
+        gather_path = self.main_project.path + '/build/' + config_path + '/output/'
+        return self.main_project.gather_data(normpath(gather_path))
 
     def alias_target(self):
         self.main_project.alias_target()
@@ -1370,6 +1385,12 @@ class Generator:
         changelist = self.solution.gather_dlls()
         log.pop_verbose()
         return changelist
+
+    def gather_data(self):
+        log.info('Gathering data...')
+        log.push_verbose()
+        self.solution.gather_data()
+        log.pop_verbose()
 
     # These go through the output pipe. For reloads only
     def output_build_changes(self, changelist):

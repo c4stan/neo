@@ -6,6 +6,5 @@
 !private/**
 !public/
 !public/**
-!shader/
-!shader/**
-shader/*.spv
+!data/
+!data/**

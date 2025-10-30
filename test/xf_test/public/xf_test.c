@@ -72,13 +72,14 @@ static void xf_test ( void ) {
         .device = device,
         .debug_name = "shader_db"
     ) );
-    xs->add_database_folder ( sdb, "shader/" );
-    xs->set_output_folder ( sdb, "output/shader/" );
+    xs->add_database_folder ( sdb, "data/xf_test/shader/" );
+    xs->set_output_folder ( sdb, "bake/xf_test/shader/" );
     xs->build_database ( sdb );
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle" ) );
     xs_database_pipeline_h compute_pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "clear" ) );
 
     xf_i* xf = std_module_load_m ( xf_module_name_m );
+    xf->load_shaders ( device );
 
     xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain(swapchain);
 

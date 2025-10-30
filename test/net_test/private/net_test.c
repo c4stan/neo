@@ -121,8 +121,7 @@ void test_http_server ( void ) {
 
         char path[std_path_size_m];
         std_stack_t stack = std_static_stack_m ( path );
-        std_stack_string_append ( &stack, std_module_path_m );
-        std_stack_string_append ( &stack, "private/www/index.html" );
+        std_stack_string_append ( &stack, "data/net_test//www/index.html" );
 
         std_buffer_t file = std_file_read_to_virtual_heap ( path );
 

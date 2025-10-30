@@ -488,7 +488,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 }
 
                 std_stack_t stack = std_static_stack_m ( binary_path );
-                stack.top = stack.begin + len + 1;
+                stack.top = stack.begin + len;
 
                 const char* stage_tag = "";
 
