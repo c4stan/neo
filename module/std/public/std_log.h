@@ -94,6 +94,7 @@ void    std_log_print              ( std_log_msg_t msg, ... ); // msg, format
         std_log_m ( level, fmt, ##__VA_ARGS__ ); \
         std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) = true; \
     }
+void std_log_flush();
 
 // Callback caller wrappers with static log level check.
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m

@@ -134,7 +134,13 @@ static std_module_t* std_module_load_internal ( const char* name ) {
     char module_file_name[std_module_name_max_len_m];
     char module_entrypoint_name[std_module_name_max_len_m];
 
-    const char* file_prefix = "";
+    std_process_info_t process_info;
+    std_process_info ( &process_info, std_process_this() );
+    char file_prefix[std_module_name_max_len_m];
+    std_stack_t file_prefix_stack = std_static_stack_m ( file_prefix );
+    std_stack_string_append ( &file_prefix_stack, process_info.working_path );
+    std_stack_string_append ( &file_prefix_stack, "/" );
+
     const char* file_postfix = ".dll";
     const char* entrypoint_postfix = "_load";
 
@@ -199,17 +205,16 @@ static std_module_t* std_module_load_internal ( const char* name ) {
     void* handle = dlopen ( module_file_name, RTLD_LAZY );
 
     if ( handle == NULL ) {
-        std_log_error_m ( "Module " std_fmt_str_m " failed to load - dlopen failed on path " std_fmt_str_m ".", name, module_file_name );
+        std_log_os_error_m();
         return NULL;
     }
 
     std_module_loader_f loader = ( std_module_loader_f ) dlsym ( handle, module_entrypoint_name );
 
     if ( loader == NULL ) {
-        std_log_error_m ( "Module " std_fmt_str_m " failed to load - dlsym failed to load function " std_fmt_str_m ".", name, module_entrypoint_name );
+        std_log_os_error_m();
         return NULL;
     }
-
 #endif
 
     std_log_info_m ( "Loading module " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );
@@ -470,7 +475,13 @@ void std_module_reload ( const char* solution_name ) {
             char module_file_name[std_module_name_max_len_m];
             char module_entrypoint_name[std_module_name_max_len_m];
 
-            const char* file_prefix = "";//std_submodules_path_m;
+            std_process_info_t process_info;
+            std_process_info ( &process_info, std_process_this() );
+            char file_prefix[std_module_name_max_len_m];
+            std_stack_t file_prefix_stack = std_static_stack_m ( file_prefix );
+            std_stack_string_append ( &file_prefix_stack, process_info.working_path );
+            std_stack_string_append ( &file_prefix_stack, "/" );
+
             const char* file_postfix = ".dll";
             const char* entrypoint_postfix = "_reload";
 

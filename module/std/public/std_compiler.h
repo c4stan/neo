@@ -2,12 +2,10 @@
 
 #include <std_platform.h>
 
-#if defined(__GNUC__)
-    #define std_compiler_gcc_m
-#elif defined(__clang__)
+#if defined(__clang__)
     #define std_compiler_clang_m
-//#elif defined(_MSC_VER)
-//    #define std_compiler_ms_m
+#elif defined(__GNUC__)
+    #define std_compiler_gcc_m
 #else
     #error Unknown compiler
 #endif

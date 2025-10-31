@@ -80,6 +80,7 @@ void std_log_print_callstack ( void ) {
 #endif
 
 // TODO avoid printf, print to actual std_process out/err handles
+// TODO give option to print to file instead
 static void std_log_default_callback ( const std_log_msg_t* msg ) {
     const char* type_prefix = "";
 
@@ -294,6 +295,10 @@ void std_log_print ( std_log_msg_t msg, ... ) {
     formatted_msg.payload = buffer;
 
     std_log_state->log_callback ( &formatted_msg );
+}
+
+void std_log_flush() {
+    fflush ( stdout );
 }
 
 //==============================================================================

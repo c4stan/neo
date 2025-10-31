@@ -9,56 +9,51 @@
 #include <std_string.h>
 #include <std_file.h>
 
-std_warnings_ignore_m ( "-Wunused-variable" )
-std_warnings_ignore_m ( "-Wunused-function" )
-
 static void test_udp_msg ( void ) {
     net_i* net = std_module_get_m ( net_module_name_m );
+
+    net_socket_h s1;
+    net_socket_address_t s1_address;
     {
-        net_socket_h s1;
-        net_socket_address_t s1_address;
-        net_socket_h s2;
-        net_socket_address_t s2_address;
+        net_socket_params_t socket_params;
+        socket_params.family = net_address_family_ip4_m;
+        socket_params.protocol = net_ip_protocol_udp_m;
+        socket_params.is_blocking = true;
+        s1 = net->create_socket ( &socket_params );
 
-        {
-            net_socket_params_t socket_params;
-            socket_params.family = net_address_family_ip4_m;
-            socket_params.protocol = net_ip_protocol_udp_m;
-            socket_params.is_blocking = true;
-            s1 = net->create_socket ( &socket_params );
-
-            net->ip_string_to_bytes ( &s1_address.ip, "127.0.0.1", net_address_family_ip4_m );
-            s1_address.port = 666;
-            net->bind_socket ( s1, &s1_address );
-        }
-
-        {
-            net_socket_params_t socket_params;
-            socket_params.family = net_address_family_ip4_m;
-            socket_params.protocol = net_ip_protocol_udp_m;
-            socket_params.is_blocking = true;
-            s2 = net->create_socket ( &socket_params );
-
-            net->ip_string_to_bytes ( &s2_address.ip, "127.0.0.1", net_address_family_ip4_m );
-            s2_address.port = 999;
-            net->bind_socket ( s2, &s2_address );
-        }
-
-        char* msg = "hello world";
-        size_t msg_size = std_str_len ( msg ) + 1;
-        std_log_info_m ( "Sending UDP string '" std_fmt_str_m "' to address 127.0.0.1:" std_fmt_u16_m"...", msg, s2_address.port );
-        size_t write_size = net->write_socket ( s1, &s2_address, msg, msg_size );
-        std_assert_m ( write_size == msg_size );
-
-        net_socket_address_t read_address;
-        char buffer[32];
-        size_t read_size = net->read_socket ( &read_address, buffer, sizeof ( buffer ), s2 );
-        std_assert_m ( read_size == msg_size );
-        std_log_info_m ( "Received UDP string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, read_address.port );
-
-        net->destroy_socket ( s1 );
-        net->destroy_socket ( s2 );
+        net->ip_string_to_bytes ( &s1_address.ip, "127.0.0.1", net_address_family_ip4_m );
+        s1_address.port = 1666;
+        net->bind_socket ( s1, &s1_address );
     }
+
+    net_socket_h s2;
+    net_socket_address_t s2_address;
+    {
+        net_socket_params_t socket_params;
+        socket_params.family = net_address_family_ip4_m;
+        socket_params.protocol = net_ip_protocol_udp_m;
+        socket_params.is_blocking = true;
+        s2 = net->create_socket ( &socket_params );
+
+        net->ip_string_to_bytes ( &s2_address.ip, "127.0.0.1", net_address_family_ip4_m );
+        s2_address.port = 1999;
+        net->bind_socket ( s2, &s2_address );
+    }
+
+    char* msg = "hello world";
+    size_t msg_size = std_str_len ( msg ) + 1;
+    std_log_info_m ( "Sending UDP string '" std_fmt_str_m "' to address 127.0.0.1:" std_fmt_u16_m"...", msg, s2_address.port );
+    size_t write_size = net->write_socket ( s1, &s2_address, msg, msg_size );
+    std_assert_m ( write_size == msg_size );
+
+    net_socket_address_t read_address;
+    char buffer[32];
+    size_t read_size = net->read_socket ( &read_address, buffer, sizeof ( buffer ), s2 );
+    std_assert_m ( read_size == msg_size );
+    std_log_info_m ( "Received UDP string '" std_fmt_str_m "' from address 127.0.0.1:" std_fmt_u16_m, buffer, read_address.port );
+
+    net->destroy_socket ( s1 );
+    net->destroy_socket ( s2 );
 }
 
 static void test_tcp_msg ( void ) {
@@ -67,7 +62,7 @@ static void test_tcp_msg ( void ) {
     net_socket_h s1 = net->create_socket ( &net_socket_params_m() );
     net_socket_address_t s1_address;
     net->ip_string_to_bytes ( &s1_address.ip, "127.0.0.1", net_address_family_ip4_m );
-    s1_address.port = 666;
+    s1_address.port = 1666;
     net->bind_socket ( s1, &s1_address );
 
     net_socket_h s2 = net->create_socket ( &net_socket_params_m() );
@@ -91,8 +86,6 @@ static void test_tcp_msg ( void ) {
 
     net->destroy_socket ( s1 );
     net->destroy_socket ( s2 );
-
-    //std_assert_m ( std_thread_join ( thread ) );
 }
 
 void test_http_server ( void ) {
@@ -108,6 +101,7 @@ void test_http_server ( void ) {
     net->listen_for_connections ( server_socket );
 
     while ( 1 ) {
+        std_log_flush();
         net_socket_address_t client_address;
         net_socket_h client_socket = net->accept_pending_connection ( &client_address, server_socket );
         char client_ip[32];

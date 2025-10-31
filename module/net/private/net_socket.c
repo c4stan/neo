@@ -208,6 +208,7 @@ bool net_socket_bind_address ( net_socket_h socket_handle, const net_socket_addr
     }
 
     if ( error ) {
+        std_log_os_error_m();
         return false;
     }
 
@@ -268,6 +269,7 @@ bool net_socket_listen_for_connections ( net_socket_h socket_handle ) {
     int error = listen ( sock->os_handle, SOMAXCONN );
 
     if ( error ) {
+        std_log_os_error_m();
         return false;
     }
 
@@ -289,6 +291,7 @@ net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* addres
     SOCKET connection_socket = accept ( sock->os_handle, ( SOCKADDR* ) &sockaddr, &sockaddr_size );
 
     if ( connection_socket == INVALID_SOCKET ) {
+        std_log_os_error_m();
         return false;
     }
 #elif defined std_platform_linux_m
@@ -297,6 +300,7 @@ net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* addres
     int connection_socket = accept ( sock->os_handle, ( struct sockaddr* ) &sockaddr, &sockaddr_size );
 
     if ( connection_socket == -1 ) {
+        std_log_os_error_m();
         return false;
     }
 #endif
@@ -443,6 +447,7 @@ size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap, 
     read_size = recvfrom ( sock->os_handle, dest, ( int ) cap, 0, ( SOCKADDR* ) &sockaddr, &sockaddr_size );
 
     if ( read_size == SOCKET_ERROR ) {
+        std_log_os_error_m();
         return false;
     }
 #elif defined std_platform_linux_m
@@ -452,6 +457,7 @@ size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap, 
     read_size = recvfrom ( sock->os_handle, dest, ( size_t ) cap, 0, ( struct sockaddr* ) &sockaddr, &sockaddr_size );
 
     if ( read_size == -1 ) {
+        std_log_os_error_m();
         return false;
     }
 #endif

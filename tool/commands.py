@@ -300,7 +300,8 @@ def build_workspace(name, flags):
     pop_path()
     if result == 0:
         changelist = generator.gather_dlls()
-        generator.gather_data() # TODO probably need to run some kind of data bake here instead of a simple copy
+        if not '-r' in  flags:
+            generator.gather_data() # TODO probably need to run some kind of data bake here instead of a simple copy
         if '-r' in  flags:
             generator.output_build_changes(changelist)
         print('\n' + Color.OKGREEN + 'Build succeded.' + Color.ENDC + '\n')
@@ -482,8 +483,7 @@ def adb_setup_debug_app(name, flags):
         program_path = 'build/' + config + '/output/' + name + '.exe'
         args = ''
 
-    pid = 0 # TODO
-
+    # https://lldb.llvm.org/use/remote.html
     launch_json = '{'\
         '"version": "0.2.0",'\
         '"configurations": ['\
@@ -492,11 +492,12 @@ def adb_setup_debug_app(name, flags):
                 '"type": "lldb",'\
                 '"request": "launch",'\
                 '"program": "${workspaceRoot}/' + program_path + '",'\
-                '"cwd": "${workspaceFolder}",'\
+                '"cwd": "/data/local/tmp/' + name + '",'\
                 '"initCommands": ['\
                     '"platform select remote-android",'\
                     '"platform connect connect://localhost:5055",'\
-                    '"platform settings -w /data/local/tmp",'\
+                    '"platform settings -w /data/local/tmp/' + name + '",'\
+                    '"platform status",'\
                 '],'\
             '}'\
         ']'\
@@ -708,18 +709,17 @@ def adb_run(name, flags, params):
     if ('-o' in flags):
         config = 'release'
 
-    program_path = 'build/' + config + '/output/' + name + '.exe'
+    program_path = 'build/' + config + '/output/' #+ name + '.exe'
 
-    cmd = '"' + adb_path + '"' + ' push ' + workspace_path + '/' + program_path + ' /data/local/tmp'
-    os.system(cmd)
-    cmd = '"' + adb_path + '"' + ' shell chmod +x ' + '/data/local/tmp/' + name + '.exe' #TODO
-    os.system(cmd)
-    cmd = '"' + adb_path + '"' + ' shell ' + '/data/local/tmp/' + name + '.exe' #TODO
-    os.system(cmd)
+    subprocess.run([adb_path, 'push', workspace_path + '/' + program_path + '/.', '/data/local/tmp/' + name])
+    #subprocess.run([adb_path, 'shell', 'chmod -R +x /data/local/tmp/' + name])
+    subprocess.run([adb_path, 'shell', 'cd /data/local/tmp/' + name + ' && ./' + name + '.exe'])
 
 def adb_debug(name, flags, params):
     if not validate_workspace(name):
         return
+
+    adb_setup_debug_app(name, flags)
 
     workspace_path = get_workspace_path(name)
 
@@ -740,23 +740,21 @@ def adb_debug(name, flags, params):
     adb_path = bindings.get('android_sdk_path') + 'platform-tools/adb'
     lldb_path = bindings.get('android_lldb_path') + 'lldb-server'
 
-    program_path = 'build/' + config + '/output/' + name + '.exe'
+    program_path = 'build/' + config + '/output/' #+ name + '.exe'
 
-    # exe
-    subprocess.run([adb_path, 'push', workspace_path + '/' + program_path, '/data/local/tmp'])
-    subprocess.run([adb_path, 'shell', 'chmod +x /data/local/tmp/' + name + '.exe'])
+    #program
+    subprocess.run([adb_path, 'push', workspace_path + '/' + program_path + '/.', '/data/local/tmp/' + name])
+    #subprocess.run([adb_path, 'shell', 'chmod -R +x /data/local/tmp/' + name])
 
     #lldb
     subprocess.run([adb_path, 'push', lldb_path, '/data/local/tmp'])
-    subprocess.run([adb_path, 'shell', 'chmod +x /data/local/tmp/lldb-server'])
+    #subprocess.run([adb_path, 'shell', 'chmod +x /data/local/tmp/lldb-server'])
 
     #forward
     subprocess.run([adb_path, 'forward', 'tcp:5055', 'tcp:5055'])
 
     #start
-    subprocess.run([adb_path, 'shell', '/data/local/tmp/lldb-server', 'platform', '--server', '--listen', '*:5055'])#, '/data/local/tmp/' + name + '.exe'])
-    #cmd = '"' + adb_path + '"' + ' shell /data/local/tmp/lldb-server platform --listen 127.0.0.1:5055 --server ' + '/data/local/tmp/' + name + '.exe'
-    #os.system(cmd)
+    subprocess.run([adb_path, 'shell', '/data/local/tmp/lldb-server', 'platform', '--server', '--listen', '*:5055'])
 
 def split_run_args(args):
     if '--' in args:
