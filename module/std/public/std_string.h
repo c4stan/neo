@@ -1,25 +1,10 @@
 #pragma once
 
 #include <std_platform.h>
-#include <std_array.h>
-
-#define std_str_find_null_m    SIZE_MAX
 
 // String length is to be intended as the result of strlen(), even on utf8 strings. It is the byte size of the string without the terminator.
 // To know how many actual single readable characters are encoded in a string, use str_count.
 // Capacity(cap) parameters are to be specified in raw byte size, including the terminator character.
-
-/*
-    options for a memcpy-like string api
-        return enum
-            a bit of an extreme approach that would have to be enforced all around the api to make sense, also a bit out of place for simple functions like memcpy
-        return size that you need to complete the op, and client checks that against provided capacity to infer the result
-            what snprintf uses
-        return size that you moved
-            broken, can't know if the capacity was not enough
-        return bool
-            doesn't let the client know how much size is required to complete successfully
-*/
 
 bool std_utf8_is_single_byte    ( char c );
 bool std_utf8_is_double_byte    ( char c );
@@ -73,10 +58,35 @@ size_t std_str_copy_replace ( char* str, size_t cap, const char* source, const c
 size_t std_size_to_str_approx ( char* dest, size_t cap, size_t size_value );
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value );
 
-//void std_str_append ( char* dest, std_array_t* array, const char* source );
-
 uint32_t std_str_hash_32 ( const char* str );
 uint64_t std_str_hash_64 ( const char* str );
 
 bool std_str_validate ( const char* str, size_t cap );
 #define std_str_validate_m( _str ) ( std_str_validate ( _str, sizeof ( _str ) ) )
+
+typedef struct {
+    char* str;      // null terminated char string
+    uint64_t len;   // terminator excluded
+    uint64_t cap;   // terminator included
+} std_string_t;
+
+#define std_string_m( ... ) ( std_string_t ) { \
+    .str = NULL, \
+    .len = 0, \
+    .cap = 0, \
+    __VA_ARGS__ \
+}
+#define std_literal_string_m( s ) std_string_m ( .str = s, .len = sizeof ( s ) - 1, .cap = sizeof ( s ) )
+#define std_static_string_m( s, ... ) std_string_m ( .str = s, .len = 0, .cap = sizeof ( s ), __VA_ARGS__ )
+#define std_static_string_parse_m( s, ... ) std_string_m ( .str = s, .len = std_str_len ( s ), .cap = sizeof ( s ), __VA_ARGS__ )
+#define std_fixed_string_m( s, c, ... ) std_string_m ( .str = (char*)s, .len = 0, .cap = c, __VA_ARGS__ )
+#define std_fixed_string_len_m( s, n, ... ) std_string_m ( .str = (char*)s, .len = n, .cap = (n+1), __VA_ARGS__ )
+#define std_fixed_string_parse_m( s, c, ... ) std_string_m ( .str = (char*)s, .len = std_str_len ( s ), .cap = c, __VA_ARGS__ )
+
+bool std_string_copy ( std_string_t* string, const char* str );
+bool std_string_append ( std_string_t* string, const char* str );
+bool std_string_append_format ( std_string_t* string, const char* str, ... );
+bool std_string_append_char ( std_string_t* string, char c );
+bool std_string_pop ( std_string_t* string );
+void std_string_clear ( std_string_t* string );
+bool std_string_truncate_at ( std_string_t* string, const char* at ); // pointed character will become last in string

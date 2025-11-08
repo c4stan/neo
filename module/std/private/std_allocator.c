@@ -424,7 +424,7 @@ std_stack_t std_stack_create ( size_t virtual_size ) {
     virtual_size = std_max ( virtual_size, page_size );
     virtual_size = std_align ( virtual_size, page_size );
     void* base = std_virtual_reserve ( virtual_size );
-    std_virtual_map ( base, base + page_size );
+    std_verify_m ( std_virtual_map ( base, base + page_size ) );
     return std_stack ( base, page_size, virtual_size );
 }
 
@@ -447,7 +447,12 @@ static bool std_stack_map ( std_stack_t* stack, size_t alloc_size ) {
         size_t page_size = std_virtual_page_size();
         void* new_mapped_end = std_align_ptr ( new_top, page_size );
         std_assert_m ( new_mapped_end <= virtual_end );
-        std_virtual_map ( mapped_end, new_mapped_end );
+        bool result = std_virtual_map ( mapped_end, new_mapped_end );
+        if ( !result ) {
+            std_log_os_error_m();
+            return false;
+        }
+
         stack->end = new_mapped_end;
         return true;
     }
@@ -465,6 +470,35 @@ void* std_stack_alloc ( std_stack_t* stack, size_t size ) {
 
     stack->top = top + size;
     return top;
+}
+
+static bool std_stack_grow ( std_stack_t* stack, size_t min_grow ) {
+    size_t page_size = std_virtual_page_size();
+    if ( min_grow == 0 ) {
+        min_grow = page_size;
+    }
+
+    void* mapped_end = stack->end;
+    void* virtual_end = stack->virtual_end;
+    void* new_mapped_end = std_align_ptr ( mapped_end + min_grow, std_virtual_page_size() );
+
+    if ( new_mapped_end > virtual_end ) {
+        new_mapped_end = virtual_end;
+    }
+
+    if ( new_mapped_end == mapped_end ) {
+        return false;
+    }
+
+    std_assert_m ( new_mapped_end <= virtual_end );
+    if ( !std_virtual_map ( mapped_end, new_mapped_end ) ) {
+        std_log_os_error_m();
+        return false;
+    }
+
+    stack->end = new_mapped_end;
+
+    return true;
 }
 
 void* std_stack_write ( std_stack_t* stack, const void* data, size_t size ) {
@@ -528,6 +562,7 @@ void std_stack_clear ( std_stack_t* stack ) {
     stack->top = stack->begin;
 }
 
+#if 0
 static char* std_stack_string_copy_n ( std_stack_t* stack, const char* str, size_t len ) {
     void* alloc = std_stack_alloc ( stack, len );
     
@@ -537,10 +572,41 @@ static char* std_stack_string_copy_n ( std_stack_t* stack, const char* str, size
 
     return alloc;
 }
+#endif
 
 char* std_stack_string_copy ( std_stack_t* stack, const char* str ) {
+#if 0
     size_t len = std_str_len ( str ) ;
     return std_stack_string_copy_n ( stack, str, len + 1 );
+#else
+    char* base = ( char* ) stack->top;
+    char* top = base;
+    char* end = stack->end;
+
+    while ( str[0] ) {
+        if ( top == end ) {
+            if ( !std_stack_grow ( stack, 1 ) ) {
+                return NULL;
+            }
+            end = stack->end;
+        }
+
+        top[0] = str[0];
+        ++top;
+        ++str;
+    }
+
+    if ( top == end ) {
+        if ( !std_stack_grow ( stack, 1 ) ) {
+            return NULL;
+        }
+    }
+    *top = 0;
+
+    stack->top = top + 1;
+
+    return base;
+#endif
 }
 
 char* std_stack_string_copy_format ( std_stack_t* stack, const char* str, ... ) {
@@ -596,6 +662,14 @@ void std_stack_string_pop ( std_stack_t* stack ) {
         *top = '\0';
         stack->top = top + 1;
     }
+}
+
+std_string_t std_stack_alloc_string ( std_stack_t* stack, size_t size ) {
+    char* str = ( char* ) std_stack_alloc ( stack, size );
+    if ( size > 0 ) {
+        str[0] = 0;
+    }
+    return std_string_m ( .str = str, .len = 0, .cap = size );
 }
 
 void std_stack_free ( std_stack_t* stack, size_t size ) {

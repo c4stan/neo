@@ -114,12 +114,11 @@ void test_http_server ( void ) {
         //std_log_info_m ( std_fmt_str_m, buffer );
 
         char path[std_path_size_m];
-        std_stack_t stack = std_static_stack_m ( path );
-        std_stack_string_append ( &stack, "data/net_test//www/index.html" );
-
+        std_string_t path_string = std_static_string_m ( path );
+        std_string_append ( &path_string, "data/net_test//www/index.html" );
         std_buffer_t file = std_file_read_to_virtual_heap ( path );
 
-        stack = std_static_stack_m ( buffer );
+        std_stack_t stack = std_static_stack_m ( buffer );
         std_stack_string_append ( &stack, "HTTP/1.1 200 OK\r\n" );
         std_stack_string_append ( &stack, "Content-Type: text/html\r\n" );
         std_stack_string_append_format ( &stack, "Content-Length: " std_fmt_u64_m "\r\n", file.size );

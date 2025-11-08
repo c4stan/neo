@@ -1068,8 +1068,8 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
     // string update
     //bool changed = false;
     char buffer[xi_textfield_text_size_m + 1];
-    std_stack_t stack = std_static_stack_m ( buffer );
-    std_stack_string_append ( &stack, state->text );
+    std_string_t string = std_static_string_m ( buffer );
+    std_string_append ( &string, state->text );
 
     bool has_focus = ( xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id );
 
@@ -1082,7 +1082,7 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
                 wm_keyboard_event_args_t args = event->args.keyboard;
 
                 if ( args.keycode == wm_keyboard_state_backspace_m ) {
-                    std_stack_string_pop ( &stack );
+                    std_string_pop ( &string );
                 } else if ( args.keycode == wm_keyboard_state_enter_m ) {
                     //changed = false;
                     result = true;
@@ -1094,7 +1094,7 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
                     break;
                 } else {
                     if ( args.keycode >= wm_keyboard_state_a_m && args.keycode <= wm_keyboard_state_space_m ) {
-                        std_stack_string_append_char ( &stack, args.character );
+                        std_string_append_char ( &string, args.character );
                     }
                 }
 
@@ -1108,7 +1108,7 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
 
         // blinking cursor
         if ( ! ( ( ( uint64_t ) ( std_tick_to_milli_f32 ( xi_ui_state->focus_time ) ) >> 9 ) & 0x1 ) ) {
-            std_stack_string_append ( &stack, "_" );
+            std_string_append ( &string, "_" );
         }
     }
 

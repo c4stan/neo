@@ -138,6 +138,3 @@ void NAME##_state_bind ( NAME##_state_t* state ) { \
 }
 
 const char* std_module_name_from_id ( uint32_t id );
-
-// here because of no better place
-#define std_declare_handle_m( name ) typedef struct { uint64_t u64; } name; \

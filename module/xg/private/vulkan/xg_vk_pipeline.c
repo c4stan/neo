@@ -939,9 +939,9 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
 
             if ( params->debug_name[0] ) {
                 char module_name[xg_debug_name_size_m] = {};
-                std_stack_t stack = std_static_stack_m ( module_name );
-                std_stack_string_append ( &stack, params->debug_name );
-                std_stack_string_append ( &stack, "-cs" );
+                std_string_t string = std_static_string_m ( module_name );
+                std_string_append ( &string, params->debug_name );
+                std_string_append ( &string, "-cs" );
 
                 VkDebugUtilsObjectNameInfoEXT debug_name_info;
                 debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -1489,9 +1489,9 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
                 if ( params->debug_name[0] ) {
                     char module_name[xg_debug_name_size_m] = {};
-                    std_stack_t stack = std_static_stack_m ( module_name );
-                    std_stack_string_append ( &stack, params->debug_name );
-                    std_stack_string_append ( &stack, "-vs" );
+                    std_string_t string = std_static_string_m ( module_name );
+                    std_string_append ( &string, params->debug_name );
+                    std_string_append ( &string, "-vs" );
 
                     VkDebugUtilsObjectNameInfoEXT debug_name_info;
                     debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -1523,9 +1523,9 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
 
                 if ( params->debug_name[0] ) {
                     char module_name[xg_debug_name_size_m] = {};
-                    std_stack_t stack = std_static_stack_m ( module_name );
-                    std_stack_string_append ( &stack, params->debug_name );
-                    std_stack_string_append ( &stack, "-fs" );
+                    std_string_t string = std_static_string_m ( module_name );
+                    std_string_append ( &string, params->debug_name );
+                    std_string_append ( &string, "-fs" );
 
                     VkDebugUtilsObjectNameInfoEXT debug_name_info;
                     debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;

@@ -1033,21 +1033,23 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                 viewapp_texture_t color_texture = {};
                 struct aiString color_texture_name;
                 if ( aiGetMaterialTexture ( material, aiTextureType_DIFFUSE, 0, &color_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
-                    char texture_path[256];
-                    std_path_normalize ( texture_path, 256, input_path );
-                    size_t len = std_path_pop ( texture_path );
-                    std_path_append ( texture_path, 256 - len, color_texture_name.data );
-                    color_texture = viewapp_import_texture ( scene, texture_path );
+                    char texture_path_buffer[256];
+                    std_string_t texture_path = std_static_string_m ( texture_path_buffer );
+                    std_path_normalize ( &texture_path, input_path );
+                    std_path_pop ( &texture_path );
+                    std_path_append ( &texture_path, color_texture_name.data );
+                    color_texture = viewapp_import_texture ( scene, texture_path.str );
                 }
 
                 viewapp_texture_t normal_texture = {};
                 struct aiString normal_texture_name;
                 if ( aiGetMaterialTexture ( material, aiTextureType_NORMALS, 0, &normal_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS ) {
-                    char texture_path[256];
-                    std_path_normalize ( texture_path, 256, input_path );
-                    size_t len = std_path_pop ( texture_path );
-                    std_path_append ( texture_path, 256 - len, normal_texture_name.data );
-                    normal_texture = viewapp_import_texture ( scene, texture_path );
+                    char texture_path_buffer[256];
+                    std_string_t texture_path = std_static_string_m ( texture_path_buffer );
+                    std_path_normalize ( &texture_path, input_path );
+                    std_path_pop ( &texture_path );
+                    std_path_append ( &texture_path, normal_texture_name.data );
+                    normal_texture = viewapp_import_texture ( scene, texture_path.str );
                 }
 
                 struct aiString metalness_texture_name;
@@ -1056,11 +1058,12 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                 bool has_roughness = aiGetMaterialTexture ( material, AI_MATKEY_ROUGHNESS_TEXTURE, &roughness_texture_name, NULL, NULL, NULL, NULL, NULL, NULL ) == AI_SUCCESS;
                 if ( has_roughness && has_metalness ) {
                     std_assert_m ( std_str_cmp ( metalness_texture_name.data, roughness_texture_name.data ) == 0 );
-                    char texture_path[256];
-                    std_path_normalize ( texture_path, 256, input_path );
-                    size_t len = std_path_pop ( texture_path );
-                    std_path_append ( texture_path, 256 - len, roughness_texture_name.data );
-                    viewapp_texture_t material_texture = viewapp_import_texture ( scene, texture_path );
+                    char texture_path_buffer[256];
+                    std_string_t texture_path = std_static_string_m ( texture_path_buffer );
+                    std_path_normalize ( &texture_path, input_path );
+                    std_path_pop ( &texture_path );
+                    std_path_append ( &texture_path, roughness_texture_name.data );
+                    viewapp_texture_t material_texture = viewapp_import_texture ( scene, texture_path.str );
                     
                     for ( uint32_t i = 0; i < material_texture.width * material_texture.height; ++i ) {
                         // Following the glTF spec for metallicRoughnessTexture

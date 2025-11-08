@@ -931,8 +931,8 @@ void viewapp_boot_raster_graph ( void ) {
                 },
             ),
         );
-        std_stack_t stack = std_static_stack_m ( params.debug_name );
-        std_stack_string_append_format ( &stack, "lighting_mip_" std_fmt_u32_m, i );
+        std_string_t string = std_static_string_m ( params.debug_name );
+        std_string_append_format ( &string, "lighting_mip_" std_fmt_u32_m, i );
         xf->create_node ( graph, &params );
     }
 

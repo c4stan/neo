@@ -228,9 +228,9 @@ static xg_vk_texture_view_params_t xg_texture_view_params ( xg_texture_h texture
     params.desc = view_desc;
     params.image = texture->vk_handle;
 
-    std_stack_t stack = std_static_stack_m ( params.debug_name );
-    std_stack_string_append ( &stack, texture->params.debug_name );
-    std_stack_string_append ( &stack, "view" ); // TODO add more info
+    std_string_t string = std_static_string_m ( params.debug_name );
+    std_string_append ( &string, texture->params.debug_name );
+    std_string_append ( &string, "view" ); // TODO add more info
 
     return params;
 }

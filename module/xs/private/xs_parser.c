@@ -1716,20 +1716,21 @@ static void xs_parser_parse_include ( xs_parser_parsing_context_t* context ) {
         size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len > 0 );
 
-        char path[std_path_size_m];
-        std_str_copy ( path, std_path_size_m, context->path );
-        len = std_path_pop ( path );
-        std_path_append ( path, std_path_size_m - len, token );
+        char path_buffer[std_path_size_m];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append ( &path, context->path );
+        std_path_pop ( &path );
+        std_path_append ( &path, token );
 
         if ( context->pipeline_type == xg_pipeline_graphics_m ) {
             std_auto_m state = ( xs_parser_graphics_pipeline_state_t* ) context->state;
-            xs_parser_parse_graphics_pipeline_state_from_path ( state, path );
+            xs_parser_parse_graphics_pipeline_state_from_path ( state, path.str );
         } else if ( context->pipeline_type == xg_pipeline_compute_m ) {
             std_auto_m state = ( xs_parser_compute_pipeline_state_t* ) context->state;
-            xs_parser_parse_compute_pipeline_state_from_path ( state, path );
+            xs_parser_parse_compute_pipeline_state_from_path ( state, path.str );
         } else if ( context->pipeline_type == xg_pipeline_raytrace_m ) {
             std_auto_m state = ( xs_parser_raytrace_pipeline_state_t* ) context->state;
-            xs_parser_parse_raytrace_pipeline_state_from_path ( state, path );
+            xs_parser_parse_raytrace_pipeline_state_from_path ( state, path.str );
         } else {
             std_assert_m ( false );
         }

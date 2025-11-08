@@ -8,6 +8,7 @@
 #include <std_hash.h>
 #include <std_sort.h>
 #include <std_file.h>
+#include <std_array.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,30 +17,15 @@
 #define CHILD_PROCESS_OUTPUT "child process"
 #define PARENT_PROCESS_MESSAGE "parent process"
 
-std_warnings_ignore_m ( "-Wunused-variable" )
-std_warnings_ignore_m ( "-Wunused-function" )
-
-static uint64_t xorshift64star ( void ) {
-    static uint64_t x = 1; /* initial seed must be nonzero, don't use a static variable for the state if multithreaded */
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    return x * 0x2545F4914F6CDD1DULL;
-}
-
-static float xorshift_to_f32 ( uint64_t xs ) {
-    return ( ( float ) ( xs ) ) / ( float ) UINT64_MAX;
-}
-
 static void test_platform ( void ) {
     std_log_info_m ( "testing std_platform..." );
     std_platform_logical_core_info_t logical_cores_info[32];
     std_platform_physical_core_info_t physical_cores_info[32];
-    std_platform_cache_info_t caches_info[32];
+    //std_platform_cache_info_t caches_info[32];
     std_platform_memory_info_t memory_info = std_platform_memory_info();
     size_t physical_cores_count = std_platform_physical_cores_info ( physical_cores_info, 32 );
     size_t logical_cores_count = std_platform_logical_cores_info ( logical_cores_info, 32 );
-    size_t caches_count = std_platform_caches_info ( caches_info, 32 );
+    //size_t caches_count = std_platform_caches_info ( caches_info, 32 );
 
     {
         char ram_size[32];
@@ -104,11 +90,25 @@ static void  test_allocator ( void ) {
     {
         void* buffer = std_virtual_heap_alloc_m ( 1024 * 32, 16 );
         std_stack_t stack = std_fixed_stack_m ( buffer, 1024 * 32 );
-        void* a = std_stack_alloc_align ( &stack, 1024 * 16, 16 );
-        void* b = std_stack_alloc_align ( &stack, 1024 * 8, 16 );
-        void* c = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
-        void* d = std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
+        std_stack_alloc_align ( &stack, 1024 * 16, 16 );
+        std_stack_alloc_align ( &stack, 1024 * 8, 16 );
+        std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
+        std_stack_alloc_array_m ( &stack, uint32_t, 1024 );
         std_virtual_heap_free ( buffer );
+    }
+    {
+        std_stack_t stack = std_stack_create ( 1024 * 32 );
+        for ( uint32_t i = 0; i < 1024 * 8; ++i ) {
+            std_verify_m ( std_stack_alloc ( &stack, 4 ) );
+        }
+        std_stack_destroy ( &stack );
+    }
+    {
+        std_stack_t stack = std_stack_create ( 1024 * 32 );
+        for ( uint32_t i = 0; i < 1024 * 8 - 1; ++i ) {
+            std_verify_m ( std_stack_string_append ( &stack, "abcd" ) );
+        }
+        std_stack_destroy ( &stack );
     }
     #if 0
     {
@@ -158,6 +158,9 @@ static void test_process ( void ) {
 
     {
         std_process_io_t io = std_process_get_io ( std_process_this() );
+        std_assert_m ( io.stdin_handle == info.io.stdin_handle );
+        std_assert_m ( io.stdout_handle == info.io.stdout_handle );
+        std_assert_m ( io.stderr_handle == info.io.stderr_handle );
 #if defined(std_platform_win32_m)
         std_assert_m ( info.io.stdin_handle == ( uint64_t ) ( GetStdHandle ( STD_INPUT_HANDLE ) ) );
         std_assert_m ( info.io.stdout_handle == ( uint64_t ) ( GetStdHandle ( STD_OUTPUT_HANDLE ) ) );
@@ -1049,6 +1052,26 @@ static void test_byte ( void ) {
     std_log_info_m ( "std_byte test complete." );
 }
 
+static void test_string ( void ) {
+    std_log_info_m ( "testing std_string..." );
+
+    char buffer[32];
+    std_string_t static_string = std_static_string_m ( buffer );
+    std_string_append ( &static_string, "hello" );
+    std_string_clear ( &static_string );
+    std_string_append ( &static_string, "hello" );
+    std_string_append ( &static_string, " " );
+    std_string_append ( &static_string, "world" );
+    std_string_pop ( &static_string );
+    std_string_append ( &static_string, "d" );
+    std_log_info_m ( static_string.str );
+
+    std_string_t literal_string = std_literal_string_m ( "hello world" );
+    std_log_info_m ( literal_string.str );
+
+    std_log_info_m ( "std_string test complete." );
+}
+
 static void test_file ( void ) {
     std_log_info_m ( "testing std_file..." );
 
@@ -1056,39 +1079,36 @@ static void test_file ( void ) {
     std_process_info ( &process_info, std_process_this() );
 
     {
-        char path[256];
-        std_str_copy ( path, 256, process_info.working_path );
-        size_t len = std_path_pop ( path );
-        size_t len2 = std_str_len ( path );
-        std_assert_m ( len == len2 );
-        std_log_info_m ( std_fmt_str_m, path );
-        len = std_path_pop ( path );
-        len2 = std_str_len ( path );
-        std_assert_m ( len == len2 );
-        std_log_info_m ( std_fmt_str_m, path );
-        len = std_path_pop ( path );
-        len2 = std_str_len ( path );
-        std_assert_m ( len == len2 );
-        std_log_info_m ( std_fmt_str_m, path );
-        len = std_path_append ( path, 256, "neo/" );
-        len2 = std_str_len ( path );
-        std_assert_m ( len == len2 );
-        std_log_info_m ( std_fmt_str_m, path );
-        char path2[256];
-        len = std_path_normalize ( path2, 256, path );
-        std_log_info_m ( std_fmt_str_m, path2 );
+        char path_buffer[256];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_string_append ( &path, process_info.working_path );
+        std_path_pop ( &path );
+        std_log_info_m ( std_fmt_str_m, path.str );
+        std_path_pop ( &path );
+        std_log_info_m ( std_fmt_str_m, path.str );
+        std_path_pop ( &path );
+        std_log_info_m ( std_fmt_str_m, path.str );
+        std_path_append ( &path, "\\build\\" );
+        std_log_info_m ( std_fmt_str_m, path.str );
+        
+        char path2_buffer[256];
+        std_string_t path2 = std_static_string_m ( path2_buffer );
+        std_path_normalize ( &path2, path.str );
+        std_log_info_m ( std_fmt_str_m, path2.str );
     }
     {
-        char path[256];
+        char path_buffer[256];
+        std_string_t path = std_static_string_m ( path_buffer );
         {
-            char path2[256];
-            std_str_copy ( path2, 256, process_info.executable_path );
-            std_path_normalize ( path, 256, path2 );
+            char path2_buffer[256];
+            std_string_t path2 = std_static_string_m ( path2_buffer );
+            std_string_append ( &path2, process_info.executable_path );
+            std_path_normalize ( &path, path2.str );
         }
-        std_log_info_m ( std_fmt_str_m, path );
+        std_log_info_m ( std_fmt_str_m, path.str );
         {
             std_file_info_t info;
-            std_file_path_info ( &info, path );
+            std_file_path_info ( &info, path.str );
             std_calendar_time_t creation_time = std_timestamp_to_calendar ( info.creation_time );
             std_calendar_time_t last_write_time = std_timestamp_to_calendar ( info.last_write_time );
             std_calendar_time_t last_access_time = std_timestamp_to_calendar ( info.last_access_time );
@@ -1100,11 +1120,11 @@ static void test_file ( void ) {
             std_calendar_to_string ( last_write_time, time, 64 );
             std_log_info_m ( std_fmt_tab_m"Last write time: "std_fmt_tab_m std_fmt_str_m, time );
         }
-        std_path_pop ( path );
-        std_log_info_m ( std_fmt_str_m, path );
+        std_path_pop ( &path );
+        std_log_info_m ( std_fmt_str_m, path.str );
         {
             std_directory_info_t info;
-            std_directory_info ( &info, path );
+            std_directory_info ( &info, path.str );
             std_calendar_time_t creation_time = std_timestamp_to_calendar ( info.creation_time );
             std_calendar_time_t last_write_time = std_timestamp_to_calendar ( info.last_write_time );
             std_calendar_time_t last_access_time = std_timestamp_to_calendar ( info.last_access_time );
@@ -1225,6 +1245,8 @@ void std_main ( void ) {
     test_time();
     std_log_info_m ( separator );
     test_byte();
+    std_log_info_m ( separator );
+    test_string();
     std_log_info_m ( separator );
     test_array();
     std_log_info_m ( separator );

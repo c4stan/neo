@@ -312,19 +312,19 @@ bool std_log_debugger_attached ( void ) {
 
 void std_log_os_error ( std_log_scope_t scope ) {
     char buffer[2048];
-    std_stack_t stack = std_static_stack_m ( buffer );
+    std_string_t string = std_static_string_m ( buffer );
 
 #if defined std_platform_win32_m
     DWORD error_code = GetLastError();
 
-    std_stack_string_append ( &stack, "OS-" );
+    std_string_append ( &string, "OS-" );
     char code_string[32];
     std_u32_to_str ( code_string, 32, error_code, 0 );
-    std_stack_string_append ( &stack, code_string );
-    std_stack_string_append ( &stack, ": " );
+    std_string_append ( &string, code_string );
+    std_string_append ( &string, ": " );
 
     // TODO avoid heap alloc, prefix os msg with something
-    FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), ( LPSTR ) stack.top - 1, stack.end - stack.top, NULL );
+    FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), ( LPSTR ) string.len, string.cap - string.len, NULL );
 
     std_log_msg_t msg;
     msg.scope = scope;
@@ -334,13 +334,13 @@ void std_log_os_error ( std_log_scope_t scope ) {
 #elif defined ( std_platform_linux_m )
     int error_code = errno;
 
-    std_stack_string_append ( &stack, "OS-" );
+    std_string_append ( &string, "OS-" );
     char code_string[32];
     std_u32_to_str ( code_string, 32, error_code, 0 );
-    std_stack_string_append ( &stack, code_string );
-    std_stack_string_append ( &stack, ": " );
+    std_string_append ( &string, code_string );
+    std_string_append ( &string, ": " );
 
-    std_stack_string_append ( &stack, strerror ( error_code ) );
+    std_string_append ( &string, strerror ( error_code ) );
 
     std_log_msg_t msg;
     msg.scope = scope;

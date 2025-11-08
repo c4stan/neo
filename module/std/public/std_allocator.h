@@ -2,6 +2,7 @@
 
 #include <std_byte.h>
 #include <std_compiler.h>
+#include <std_string.h>
 
 /*
     Virtual memory page allocator
@@ -82,7 +83,6 @@ typedef struct {
 #define std_buffer_struct_m( item ) std_buffer_m ( .base = item, .size = sizeof ( *item ) )
 #define std_buffer_static_array_m( array ) std_buffer_m ( .base = array, .size = sizeof ( array ) )
 
-// TODO pass len as param to str functions instead of computing it inside
 // Linear allocator based on virtual memory. The mapped segment will grow until the whole reserved range is full. It will not grow further.
 typedef struct {
     void* begin;
@@ -105,6 +105,8 @@ void        std_stack_free ( std_stack_t* stack, size_t size );
 uint64_t    std_stack_used_size ( const std_stack_t* stack );
 uint64_t    std_stack_used_size_from ( const std_stack_t* stack, void* base );
 uint64_t    std_stack_unused_size ( const std_stack_t* stack );
+
+std_string_t std_stack_alloc_string ( std_stack_t* stack, size_t size );
 
 char*       std_stack_string_copy ( std_stack_t* stack, const char* str );
 char*       std_stack_string_copy_format ( std_stack_t* stack, const char* str, ... );

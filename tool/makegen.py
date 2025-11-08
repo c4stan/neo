@@ -443,6 +443,7 @@ class Project:
         self.makedef_bindings_path = None
 
         self.launcher_path = None # only used when output == OUTPUT_APP
+        self.launcher_pdb_path = None
 
         self.inc = []
         self.src = []
@@ -540,6 +541,7 @@ class Project:
             launcher_name = 'std_launcher'
             launcher_path = self.index.workspace_map[launcher_name]
             self.launcher_path = normpath(launcher_path + '/build/' + config_name + '/output/' + 'std_launcher.exe')
+            self.launcher_pdb_path = normpath(launcher_path + '/build/' + config_name + '/output/' + 'std_launcher.pdb')
             #log.verbose('EXT EXE: ' + launcher_name)
 
         log.pop_verbose()
@@ -1044,6 +1046,7 @@ class Project:
         # TODO remove this, use external_exes instead
         if self.output == OUTPUT_APP and not (BUILD_FLAGS & BUILD_FLAG_RELOAD):
             shutil.copy(self.launcher_path, modules_path)
+            shutil.copy(self.launcher_pdb_path, modules_path)
 
         dlls_to_copy = self.external_dlls
         if self.output == OUTPUT_APP:

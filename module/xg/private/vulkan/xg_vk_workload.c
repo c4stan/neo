@@ -247,8 +247,8 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
             .size = xg_workload_uniform_buffer_size_m,
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
         );
-        std_stack_t stack = std_static_stack_m ( params.debug_name );
-        std_stack_string_append_format ( &stack, "workload_uniform_buffer(" std_fmt_u32_m ")", i );
+        std_string_t string = std_static_string_m ( params.debug_name );
+        std_string_append_format ( &string, "workload_uniform_buffer(" std_fmt_u32_m ")", i );
         xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &params );
         xg_buffer_info_t uniform_buffer_info;
         xg_buffer_get_info ( &uniform_buffer_info, uniform_buffer_handle );
@@ -266,8 +266,8 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
             .size = xg_workload_staging_buffer_size_m,
             .allowed_usage = xg_buffer_usage_bit_copy_source_m,
         );
-        std_stack_t stack = std_static_stack_m ( params.debug_name );
-        std_stack_string_append_format ( &stack, "workload_staging_buffer(" std_fmt_u32_m ")", i );
+        std_string_t string = std_static_string_m ( params.debug_name );
+        std_string_append_format ( &string, "workload_staging_buffer(" std_fmt_u32_m ")", i );
         xg_buffer_h staging_buffer_handle = xg_buffer_create ( &params );
         xg_buffer_info_t staging_buffer_info;
         xg_buffer_get_info ( &staging_buffer_info, staging_buffer_handle );
@@ -1986,13 +1986,13 @@ static void xg_vk_workload_log_device_lost ( xg_device_h device_handle ) {
     device->ext_api.get_checkpoints ( device->queues[xg_cmd_queue_graphics_m].vk_handle, &data_count[xg_cmd_queue_graphics_m], NULL );
     device->ext_api.get_checkpoints ( device->queues[xg_cmd_queue_compute_m].vk_handle, &data_count[xg_cmd_queue_compute_m], NULL );
     device->ext_api.get_checkpoints ( device->queues[xg_cmd_queue_copy_m].vk_handle, &data_count[xg_cmd_queue_copy_m], NULL );
-    char stack_buffer[1024];
-    std_stack_t stack = std_static_stack_m ( stack_buffer );
-    std_stack_string_append_format ( &stack, "Device " std_fmt_str_m " lost.\n", device->generic_properties.deviceName );
+    char string_buffer[1024];
+    std_string_t string = std_static_string_m ( string_buffer );
+    std_string_append_format ( &string, "Device " std_fmt_str_m " lost.\n", device->generic_properties.deviceName );
 
     for ( xg_cmd_queue_e queue_it = 0; queue_it < xg_cmd_queue_count_m; ++queue_it ) {
         uint32_t count = data_count[queue_it];
-        std_stack_string_append_format ( &stack, std_fmt_str_m " checkpoints: " std_fmt_u32_m "\n", xg_cmd_queue_str ( queue_it ), data_count[queue_it] );
+        std_string_append_format ( &string, std_fmt_str_m " checkpoints: " std_fmt_u32_m "\n", xg_cmd_queue_str ( queue_it ), data_count[queue_it] );
         if ( count ) {
             VkCheckpointDataNV* data = std_virtual_heap_alloc_array_m ( VkCheckpointDataNV, count );
             for ( uint32_t i = 0; i < count; ++i ) {
@@ -2006,13 +2006,13 @@ static void xg_vk_workload_log_device_lost ( xg_device_h device_handle ) {
                 const char* stage = xg_pipeline_stage_str ( xg_pipeline_stage_from_vk ( data[i].stage ) );
                 char buffer[64] = "-";
                 if ( key != -1 ) std_u64_to_str ( buffer, 64, key );
-                std_stack_string_append_format ( &stack, std_fmt_tab_m std_fmt_str_m ": " std_fmt_str_m "\n", stage, buffer );
+                std_string_append_format ( &string, std_fmt_tab_m std_fmt_str_m ": " std_fmt_str_m "\n", stage, buffer );
             }
             std_virtual_heap_free ( data );
         }
     }
 
-    std_log_error_m ( stack_buffer );
+    std_log_error_m ( string_buffer );
 
     std_process_this_exit ( std_process_exit_code_error_m );
 }

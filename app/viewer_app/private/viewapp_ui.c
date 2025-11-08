@@ -246,16 +246,16 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xi_label_state_t size_label = xi_label_state_m ( 
             .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
         );
-        std_stack_t stack = std_static_stack_m ( size_label.text );
+        std_string_t string = std_static_string_m ( size_label.text );
         char buffer[32];
         std_size_to_str_approx ( buffer, 32, cpu_info.used_heap_size );
-        std_stack_string_append ( &stack, buffer );
-        std_stack_string_append ( &stack, "/" );
+        std_string_append ( &string, buffer );
+        std_string_append ( &string, "/" );
         std_size_to_str_approx ( buffer, 32, cpu_info.total_heap_size );
-        std_stack_string_append ( &stack, buffer );
-        std_stack_string_append ( &stack, "/" );
+        std_string_append ( &string, buffer );
+        std_string_append ( &string, "/" );
         std_size_to_str_approx ( buffer, 32, memory_info.total_ram_size );
-        std_stack_string_append ( &stack, buffer );
+        std_string_append ( &string, buffer );
         xi->add_label ( xi_workload, &size_label );
     }
     xi->newline();
@@ -264,7 +264,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xg->get_allocator_info ( &info, state->render.device, i );
         {
             xi_label_state_t type_label = xi_label_state_m();
-            std_stack_t stack = std_static_stack_m ( type_label.text );
+            std_string_t string = std_static_string_m ( type_label.text );
             const char* memory_type_name;
             switch ( i ) {
                 case xg_memory_type_gpu_only_m:     memory_type_name = "gpu"; break;
@@ -272,23 +272,23 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                 case xg_memory_type_upload_m:       memory_type_name = "upload"; break;
                 case xg_memory_type_readback_m:     memory_type_name = "readback"; break;
             }
-            std_stack_string_append ( &stack, memory_type_name );
+            std_string_append ( &string, memory_type_name );
             xi->add_label ( xi_workload, &type_label );
         }
         {
             xi_label_state_t size_label = xi_label_state_m ( 
                 .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
             );
-            std_stack_t stack = std_static_stack_m ( size_label.text );
+            std_string_t string = std_static_string_m ( size_label.text );
             char buffer[32];
             std_size_to_str_approx ( buffer, 32, info.allocated_size );
-            std_stack_string_append ( &stack, buffer );
-            std_stack_string_append ( &stack, "/" );
+            std_string_append ( &string, buffer );
+            std_string_append ( &string, "/" );
             std_size_to_str_approx ( buffer, 32, info.reserved_size );
-            std_stack_string_append ( &stack, buffer );
-            std_stack_string_append ( &stack, "/" );
+            std_string_append ( &string, buffer );
+            std_string_append ( &string, "/" );
             std_size_to_str_approx ( buffer, 32, info.system_size );
-            std_stack_string_append ( &stack, buffer );
+            std_string_append ( &string, buffer );
             xi->add_label ( xi_workload, &size_label );
         }
         xi->newline();
@@ -553,12 +553,12 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                     .horizontal_border_margin = 25,
                 )
             );
-            std_stack_t stack = std_static_stack_m ( time_label.text );
+            std_string_t string = std_static_string_m ( time_label.text );
             char buffer[32];
 
             float sum_ms = xg->timestamp_to_ns ( state->render.device ) * timestamp_sum / 1000000.f;
             std_f32_to_str ( buffer, 32, sum_ms );
-            std_stack_string_append ( &stack, buffer );
+            std_string_append ( &string, buffer );
 
             //std_stack_string_append ( &stack, "/" );
             //uint64_t timestamp_diff = timings[graph_info.node_count * 2 - 1] - timings[0];
@@ -693,17 +693,17 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
             if ( expanded ) {
                 char buffer[1024];
-                std_stack_t stack = std_static_stack_m ( buffer );
+                std_string_t string = std_static_string_m ( buffer );
 
                 for ( uint32_t j = 0; j < props.component_count; ++j ) {
                     se_component_properties_t* component = &props.components[j];
 
                     // component label
                     xi_label_state_t label = xi_label_state_m();
-                    std_stack_string_append ( &stack, "  " );
-                    std_stack_string_append ( &stack, component->name );
+                    std_string_append ( &string, "  " );
+                    std_string_append ( &string, component->name );
                     std_str_copy_static_m ( label.text, buffer );
-                    std_stack_clear ( &stack );
+                    std_string_clear ( &string );
                     xi->add_label ( xi_workload, &label );
                     xi->newline();
 
@@ -712,11 +712,11 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
                         // property label
                         xi_label_state_t label = xi_label_state_m();
-                        std_stack_string_append ( &stack, "  " );
-                        std_stack_string_append ( &stack, "  " );
-                        std_stack_string_append ( &stack, property->name );
+                        std_string_append ( &string, "  " );
+                        std_string_append ( &string, "  " );
+                        std_string_append ( &string, property->name );
                         std_str_copy_static_m ( label.text, buffer );
-                        std_stack_clear ( &stack );
+                        std_string_clear ( &string );
                         xi->add_label ( xi_workload, &label );
 
                         // property editor

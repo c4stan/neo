@@ -19,62 +19,6 @@ static std_module_state_t* std_module_state;
 
 // ----------------------------------------------------------------------------
 
-// The hash is locally stored in the key, so that it doesn't need to be recomputed a bunch of times
-//static uint64_t std_module_hash_name ( const void* _name, void* _ ) {
-//    std_unused_m ( _ );
-//    const std_module_name_t* name = ( const std_module_name_t* ) _name;
-//    return name->hash;
-//}
-
-//static bool std_module_cmp_name ( uint64_t hash1, const void* _name1, const void* _name2, void* _ ) {
-//    std_unused_m ( _ );
-//    std_unused_m ( hash1 );
-//    const std_module_name_t* name1 = ( const std_module_name_t* ) _name1;
-//    const std_module_name_t* name2 = ( const std_module_name_t* ) _name2;
-//
-//    if ( name1->hash != name2->hash ) {
-//        return false;
-//    }
-//
-//    return std_str_cmp ( name1->string, name2->string ) == 0;
-//}
-
-//static uint64_t std_module_hash_api ( const void* api, void* _ ) {
-//    std_unused_m ( _ );
-//    uint64_t key = * ( const size_t* ) api;
-//    uint64_t hash = std_hash_murmur_64 ( key );
-//    return hash;
-//}
-
-//static bool std_module_cmp_api ( uint64_t hash1, const void* _api1, const void* _api2, void* _ ) {
-//    std_unused_m ( _ );
-//    std_unused_m ( hash1 );
-//    void** api1 = ( void** ) _api1;
-//    void** api2 = ( void** ) _api2;
-//    return *api1 == *api2;
-//}
-
-// ----------------------------------------------------------------------------
-
-// TODO what to do with this?
-#ifdef std_module_enable_fake_loading_m
-void std_module_fakeload_api ( const char* name, void* api ) {
-    // Lock, pop freelist, write to buffer
-    //std_rwmutex_lock ( &std_module_state->modules_mutex );
-    std_module_t* module = std_list_pop_m ( &std_module_state->modules_freelist );
-    module->api = api;
-    module->name.hash = std_hash_string_64_m ( name );
-    std_str_copy ( module->name.string, std_module_name_max_len_m, name );
-#ifdef std_platform_win32_m
-    module->handle = 0;
-#endif
-    std_hash_map_insert ( &std_module_state->modules_api_map, ( uint64_t ) api, ( uint64_t ) module );
-    //std_rwmutex_unlock ( &std_module_state->modules_mutex );
-}
-#endif
-
-// ----------------------------------------------------------------------------
-
 static std_module_t* std_module_lookup ( const char* name ) {
     uint64_t name_hash = std_hash_string_64_m ( name );
 
@@ -90,21 +34,21 @@ static std_module_t* std_module_lookup ( const char* name ) {
 
 static bool std_module_file_name ( const char* name, const char* file_prefix, const char* file_postfix, char* module_file_name ) {
     size_t i;
-    i = std_str_copy ( module_file_name, std_module_name_max_len_m, file_prefix );
+    i = std_str_copy ( module_file_name, std_path_size_m, file_prefix );
 
-    if ( i > std_module_name_max_len_m ) {
+    if ( i > std_path_size_m ) {
         return false;
     }
 
-    i += std_str_copy ( module_file_name + i, std_module_name_max_len_m - i, name );
+    i += std_str_copy ( module_file_name + i, std_path_size_m - i, name );
 
-    if ( i > std_module_name_max_len_m ) {
+    if ( i > std_path_size_m ) {
         return false;
     }
 
-    i += std_str_copy ( module_file_name + i, std_module_name_max_len_m - i, file_postfix );
+    i += std_str_copy ( module_file_name + i, std_path_size_m - i, file_postfix );
 
-    if ( i > std_module_name_max_len_m ) {
+    if ( i > std_path_size_m ) {
         return false;
     }
 
@@ -113,15 +57,15 @@ static bool std_module_file_name ( const char* name, const char* file_prefix, co
 
 static bool std_module_entrypoint_name ( const char* name, const char* entrypoint_postfix, char* module_entrypoint_name ) {
     size_t i;
-    i = std_str_copy ( module_entrypoint_name, std_module_name_max_len_m, name );
+    i = std_str_copy ( module_entrypoint_name, std_module_entrypoint_name_max_len_m, name );
 
-    if ( i > std_module_name_max_len_m ) {
+    if ( i > std_module_entrypoint_name_max_len_m ) {
         return false;
     }
 
-    i += std_str_copy ( module_entrypoint_name + i, std_module_name_max_len_m - i, entrypoint_postfix );
+    i += std_str_copy ( module_entrypoint_name + i, std_module_entrypoint_name_max_len_m - i, entrypoint_postfix );
 
-    if ( i > std_module_name_max_len_m ) {
+    if ( i > std_module_entrypoint_name_max_len_m ) {
         return false;
     }
 
@@ -131,28 +75,21 @@ static bool std_module_entrypoint_name ( const char* name, const char* entrypoin
 static std_module_t* std_module_load_internal ( const char* name ) {
     //std_log_info_m ( "Requested module " std_fmt_str_m " is not currently loaded. Looking up the modules library...", name );
     // Build file and entrypoint name
-    char module_file_name[std_module_name_max_len_m];
-    char module_entrypoint_name[std_module_name_max_len_m];
+    char module_file_name[std_path_size_m];
+    char module_entrypoint_name[std_module_entrypoint_name_max_len_m];
 
     std_process_info_t process_info;
     std_process_info ( &process_info, std_process_this() );
-    char file_prefix[std_module_name_max_len_m];
-    std_stack_t file_prefix_stack = std_static_stack_m ( file_prefix );
-    std_stack_string_append ( &file_prefix_stack, process_info.working_path );
-    std_stack_string_append ( &file_prefix_stack, "/" );
+    char file_prefix[std_path_size_m];
+    std_string_t file_prefix_string = std_static_string_m ( file_prefix );
+    std_string_append ( &file_prefix_string, process_info.working_path );
+    std_string_append ( &file_prefix_string, "/" );
 
     const char* file_postfix = ".dll";
     const char* entrypoint_postfix = "_load";
 
-    if ( !std_module_file_name ( name, file_prefix, file_postfix, module_file_name ) ) {
-        std_log_error_m ( "Module name max length (" std_fmt_int_m ") was exceeded for module " std_fmt_str_m ".", std_module_name_max_len_m, name );
-        return NULL;
-    }
-
-    if ( !std_module_entrypoint_name ( name, entrypoint_postfix, module_entrypoint_name ) ) {
-        std_log_error_m ( "Module entrypoint name max length (" std_fmt_int_m ") was exceeded for module " std_fmt_str_m ".", std_module_name_max_len_m, name );
-        return NULL;
-    }
+    std_verify_m ( std_module_file_name ( name, file_prefix, file_postfix, module_file_name ) );
+    std_verify_m ( std_module_entrypoint_name ( name, entrypoint_postfix, module_entrypoint_name ) );
 
     //
     /*
@@ -273,13 +210,10 @@ static void std_module_unload_internal ( std_module_t* module ) {
     std_log_info_m ( "Unloading module " std_fmt_str_m "...", module->name.string );
 
     std_assert_m ( module->handle != 0 );
-    char module_entrypoint_name[std_module_name_max_len_m];
+    char module_entrypoint_name[std_module_entrypoint_name_max_len_m];
     const char* entrypoint_postfix = "_unload";
 
-    if ( !std_module_entrypoint_name ( module->name.string, entrypoint_postfix, module_entrypoint_name ) ) {
-        std_log_error_m ( "Module entrypoint name max length (" std_fmt_int_m ") was exceeded for module " std_fmt_str_m ".", std_module_name_max_len_m, module->name.string );
-        return;
-    }
+    std_verify_m ( std_module_entrypoint_name ( module->name.string, entrypoint_postfix, module_entrypoint_name ) );
 
 #ifdef std_platform_win32_m
     std_module_unloader_f unloader = ( std_module_unloader_f ) GetProcAddress ( ( HMODULE ) module->handle, module_entrypoint_name );
@@ -343,23 +277,19 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
     char args_buffer[std_process_args_max_len_m];
     {
         std_stack_t stack = std_static_stack_m ( args_buffer );
+
+        char path_buffer[std_process_args_max_len_m];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append ( &path, std_tool_path_m );
+        std_path_append ( &path, "cli.py" );
         
-        argv[argc++] = stack.top;
-        std_stack_string_copy ( &stack, std_tool_path_m );
-        std_stack_string_append ( &stack, "cli.py" );
-
-        argv[argc++] = stack.top;
-        std_stack_string_copy ( &stack, "build" );
-
-        argv[argc++] = stack.top;
-        std_stack_string_copy ( &stack, solution_name );
-
-        argv[argc++] = stack.top;
-        std_stack_string_copy ( &stack, "-r" ); // reload flag
+        argv[argc++] = std_stack_string_copy ( &stack, path.str );
+        argv[argc++] = std_stack_string_copy ( &stack, "build" );
+        argv[argc++] = std_stack_string_copy ( &stack, solution_name );
+        argv[argc++] = std_stack_string_copy ( &stack, "-r" ); // reload flag
 
 #if !std_build_debug_m
-        argv[argc++] = stack.top;
-        std_stack_string_copy ( &stack, "-o" );
+        argv[argc++] = std_stack_string_copy ( &stack, "-o" );
 #endif
     }
 
@@ -394,9 +324,6 @@ size_t std_module_build ( const char* solution_name, void* output, size_t output
 
     return read_size;
 }
-
-std_warnings_ignore_m ( "-Wunreachable-code" )
-std_warnings_ignore_m ( "-Wunused-macros" )
 
 void* std_module_reboot ( const char* solution_name ) {
     std_module_unload ( solution_name );
@@ -472,28 +399,21 @@ void std_module_reload ( const char* solution_name ) {
 
 
             // Build file and entrypoint name
-            char module_file_name[std_module_name_max_len_m];
-            char module_entrypoint_name[std_module_name_max_len_m];
+            char module_file_name[std_path_size_m];
+            char module_entrypoint_name[std_module_entrypoint_name_max_len_m];
 
             std_process_info_t process_info;
             std_process_info ( &process_info, std_process_this() );
-            char file_prefix[std_module_name_max_len_m];
-            std_stack_t file_prefix_stack = std_static_stack_m ( file_prefix );
-            std_stack_string_append ( &file_prefix_stack, process_info.working_path );
-            std_stack_string_append ( &file_prefix_stack, "/" );
+            char file_prefix[std_path_size_m];
+            std_string_t file_prefix_string = std_static_string_m ( file_prefix );
+            std_string_append ( &file_prefix_string, process_info.working_path );
+            std_string_append ( &file_prefix_string, "/" );
 
             const char* file_postfix = ".dll";
             const char* entrypoint_postfix = "_reload";
 
-            if ( !std_module_file_name ( name, file_prefix, file_postfix, module_file_name ) ) {
-                std_log_error_m ( "Module name max length (" std_fmt_int_m ") was exceeded for module " std_fmt_str_m ".", std_module_name_max_len_m, name );
-                return;
-            }
-
-            if ( !std_module_entrypoint_name ( name, entrypoint_postfix, module_entrypoint_name ) ) {
-                std_log_error_m ( "Module entrypoint name max length (" std_fmt_int_m ") was exceeded for module " std_fmt_str_m ".", std_module_name_max_len_m, name );
-                return;
-            }
+            std_verify_m ( std_module_file_name ( name, file_prefix, file_postfix, module_file_name ) );
+            std_verify_m ( std_module_entrypoint_name ( name, entrypoint_postfix, module_entrypoint_name ) );
 
 #if defined(std_platform_win32_m)
             HMODULE handle = LoadLibrary ( module_file_name );
@@ -509,7 +429,6 @@ void std_module_reload ( const char* solution_name ) {
                 std_log_error_m ( "Module " std_fmt_str_m " failed to reload - GetProcAddress failed to load function " std_fmt_str_m ".", name, module_entrypoint_name );
                 return;
             }
-
 #elif defined(std_platform_linux_m)
             void* handle = dlopen ( module_file_name, RTLD_LAZY );
 
@@ -524,7 +443,6 @@ void std_module_reload ( const char* solution_name ) {
                 std_log_error_m ( "Module " std_fmt_str_m " failed to reload - dlsym failed to load function " std_fmt_str_m ".", name, module_entrypoint_name );
                 return;
             }
-
 #endif
 
             std_log_info_m ( "Reloading module " std_fmt_str_m " at entrypoint " std_fmt_str_m, name, module_entrypoint_name );

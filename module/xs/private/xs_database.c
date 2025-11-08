@@ -60,7 +60,7 @@ void xs_database_unload ( void ) {
     std_virtual_heap_free ( xs_database_state->database_array );
 }
 
-static char* xs_database_alloc_string ( xs_database_t* db, size_t size ) {
+static std_string_t xs_database_alloc_string ( xs_database_t* db, size_t size ) {
 #if 0
     xs_database_memory_page_t* memory_page = NULL;
 
@@ -88,12 +88,12 @@ static char* xs_database_alloc_string ( xs_database_t* db, size_t size ) {
     return dest;
 #endif
     void* alloc = std_stack_alloc ( &db->stack, size );
-    return ( char* ) alloc;
+    return std_string_m ( .str = alloc, .cap = size );
 }
 
 typedef struct {
     xs_database_t* db;
-    char* base;
+    std_string_t base_path;
 } xs_database_folder_iterator_params_t;
 
 static void xs_database_folder_iterator ( const char* name, std_path_flags_t flags, void* arg ) {
@@ -103,14 +103,14 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
 
     xs_database_folder_iterator_params_t* params = ( xs_database_folder_iterator_params_t* ) arg;
 
-    size_t path_len = std_path_append ( params->base, std_path_size_m, name );
+    std_path_append ( &params->base_path, name );
     bool is_header = false;
     xg_pipeline_e type;
     {
-        char* ext = std_str_find_reverse ( params->base, path_len, "." );
+        char* ext = std_str_find_reverse ( params->base_path.str, params->base_path.len, "." );
 
         if ( !ext ) {
-            std_path_pop ( params->base );
+            std_path_pop ( &params->base_path );
             return;
         }
 
@@ -126,35 +126,32 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
         } else if ( std_str_cmp ( ext, ".glsl" ) == 0 ) {
             is_header = true;
         } else {
-            std_path_pop ( params->base );
+            std_path_pop ( &params->base_path );
             return;
         }
     }
 
-    char* dest = xs_database_alloc_string ( params->db, path_len + 1 );
-    std_str_copy ( dest, path_len + 1, params->base );
+    std_string_t dest = xs_database_alloc_string ( params->db, params->base_path.len + 1 );
+    std_string_append ( &dest, params->base_path.str );
 
     if ( is_header ) {
         xs_database_pipeline_state_header_t* header = &params->db->pipeline_state_headers_array[params->db->pipeline_state_headers_count++];
-        header->path = dest;
+        header->path = dest.str;
     } else {
         xs_database_pipeline_state_t* pipeline_state = &params->db->pipeline_states[params->db->pipeline_states_count++];
-        pipeline_state->path = dest;
-        pipeline_state->name = std_path_name_ptr ( dest ); // TODO alloc separate string and remove .xss ext?
+        pipeline_state->path = dest.str;
+        pipeline_state->name = std_path_name_ptr ( &dest ); // TODO alloc separate string and remove .xss ext?
         pipeline_state->type = type;
         pipeline_state->pipeline_handle = xg_null_handle_m;
         pipeline_state->old_pipeline_handle = xg_null_handle_m;
         pipeline_state->old_pipeline_workload = xg_null_handle_m;
         pipeline_state->last_build_timestamp = std_timestamp_zero_m;
 
-        //size_t name_len = std_str_len ( pipeline_state->name );
-        //name_len = std_str_find_reverse ( pipeline_state->name, name_len, "." );
-        //std_assert_m ( name_len != std_str_find_null_m );
-        //xs_string_hash_t hash = xs_hash_string_m ( pipeline_state->name, name_len );
-
-        char* name = std_path_name_ptr ( pipeline_state->name );
-        char* ext = std_path_ext ( name );
-        size_t name_len = ext ? ext - name - 1 : std_str_len ( name );
+        uint64_t name_len = std_str_len ( pipeline_state->name );
+        char* name = std_path_name_ptr ( &std_fixed_string_len_m ( pipeline_state->name, name_len ) );
+        name_len = std_str_len ( name );
+        char* ext = std_path_ext ( &std_fixed_string_len_m ( name, name_len ) );
+        name_len = ext ? ext - name - 1 : name_len;
         xs_string_hash_t hash = xs_hash_string_m ( name, name_len );
         pipeline_state->name_hash = hash;
 
@@ -163,25 +160,26 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
         std_assert_m ( unique );
     }
 
-    std_path_pop ( params->base );
+    std_path_pop ( &params->base_path );
 }
 
 bool xs_database_add_folder ( xs_database_h db_handle, const char* input_path ) {
     xs_database_t* db = &xs_database_state->database_array[db_handle];
 
-    char path[std_path_size_m] = { 0 };
-    size_t path_len = std_path_absolute ( path, std_path_size_m, input_path );
+    char path_buffer[std_path_size_m];
+    std_string_t path = std_static_string_m ( path_buffer );
+    size_t path_len = std_path_absolute ( &path, input_path );
 
     // TODO check that the path exists and is a folder
 
-    char* dest = xs_database_alloc_string ( db, path_len + 1 );
-    std_str_copy ( dest, path_len + 1, path );
-    db->folders[db->folders_count++] = dest;
+    std_string_t dest = xs_database_alloc_string ( db, path_len + 1 );
+    std_string_append ( &dest, path.str );
+    db->folders[db->folders_count++] = dest.str;
 
     xs_database_folder_iterator_params_t args;
     args.db = db;
-    args.base = path;
-    std_directory_iterate ( path, xs_database_folder_iterator, &args );
+    args.base_path = path;
+    std_directory_iterate ( path.str, xs_database_folder_iterator, &args );
 
     return true;
 }
@@ -197,10 +195,11 @@ bool xs_database_set_output_folder ( xs_database_h db_handle, const char* input_
         result = std_directory_create ( input_path );
     }
 
-    char path[std_path_size_m] = { 0 };
-    std_path_absolute ( path, std_path_size_m, input_path );
+    char path_buffer[std_path_size_m];
+    std_string_t path = std_static_string_m ( path_buffer );
+    std_path_absolute ( &path, input_path );
 
-    std_str_copy ( db->output_path, std_path_size_m, path );
+    std_str_copy ( db->output_path, std_path_size_m, path.str );
 
     return result;
 }
@@ -392,23 +391,27 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             continue;
         }
 
-        char input_path[std_path_size_m];
-        std_str_copy ( input_path, std_path_size_m, pipeline_state->path );
-        std_path_pop ( input_path );
+        char input_path_buffer[std_path_size_m];
+        std_string_t input_path = std_static_string_m ( input_path_buffer );
+        std_string_append ( &input_path, pipeline_state->path );
+        std_path_pop ( &input_path );
 
-        char output_path[std_path_size_m];
+        char output_path_buffer[std_path_size_m];
+        std_string_t output_path = std_static_string_m ( output_path_buffer );
 
         if ( db->output_path[0] ) {
-            std_str_copy ( output_path, std_path_size_m, db->output_path );
+            std_string_append ( &output_path, db->output_path );
         } else {
-            std_str_copy ( output_path, std_path_size_m, input_path );
+            std_string_append ( &output_path, input_path.str );
         }
 
-        std_directory_create ( output_path );
+        std_directory_create ( output_path.str );
 
         shader_bytecode_t shader_bytecode[xs_shader_parser_max_shader_references_m];
-        char shader_path[std_path_size_m];
-        char binary_path[std_path_size_m];
+        char shader_path_buffer[std_path_size_m];
+        char binary_path_buffer[std_path_size_m];
+        std_string_t shader_path = std_static_string_m ( shader_path_buffer );
+        std_string_t binary_path = std_static_string_m ( binary_path_buffer );
 
         // check if the pipeline state needs to be (re)built
         bool needs_to_build = dirty_headers || pipeline_state->last_build_timestamp.count < pipeline_state_file_info.last_write_time.count || db->dirty_build_params;
@@ -433,12 +436,14 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
             #else
             for ( uint32_t i = 0; i < shader_references->count; ++i ) {
                 xs_parser_shader_reference_t* shader = &shader_references->array[i];
-                std_str_copy ( shader_path, std_path_size_m, input_path );
-                std_path_append ( shader_path, std_path_size_m, shader->name );
+                std_string_copy ( &shader_path, input_path.str );
+                std_path_append ( &shader_path, shader->name );
+                //std_str_copy ( shader_path, std_path_size_m, input_path );
+                //std_path_append ( shader_path, std_path_size_m, shader->name );
 
                 // check shader source edit time
                 std_file_info_t shader_source_info;
-                std_verify_m ( std_file_path_info ( &shader_source_info, shader_path ) );
+                std_verify_m ( std_file_path_info ( &shader_source_info, shader_path.str ) );
 
                 if ( pipeline_state->last_build_timestamp.count < shader_source_info.last_write_time.count ) {
                     needs_to_build = true;
@@ -474,21 +479,17 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 shader_bytecode_t* bytecode = &shader_bytecode[i];
 
                 // prepare shader code input path
-                std_str_copy ( shader_path, std_path_size_m, input_path );
-                std_path_append ( shader_path, std_path_size_m, shader->name );
+                std_string_copy ( &shader_path, input_path.str );
+                std_path_append ( &shader_path, shader->name );
 
                 // prepare shader bytecode output path
-                std_str_copy ( binary_path, std_path_size_m, output_path );
-                std_path_append ( binary_path, std_path_size_m, shader->name );
-                size_t len = std_str_len ( binary_path );
-                char* ext = std_str_find_reverse ( binary_path, len, "." );
+                std_string_copy ( &binary_path, output_path.str );
+                std_path_append ( &binary_path, shader->name );
+                char* ext = std_str_find_reverse ( binary_path.str, binary_path.len, "." );
 
                 if ( ext ) {
-                    len = ext - binary_path;
+                    std_string_truncate_at ( &binary_path, ext - 1 );
                 }
-
-                std_stack_t stack = std_static_stack_m ( binary_path );
-                stack.top = stack.begin + len;
 
                 const char* stage_tag = "";
 
@@ -507,16 +508,16 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     stage_tag = "rhc";
                 }
 
-                std_stack_string_append ( &stack, "-" );
-                std_stack_string_append ( &stack, stage_tag );
-                std_stack_string_append ( &stack, ".spv" );
+                std_string_append ( &binary_path, "-" );
+                std_string_append ( &binary_path, stage_tag );
+                std_string_append ( &binary_path, ".spv" );
 
                 // check if shader needs to be (re)compiled
                 bool skip_compile = false;
                 std_file_info_t shader_source_info;
-                std_verify_m ( std_file_path_info ( &shader_source_info, shader_path ) );
+                std_verify_m ( std_file_path_info ( &shader_source_info, shader_path.str ) );
                 std_file_info_t shader_output_info;
-                if ( std_file_path_info ( &shader_output_info, binary_path ) ) {
+                if ( std_file_path_info ( &shader_output_info, binary_path.str ) ) {
                     if ( shader_output_info.last_write_time.count > shader_source_info.last_write_time.count
                         && shader_output_info.last_write_time.count > most_recent_header_edit.count     // if any header got updated after the shader was compiled, need to recompile
                     ) {
@@ -536,8 +537,8 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 // invoke compiler process
                 if ( !skip_compile ) {
                     xs_shader_compiler_params_t params;
-                    params.binary_path = binary_path;
-                    params.shader_path = shader_path;
+                    params.binary_path = binary_path.str;
+                    params.shader_path = shader_path.str;
                     params.global_definitions = db->global_definitions;
                     params.global_definition_count = db->global_definition_count;
                     params.shader_definitions = shader_definitions->array;
@@ -547,7 +548,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
                     if ( !compile_result ) {
                         if ( verbose ) {
-                            std_log_info_m ( "Shader " std_fmt_str_m " failed to build", shader_path );
+                            std_log_info_m ( "Shader " std_fmt_str_m " failed to build", shader_path.str );
                         }
                         ++shader_fail;
                         bytecode->buffer = std_buffer_m();
@@ -576,10 +577,10 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                 fs->close_file ( bytecode_file );
                 #else
                 if ( verbose ) {
-                    std_log_info_m ( "Loading shader binary " std_fmt_str_m " from disk", shader_path, binary_path );
+                    std_log_info_m ( "Loading shader binary " std_fmt_str_m " from disk", shader_path.str, binary_path );
                 }
                 bytecode->stage = stage;
-                bytecode->buffer = std_file_read_to_virtual_heap ( binary_path );
+                bytecode->buffer = std_file_read_to_virtual_heap ( binary_path.str );
                 #endif
                 //}
             }
@@ -632,10 +633,12 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
 
             for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
                 xg_resource_bindings_layout_params_t* layout_params = &resource_layouts[i];
-                std_stack_t stack = std_static_stack_m ( layout_params->debug_name );
-                std_stack_string_append ( &stack, pipeline_state->name );
-                std_stack_string_append ( &stack, "-" );
-                std_stack_string_append ( &stack, xg_shader_binding_set_str ( i ) );
+                std_string_t string = std_static_string_m ( layout_params->debug_name );
+                // TODO this set will likely get reused by multiple pipeline states, making the name somewhat misleading.
+                //      make a name string that describes the set layout instead?
+                std_string_append ( &string, pipeline_state->name );
+                std_string_append ( &string, "-" );
+                std_string_append ( &string, xg_shader_binding_set_str ( i ) );
                 xg_resource_bindings_layout_h resource_layout = xg->create_resource_layout ( layout_params );
                 pipeline_state->resource_layouts[i] = resource_layout;
 

@@ -5,6 +5,7 @@
 #include <std_process.h>
 #include <std_allocator.h>
 #include <std_file.h>
+#include <std_string.h>
 
 #include <net.h>
 #include <aud.h>
@@ -14,13 +15,17 @@
 #include "minimp3_ex.h"
 #include "foxen-flac.h"
 
-#define onda_subpath_max_len_m 128
+#define onda_subpath_size_m 128
 #define onda_stream_chunk_size_m (1024ull * 64 * 1)
+
+#define onda_rootpath_size_m 128
+#define onda_path_size_m ( onda_rootpath_size_m + onda_subpath_size_m )
 
 typedef struct {
     net_socket_h client_socket;
     net_socket_address_t client_address;
-    char root_path[std_path_size_m];
+    std_string_t root_path;
+    char root_path_buffer[onda_path_size_m];
 } onda_server_state_t;
 
 typedef struct {
@@ -38,7 +43,8 @@ typedef struct {
     list_result_t list;
     std_stack_t list_stack;
     float volume;
-    char path[std_path_size_m];
+    std_string_t path;
+    char path_buffer[onda_path_size_m];
 } onda_client_state_t;
 
 typedef struct {
@@ -63,10 +69,10 @@ std_module_implement_state_m ( onda );
 
 static void onda_print_help ( void ) {
     char buffer[128];
-    std_stack_t stack = std_static_stack_m ( buffer );
-    std_stack_string_append ( &stack, "onda ( -s | -c )\n" );
-    std_stack_string_append ( &stack, std_fmt_tab_m "if -s: PORT PATH\n" );
-    std_stack_string_append ( &stack, std_fmt_tab_m "if -c: IP PORT\n" );
+    std_string_t string = std_static_string_m ( buffer );
+    std_string_append ( &string, "onda ( -s | -c )\n" );
+    std_string_append ( &string, std_fmt_tab_m "if -s: PORT PATH\n" );
+    std_string_append ( &string, std_fmt_tab_m "if -c: IP PORT\n" );
     std_log_info_m ( buffer );
 }
 
@@ -87,9 +93,10 @@ static bool onda_boot_server ( uint16_t port, const char* path ) {
         return false;
     }
 
-    std_path_normalize ( onda_state->server.root_path, sizeof ( onda_state->server.root_path ), path );
+    onda_state->server.root_path = std_static_string_m ( onda_state->server.root_path_buffer );
+    std_path_normalize ( &onda_state->server.root_path, path );
     std_path_info_t path_info;
-    success = std_path_info ( &path_info, onda_state->server.root_path );
+    success = std_path_info ( &path_info, onda_state->server.root_path.str );
     if ( !success ) {
         std_log_error_m ( "Invalid path" );
         return false;
@@ -164,7 +171,8 @@ static bool onda_boot_client ( const char* server_ip, uint16_t server_port ) {
     onda_state->client.wm = wm;
     onda_state->client.window = wm->get_console_window();
 
-    onda_state->client.path[0] = '\0';
+    onda_state->client.path = std_static_string_m ( onda_state->client.path_buffer );
+    onda_state->client.path_buffer[0] = '\0';
     std_mem_zero_m ( &onda_state->client.list );
     onda_state->client.volume = 0.2f;
 
@@ -212,25 +220,25 @@ static list_result_t onda_build_list ( std_stack_t* stack, const char* client_pa
     uint32_t max_subdirs = 256;
     uint32_t max_files = 256;
 
-    char* path = std_stack_alloc ( stack, std_path_size_m );
-    std_str_copy ( path, std_path_size_m, onda_state->server.root_path );
-    std_path_append ( path, std_path_size_m, client_path );
+    std_string_t path = std_stack_alloc_string ( stack, onda_path_size_m );
+    std_string_copy ( &path, onda_state->server.root_path.str );
+    std_path_append ( &path, client_path );
 
     char** subdirs = std_stack_alloc_array_m ( stack, char*, max_subdirs );
     for ( uint32_t i = 0; i < max_subdirs; ++i ) {
-        subdirs[i] = std_stack_alloc ( stack, onda_subpath_max_len_m );
+        subdirs[i] = std_stack_alloc ( stack, onda_subpath_size_m );
     }
-    size_t subdir_count = std_directory_subdirs ( subdirs, max_subdirs, onda_subpath_max_len_m, path );
+    size_t subdir_count = std_directory_subdirs ( subdirs, max_subdirs, onda_subpath_size_m, path.str );
     char** raw_files = std_stack_alloc_array_m ( stack, char*, max_files );
     for ( uint32_t i = 0; i < max_files; ++i ) {
-        raw_files[i] = std_stack_alloc ( stack, onda_subpath_max_len_m );
+        raw_files[i] = std_stack_alloc ( stack, onda_subpath_size_m );
     }
-    size_t raw_file_count = std_directory_files ( raw_files, max_files, onda_subpath_max_len_m, path );
+    size_t raw_file_count = std_directory_files ( raw_files, max_files, onda_subpath_size_m, path.str );
 
     char** files = std_stack_alloc_array_m ( stack, char*, max_files );
     uint32_t file_count = 0;
     for ( uint32_t i = 0; i < raw_file_count; ++i ) {
-        char* ext = std_path_ext ( raw_files[i] );
+        char* ext = std_path_ext ( &std_string_m ( .str = raw_files[i], .len = std_str_len ( raw_files[i] ), .cap = onda_subpath_size_m ) );
         if ( std_str_cmp ( ext, "mp3" ) != 0 && std_str_cmp ( ext, "flac" ) != 0 ) {
             continue;
         }
@@ -263,13 +271,13 @@ static void onda_server_send_list ( std_stack_t* stack, const list_result_t* lis
 
     // TODO dynamic size paths
     for ( uint32_t i = 0; i < list->subdir_count; ++i ) {
-        char* subdir = std_stack_alloc ( stack, onda_subpath_max_len_m );
-        std_str_copy ( subdir, onda_subpath_max_len_m, list->subdirs[i] );
+        char* subdir = std_stack_alloc ( stack, onda_subpath_size_m );
+        std_str_copy ( subdir, onda_subpath_size_m, list->subdirs[i] );
     }
 
     for ( uint32_t i = 0; i < list->file_count; ++i ) {
-        char* file = std_stack_alloc ( stack, onda_subpath_max_len_m );
-        std_str_copy ( file, onda_subpath_max_len_m, list->files[i] );
+        char* file = std_stack_alloc ( stack, onda_subpath_size_m );
+        std_str_copy ( file, onda_subpath_size_m, list->files[i] );
     }
 
     size_t msg_size = std_stack_used_size_from ( stack, header );
@@ -302,7 +310,9 @@ static void onda_server_stream_media ( std_stack_t* stack, const char* path ) {
     std_file_info_t file_info;
     std_file_info ( &file_info, file );
     
-    char* label = std_path_relative_to ( path, onda_state->server.root_path );
+    uint64_t path_len = std_str_len ( path );
+    std_string_t path_string = std_fixed_string_len_m ( path, path_len );
+    char* label = std_path_relative_to ( &path_string, onda_state->server.root_path.str );
     size_t label_size = std_str_len ( label ) + 1;
     
     void* begin = std_stack_alloc ( stack, sizeof ( onda_media_header_t ) );
@@ -315,7 +325,7 @@ static void onda_server_stream_media ( std_stack_t* stack, const char* path ) {
     std_file_read ( media_data, file_info.size, file );
     std_file_close ( file );
 
-    char* ext = std_path_ext ( path );
+    char* ext = std_path_ext ( &path_string );
     if ( ext ) {
         if ( std_str_cmp ( ext, "mp3" ) == 0 ) {
             header->type = onda_client_stream_type_mp3_m;
@@ -412,10 +422,10 @@ static std_app_state_e onda_update_server ( void ) {
         onda_server_send_list ( stack, &list );
     } else if ( std_str_starts_with ( client_msg, "play" ) ) {
         char* client_path = client_msg + 5;
-        char* media_path = std_stack_string_copy ( stack, onda_state->server.root_path );
-        std_stack_alloc ( stack, std_str_len ( client_path ) );
-        std_path_append_file ( media_path, (char*) stack->top - media_path, client_path );
-        onda_server_stream_media ( stack, media_path );
+        std_string_t media_path = std_stack_alloc_string ( stack, onda_path_size_m );
+        std_path_append_dir ( &media_path, onda_state->server.root_path.str );
+        std_path_append_file ( &media_path, client_path );
+        onda_server_stream_media ( stack, media_path.str );
     } else if ( std_str_starts_with ( client_msg, "exit" ) ) {
         net->destroy_socket ( onda_state->server.client_socket );
         onda_state->server.client_socket = net_null_handle_m;
@@ -467,8 +477,8 @@ static list_result_t onda_client_read_list ( std_stack_t* stack ) {
     std_auto_m header = std_stack_alloc_m ( stack, onda_list_header_t );
     net->read_connected_socket ( header, sizeof ( onda_list_header_t ), socket, net_connected_socket_read_flag_read_all_m );
 
-    uint32_t subdir_data_size = onda_subpath_max_len_m * header->subdir_count;
-    uint32_t file_data_size = onda_subpath_max_len_m * header->file_count;
+    uint32_t subdir_data_size = onda_subpath_size_m * header->subdir_count;
+    uint32_t file_data_size = onda_subpath_size_m * header->file_count;
     char* subdir_data = std_stack_alloc ( stack, subdir_data_size );
     char* file_data = std_stack_alloc ( stack, file_data_size );
     net->read_connected_socket ( header->data, subdir_data_size + file_data_size, socket, net_connected_socket_read_flag_read_all_m );
@@ -480,10 +490,10 @@ static list_result_t onda_client_read_list ( std_stack_t* stack ) {
     list.subdirs = std_stack_alloc ( stack, subdir_data_size );
     list.files = std_stack_alloc ( stack, file_data_size );
     for ( uint32_t i = 0; i < list.subdir_count; ++i ) {
-        list.subdirs[i] = subdir_data + onda_subpath_max_len_m * i;
+        list.subdirs[i] = subdir_data + onda_subpath_size_m * i;
     }
     for ( uint32_t i = 0; i < list.file_count; ++i ) {
-        list.files[i] = file_data + onda_subpath_max_len_m * i;
+        list.files[i] = file_data + onda_subpath_size_m * i;
     }
 
     return list;
@@ -612,6 +622,10 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
             sleep_ms = step_ms / 2;
         }
         
+        // left alt + up/down : volume
+        // left alt + left/right : skip
+        // left alt + left ctrl + up : pause/resume
+        // left alt + left ctrl + down : stop
         wm_input_state_t new_input_state;
         wm->get_window_input_state ( onda_state->client.window, &new_input_state );
         if ( new_input_state.keyboard[wm_keyboard_state_alt_left_m] ) {
@@ -740,12 +754,11 @@ static void onda_client_print_list ( std_stack_t* stack, const list_result_t* li
 static void onda_client_request_list ( std_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
     onda_client_request_t* request = std_stack_alloc_m ( stack, onda_client_request_t );
-    void* base = stack->top;
-    std_stack_string_copy ( stack, "list ");
-    char* dir_path = std_stack_string_append ( stack, onda_state->client.path );
-    std_stack_alloc ( stack, std_str_len ( path ) + 1 );
-    std_path_append_dir ( dir_path, (char*) stack->top - dir_path, path );
-    uint32_t data_size = stack->top - base + 1;
+    std_string_t string = std_stack_alloc_string ( stack, onda_path_size_m + 5 );
+    std_string_append ( &string, "list " );
+    std_path_append_dir ( &string, onda_state->client.path.str );
+    std_path_append_dir ( &string, path );
+    uint32_t data_size = string.len + 1;
     request->data_size = data_size;
     net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + data_size );
 }
@@ -766,11 +779,11 @@ static bool onda_client_play_media ( std_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
 
     onda_client_request_t* request = std_stack_alloc_m ( stack, onda_client_request_t );
-    char* request_data = std_stack_string_copy ( stack, "play " );
-    char* media_path = std_stack_string_append ( stack, onda_state->client.path );
-    std_stack_alloc ( stack, std_str_len ( path ) );
-    std_path_append_file ( media_path, (char*) stack->top - media_path, path );
-    uint32_t request_data_size =  std_str_len ( request_data ) + 1;
+    std_string_t string = std_stack_alloc_string ( stack, onda_path_size_m + 5 );
+    std_string_append ( &string, "play " );
+    std_path_append_dir ( &string, onda_state->client.path.str );
+    std_path_append_dir ( &string, path );
+    uint32_t request_data_size =  string.len + 1;
     request->data_size = request_data_size;
     net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + request_data_size );
 
@@ -831,9 +844,9 @@ static std_app_state_e onda_update_client ( void ) {
         list_result_t* client_list = &onda_state->client.list;
         std_assert_m ( id < client_list->subdir_count + client_list->file_count );
         if ( id < client_list->subdir_count ) {
-            std_path_append_dir ( onda_state->client.path, std_path_size_m, client_list->subdirs[id] );
+            std_path_append_dir ( &onda_state->client.path, client_list->subdirs[id] );
         } else {
-            std_path_append_file ( onda_state->client.path, std_path_size_m, client_list->files[id - client_list->subdir_count] );
+            std_path_append_file ( &onda_state->client.path, client_list->files[id - client_list->subdir_count] );
         }
         onda_client_request_list ( stack, "" );
         std_stack_clear ( list_stack );
@@ -841,7 +854,7 @@ static std_app_state_e onda_update_client ( void ) {
         onda_state->client.list = list;
         onda_client_print_list ( stack, &list );
     } else if ( std_str_cmp ( msg, "back" ) == 0 ) {
-        std_path_pop ( onda_state->client.path );
+        std_path_pop ( &onda_state->client.path );
         onda_client_request_list ( stack, "" );
         std_stack_clear ( list_stack );
         list_result_t list = onda_client_read_list ( list_stack );
@@ -860,7 +873,7 @@ static std_app_state_e onda_update_client ( void ) {
         std_assert_m ( id < client_list->subdir_count + client_list->file_count );
         std_log_m ( std_log_level_custom_m, "\n\n" ); // make room for 2 empty lines for the player
         if ( id < client_list->subdir_count ) {
-            std_path_append_dir ( onda_state->client.path, std_path_size_m, client_list->subdirs[id] );
+            std_path_append_dir ( &onda_state->client.path, client_list->subdirs[id] );
             onda_client_request_list ( stack, "" );
             list_result_t subdir_list = onda_client_read_list ( stack );
             onda_client_print_list ( stack, &subdir_list );
@@ -868,7 +881,7 @@ static std_app_state_e onda_update_client ( void ) {
                 bool exit = onda_client_play_media ( stack, subdir_list.files[i] );
                 if ( exit ) break;
             }
-            std_path_pop ( onda_state->client.path );
+            std_path_pop ( &onda_state->client.path );
         } else {
             char* file = client_list->files[id - client_list->subdir_count];
             onda_client_play_media ( stack, file );

@@ -36,73 +36,30 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
     {
         std_stack_t stack = std_static_stack_m ( args_buffer );
 
-        args[argc++] = stack.top;
-        std_stack_string_copy ( &stack, "--target-env=vulkan1.2" );
-
-        args[argc++] = stack.top;
-        std_stack_string_copy ( &stack, params->shader_path );
-
-        args[argc++] = stack.top;
-        std_stack_string_copy ( &stack, "-g" );
-
-        args[argc++] = stack.top;
+        args[argc++] = std_stack_string_copy ( &stack, "--target-env=vulkan1.2" );
+        args[argc++] = std_stack_string_copy ( &stack, params->shader_path );
+        args[argc++] = std_stack_string_copy ( &stack, "-g" );
 #if std_build_debug_m
-        std_stack_string_copy ( &stack, "-O0" );
+        args[argc++] = std_stack_string_copy ( &stack, "-O0" );
 #else
-        std_stack_string_copy ( &stack, "-O" );
+        args[argc++] = std_stack_string_copy ( &stack, "-O" );
 #endif
+        args[argc++] = std_stack_string_copy ( &stack, "-o" );
+        args[argc++] = std_stack_string_copy ( &stack, params->binary_path );
 
-        args[argc++] = stack.top;
-        std_stack_string_copy ( &stack, "-o" );
-
-        /*char binary_name[xs_shader_name_max_len_m];
-        {
-            char* dest2 = binary_name;
-            size_t cap2 = xs_shader_name_max_len_m;
-            std_str_append_m ( dest2, cap2, output_path );
-            //std_str_copy ( binary_name, xs_shader_name_max_len_m, shader_path );
-
-            size_t len = std_str_len ( binary_name );
-            len = std_str_find_reverse ( binary_name, len, "." );
-            dest2 = binary_name + len;
-            cap2 = xs_shader_name_max_len_m - len;
-            std_str_append_m ( dest2, cap2, ".spv" );
-        }*/
-        args[argc++] = stack.top;
-        std_stack_string_copy ( &stack, params->binary_path );
-
-#if 0
-        args[argc++] = ++dest;
-        std_str_append_m ( dest, cap, "-fshader-stage=" );
-        std_str_append_m ( dest, cap, stage_name );
-
-        args[argc++] = ++dest;
-        std_str_append_m ( dest, cap, "-D" );
-        std_str_append_m ( dest, cap, entry_point );
-        std_str_append_m ( dest, cap, "=main" );
-#endif
-
-        args[argc++] = stack.top;
-        // TODO find a better way to do this... this depends on the working dir (the app workspace root when running from neo)
         {
             char include_path[256];
-            std_stack_t include_path_string = std_static_stack_m ( include_path );
-            std_stack_string_append ( &include_path_string, "-I" );
-            std_stack_string_append ( &include_path_string, "data/xs/shader/" );
-            std_stack_string_copy ( &stack, include_path );
+            std_string_t include_path_string = std_static_string_m ( include_path );
+            std_string_append ( &include_path_string, "-I" );
+            std_string_append ( &include_path_string, "data/xs/shader/" );
+            args[argc++] = std_stack_string_copy ( &stack, include_path );
         }
-
-        //if ( binary_name_out ) {
-        //    std_str_copy ( binary_name_out, out_cap, binary_name );
-        //}
 
         if ( params->global_definitions != NULL && params->global_definition_count > 0 ) {
             char u32_buffer[32];
 
             for ( size_t i = 0; i < params->global_definition_count; ++i ) {
-                //std_array_push ( &array, 1 );
-                args[argc++] = stack.top;
-                std_stack_string_copy ( &stack, "-D" );
+                args[argc++] = std_stack_string_copy ( &stack, "-D" );
                 std_stack_string_append ( &stack, params->global_definitions[i].name );
                 std_stack_string_append ( &stack, "=" );
                 size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );
@@ -111,8 +68,7 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             }
 
             for ( size_t i = 0; i < params->shader_definition_count; ++i ) {
-                args[argc++] = stack.top;
-                std_stack_string_copy ( &stack, "-D" );
+                args[argc++] = std_stack_string_copy ( &stack, "-D" );
                 std_stack_string_append ( &stack, params->global_definitions[i].name );
                 std_stack_string_append ( &stack, "=" );
                 size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );

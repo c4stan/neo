@@ -3,6 +3,7 @@
 #include <std_platform.h>
 #include <std_time.h>
 #include <std_allocator.h>
+#include <std_string.h>
 
 typedef struct {
     uint64_t u64;
@@ -88,18 +89,18 @@ typedef void ( std_directory_iterator_callback_f ) ( const char* name, std_path_
 //                  remove all ./ and ../
 //                  TODO make this be the case everywhere
 
-size_t      std_path_append      ( char* path, size_t cap, const char* append );
-size_t      std_path_append_dir  ( char* path, size_t cap, const char* dir );
-size_t      std_path_append_file ( char* path, size_t cap, const char* filename );
-size_t      std_path_pop         ( char* path );
-size_t      std_path_normalize   ( char* dest, size_t cap, const char* path );
-bool        std_path_is_drive    ( const char* path );
+bool      std_path_append      ( std_string_t* path, const char* append );
+bool      std_path_append_dir  ( std_string_t* path, const char* dir );
+bool      std_path_append_file ( std_string_t* path, const char* filename );
+bool      std_path_pop         ( std_string_t* path );
+bool      std_path_normalize   ( std_string_t* dest, const char* path );
+bool        std_path_is_drive    ( const std_string_t* path );
 //size_t      std_path_name        ( char* name, size_t cap, const char* path );
-char*       std_path_name_ptr    ( const char* path );
+char*       std_path_name_ptr    ( const std_string_t* path );
 bool        std_path_info        ( std_path_info_t* info, const char* path );
-size_t      std_path_absolute    ( char* dest, size_t dest_cap, const char* path );
-char*       std_path_relative_to ( const char* path, const char* relative_to );
-char*       std_path_ext         ( const char* path );  // no '.'
+size_t      std_path_absolute    ( std_string_t* dest, const char* path );
+char*       std_path_relative_to ( const std_string_t* path, const char* relative_to );
+char*       std_path_ext         ( const std_string_t* path );  // no '.'
 
 bool        std_directory_create ( const char* path );
 bool        std_directory_destroy ( const char* path );

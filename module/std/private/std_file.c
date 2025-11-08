@@ -126,6 +126,10 @@ void std_filetime_to_timestamp ( struct timespec ts, std_timestamp_t* timestamp 
 //                                         P A T H
 // ======================================================================================= //
 
+static bool std_path_is_slash ( char c ) {
+    return c == '/' || c == '\\';
+}
+
 static const char* std_path_next_token ( const char* path, const char* cursor ) {
     std_assert_m ( path != NULL );
     std_assert_m ( cursor != NULL );
@@ -134,7 +138,7 @@ static const char* std_path_next_token ( const char* path, const char* cursor ) 
         return NULL;
     }
 
-    while ( *cursor != '/' && *cursor != '\\' && *cursor != '\0' ) {
+    while ( !std_path_is_slash ( *cursor ) && *cursor != '\0' ) {
         ++cursor;
     }
 
@@ -157,121 +161,134 @@ static size_t std_path_token_len ( const char* path, const char* cursor ) {
         return 0;
     }
 
-    while ( cursor > path && *cursor != '/' && *cursor != '\\' ) {
+    while ( cursor > path && !std_path_is_slash ( *cursor ) ) {
         --cursor;
     }
 
-    if ( *cursor == '/' || *cursor == '\\' ) {
+    if ( std_path_is_slash ( *cursor ) ) {
         ++cursor;
     }
 
     const char* start = cursor;
 
-    while ( *cursor != '/' && *cursor != '\\' && *cursor != '\0' ) {
+    while ( !std_path_is_slash ( *cursor ) && *cursor != '\0' ) {
         ++cursor;
     }
 
     return ( size_t ) ( cursor - start );
 }
 
-// appends to path first n characters from append, adds a / in between if necessary
-// TODO avoid computing path len every time!
-//      change std_string to use <len, str> strings instead of c string
-static size_t std_path_append_n ( char* path, size_t cap, const char* append, size_t n ) {
-    std_assert_m ( path != NULL );
-    std_assert_m ( append != NULL );
-    size_t path_len = std_str_len ( path );
-    size_t extra = 0;
+// appends to path first n characters from append, adds a / in between if necessary, skips redundant / at the start of append if any
+static bool std_path_append_n ( std_string_t* path, const char* append, size_t n ) {
+    if ( n == 0 ) {
+        return true;
+    }
 
-    if ( path_len > 0 && path[path_len - 1] != '/' && append[0] != '/' && path_len + 1 < cap ) {
-        path[path_len++] = '/';
-        path[path_len] = '\0';
-        extra = 1;
+    if ( path->len > 0 && !std_path_is_slash ( path->str[path->len - 1] ) && !std_path_is_slash ( append[0] ) ) {
+        if ( !std_string_append_char ( path, '/' ) ) {
+            return false;
+        }
+    }
+
+    if ( path->len > 0 && std_path_is_slash ( path->str[path->len - 1] ) ) {
+        while ( n > 0 && std_path_is_slash ( append[0] ) ) {
+            ++append;
+            --n;
+        }
+    }
+
+    if ( n == 0 ) {
+        return true;
     }
 
     size_t append_len = n;
-    size_t new_path_len = path_len + append_len + extra;
-    std_assert_m ( new_path_len < cap );
-    if ( new_path_len < cap ) {
-        std_mem_copy ( path + path_len, append, append_len );
-        path[new_path_len] = '\0';
+    size_t new_path_len = path->len + append_len;
+    if ( new_path_len < path->cap ) {
+        std_mem_copy ( path->str + path->len, append, append_len );
+        path->str[new_path_len] = '\0';
+        path->len = new_path_len;
+        return true;
     }
-    return new_path_len;
+
+    return false;
 }
 
-size_t std_path_append ( char* path, size_t cap, const char* append ) {
-    std_assert_m ( path != NULL );
-    std_assert_m ( append != NULL );
-    size_t append_len = std_str_len ( append );
-    size_t new_len = std_path_append_n ( path, cap, append, append_len );
-    if ( path[new_len - 1] != '/' ) {
-        std_path_info_t path_info;
-        std_path_info ( &path_info, path );
-        if ( path_info.flags & std_path_is_directory_m ) {
-            std_assert_m ( cap > new_len + 1 );
-            if ( cap > new_len + 1 ) {
-                path[new_len++] = '/';
-                path[new_len] = '\0';
-            }
+static bool std_path_append_str ( std_string_t* path, const char* append ) {
+    if ( !append || append[0] == 0 ) {
+        return true;
+    }
+
+    if ( path->len > 0 && !std_path_is_slash ( path->str[path->len - 1] ) && !std_path_is_slash ( append[0] ) ) {
+        if ( !std_string_append_char ( path, '/' ) ) {
+            return false;
         }
     }
-    return new_len;
-}
 
-size_t std_path_append_dir ( char* path, size_t cap, const char* append ) {
-    std_assert_m ( path != NULL );
-    std_assert_m ( append != NULL );
-    size_t append_len = std_str_len ( append );
-    size_t new_len = std_path_append_n ( path, cap, append, append_len );
-    if ( append_len == 0 ) {
-        return new_len;
+    if ( path->len > 0 && std_path_is_slash ( path->str[path->len - 1] ) ) {
+        while ( append[0] != '\0' && std_path_is_slash ( append[0] ) ) {
+            ++append;
+        }
     }
-    std_assert_m ( cap > new_len + 1 );
-    if ( cap > new_len + 1 ) {
-        path[new_len++] = '/';
-        path[new_len] = '\0';
+
+    return std_string_append ( path, append );
+}
+
+bool std_path_append ( std_string_t* path, const char* append ) {
+    if ( !std_path_append_str ( path, append ) ) {
+        return false;
     }
-    return new_len;
+
+    if ( path->len > 0 && !std_path_is_slash ( path->str[path->len - 1] ) ) {
+        std_path_info_t path_info;
+        std_path_info ( &path_info, path->str );
+        if ( path_info.flags & std_path_is_directory_m ) {
+            return std_string_append_char ( path, '/' );
+        }
+    }
+
+    return true;
 }
 
-size_t std_path_append_file ( char* path, size_t cap, const char* append ) {
-    std_assert_m ( path != NULL );
-    std_assert_m ( append != NULL );
-    size_t append_len = std_str_len ( append );
-    size_t new_len = std_path_append_n ( path, cap, append, append_len );
-    return new_len;
+bool std_path_append_dir ( std_string_t* path, const char* append ) {
+    if ( !std_path_append_str ( path, append ) ) {
+        return false;
+    }
+
+    return std_string_append_char ( path, '/' );
 }
 
-size_t std_path_pop ( char* path ) {
+bool std_path_append_file ( std_string_t* path, const char* append ) {
+    return std_path_append_str ( path, append );
+}
+
+bool std_path_pop ( std_string_t* path ) {
     // a path component is at least 1 char, so if there only one (or less) chars in the string return empty
     // iterate back starting from skipping the last utf8, as it's either a filename's last character component or a path's '/' end character.
     // insert a string terminator at the first '/', or after the first ':', and return
     // return empty if no '/' or ':' was found
-    std_assert_m ( path != NULL );
-    size_t len = std_str_len ( path );
 
-    if ( len <= 1 ) {
-        path[0] = '\0';
-        return 0;
+    if ( path->len <= 1 ) {
+        path->str[0] = '\0';
+        return false;
     }
 
-    size_t i = len - 1;
-    size_t char_size = std_utf8_char_size_reverse ( path + i, path );
+    size_t i = path->len - 1;
+    size_t char_size = std_utf8_char_size_reverse ( path->str + i, path->str );
     i -= char_size;
 
     for ( ;; ) {
-        if ( path[i] == ':' ) {
-            path[i + 1] = '/';
-            path[i + 2] = '\0';
-            return i + 2;
+        if ( path->str[i] == ':' ) {
+            std_string_truncate_at ( path, path->str + i );
+            std_string_append_char ( path, '/' );
+            return true;
         }
 
-        if ( path[i] == '/' && i < len - 1 ) {
-            path[i + 1] = '\0';
-            return i + 1;
+        if ( std_path_is_slash ( path->str[i] ) && i < path->len - 1 ) {
+            std_string_truncate_at ( path, path->str + i );
+            return true;
         }
 
-        char_size = std_utf8_char_size_reverse ( path + i, path );
+        char_size = std_utf8_char_size_reverse ( path->str + i, path->str );
 
         if ( char_size >= i ) {
             break;
@@ -280,24 +297,19 @@ size_t std_path_pop ( char* path ) {
         i -= char_size;
     }
 
-    path[0] = '\0';
-    return 0;
+    return false;
 }
 
-size_t std_path_normalize ( char* dest, size_t cap, const char* path ) {
-    if ( cap == 0 ) {
-        return 0;
-    }
-
-    size_t len = 0;
-    dest[0] = 0;
+// TODO inplace?
+bool std_path_normalize ( std_string_t* dest, const char* path ) {
+    std_string_clear ( dest );
     const char* token = path;
 
     // On linux preserve initial '/'
     // TODO does win32 require a branch to ignore it?
 #if defined std_platform_linux_m
     if ( *token == '/' ) {
-        len = std_path_append_n ( dest, cap, "/", 1 );
+        std_string_append_char ( dest, '/' );
         ++token;
     }
 #endif
@@ -309,35 +321,35 @@ size_t std_path_normalize ( char* dest, size_t cap, const char* path ) {
             std_path_pop ( dest );
         } else {
             size_t token_len = std_path_token_len ( path, token );
-            len = std_path_append_n ( dest, cap, token, token_len );
+            std_path_append_n ( dest, token, token_len );
 
-            if ( * ( token + token_len ) != '\0' ) {
-                len = std_path_append ( dest, cap, "/" );
+            if ( *( token + token_len ) != '\0' ) {
+                std_string_append_char ( dest, '/' );
             }
         }
 
         token = std_path_next_token ( path, token );
     } while ( token != NULL );
 
-    if ( dest [len - 1] != '/' && len < cap ) {
+    if ( !std_path_is_slash ( dest->str[dest->len - 1] ) && dest->len < dest->cap ) {
         std_path_info_t path_info;
-        if ( std_path_info ( &path_info, dest ) ) {
+        if ( std_path_info ( &path_info, dest->str ) ) {
             if ( path_info.flags & std_path_is_directory_m ) {
-                len = std_path_append ( dest, cap, "\0" );
+                std_string_append_char ( dest, '/' );
             }
         }
     }
 
-    return len;
+    return true;
 }
 
-bool std_path_is_drive ( const char* path ) {
+bool std_path_is_drive ( const std_string_t* path ) {
 #if defined(std_platform_win32_m)
-    return std_str_len ( path ) == 3 && path[0] >= 65 && path[0] <= 90 && path[1] == ':' && path[2] == '/';
+    return path->len == 3 && path->str[0] >= 65 && path->str[0] <= 90 && path->str[1] == ':' && std_path_is_slash ( path->str[2] );
 #elif defined(std_platform_linux_m)
     // compare path device id with parent device id, if differs then path is mount point
     char parent[std_path_size_m];
-    std_str_copy ( parent, std_path_size_m, path );
+    std_str_copy ( parent, std_path_size_m, path->str );
     size_t parent_len = std_path_pop ( parent );
 
     if ( parent_len == 0 ) {
@@ -345,9 +357,9 @@ bool std_path_is_drive ( const char* path ) {
     }
 
     struct stat path_stat;
-    int path_stat_result = stat ( path, &path_stat );
+    int path_stat_result = stat ( path->str, &path_stat );
     struct stat parent_stat;
-    int parent_stat_result = stat ( path, &parent_stat );
+    int parent_stat_result = stat ( parent, &parent_stat );
     std_assert_m ( path_stat_result == 0 && parent_stat_result == 0 );
 
     if ( path_stat.st_dev != parent_stat.st_dev ) {
@@ -379,14 +391,10 @@ size_t std_path_name ( char* name, size_t cap, const char* path ) {
 }
 #endif
 
-char* std_path_name_ptr ( const char* path ) {
-    std_assert_m ( path != NULL );
-    size_t len = std_str_len ( path );
-    std_assert_m ( len > 0 );
-    
-    char* find = std_str_find_reverse ( path, len, "/" );
+char* std_path_name_ptr ( const std_string_t* path ) {
+    char* find = std_str_find_reverse ( path->str, path->len, "/" );
     if ( !find ) {
-        return ( char* ) path;
+        return path->str;
     }
 
     return ( char* ) ( find + 1 );
@@ -439,7 +447,7 @@ bool std_path_info ( std_path_info_t* info, const char* path ) {
 #endif
 }
 
-size_t std_path_absolute ( char* dest, size_t dest_cap, const char* path ) {
+size_t std_path_absolute ( std_string_t* dest, const char* path ) {
 #if defined(std_platform_win32_m)
     size_t len = std_to_path_buffer ( path );
     std_assert_m ( len > 0 && len < std_path_size_m );
@@ -447,7 +455,7 @@ size_t std_path_absolute ( char* dest, size_t dest_cap, const char* path ) {
     char buffer[std_path_size_m];
     size_t full_len = std_from_path_buffer_2 ( buffer, std_path_size_m );
     std_assert_m ( full_len > 0 && full_len < std_path_size_m );
-    return std_path_normalize ( dest, dest_cap, buffer );
+    return std_path_normalize ( dest, buffer );
 #elif defined(std_platform_linux_m)
     char buffer[PATH_MAX];
     char* result = realpath ( path, buffer );
@@ -456,25 +464,22 @@ size_t std_path_absolute ( char* dest, size_t dest_cap, const char* path ) {
         return 0;
     }
 
-    return std_path_normalize ( dest, dest_cap, buffer );
+    return std_path_normalize ( dest, buffer );
 #endif
 }
 
-char* std_path_relative_to ( const char* path, const char* relative_to ) {
-    size_t path_len = std_str_len ( path );
+char* std_path_relative_to ( const std_string_t* path, const char* relative_to ) {
     size_t i = 0;
-    for ( ; i < path_len; ++i ) {
-        if ( path[i] != relative_to[i] ) {
+    for ( ; i < path->len; ++i ) {
+        if ( path->str[i] != relative_to[i] ) {
             break;
         }
     }
-    return ( char* ) ( path + i );
+    return ( char* ) ( path->str + i );
 }
 
-char* std_path_ext ( const char* path ) {
-    size_t len = std_str_len ( path );
-    // TODO make this find rev more robust
-    char* ext = std_str_find_reverse ( path, len, "." );
+char* std_path_ext ( const std_string_t* path ) {
+    char* ext = std_str_find_reverse ( path->str, path->len, "." );
     
     if ( ext ) {
         return ext + 1; // skip the '.'
@@ -492,7 +497,7 @@ static bool std_dir_create_recursive_from_path_buffer ( void ) {
     WCHAR* p = t_path_buffer;
 
     while ( *p ) {
-        if ( *p == '\\' || *p == '/' ) {
+        if ( std_path_is_slash ( *p ) ) {
             *p = '\0';
             BOOL create_retcode = CreateDirectoryW ( t_path_buffer, NULL );
 
@@ -534,7 +539,7 @@ static bool std_dir_create_recursive ( const char* path ) {
 
     char* p = buffer;
     while ( *p ) {
-        if ( *p == '\\' || *p == '/' ) {
+        if ( std_path_is_slash ( *p ) ) {
             *p = '\0';
             int create_retcode = mkdir ( buffer, 0700 );
             if ( create_retcode != 0 ) {

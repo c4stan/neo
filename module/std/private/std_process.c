@@ -2,6 +2,7 @@
 #include <std_process.h>
 #include <std_mutex.h>
 #include <std_thread.h>
+#include <std_file.h>
 
 #include "std_state.h"
 
@@ -37,18 +38,21 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
     // executable path
 #if defined(std_platform_win32_m)
     // TODO normalize the path?
+    char path_buffer[std_process_path_max_len_m];
     {
-        WCHAR path_buffer[std_process_path_max_len_m];
-        DWORD get_retcode = GetModuleFileNameW ( NULL, path_buffer, std_process_path_max_len_m );
+        WCHAR wpath_buffer[std_process_path_max_len_m];
+        DWORD get_retcode = GetModuleFileNameW ( NULL, wpath_buffer, std_process_path_max_len_m );
         std_unused_m ( get_retcode );
         std_assert_m ( get_retcode > 0 && get_retcode < std_process_path_max_len_m );
-        int result = WideCharToMultiByte ( CP_UTF8, 0, path_buffer, -1, process->executable_path, std_process_path_max_len_m, NULL, NULL );
+        int result = WideCharToMultiByte ( CP_UTF8, 0, wpath_buffer, -1, path_buffer, std_process_path_max_len_m, NULL, NULL );
         std_unused_m ( result );
         std_assert_m ( result > 0 );
     }
-    //std_str_copy ( process->executable, std_process_path_max_len_m, args[0] );
+    std_path_normalize ( &std_static_string_m ( process->executable_path ), path_buffer );
 #elif defined(std_platform_linux_m)
-    readlink ( "/proc/self/exe", process->executable_path, std_process_path_max_len_m );
+    char path_buffer[std_process_path_max_len_m];
+    readlink ( "/proc/self/exe", path_buffer, std_process_path_max_len_m );
+    std_path_normalize ( &std_static_string_m ( process->executable_path ), path_buffer );
 #endif
 
     // process name (first arg)
@@ -59,8 +63,7 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
         std_stack_t stack = std_static_stack_m ( process->args_buffer );
 
         for ( size_t i = 1; i < args_count; ++i ) {
-            process->args[i - 1] = stack.top;
-            std_stack_string_copy ( &stack, args[i] );
+            process->args[i - 1] = std_stack_string_copy ( &stack, args[i] );
         }
     }
     process->args_count = args_count - 1;
@@ -140,19 +143,20 @@ void std_process_init ( std_process_state_t* state, char** args, size_t args_cou
     // read working path once. it is assumed that it will never change.
 #if defined(std_platform_win32_m)
     {
-        WCHAR path_buffer[std_process_path_max_len_m];
-        DWORD get_retcode = GetCurrentDirectoryW ( std_process_path_max_len_m, path_buffer );
+        WCHAR wpath_buffer[std_process_path_max_len_m];
+        char path_buffer[std_process_path_max_len_m];
+        DWORD get_retcode = GetCurrentDirectoryW ( std_process_path_max_len_m, wpath_buffer );
         std_unused_m ( get_retcode );
         std_assert_m ( get_retcode > 0 && get_retcode < std_process_path_max_len_m );
-        int result = WideCharToMultiByte ( CP_UTF8, 0, path_buffer, -1, state->working_path, std_process_path_max_len_m, NULL, NULL );
+        int result = WideCharToMultiByte ( CP_UTF8, 0, wpath_buffer, -1, path_buffer, std_process_path_max_len_m, NULL, NULL );
         std_unused_m ( result );
         std_assert_m ( result > 0 );
-        std_str_replace ( state->working_path, "\\", "/" );
-        state->working_path[result - 1] = '/';
-        state->working_path[result] = '\0';
+        std_path_normalize ( &std_static_string_m ( state->working_path ), path_buffer );
     }
 #else
-    getcwd ( state->working_path, std_process_path_max_len_m );
+    char path_buffer[std_process_path_max_len_m];
+    getcwd ( path_buffer, std_process_path_max_len_m );
+    std_path_normalize ( &std_static_string_m ( state->working_path ), path_buffer );
 #endif
 
     // set exception handler
@@ -572,9 +576,9 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     char pipe_name[256];
     {
         const char* win32_pipe_prefix = "\\\\.\\pipe\\";
-        std_stack_t stack  = std_static_stack_m ( pipe_name );
-        std_stack_string_append ( &stack, win32_pipe_prefix );
-        std_stack_string_append ( &stack, params->name );
+        std_string_t string  = std_static_string_m ( pipe_name );
+        std_string_append ( &string, win32_pipe_prefix );
+        std_string_append ( &string, params->name );
     }
 
     HANDLE handle = CreateNamedPipe ( pipe_name, open_mode, pipe_mode, max_instances, out_buffer_size, in_buffer_size, 0, NULL );
@@ -603,9 +607,9 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
 #else
     char pipe_name[256];
     {
-        std_stack_t stack = std_static_stack_m ( pipe_name );
-        std_stack_string_append ( &stack, "/tmp/" );
-        std_stack_string_append ( &stack, params->name );
+        std_string_t string = std_static_string_m ( pipe_name );
+        std_string_append ( &string, "/tmp/" );
+        std_string_append ( &string, params->name );
     }
 
     // Remove any pre-existing
@@ -685,9 +689,9 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
 #else
     char pipe_name[256];
     {
-        std_stack_t stack = std_static_stack_m ( pipe_name );
-        std_stack_string_append ( &stack, "/tmp/" );
-        std_stack_string_append ( &stack, pipe->params.name );
+        std_string_t string = std_static_string_m ( pipe_name );
+        std_string_append ( &string, "/tmp/" );
+        std_string_append ( &string, pipe->params.name );
     }
 
     int flags = 0;
@@ -732,9 +736,9 @@ std_pipe_h std_process_pipe_connect ( const char* name, std_process_pipe_flags_b
     char pipe_name[256];
     {
         const char* win32_pipe_prefix = "\\\\.\\pipe\\";
-        std_stack_t stack  = std_static_stack_m ( pipe_name );
-        std_stack_string_append ( &stack, win32_pipe_prefix );
-        std_stack_string_append ( &stack, name );
+        std_string_t string  = std_static_string_m ( pipe_name );
+        std_string_append ( &string, win32_pipe_prefix );
+        std_string_append ( &string, name );
     }
 
     if ( flags & std_process_pipe_flags_blocking_m ) {

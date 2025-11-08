@@ -86,26 +86,19 @@ size_t std_str_len ( const char* str ) {
 }
 
 size_t std_str_copy ( char* dest, size_t cap, const char* src ) {
-    std_assert_m ( cap > 0 );
-    size_t i = 0;
+    const char* src_begin = src;
 
-    for ( ;; ) {
-        if ( i == cap ) {
-            if ( cap > 0 ) {
-                dest[cap - 1] = '\0';
-            }
-
-            return std_str_len ( src );
+    if ( cap > 0 ) {
+        while ( --cap > 0 && *src != '\0' ) {
+            *dest++ = *src++;
         }
-
-        dest[i] = src[i];
-
-        if ( src[i] == '\0' ) {
-            return i;
-        }
-
-        ++i;
     }
+
+    *dest = '\0';
+
+    while ( *src++ ) ;
+
+    return src - src_begin - 1;
 }
 
 //size_t std_str_append ( char* dest, size_t dest_cap, const char* source ) {
@@ -518,10 +511,99 @@ bool std_str_validate ( const char* str, size_t cap ) {
     return terminated;
 }
 
-//const char* std_str_static ( const char* text, size_t size ) {
-//    // TODO avoid leaking this memory
-//    std_alloc_t alloc = std_virtual_heap_alloc ( size, 16 );
-//    std_auto_m str = ( const char* ) alloc.buffer.base;
-//    std_str_copy ( str, size, text );
-//    return str;
-//}
+// --
+
+bool std_string_copy ( std_string_t* string, const char* str ) {
+    std_string_clear ( string );
+    return std_string_append ( string, str );
+}
+
+bool std_string_append ( std_string_t* string, const char* src ) {
+    uint64_t len = string->len;
+    uint64_t cap = string->cap;
+    char* str = string->str;
+
+    while ( len + 1 < cap && src[0] != '\0' ) {
+        str[len] = src[0];
+        ++src;
+        ++len;
+    }
+
+    str[len] = '\0';
+    string->len = len;
+
+    return src[0] == '\0';
+}
+
+bool std_string_append_format ( std_string_t* string, const char* str, ... ) {
+    uint64_t len = string->len;
+    uint64_t cap = string->cap;
+    char* dest = string->str + len;
+
+    va_list va;
+    va_start ( va, str );
+    int result = vsnprintf ( dest, cap - len, str, va );
+    va_end ( va );
+
+    if ( result < 0 ) {
+        return false;
+    }
+
+    uint64_t write_len = ( uint64_t ) result;
+
+    if ( len + write_len + 1 < cap ) {
+        string->len = len + write_len;
+        return true;
+    }
+
+    return false;
+}
+
+bool std_string_append_char ( std_string_t* string, char c ) {
+    uint64_t len = string->len;
+    uint64_t cap = string->cap;
+    char* str = string->str;
+
+    if ( len + 1 < cap ) {
+        str[len++] = c;
+        str[len] = '\0';
+        string->len = len;
+        return true;
+    }
+
+    return false;
+}
+
+bool std_string_pop ( std_string_t* string ) {
+    uint64_t len = string->len;
+
+    if ( len > 0 ) {
+        len = len - 1;
+        string->str[len] = '\0';
+        string->len = len;
+        return true;
+    }
+
+    return false;
+}
+
+void std_string_clear ( std_string_t* string ) {
+    string->len = 0;
+    if ( string->cap > 0 ) {
+        string->str[0] = '\0';
+    }
+}
+
+bool std_string_truncate_at ( std_string_t* string, const char* at ) {
+    char* str = string->str;
+    uint64_t len = string->len;
+
+    if ( at < str || at >= str + len ) {
+        return false;
+    }
+
+    len = at - str + 1;
+    str[len] = '\0';
+    string->len = len;
+    return true;
+}

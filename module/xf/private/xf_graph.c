@@ -700,27 +700,27 @@ static void xf_graph_linearize ( xf_graph_h graph_handle ) {
             xf_node_h node_handle = graph->nodes_declaration_order[i];
             xf_node_t* node = &graph->nodes_array[node_handle];
             char buffer[1024];
-            std_stack_t stack = std_static_stack_m ( buffer );
-            std_stack_string_append ( &stack, node->params.debug_name );
-            std_stack_string_append ( &stack, " | next: [" );
+            std_string_t string = std_static_string_m ( buffer );
+            std_string_append ( &string, node->params.debug_name );
+            std_string_append ( &string, " | next: [" );
             for ( uint32_t j = 0; j < node->next_nodes_count; ++j ) {
                 if ( j > 0 ) {
-                    std_stack_string_append ( &stack, " " );
+                    std_string_append ( &string, " " );
                 }
                 xf_node_t* dep_node = &graph->nodes_array[node->next_nodes[j]];
-                std_stack_string_append ( &stack, dep_node->params.debug_name );
+                std_string_append ( &string, dep_node->params.debug_name );
                 //std_assert_m ( node->next_nodes[j] > i );
             }
-            std_stack_string_append ( &stack, "] | prev: [" );
+            std_string_append ( &string, "] | prev: [" );
             for ( uint32_t j = 0; j < node->prev_nodes_count; ++j ) {
                 if ( j > 0 ) {
-                    std_stack_string_append ( &stack, " " );
+                    std_string_append ( &string, " " );
                 }
                 xf_node_t* dep_node = &graph->nodes_array[node->prev_nodes[j]];
-                std_stack_string_append ( &stack, dep_node->params.debug_name );
+                std_string_append ( &string, dep_node->params.debug_name );
                 //std_assert_m ( node->prev_nodes[j] < i );
             }
-            std_stack_string_append ( &stack, "]" );
+            std_string_append ( &string, "]" );
             std_log_info_m ( std_fmt_tab_m std_fmt_str_m, buffer );
         }
     }
@@ -1668,12 +1668,12 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
 
         if ( !backing_texture ) {
             xg_texture_params_t params = transient_texture->params;
-            std_stack_t stack = std_static_stack_m ( params.debug_name );
+            std_string_t string = std_static_string_m ( params.debug_name );
             char buffer[16];
             std_u32_to_str ( buffer, 16, committed_textures_count, 0 );
-            std_stack_string_append ( &stack, graph->params.debug_name );
-            std_stack_string_append ( &stack, " CT" ); // Committed Texture
-            std_stack_string_append ( &stack, buffer );
+            std_string_append ( &string, graph->params.debug_name );
+            std_string_append ( &string, " CT" ); // Committed Texture
+            std_string_append ( &string, buffer );
 
             committed_textures_array[committed_textures_count++] = ( xf_graph_committed_texture_t ) {
                 .params = params,
@@ -2280,17 +2280,17 @@ static void xf_graph_create_segment_events ( xf_graph_h graph_handle, xg_i* xg )
 void xf_graph_print ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
-    char stack_buffer[2048];
-    std_stack_t stack = std_static_stack_m ( stack_buffer );
-    std_stack_string_append ( &stack, graph->params.debug_name );
-    std_stack_string_append ( &stack, ":\n" );
-    std_stack_string_append ( &stack, "DEPENDENCIES" std_fmt_tab_m std_fmt_tab_m "| EXECUTION ORDER" std_fmt_tab_m std_fmt_tab_m "| SEGMENTS""\n" );
-    std_stack_string_append ( &stack, "GRAPH" );
-    std_stack_string_append ( &stack, std_fmt_tab_m );
-    std_stack_string_append ( &stack, "COMP" );
-    std_stack_string_append ( &stack, std_fmt_tab_m );
-    std_stack_string_append ( &stack, "COPY" );
-    std_stack_string_append ( &stack, "\n" );
+    char string_buffer[2048];
+    std_string_t string = std_static_string_m ( string_buffer );
+    std_string_append ( &string, graph->params.debug_name );
+    std_string_append ( &string, ":\n" );
+    std_string_append ( &string, "DEPENDENCIES" std_fmt_tab_m std_fmt_tab_m "| EXECUTION ORDER" std_fmt_tab_m std_fmt_tab_m "| SEGMENTS""\n" );
+    std_string_append ( &string, "GRAPH" );
+    std_string_append ( &string, std_fmt_tab_m );
+    std_string_append ( &string, "COMP" );
+    std_string_append ( &string, std_fmt_tab_m );
+    std_string_append ( &string, "COPY" );
+    std_string_append ( &string, "\n" );
 
     uint32_t prev_segment_idx = -1;
     for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
@@ -2300,18 +2300,18 @@ void xf_graph_print ( xf_graph_h graph_handle ) {
             if ( graph->cross_queue_node_deps[i][q] != -1 ) {
                 std_u32_to_str ( buffer, 32, graph->cross_queue_node_deps[i][q], 2 );
             }
-            std_stack_string_append ( &stack, buffer );
-            std_stack_string_append ( &stack, std_fmt_tab_m );
+            std_string_append ( &string, buffer );
+            std_string_append ( &string, std_fmt_tab_m );
         }
         // exec order
         uint32_t node_idx = graph->nodes_execution_order[i];
         xf_node_t* node = &graph->nodes_array[node_idx];
         char buffer[32] = " -";
         std_u32_to_str ( buffer, 32, i, 2 );
-        std_stack_string_append ( &stack, buffer );
-        std_stack_string_append ( &stack, " - " );
-        std_stack_string_append ( &stack, node->params.debug_name );
-        std_stack_string_append ( &stack, " (" );
+        std_string_append ( &string, buffer );
+        std_string_append ( &string, " - " );
+        std_string_append ( &string, node->params.debug_name );
+        std_string_append ( &string, " (" );
         char* queue_name = "";
         xg_cmd_queue_e node_queue = node->enabled ? node->params.queue : xg_cmd_queue_graphics_m;
         xg_cmd_queue_e q = node_queue;
@@ -2319,43 +2319,43 @@ void xf_graph_print ( xf_graph_h graph_handle ) {
         else if ( q == xg_cmd_queue_compute_m ) queue_name = "COMP";
         else if ( q == xg_cmd_queue_copy_m ) queue_name = "COPY";
         else std_not_implemented_m();
-        std_stack_string_append ( &stack, queue_name );
-        std_stack_string_append ( &stack, ")" );
+        std_string_append ( &string, queue_name );
+        std_string_append ( &string, ")" );
         // segment
         uint32_t exec_order_len = std_str_len ( node->params.debug_name ) + std_str_len ( queue_name ) + 5 + 3;
         uint32_t segment_idx = node->segment;
         for ( uint32_t j = exec_order_len; j < 32; j += 8 ) {
-            std_stack_string_append ( &stack, std_fmt_tab_m );
+            std_string_append ( &string, std_fmt_tab_m );
         }
         if ( prev_segment_idx != segment_idx ) {
             prev_segment_idx = segment_idx;
             xf_graph_segment_t* segment = &graph->segments_array[segment_idx];
             char buffer[32];
             std_u32_to_str ( buffer, 32, segment_idx, 2 );
-            std_stack_string_append ( &stack, "--" );
-            std_stack_string_append ( &stack, buffer );
+            std_string_append ( &string, "--" );
+            std_string_append ( &string, buffer );
             for ( uint32_t j = 0; j < segment->deps_count; ++j ) {
                 if ( j == 0 ) {
-                    std_stack_string_append ( &stack, " (" );
+                    std_string_append ( &string, " (" );
                 }
                 char buffer[32];
                 std_u32_to_str ( buffer, 32, segment->deps[j], 0 );
-                std_stack_string_append ( &stack, buffer );
+                std_string_append ( &string, buffer );
                 if ( j == segment->deps_count - 1 ) {
-                    std_stack_string_append ( &stack, ")" );
+                    std_string_append ( &string, ")" );
                 } else {
-                    std_stack_string_append ( &stack, ", " );
+                    std_string_append ( &string, ", " );
                 }
             }
         } else {
-            std_stack_string_append ( &stack, "| " );
+            std_string_append ( &string, "| " );
         }
         // end
         if ( i < graph->nodes_count - 1 ) {
-            std_stack_string_append ( &stack, "\n" );
+            std_string_append ( &string, "\n" );
         }
     }
-    std_log_info_m ( std_fmt_str_m, stack_buffer );
+    std_log_info_m ( std_fmt_str_m, string_buffer );
 }
 
 // Frees all graph resources but leaves graph structure intact

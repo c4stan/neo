@@ -237,11 +237,10 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         char id[8];
         std_u32_to_str ( id, 8, i, 0 );
         xg_texture_params_t texture_params = swapchain_texture_params;
-        std_stack_t stack = std_static_stack_m ( texture_params.debug_name );
-        stack.top += std_str_len ( texture_params.debug_name );
-        std_stack_string_append ( &stack, "(" );
-        std_stack_string_append ( &stack, id );
-        std_stack_string_append ( &stack, ")" );
+        std_string_t string = std_static_string_parse_m ( texture_params.debug_name );
+        std_string_append ( &string, "(" );
+        std_string_append ( &string, id );
+        std_string_append ( &string, ")" );
 
         swapchain->textures[i] = xg_vk_texture_register_swapchain_texture ( &texture_params, swapchain_textures[i] );
 

@@ -393,14 +393,16 @@ def run_app(name, flags, params):
         print(Color.FAIL + 'Another subprocess is already running. Can\'t run more than one at the same time.' + Color.ENDC)
         return
     path = get_workspace_path(name)
-    push_path(path)
 
-    makedef_path = 'makedef'
+    makedef_path = path + '/makedef'
     makedef = makegen.parse_makedef(makedef_path, None)
 
     config = 'debug'
     if ('-o' in flags):
         config = 'release'
+
+    output_path = path + '/build/' + config + '/output/'
+    push_path(output_path)
 
     env_vars = os.environ.copy()
     if ('-rd' in flags):
@@ -410,15 +412,12 @@ def run_app(name, flags, params):
     if ('-a' in flags):
         process_flags = 4 # CREATE_SUSPENDED
 
-    output_path = path + '/build/' + config + '/output/'
-    push_path(output_path)
     if makedef['output'] == ['app']:
         cmd = './std_launcher.exe'
         SUBPROCESS = subprocess.Popen([cmd, name] + params, env = env_vars, creationflags = process_flags, stdin=subprocess.PIPE)
     else:
         cmd = './' + name + '.exe'
         SUBPROCESS = subprocess.Popen([cmd] + params, env = env_vars, creationflags = process_flags, stdin=subprocess.PIPE)
-    pop_path()
 
     if ('-a' in flags):
         debug_process()
@@ -440,7 +439,6 @@ def debug_app(name, flags, params):
     if not validate_workspace(name):
         return
     path = get_workspace_path(name)
-    push_path(path)
 
     makedef_path = makegen.normpath(path + '/' + 'makedef')
     makedef = makegen.parse_makedef(makedef_path, None)
@@ -450,15 +448,18 @@ def debug_app(name, flags, params):
         config = 'release'
 
     params = ' '.join(params)
+
+    output_path = path + '/build/' + config + '/output/'
+    push_path(output_path)
     if platform.system() == 'Windows':
         if makedef['output'] == ['app']:
-            cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\std_launcher.exe' + ' ' + name + ' ' + params
+            cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'std_launcher.exe' + ' ' + name + ' ' + params
         else:
             #cmd = 'start ..\\remedybg.exe ' + 'output\\debug\\' + name + '.exe'
-            cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'build\\' + config + '\\output\\' + name + '.exe' + ' ' + params
+            cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + name + '.exe' + ' ' + params
     elif platform.system() == 'Linux':
         # TODD try https://github.com/nakst/gf
-        cmd = 'code .'
+        cmd = 'code .' # TODO probably needs to be fixed after changing cwd to /output/
     os.system(cmd)
     pop_path()
 
