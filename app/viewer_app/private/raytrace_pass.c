@@ -240,6 +240,13 @@ xf_node_h add_raytrace_pass ( xf_graph_h graph, xf_texture_h color_texture, xf_t
     return node;
 }
 
+void bind_raytrace_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "raytrace" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, raytrace_pass );
+}
+
 xf_node_h add_raytrace_setup_pass ( xf_graph_h graph, xf_buffer_h instances, xf_buffer_h lights ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
@@ -257,4 +264,11 @@ xf_node_h add_raytrace_setup_pass ( xf_graph_h graph, xf_buffer_h instances, xf_
     );
     xf_node_h node = xf->create_node ( graph, &node_params );
     return node;
+}
+
+void bind_raytrace_setup_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "raytrace_setup" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, raytrace_setup_pass );
 }

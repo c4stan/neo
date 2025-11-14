@@ -337,6 +337,7 @@ static xg_vk_workload_buffer_t* xg_vk_uniform_buffer_pop ( xg_device_h device_ha
     xg_vk_workload_buffer_t* buffer = std_list_pop_m ( &device_context->uniform_buffers_freelist );
     std_assert_m ( buffer );
     workload->uniform_buffer = buffer;
+    std_assert_m ( workload->uniform_buffers_count < xg_vk_workload_max_uniform_buffers_per_workload_m );
     workload->uniform_buffers_array[workload->uniform_buffers_count++] = buffer;
     return buffer;
 }
@@ -347,6 +348,7 @@ static xg_vk_workload_buffer_t* xg_vk_staging_buffer_pop ( xg_device_h device_ha
     xg_vk_workload_buffer_t* buffer = std_list_pop_m ( &device_context->staging_buffers_freelist );
     std_assert_m ( buffer );
     workload->staging_buffer = buffer;
+    std_assert_m ( workload->staging_buffers_count < xg_vk_workload_max_staging_buffers_per_workload_m );
     workload->staging_buffers_array[workload->staging_buffers_count++] = buffer;
     return buffer;
 }

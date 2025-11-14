@@ -54,6 +54,7 @@ void main ( void ) {
     float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
     float intersect_dist = texture ( sampler2D ( tex_intersect_dist, sampler_point ), screen_uv ).x;
 
+    // Reproject
     // from AMD FFX
     vec3 view_pos = view_from_depth ( screen_uv, depth );
     float view_dist = length ( view_pos );
@@ -68,9 +69,6 @@ void main ( void ) {
     //vec2 screen_offset = velocity;
 
     vec3 history = texture ( sampler2D ( tex_history, sampler_linear ), reprojected_uv ).xyz;
-    if ( frame_uniforms.is_reload > 0 ) {
-        history = color;
-    }
 
     // Neighborhood clamp
 #if 0
@@ -134,11 +132,11 @@ void main ( void ) {
     history = clamp ( history, min, max );
 #endif
 #endif
-    vec3 blend_factor = 0.1.xxx;
+    float blend_factor = 0.1;
 
     // Reject history if not valid
-    if ( any ( lessThan ( reprojected_uv, vec2 ( 0 ) ) ) || any ( greaterThan ( reprojected_uv, vec2 ( 1 ) ) ) ) {
-        blend_factor = 1.0.xxx;
+    if ( is_outside_screen ( reprojected_uv ) || frame_uniforms.clear_history > 0 ) {
+        blend_factor = 1.0;
     }
 
     color = mix ( history, color, blend_factor );

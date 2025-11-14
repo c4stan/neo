@@ -38,7 +38,7 @@ xf_node_h add_ssr_raymarch_pass ( xf_graph_h graph, xf_texture_h ssr_raymarch, x
         .debug_name = "ssr",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
-            .pipeline = xs->get_pipeline_state ( xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ssr" ) ) ),
+            .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ssr" ) ),
             .workgroup_count = { std_div_round_up_u32 ( dst_info.width, 8 ), std_div_round_up_u32 ( dst_info.height, 8 ), 1 },
             .uniform_data = std_buffer_struct_m ( &uniform_data ),
             .samplers_count = 1,

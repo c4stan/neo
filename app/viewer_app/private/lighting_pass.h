@@ -9,4 +9,5 @@ uint32_t light_data_size ( void );
 xf_node_h add_light_cull_pass ( xf_graph_h graph, xf_buffer_h light_buffer, xf_buffer_h light_list_buffer, xf_buffer_h light_grid_buffer );
 
 xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h light_buffer );
+void bind_light_update_routine ( xf_graph_h graph );
 void get_light_uniform_scale_bias ( float* scale, float* bias );

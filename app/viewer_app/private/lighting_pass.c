@@ -133,6 +133,13 @@ xf_node_h add_light_update_pass ( xf_graph_h graph, xf_buffer_h light_buffer ) {
     return node;
 }
 
+void bind_light_update_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "light_update" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, light_update_pass );
+}
+
 uint32_t light_data_size ( void ) {
     return sizeof ( light_buffer_t ) + sizeof ( uniform_light_data_t ) * viewapp_max_lights_m;
 }

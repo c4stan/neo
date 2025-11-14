@@ -5,19 +5,14 @@
 
 #include <std_time.h>
 
-//typedef struct {
-//    std_alloc_t alloc;
-//    size_t top;
-//} xs_database_memory_page_t;
-
 typedef struct {
     xs_database_build_params_t params;
     xs_database_build_result_t result;
 } xs_database_build_t;
 
 typedef struct {
-    // These both point to xs_database_memory_page_t allocated memory
     const char* path;
+    const char* live_path; // path to source data shader (not build), used for live reloads
     const char* name;
     uint64_t name_hash;
     xg_pipeline_e type;
@@ -81,8 +76,10 @@ void xs_database_clear ( xs_database_h database );
 
 void xs_database_set_build_params ( xs_database_h database, const xs_database_build_params_t* params );
 xs_database_build_result_t xs_database_build ( xs_database_h database );
+xs_database_build_result_t xs_database_update ( xs_database_h db_handle );
 void xs_database_build_all ( void );
+void xs_database_update_all ( void );
 xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h database, xs_string_hash_t name_hash );
-xg_graphics_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h state );
+xg_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h state );
 void xs_database_update_pipelines ( xg_workload_h last_workload );
 

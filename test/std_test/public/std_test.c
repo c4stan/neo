@@ -323,7 +323,11 @@ static void test_thread ( void ) {
 
 static void test_module ( void ) {
     std_log_info_m ( "testing std_module..." );
-    std_log_info_m ( "std_module_test complete. [TODO: expand this test]" );
+    // TODO expand this
+    std_log_info_m ( "tool path: " std_fmt_str_m, std_tool_path_m );
+    std_log_info_m ( "module path: " std_fmt_str_m, std_module_path_m );
+    std_log_info_m ( "source data path: " std_fmt_str_m, std_source_data_path_m );
+    std_log_info_m ( "std_module_test complete." );
 }
 
 typedef struct {

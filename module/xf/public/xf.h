@@ -339,7 +339,7 @@ typedef struct {
 }
 
 typedef struct {
-    xg_compute_pipeline_state_h pipeline;
+    xs_database_pipeline_h pipeline;
     uint32_t workgroup_count[3];
     std_buffer_t uniform_data;
     bool copy_uniform_data;
@@ -356,7 +356,7 @@ typedef struct {
 }
 
 typedef struct {
-    xg_raytrace_pipeline_state_h pipeline;
+    xs_database_pipeline_h pipeline;
     uint32_t thread_count[3];
     std_buffer_t uniform_data;
     bool copy_uniform_data;
@@ -647,6 +647,9 @@ typedef struct {
     void ( *disable_node ) ( xf_graph_h graph, xf_node_h node );
     void ( *enable_node ) ( xf_graph_h graph, xf_node_h node );
     void ( *node_set_enabled ) ( xf_graph_h graph, xf_node_h node, bool enabled );
+
+    xf_node_h ( *get_node_by_name ) ( xf_graph_h graph, const char* name );
+    void ( *bind_custom_node_routine ) ( xf_graph_h graph, xf_node_h node, xf_node_execute_f* routine );
 
     void ( *advance_multi_texture ) ( xf_texture_h multi_texture );
     void ( *advance_multi_buffer ) ( xf_buffer_h multi_buffer );

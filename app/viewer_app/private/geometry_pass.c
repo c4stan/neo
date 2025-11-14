@@ -206,6 +206,13 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
     return node;
 }
 
+void bind_geometry_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "geometry" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, geometry_pass );
+}
+
 typedef struct {
     sm_mat_4x4f_t world;
 } object_id_vertex_uniforms_t;
@@ -326,4 +333,11 @@ xf_node_h add_object_id_node ( xf_graph_h graph, xf_texture_h object_id, xf_text
     ) );
 
     return node;
+}
+
+void bind_object_id_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "object_id" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, object_id_pass );
 }

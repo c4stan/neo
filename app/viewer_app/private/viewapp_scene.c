@@ -497,7 +497,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
     float x = -50;
 
     // quads
-    for ( uint32_t i = 0; i < 10; ++i ) {
+    for ( uint32_t i = 0; i < 6; ++i ) {
         xg_geo_util_geometry_data_t geo = xg_geo_util_generate_plane ( 10.f );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
@@ -936,7 +936,7 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
     flags |= aiProcess_JoinIdenticalVertices;
     flags |= aiProcess_Triangulate;
     flags |= aiProcess_ValidateDataStructure;
-    //flags |= aiProcess_GenSmoothNormals;
+    flags |= aiProcess_GenSmoothNormals;
     //flags |= aiProcess_GenNormals;
     flags |= aiProcess_FindInvalidData;
     flags |= aiProcess_PreTransformVertices;

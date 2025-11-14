@@ -126,6 +126,13 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
     return hiz_mip0_gen_node;
 }
 
+void bind_hiz_mip0_gen_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "hiz_gen_mip_0" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, hz_gen_mip0_copy_pass );
+}
+
 xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t mip_level ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_i* xf = state->modules.xf;
@@ -149,12 +156,11 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
     };
 
     xs_database_pipeline_h xs_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "hiz_gen" ) );
-    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( xs_pipeline );
 
     xf_node_params_t params = xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
-            .pipeline = pipeline_state,
+            .pipeline = xs_pipeline,
             .workgroup_count = { std_div_round_up_u32 ( dst_width, 8 ), std_div_round_up_u32 ( dst_height, 8 ), 1 },
             .uniform_data = std_buffer_struct_m ( &uniform_data ),
             .samplers_count = 1,

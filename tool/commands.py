@@ -774,8 +774,14 @@ def execute(string):
     if cmd == '':
         return
 
+    block_redirect = False
+    if cmd == '--':
+        cmd = tokens[1]
+        tokens = tokens[1:]
+        block_redirect = True
+
     global SUBPROCESS
-    if has_subprocess():
+    if has_subprocess() and not block_redirect:
         print(Color.OKBLUE + 'Redirecting to subprocess stdin' + Color.ENDC)
         SUBPROCESS.stdin.write(string.encode('ascii'))
         SUBPROCESS.stdin.flush()

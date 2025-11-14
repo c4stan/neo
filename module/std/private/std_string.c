@@ -348,13 +348,14 @@ size_t std_str_trim_right ( char* str, size_t str_len, const char** tokens, size
     return str_len;
 }
 
+// TODO pass string here and in _reverse to avoid strlen call
 char* std_str_find ( const char* str, const char* token ) {
     // Naive token match for every char in str
     size_t i = 0;
+    size_t token_len = std_str_len ( token );
 
     while ( str[i] != '\0' ) {
-        if ( std_str_cmp ( str + i, token ) == 0 ) {
-        //if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
+        if ( std_mem_cmp ( str + i, token, token_len ) == 0 ) {
             return ( char* ) ( str + i );
         }
 

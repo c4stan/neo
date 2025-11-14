@@ -29,7 +29,6 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
     xf->get_texture_info ( &hiz_info, hiz );
 
     xs_database_pipeline_h xs_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ssgi" ) );
-    xg_compute_pipeline_state_h pipeline_state = xs->get_pipeline_state ( xs_pipeline );
 
     ssgi_draw_data_t uniform_data = {
         .resolution_x_f32 = ( float ) dst_info.width,
@@ -40,7 +39,7 @@ xf_node_h add_ssgi_raymarch_pass ( xf_graph_h graph, const char* name, xf_textur
     xf_node_params_t params = xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
-            .pipeline = pipeline_state,
+            .pipeline = xs_pipeline,
             .workgroup_count = { std_div_round_up_u32 ( dst_info.width, 8 ), std_div_round_up_u32 ( dst_info.height, 8 ), 1 },
             .uniform_data = std_buffer_struct_m ( &uniform_data ),
             .samplers_count = 1,

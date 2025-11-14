@@ -38,8 +38,8 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
 
         args[argc++] = std_stack_string_copy ( &stack, "--target-env=vulkan1.2" );
         args[argc++] = std_stack_string_copy ( &stack, params->shader_path );
-        args[argc++] = std_stack_string_copy ( &stack, "-g" );
 #if std_build_debug_m
+        args[argc++] = std_stack_string_copy ( &stack, "-g" );
         args[argc++] = std_stack_string_copy ( &stack, "-O0" );
 #else
         args[argc++] = std_stack_string_copy ( &stack, "-O" );
@@ -51,7 +51,8 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             char include_path[256];
             std_string_t include_path_string = std_static_string_m ( include_path );
             std_string_append ( &include_path_string, "-I" );
-            std_string_append ( &include_path_string, "data/xs/shader/" );
+            std_string_append ( &include_path_string, std_source_data_path_m );
+            std_string_append ( &include_path_string, "/shader/" );
             args[argc++] = std_stack_string_copy ( &stack, include_path );
         }
 
@@ -69,9 +70,9 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
 
             for ( size_t i = 0; i < params->shader_definition_count; ++i ) {
                 args[argc++] = std_stack_string_copy ( &stack, "-D" );
-                std_stack_string_append ( &stack, params->global_definitions[i].name );
+                std_stack_string_append ( &stack, params->shader_definitions[i].name );
                 std_stack_string_append ( &stack, "=" );
-                size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );
+                size_t len = std_u32_to_str ( u32_buffer, 32, params->shader_definitions[i].value, 0 );
                 std_assert_m ( len > 0 && len < 32 );
                 std_stack_string_append ( &stack, u32_buffer );
             }

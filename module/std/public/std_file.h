@@ -89,11 +89,11 @@ typedef void ( std_directory_iterator_callback_f ) ( const char* name, std_path_
 //                  remove all ./ and ../
 //                  TODO make this be the case everywhere
 
-bool      std_path_append      ( std_string_t* path, const char* append );
-bool      std_path_append_dir  ( std_string_t* path, const char* dir );
-bool      std_path_append_file ( std_string_t* path, const char* filename );
-bool      std_path_pop         ( std_string_t* path );
-bool      std_path_normalize   ( std_string_t* dest, const char* path );
+bool        std_path_append      ( std_string_t* path, const char* append );
+bool        std_path_append_dir  ( std_string_t* path, const char* dir );
+bool        std_path_append_file ( std_string_t* path, const char* filename );
+bool        std_path_pop         ( std_string_t* path );
+bool        std_path_normalize   ( std_string_t* dest, const char* path );
 bool        std_path_is_drive    ( const std_string_t* path );
 //size_t      std_path_name        ( char* name, size_t cap, const char* path );
 char*       std_path_name_ptr    ( const std_string_t* path );

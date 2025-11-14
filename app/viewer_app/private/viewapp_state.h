@@ -13,6 +13,8 @@
 
 #include <xg_geo_util.h>
 
+#include "viewapp_scene.h"
+
 // Modules
 typedef struct {
     wm_i* wm;
@@ -39,14 +41,14 @@ typedef struct {
 } viewapp_scene_mesh_instance_t;
 #endif
 typedef struct {
-    uint32_t active_scene;
+    viewapp_scene_e active_scene;
     char custom_scene_path[128];
     //uint32_t entity_count;
     //se_entity_h entities[128];
 } viewapp_scene_state_t;
 
 #define viewapp_scene_state_m( ... ) ( viewapp_scene_state_t ) { \
-    .active_scene = 0, \
+    .active_scene = viewapp_scene_cornell_box_m, \
     .custom_scene_path[0] = '\0' \
     ##__VA_ARGS__ \
 }
@@ -89,7 +91,7 @@ typedef struct {
     xg_raytrace_world_h raytrace_world;
     xg_resource_bindings_layout_h workload_bindings_layout;
 
-    bool graph_reload;
+    bool clear_history;
     bool allow_graph_aliasing;
     bool raytrace_world_update;
 
@@ -117,10 +119,12 @@ typedef struct {
     .window_info = {}, \
     .input_state = {}, \
     .frame_tick = 0, \
-    .allow_graph_aliasing = true, \
-    .export_dest = xf_null_handle_m, \
     .target_fps = 120, \
-    ##__VA_ARGS__ \
+    .clear_history = false, \
+    .allow_graph_aliasing = true, \
+    .raytrace_world_update = false, \
+    .export_dest = xf_null_handle_m, \
+    __VA_ARGS__ \
 }
 
 // UI
@@ -143,8 +147,6 @@ typedef struct {
     xg_texture_h export_texture;
     xf_texture_h export_source;
     uint64_t export_id;
-    uint64_t export_node_id;
-    uint64_t export_tex_id;
     xf_node_h export_node;
     xf_export_channel_e export_channels[4];
 
@@ -164,11 +166,9 @@ typedef struct {
     .entities_section_state = xi_section_state_m(), \
     .export_texture = xg_null_handle_m, \
     .export_channels = { xf_export_channel_r, xf_export_channel_g, xf_export_channel_b, xf_export_channel_a }, \
-    .export_node_id = -1, \
-    .export_tex_id = -1, \
     .mouse_pick_entity = se_null_handle_m, \
     .target_fps_values = { 120, 90, 60, 30, 24, 8 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Components
@@ -198,7 +198,7 @@ typedef struct {
     .color_texture = xg_null_handle_m, \
     .normal_texture = xg_null_handle_m, \
     .metalness_roughness_texture = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -211,7 +211,7 @@ typedef struct {
     .position = { 0, 0, 0 }, \
     .scale = 1, \
     .orientation = { 0, 0, 0, 1 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -236,7 +236,7 @@ typedef struct {
     .object_id = 0, \
     .material = viewapp_material_data_m(), \
     .rt_geo = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -256,7 +256,7 @@ typedef struct {
     .enabled = false, \
     .move_speed = 0.00002, \
     .type = viewapp_camera_type_flycam_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define viewapp_light_max_views_m 6
@@ -286,7 +286,7 @@ typedef struct {
     .radius = 100, \
     .color = { 0, 0, 0 }, \
     .intensity = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define viewapp_render_component_name_size_m 32
@@ -300,7 +300,7 @@ typedef struct {
 #define viewapp_render_component_m( ... ) ( viewapp_render_component_t ) { \
     .name = {0}, \
     .meshes = {0}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Viewapp

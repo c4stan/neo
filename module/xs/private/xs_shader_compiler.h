@@ -5,6 +5,7 @@
 typedef struct {
     const char* binary_path;
     const char* shader_path;
+    const char* entry_point;
     const xs_shader_definition_t* global_definitions;
     uint32_t global_definition_count;
     const xs_shader_definition_t* shader_definitions;

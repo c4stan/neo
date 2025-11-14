@@ -6,7 +6,7 @@
 static void xs_api_init ( xs_i* xs ) {
     xs->create_database = xs_database_create;
     xs->destroy_database = xs_database_destroy;
-    xs->add_database_folder = xs_database_add_folder;
+    xs->add_data_folder = xs_database_add_folder;
     xs->set_output_folder = xs_database_set_output_folder;
     xs->set_build_params = xs_database_set_build_params;
     xs->clear_database = xs_database_clear;

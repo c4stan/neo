@@ -209,3 +209,10 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
 
     return node;
 }
+
+void bind_shadow_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "shadows" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, shadow_pass_routine );
+}

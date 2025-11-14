@@ -1,6 +1,7 @@
 #include <std_main.h>
 #include <std_time.h>
 #include <std_log.h>
+#include <std_file.h>
 
 #include <xs.h>
 #include <xf.h>
@@ -72,8 +73,14 @@ static void xf_test ( void ) {
         .device = device,
         .debug_name = "shader_db"
     ) );
-    xs->add_database_folder ( sdb, "data/xf_test/shader/" );
-    xs->set_output_folder ( sdb, "bake/xf_test/shader/" );
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
     xs->build_database ( sdb );
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle" ) );
     xs_database_pipeline_h compute_pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "clear" ) );
@@ -139,7 +146,7 @@ static void xf_test ( void ) {
             .type = xf_node_type_compute_pass_m,
             .queue = xg_cmd_queue_compute_m,
             .pass.compute = xf_node_compute_pass_params_m (
-                .pipeline = xs->get_pipeline_state ( compute_pipeline_state ),
+                .pipeline = compute_pipeline_state,
                 .workgroup_count = { resolution_x, resolution_y, 1 },
             ),
             .resources = xf_node_resource_params_m (
@@ -201,6 +208,8 @@ static void xf_test ( void ) {
 
     wm_window_info_t window_info;
     wm->get_window_info ( &window_info, window );
+    wm_input_state_t input_state;
+    wm->get_window_input_state ( window, &input_state );
 
     while ( true ) {
         wm->update_window ( window );
@@ -209,14 +218,14 @@ static void xf_test ( void ) {
             break;
         }
 
-        wm_input_state_t input_state;
-        wm->get_window_input_state ( window, &input_state );
+        wm_input_state_t new_input_state;
+        wm->get_window_input_state ( window, &new_input_state );
 
-        if ( input_state.keyboard[wm_keyboard_state_esc_m] ) {
+        if ( !input_state.keyboard[wm_keyboard_state_esc_m] && new_input_state.keyboard[wm_keyboard_state_esc_m] ) {
             break;
         }
 
-        if ( input_state.keyboard[wm_keyboard_state_f1_m] ) {
+        if ( !input_state.keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
             xs->build_databases();
         }
 
@@ -224,6 +233,7 @@ static void xf_test ( void ) {
         wm->get_window_info ( &new_window_info, window );
 
         window_info = new_window_info;
+        input_state = new_input_state;
 
         xg_workload_h workload = xg->create_workload ( device );
 

@@ -48,7 +48,6 @@ CONFIG_RELEASE = 2  # optimized (-o)
 # -- Make targets
 TARGET_ALL = 1
 TARGET_CLEAN = 2
-
 MAKE_TARGETS = [TARGET_ALL]#, TARGET_CLEAN]
 
 # -- Compilers
@@ -61,7 +60,21 @@ COMPILER = COMPILER_CLANG
 TARGET_WIN32 = 1
 TARGET_LINUX = 2
 TARGET_ANDROID = 3
-TARGET = TARGET_WIN32
+if COMPILER == COMPILER_CLANG_ANDROID:
+    TARGET = TARGET_ANDROID
+else:
+    if platform.system() == 'Windows':
+        TARGET = TARGET_WIN32
+    else:
+        TARGET = TARGET_LINUX
+
+# -- Source data
+DATA_PATH_SOURCE = 0
+DATA_PATH_DEPLOY = 1
+if TARGET == TARGET_ANDROID:
+    DATA_PATH = DATA_PATH_DEPLOY # /build/config/output/data
+else:
+    DATA_PATH = DATA_PATH_SOURCE # /data
 
 # -- Warnings
 CORE_WARNING_FLAGS = (
@@ -685,9 +698,14 @@ class Project:
             main_target.dependencies.append(' ' + relpath(dep, rootpath + '/' + build_path))
 
         def_cmd = '-Dstd_module_name_m=' + self.name
-        #def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
+        def_cmd += ' -Dstd_module_path_m=' + '\\"' + normpath(self.index.workspace_map[self.name]) + '/\\"'
         def_cmd += ' -Dstd_solution_module_name_m=' + solution.name
         def_cmd += ' -Dstd_tool_path_m=\\"' + normpath(self.index.tool_path) + '/\\"'
+        if DATA_PATH == DATA_PATH_DEPLOY:
+            source_data_path = normpath(self.index.workspace_map[self.name] + '/build/' + config_str(self.config) + '/output/data/' + self.name)
+        elif DATA_PATH == DATA_PATH_SOURCE:
+            source_data_path = normpath(self.index.workspace_map[self.name] + '/data')
+        def_cmd += ' -Dstd_source_data_path_m=' + '\\"' + source_data_path + '\\"'
         if self.config == CONFIG_DEBUG:
             def_cmd += ' -Dstd_build_debug_m=1'
         elif self.config == CONFIG_RELEASE:
@@ -1103,6 +1121,9 @@ class Project:
         return copied_dlls
 
     def gather_data(self, path):
+        if DATA_PATH != DATA_PATH_DEPLOY:
+            return
+
         dest_base_path = normpath(path + '/data/')
         create_dir(dest_base_path)
 

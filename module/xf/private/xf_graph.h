@@ -415,3 +415,6 @@ void xf_graph_node_disable ( xf_graph_h graph, xf_node_h node );
 const uint64_t* xf_graph_get_timings ( xf_graph_h graph );
 
 void xf_graph_set_texture_export ( xf_graph_h graph, xf_node_h node, xf_texture_h texture, xf_texture_h dest, xf_export_channel_e channel_remap[4] );
+
+xf_node_h xf_graph_get_node_by_name ( xf_graph_h graph, const char* name );
+void xf_graph_bind_custom_node_routine ( xf_graph_h graph, xf_node_h node, xf_node_execute_f* routine );

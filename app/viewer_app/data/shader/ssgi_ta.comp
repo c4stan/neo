@@ -34,26 +34,23 @@ void main ( void ) {
     vec2 velocity = velocity_sample - 0.5;
     uint id = id_sample.x << 8 | id_sample.y;
 
-    // reprojection
+    // Reproject
 #if 0
+    float depth = texture ( sampler2D ( tex_depth, sampler_linear ), screen_uv ).x;
     vec3 view = view_from_depth ( screen_uv, depth );
     vec3 world = ( frame_uniforms.world_from_view * vec4 ( view, 1 ) ).xyz;
     vec3 prev_screen = prev_screen_from_world ( world );
-    vec2 screen_offset = prev_screen.xy - screen_uv;
     vec2 reprojected_uv = screen_uv - velocity;
 #else
     vec2 reprojected_uv = screen_uv - velocity;
-    vec2 screen_offset = velocity;
 #endif
 
-    // history sample
-    //vec3 history = texture ( sampler2D ( tex_history, sampler_point ), prev_screen.xy ).xyz;
+    // Sample history
     vec3 history = texture ( sampler2D ( tex_history, sampler_linear ), reprojected_uv ).xyz;
     uvec4 prev_id_sample = texture ( usampler2D ( tex_prev_id, sampler_point ), reprojected_uv );
-
     uint prev_id = prev_id_sample.x << 8 | prev_id_sample.y;
 
-    // history clamping
+    // Variance clipping
 #if 1
     vec3 sum = 0.0.xxx;
     vec3 sum_sq = 0.0.xxx;
@@ -62,9 +59,9 @@ void main ( void ) {
     const int k = 2;
     for ( int y = -k; y <= k; ++y ) {
         for ( int x = -k; x <= k; ++x ) {
-            vec2 sample_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) + ivec2 ( x, y ) * 1 ) / res );
+            vec2 sample_uv = ( gl_GlobalInvocationID.xy + 0.5.xx + ivec2 ( x, y ) ) / res;
             vec3 n = texture ( sampler2D ( tex_color, sampler_linear ), sample_uv ).xyz;
-            float w = exp ( -3.0 * float ( x * x + y * y ) / float ( ( k+1. ) * ( k+1. ) ) );
+            float w = exp ( -3.0 * float ( x * x + y * y ) / float ( ( k + 1 ) * ( k + 1 ) ) );
             sum += n * w;
             sum_sq += n * n * w;
             sum_w += w;
@@ -79,7 +76,6 @@ void main ( void ) {
     vec3 his_min = avg - dev * n_dev;
     vec3 his_max = avg + dev * n_dev;
     history = clamp ( history, his_min, his_max );
-
 #else
     // Sample neighborhood
     vec3 n0 = texture ( sampler2D ( tex_color, sampler_point ), screen_uv + vec2 (  1,  0 ) * texel_size ).xyz;
@@ -95,13 +91,12 @@ void main ( void ) {
     // blend factor
     float blend_factor = 0.05;
 
-    // history rejection
-    if ( any ( lessThan ( reprojected_uv, vec2 ( 0 ) ) ) || any ( greaterThan ( reprojected_uv, vec2 ( 1 ) ) ) || frame_uniforms.is_reload > 0 ) {
+    // History rejection
+    if ( is_outside_screen ( reprojected_uv ) || frame_uniforms.clear_history > 0 ) {
         blend_factor = 1.0;
     }
-
     if ( prev_id != id ) {
-        blend_factor = 1;
+        blend_factor = 1.0;
     }
 
     // store

@@ -27,7 +27,7 @@ layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_uni
     float z_near;
     float z_far;
 
-    uint is_reload;
+    uint clear_history;
 } frame_uniforms;
 
 // ======================================================================================= //

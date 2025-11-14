@@ -150,6 +150,7 @@ void xg_reload ( void* std_runtime, void* api ) {
 
     xg_state_t* state = ( xg_state_t* ) api;
 
+    xg_debug_capture_reload ( &state->debug_capture );
     xg_vk_instance_reload ( &state->vk.instance );
     xg_vk_device_reload ( &state->vk.device );
     xg_vk_allocator_reload ( &state->vk.allocator );
@@ -165,7 +166,6 @@ void xg_reload ( void* std_runtime, void* api ) {
 
     xg_cmd_buffer_reload ( &state->cmd_buffer );
     xg_resource_cmd_buffer_reload ( &state->resource_cmd_buffer );
-    xg_debug_capture_reload ( &state->debug_capture );
 
     xg_api_init ( &state->api );
     xg_state_bind ( state );

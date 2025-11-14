@@ -1,6 +1,7 @@
 #include <std_log.h>
 #include <std_time.h>
 #include <std_app.h>
+#include <std_file.h>
 
 #include <viewapp.h>
 #include <viewapp_state.h>
@@ -151,8 +152,14 @@ static void viewapp_boot ( void ) {
     xs_i* xs = state->modules.xs;
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "viewapp_sdb" ) );
     state->render.sdb = sdb;
-    xs->add_database_folder ( sdb, "data/viewer_app/shader/" );
-    xs->set_output_folder ( sdb, "bake/viewer_app/shader/" );
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
     xs_database_build_result_t build_result = xs->build_database ( sdb );
     std_assert_m ( build_result.failed_pipeline_states == 0 );
 
@@ -438,7 +445,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     if ( delta_ms < target_frame_period ) {
         //std_thread_yield();
-        std_thread_this_sleep( 0 );
+        std_thread_this_sleep ( 0 );
         return std_app_state_tick_m;
     }
 
@@ -461,7 +468,6 @@ static std_app_state_e viewapp_update ( void ) {
 
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
         xs->build_databases();
-        state->reload = true;
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
@@ -485,45 +491,7 @@ static std_app_state_e viewapp_update ( void ) {
     }
 
     if ( state->reload ) {
-        bool enabled[xf_graph_max_nodes_m] = {};
-        xf_graph_info_t graph_info;
-        xf->get_graph_info ( &graph_info, state->render.active_graph );
-        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
-            xf_node_info_t node_info;
-            xf->get_node_info ( &node_info, state->render.active_graph, graph_info.nodes[i] );
-            enabled[i] = node_info.enabled;
-        }
-
-        bool active_graph[2] = {};
-        if ( state->render.active_graph == state->render.raster_graph ) active_graph[0] = 1;
-        if ( state->render.active_graph == state->render.raytrace_graph ) active_graph[1] = 1;
-
-        xf->destroy_graph ( state->render.raster_graph, workload );
-        xf->destroy_graph ( state->render.raytrace_graph, workload );
-        xf->destroy_graph ( state->render.mouse_pick_graph, workload );
-
-        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-        xg->cmd_destroy_texture ( resource_cmd_buffer, state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_complete_m );
- 
-        viewapp_boot_raster_graph();
-        viewapp_boot_raytrace_graph();
-        viewapp_boot_mouse_pick_graph();
-
-        viewapp_build_raytrace_world ( workload );
-
-        if ( active_graph[0] ) state->render.active_graph = state->render.raster_graph;
-        if ( active_graph[1] ) state->render.active_graph = state->render.raytrace_graph;
-
-        bool any_passthrough = false;
-        for ( uint32_t i = 0; i < graph_info.node_count; ++i ) {
-            if ( !enabled[i] ) {
-                xf->node_set_enabled ( state->render.active_graph, graph_info.nodes[i], false );
-                any_passthrough = true;
-            }
-        }
-
-        state->reload = false;
-        state->render.graph_reload = true;
+        viewapp_reload_graphs();
     }
 
     wm_window_info_t new_window_info;
@@ -539,8 +507,6 @@ static std_app_state_e viewapp_update ( void ) {
     state->render.input_state = new_input_state;
 
     viewapp_update_workload_uniforms ( workload );
-
-    state->render.graph_reload = false;
 
     xf->execute_graph ( state->render.active_graph, workload, 0 );
     xg->submit_workload ( workload );
@@ -561,6 +527,7 @@ static std_app_state_e viewapp_update ( void ) {
     std_tick_t update_tick = std_tick_now();
     float update_ms = std_tick_to_milli_f32 ( update_tick - new_tick );
     state->render.update_time_ms = update_ms;
+    state->reload = false;
 
     return std_app_state_tick_m;
 }

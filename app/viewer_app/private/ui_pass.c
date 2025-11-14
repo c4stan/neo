@@ -80,3 +80,10 @@ xf_node_h add_ui_pass ( xf_graph_h graph, xf_texture_h color, xf_texture_h expor
     xf_node_h ui_node = xf->create_node ( graph, &params );
     return ui_node;
 }
+
+void bind_ui_routine ( xf_graph_h graph ) {
+    xf_i* xf = std_module_get_m ( xf_module_name_m );
+    xf_node_h node = xf->get_node_by_name ( graph, "ui" );
+    std_assert_m ( node != xf_null_handle_m );
+    xf->bind_custom_node_routine ( graph, node, ui_pass_routine );
+}

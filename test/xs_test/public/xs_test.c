@@ -1,6 +1,7 @@
 #include <std_main.h>
 #include <std_time.h>
 #include <std_log.h>
+#include <std_file.h>
 
 #include <wm.h>
 #include <xg.h>
@@ -421,8 +422,14 @@ static void xs_test ( void ) {
         .device = device,
         .debug_name = "shader_db"
     ) );
-    xs->add_database_folder ( sdb, "data/xs_test/shader/" );
-    xs->set_output_folder ( sdb, "shader/" );
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
     xs->set_build_params ( sdb, &xs_database_build_params_m (
         .base_graphics_state = &xg_graphics_pipeline_state_m ( 
             .viewport_state.width = 600,
@@ -463,7 +470,7 @@ static void xs_test ( void ) {
         wm_input_state_t new_input_state;
         wm->get_window_input_state ( window, &new_input_state );
 
-        if ( new_input_state.keyboard[wm_keyboard_state_esc_m] ) {
+        if ( !input_state.keyboard[wm_keyboard_state_esc_m] && new_input_state.keyboard[wm_keyboard_state_esc_m] ) {
             break;
         }
 

@@ -1419,16 +1419,11 @@ static void xf_graph_update_export_node ( xf_graph_h graph_handle ) {
             .remap[3] = graph->export_channels[3],
         };
 
-        xs_i* xs = std_module_get_m ( xs_module_name_m );
-        xg_pipeline_state_h pipeline = xs->get_pipeline_state ( xf_graph_state->export_pipeline );
-        xg_pipeline_info_t pipe_info;
-        xg->get_pipeline_info ( &pipe_info, pipeline );
-
         xf_node_h export_node_handle = xf_graph_node_create ( graph_handle, &xf_node_params_m (
             .debug_name = "export",
             .type = xf_node_type_compute_pass_m,
             .pass.compute = xf_node_compute_pass_params_m (
-                .pipeline = pipeline,
+                .pipeline = xf_graph_state->export_pipeline,
                 .workgroup_count = { std_div_round_up_u32 ( info.width, 8 ), std_div_round_up_u32 ( info.height, 8 ), 1 },
                 .samplers_count = 1,
                 .samplers = { xg->get_default_sampler ( graph->params.device, xg_default_sampler_linear_clamp_m ) },
@@ -2624,6 +2619,7 @@ void xf_graph_copy_pass_routine ( const xf_node_execute_args_t* node_args, void*
 
 typedef struct {
     xg_i* xg;
+    xs_i* xs;
     xg_compute_pipeline_state_h pipeline;
     uint32_t workgroup_count[3];
     std_buffer_t uniform_data;
@@ -2637,8 +2633,11 @@ void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, vo
     uint64_t key = node_args->base_key;
 
     xg_i* xg = pass_args->xg;
+    xs_i* xs = pass_args->xs;
+    xg_compute_pipeline_state_h compute_pipeline = xs->get_pipeline_state ( pass_args->pipeline );
+    std_assert_m ( compute_pipeline != xg_null_handle_m );
 
-    xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pass_args->pipeline, xg_shader_binding_set_dispatch_m );
+    xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( compute_pipeline, xg_shader_binding_set_dispatch_m );
     const xf_node_resource_params_t* resources = &pass_args->params->resources;
 
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
@@ -2708,7 +2707,7 @@ void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, vo
     uint32_t workgroup_count_z = pass_args->params->pass.compute.workgroup_count[2];
 
     xg->cmd_compute ( cmd_buffer, key, &xg_cmd_compute_params_m ( 
-        .pipeline = pass_args->pipeline,
+        .pipeline = compute_pipeline,
         .bindings = { xg_null_handle_m, xg_null_handle_m, xg_null_handle_m, group },
         .workgroup_count_x = workgroup_count_x,
         .workgroup_count_y = workgroup_count_y,
@@ -2718,6 +2717,7 @@ void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, vo
 
 typedef struct {
     xg_i* xg;
+    xs_i* xs;
     xg_raytrace_pipeline_state_h pipeline;
     uint32_t thread_count[3];
     std_buffer_t uniform_data;
@@ -2731,8 +2731,12 @@ void xf_graph_raytrace_pass_routine ( const xf_node_execute_args_t* node_args, v
     uint64_t key = node_args->base_key;
 
     xg_i* xg = pass_args->xg;
+    xs_i* xs = pass_args->xs;
 
-    xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( pass_args->pipeline, xg_shader_binding_set_dispatch_m );
+    xg_raytrace_pipeline_state_h raytrace_pipeline = xs->get_pipeline_state ( pass_args->pipeline );
+    std_assert_m ( raytrace_pipeline != xg_null_handle_m );
+
+    xg_resource_bindings_layout_h layout = xg->get_pipeline_resource_layout ( raytrace_pipeline, xg_shader_binding_set_dispatch_m );
     const xf_node_resource_params_t* resources = &pass_args->params->resources;
 
     xg_pipeline_resource_bindings_t draw_bindings = xg_pipeline_resource_bindings_m (
@@ -2810,7 +2814,7 @@ void xf_graph_raytrace_pass_routine ( const xf_node_execute_args_t* node_args, v
     uint32_t thread_count_z = pass_args->params->pass.raytrace.thread_count[2];
 
     xg->cmd_raytrace ( cmd_buffer, key, &xg_cmd_raytrace_params_m ( 
-        .pipeline = pass_args->pipeline,
+        .pipeline = raytrace_pipeline,
         .bindings = { xg_null_handle_m, xg_null_handle_m, xg_null_handle_m, group },
         .ray_count_x = thread_count_x,
         .ray_count_y = thread_count_y,
@@ -2920,6 +2924,7 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
     std_assert_m ( graph );
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xs_i* xs = std_module_get_m ( xs_module_name_m );
 
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( xg_workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( xg_workload );
@@ -3417,10 +3422,11 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
                     uniform_data.base = node->user_alloc;
                 }
 
-                std_assert_m ( node->params.pass.compute.pipeline != xg_null_handle_m );
+                std_assert_m ( node->params.pass.compute.pipeline != xs_null_handle_m );
 
                 xf_graph_compute_pass_routine_args_t user_args = {
                     .xg = xg,
+                    .xs = xs,
                     .pipeline = node->params.pass.compute.pipeline,
                     .workgroup_count[0] = node->params.pass.compute.workgroup_count[0],
                     .workgroup_count[1] = node->params.pass.compute.workgroup_count[1],
@@ -3437,10 +3443,11 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
                     uniform_data.base = node->user_alloc;
                 }
 
-                std_assert_m ( node->params.pass.raytrace.pipeline != xg_null_handle_m );
+                std_assert_m ( node->params.pass.raytrace.pipeline != xs_null_handle_m );
 
                 xf_graph_raytrace_pass_routine_args_t user_args = {
                     .xg = xg,
+                    .xs = xs,
                     .pipeline = node->params.pass.raytrace.pipeline,
                     .thread_count[0] = node->params.pass.raytrace.thread_count[0],
                     .thread_count[1] = node->params.pass.raytrace.thread_count[1],
@@ -3644,4 +3651,27 @@ void xf_graph_set_texture_export ( xf_graph_h graph_handle, xf_node_h node, xf_t
     graph->export_channels[2] = channel_remap[2];
     graph->export_channels[3] = channel_remap[3];
     graph->needs_clear = true;
+}
+
+// TODO at creation time ensure names are unique
+//      remove debug_ prefix from name
+//      speedup lookup?
+xf_node_h xf_graph_get_node_by_name ( xf_graph_h graph_handle, const char* name ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    for ( uint32_t i = 0; i < graph->nodes_count; ++i ) {
+        xf_node_t* node = &graph->nodes_array[i];
+        if ( std_str_cmp ( node->params.debug_name, name ) == 0 ) {
+            return i;
+        }
+    }
+    return xf_null_handle_m;
+}
+
+void xf_graph_bind_custom_node_routine ( xf_graph_h graph_handle, xf_node_h node_handle, xf_node_execute_f* routine ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    xf_node_t* node = &graph->nodes_array[node_handle];
+    std_assert_m ( node->params.type == xf_node_type_custom_pass_m );
+    if ( node->params.type == xf_node_type_custom_pass_m ) {
+        node->params.pass.custom.routine = routine;
+    }
 }

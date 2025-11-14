@@ -1,17 +1,22 @@
 #include <xi.h>
 
 #include "xi_state.h"
-
 #include "xi_update.h"
 
-#include "std_string.h"
+#include <std_file.h>
 
 static void xi_load_shaders ( xg_device_h device ) {
     xs_i* xs = std_module_get_m ( xs_module_name_m );
 
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "xi_sdb" ) );
-    xs->add_database_folder ( sdb, "data/xi/shader" );
-    xs->set_output_folder ( sdb, "bake/xi/shader" );
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
     xi_workload_load_shaders ( xs, sdb );
     xi_font_load_shaders ( xs, sdb );
     xs->build_database ( sdb );

@@ -1,13 +1,21 @@
 #include <xf.h>
 
+#include <std_file.h>
+
 #include "xf_state.h"
 
 static void xf_load_shaders ( xg_device_h device ) {
     xs_i* xs = std_module_get_m ( xs_module_name_m );
     
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "xf_sdb" ) );
-    xs->add_database_folder ( sdb, "data/xf/shader/" );
-    xs->set_output_folder ( sdb, "bake/xf/shader/" );
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
     xf_graph_load_shaders ( xs, sdb );
     xs->build_database ( sdb );
     xf_state_set_sdb ( sdb );
@@ -55,6 +63,9 @@ static void xf_api_init ( xf_i* xf ) {
 
     xf->list_textures = xf_resource_texture_list;
     xf->set_graph_texture_export = xf_graph_set_texture_export;
+
+    xf->get_node_by_name = xf_graph_get_node_by_name;
+    xf->bind_custom_node_routine = xf_graph_bind_custom_node_routine;
 }
 
 void* xf_load ( void* std_runtime ) {

@@ -194,9 +194,6 @@ static void xi_test ( void ) {
         )
     ) );
 
-    wm_window_info_t window_info;
-    wm->get_window_info ( &window_info, window );
-
     // ui
     xi_window_state_t ui_window = xi_window_state_m (
         .title = "window",
@@ -348,6 +345,11 @@ static void xi_test ( void ) {
 
     xi_transform_state_t xform_state = xi_transform_state_m();
 
+    wm_window_info_t window_info;
+    wm->get_window_info ( &window_info, window );
+    wm_input_state_t input_state;
+    wm->get_window_input_state ( window, &input_state );
+
     float target_fps = 24.f;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = std_tick_now();
@@ -368,18 +370,18 @@ static void xi_test ( void ) {
             break;
         }
 
-        wm_input_state_t input_state;
-        wm->get_window_input_state ( window, &input_state );
+        wm_input_state_t new_input_state;
+        wm->get_window_input_state ( window, &new_input_state );
 
-        if ( input_state.keyboard[wm_keyboard_state_esc_m] ) {
+        if ( !input_state.keyboard[wm_keyboard_state_esc_m] && new_input_state.keyboard[wm_keyboard_state_esc_m] ) {
             break;
         }
 
-        if ( input_state.keyboard[wm_keyboard_state_f1_m] ) {
+        if ( !input_state.keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
             std_module_reload_m();
         }
 
-        if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
+        if ( !input_state.keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
             xs->build_databases();
         }
 
@@ -387,6 +389,7 @@ static void xi_test ( void ) {
         wm->get_window_info ( &new_window_info, window );
 
         window_info = new_window_info;
+        input_state = new_input_state;
 
         xg_workload_h workload = xg->create_workload ( device );
 

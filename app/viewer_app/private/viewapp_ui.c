@@ -12,6 +12,7 @@ void viewapp_boot_ui ( xg_device_h device ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
     xi_i* xi = state->modules.xi;
+    xf_i* xf = state->modules.xf;
 
     xg_workload_h workload = xg->create_workload ( device );
 
@@ -65,6 +66,8 @@ void viewapp_boot_ui ( xg_device_h device ) {
         .allowed_usage = xg_texture_usage_bit_storage_m | xg_texture_usage_bit_sampled_m,
         .debug_name = "export",
     ) );
+
+    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
 
     xg->submit_workload ( workload );
 }
@@ -416,7 +419,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
                 if ( node_switch.value != node_enabled ) {
                     xf->node_set_enabled ( state->render.active_graph, graph_info.nodes[i], node_switch.value );
-                    state->render.graph_reload = true;
+                    state->render.clear_history = true;
                 }
             }
 
@@ -506,28 +509,24 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                         channel_change |= state->ui.export_channels[1] != channel_select_1.item_idx;
                         channel_change |= state->ui.export_channels[2] != channel_select_2.item_idx;
                         channel_change |= state->ui.export_channels[3] != channel_select_3.item_idx;
-                        bool reload = state->render.graph_reload && state->ui.export_node_id == node_id && state->ui.export_tex_id == j;
 
-                        if ( switch_change || channel_change || reload ) {
+                        if ( switch_change || channel_change ) {
                             state->ui.export_channels[0] = channel_select_0.item_idx;
                             state->ui.export_channels[1] = channel_select_1.item_idx;
                             state->ui.export_channels[2] = channel_select_2.item_idx;
                             state->ui.export_channels[3] = channel_select_3.item_idx;
 
-                            if ( switch_change || reload ) {
+                            if ( switch_change ) {
                                 if ( export_switch.value ) {
-                                    state->ui.export_source = texture_handle;
-                                    state->ui.export_node_id = node_id;
-                                    state->ui.export_tex_id = j;
-                                    state->ui.export_id = id;
                                     state->ui.export_node = graph_info.nodes[i];
+                                    state->ui.export_source = texture_handle;
+                                    state->ui.export_id = id;
                                 } else {
-                                    state->ui.export_source = xf_null_handle_m;
-                                    state->ui.export_node_id = -1;
-                                    state->ui.export_tex_id = -1;
-                                    state->ui.export_id = 0;
                                     state->ui.export_node = xf_null_handle_m;
+                                    state->ui.export_source = xf_null_handle_m;
+                                    state->ui.export_id = 0;
                                 }
+                                state->render.clear_history = true;
                             }
 
                             xf->set_graph_texture_export ( state->render.active_graph, state->ui.export_node, state->ui.export_source, state->render.export_dest, state->ui.export_channels );

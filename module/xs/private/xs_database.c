@@ -16,15 +16,6 @@ static xs_database_state_t* xs_database_state;
 void xs_database_load ( xs_database_state_t* state ) {
     xs_database_state = state;
 
-#if 0
-    for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
-        xs_database_memory_page_t* page = &xs_database_state->memory_pages[i];
-
-        page->alloc = std_null_alloc_m;
-        page->top = 0;
-    }
-#endif
-
     //xs_database_state->stack = std_virtual_stack_create ( xs_database_memory_pool_max_size_m );
 
     //xs_database_state->folders_count = 0;
@@ -61,32 +52,6 @@ void xs_database_unload ( void ) {
 }
 
 static std_string_t xs_database_alloc_string ( xs_database_t* db, size_t size ) {
-#if 0
-    xs_database_memory_page_t* memory_page = NULL;
-
-    for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
-        xs_database_memory_page_t* page = &xs_database_state->memory_pages[i];
-
-        if ( page->alloc.handle.id == std_null_memory_handle_id_m ) {
-            page->alloc = std_virtual_alloc ( std_virtual_page_size() );
-            page->top = 0;
-            std_assert_m ( page->alloc.handle.id != std_null_memory_handle_id_m );
-            memory_page = page;
-            break;
-        } else if ( page->alloc.buffer.size - page->top < size ) {
-            continue;
-        } else {
-            memory_page = page;
-        }
-    }
-
-    std_assert_m ( memory_page != NULL );
-
-    char* dest = ( char* ) memory_page->alloc.buffer.base + memory_page->top;
-    memory_page->top += size;
-
-    return dest;
-#endif
     void* alloc = std_stack_alloc ( &db->stack, size );
     return std_string_m ( .str = alloc, .cap = size );
 }
@@ -131,16 +96,25 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
         }
     }
 
-    std_string_t dest = xs_database_alloc_string ( params->db, params->base_path.len + 1 );
-    std_string_append ( &dest, params->base_path.str );
+    std_string_t path = xs_database_alloc_string ( params->db, params->base_path.len + 1 );
+    std_string_append ( &path, params->base_path.str );
+
+    // TODO remove
+    //std_string_t live_path = xs_database_alloc_string ( params->db, params->base_path.len + 1 );
+    //std_string_append ( &path, std_module_path_m );
+    //std_path_append_dir ( &path, "data" );
+    //std_path_append_dir ( &path, "data" );
 
     if ( is_header ) {
         xs_database_pipeline_state_header_t* header = &params->db->pipeline_state_headers_array[params->db->pipeline_state_headers_count++];
-        header->path = dest.str;
+        header->path = path.str;
+
+        // TODO header->live_path
     } else {
         xs_database_pipeline_state_t* pipeline_state = &params->db->pipeline_states[params->db->pipeline_states_count++];
-        pipeline_state->path = dest.str;
-        pipeline_state->name = std_path_name_ptr ( &dest ); // TODO alloc separate string and remove .xss ext?
+        pipeline_state->path = path.str;
+        // TODO pipeline_state->live_path
+        pipeline_state->name = std_path_name_ptr ( &path ); // TODO alloc separate string and remove .xss ext?
         pipeline_state->type = type;
         pipeline_state->pipeline_handle = xg_null_handle_m;
         pipeline_state->old_pipeline_handle = xg_null_handle_m;
@@ -205,19 +179,6 @@ bool xs_database_set_output_folder ( xs_database_h db_handle, const char* input_
 }
 
 void xs_database_clear ( xs_database_h db_handle ) {
-#if 0
-    for ( size_t i = 0; i < xs_database_max_memory_pages_m; ++i ) {
-        xs_database_memory_page_t* page = &xs_database_state->memory_pages[i];
-
-        if ( page->alloc.handle.id != std_null_memory_handle_id_m ) {
-            std_virtual_free ( page->alloc.handle );
-            page->alloc = std_null_alloc_m;
-            page->top = 0;
-        } else {
-            break;
-        }
-    }
-#endif
     // TODO is this ever used? missing some stuff?
     xs_database_t* db = &xs_database_state->database_array[db_handle];
     
@@ -250,15 +211,6 @@ void xs_database_set_build_params ( xs_database_h db_handle, const xs_database_b
     db->dirty_build_params = true;
 }
 
-void xs_database_build_all ( void ) {
-    uint64_t db_idx = 0;
-    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
-        xs_database_h db_handle = db_idx;
-        xs_database_build ( db_handle );
-        ++db_idx;
-    }
-}
-
 typedef struct {
     xg_shading_stage_e stage;
     std_buffer_t buffer;
@@ -271,7 +223,7 @@ static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* 
     shader->buffer = bytecode->buffer;
 }
 
-xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
+xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle, bool is_reload ) {
     xs_database_t* db = &xs_database_state->database_array[db_handle];
 
     xs_database_build_result_t result = xs_database_build_result_m();
@@ -286,6 +238,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
     // check headers, froce rebuild all shaders if one changed
     // TODO try to take dependencies into account and avoid rebuilding everything?
     // TODO account for xs.glsl changes
+    // TODO look at source shader files, not deployed data
     bool dirty_headers = false;
     std_timestamp_t most_recent_header_edit = std_timestamp_zero_m;
 
@@ -539,6 +492,7 @@ xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
                     xs_shader_compiler_params_t params;
                     params.binary_path = binary_path.str;
                     params.shader_path = shader_path.str;
+                    params.entry_point = NULL;
                     params.global_definitions = db->global_definitions;
                     params.global_definition_count = db->global_definition_count;
                     params.shader_definitions = shader_definitions->array;
@@ -717,7 +671,7 @@ xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h db_handle, xs_st
     return handle;
 }
 
-xg_graphics_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h handle ) {
+xg_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h handle ) {
     if ( handle == xs_null_handle_m ) {
         return xg_null_handle_m;
     }
@@ -765,6 +719,32 @@ void xs_database_update_pipelines ( xg_workload_h last_workload ) {
             }
         }
 
+        ++db_idx;
+    }
+}
+
+xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
+    return xs_database_build_internal ( db_handle, false );
+}
+
+xs_database_build_result_t xs_database_update ( xs_database_h db_handle ) {
+    return xs_database_build_internal ( db_handle, true );
+}
+
+void xs_database_build_all ( void ) {
+    uint64_t db_idx = 0;
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
+        xs_database_h db_handle = db_idx;
+        xs_database_build ( db_handle );
+        ++db_idx;
+    }
+}
+
+void xs_database_update_all ( void ) {
+    uint64_t db_idx = 0;
+    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
+        xs_database_h db_handle = db_idx;
+        xs_database_update ( db_handle );
         ++db_idx;
     }
 }

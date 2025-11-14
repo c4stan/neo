@@ -325,31 +325,18 @@ typedef struct {
     xs_database_h ( *create_database ) ( const xs_database_params_t* params );
     void ( *destroy_database ) ( xs_database_h database );
 
-    bool ( *add_database_folder ) ( xs_database_h database, const char* path );
+    bool ( *add_data_folder ) ( xs_database_h database, const char* path ); // TODO rename to add_data_folder, auto prepend std_source_data_path_m
     bool ( *set_output_folder ) ( xs_database_h database, const char* path );
     void ( *clear_database ) ( xs_database_h database );
     void ( *set_build_params ) ( xs_database_h database, const xs_database_build_params_t* params );
     xs_database_build_result_t ( *build_database ) ( xs_database_h database );
     void ( *build_databases ) ( void );
+    void ( *update_databases ) ( void );
 
     // TODO go hash->fx and fx->technique(pipeline state) instead of hash->pipeline state
     xs_database_pipeline_h ( *get_database_pipeline ) ( xs_database_h database, xs_string_hash_t name_hash );
-    xg_graphics_pipeline_state_h ( *get_pipeline_state ) ( xs_database_pipeline_h xs_state );
+    xg_pipeline_state_h ( *get_pipeline_state ) ( xs_database_pipeline_h xs_state );
     //void ( *release_pipeline_state ) ( xg_graphics_pipeline_state_h pipeline );
 
     void ( *update_pipeline_states ) ( xg_workload_h workload );
 } xs_i;
-
-
-
-
-
-
-
-
-
-
-
-
-
-

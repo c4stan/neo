@@ -1,121 +1,14 @@
 #include <std_main.h>
 #include <std_log.h>
+#include <std_file.h>
+#include <std_time.h>
 
 #include <se.h>
-
-std_warnings_ignore_m ( "-Wunused-function" )
-std_warnings_ignore_m ( "-Wunused-variable" )
-
-#define se_test_component_0_m 0
-#define se_test_component_1_m 1
-
-typedef struct {
-    uint64_t u64;
-} se_test_component_0_t;
-
-typedef struct {
-    uint64_t u64;
-} se_test_component_1_t;
-
-static void run_se_test_1 ( void ) {
-    se_i* se = std_module_load_m ( se_module_name_m );
-
-    se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 2,
-        .components = {
-            se_component_layout_m (
-                .id = se_test_component_0_m,
-                .stream_count = 1,
-                .streams = { sizeof ( se_component_h ) }
-            ),
-            se_component_layout_m(
-                .id = se_test_component_1_m,
-                .stream_count = 1,
-                .streams = { sizeof ( se_component_h ) }
-            )
-        }
-    ) );
-
-    se->set_component_properties ( se_test_component_0_m, "Test component 0", &se_component_properties_params_m (
-        .count = 1,
-        .properties = {
-            se_field_property_m ( 0, se_test_component_0_t, u64, se_property_u64_m ),
-        }
-    ) );
-    
-    se_component_h c0 = 1;
-    se_component_h c1 = 2;
-
-    se->create_entity ( &se_entity_params_m (
-        .debug_name = "entity",
-        .update = se_entity_update_m (
-            .component_count = 2,
-            .components = { 
-                se_component_update_m ( 
-                    .id = se_test_component_0_m,
-                    .streams = { se_stream_update_m (
-                        .data = &c0
-                    ) }
-                ),
-                se_component_update_m (
-                    .id = se_test_component_1_m,
-                    .streams = { se_stream_update_m (
-                        .data = &c1
-                    ) }
-                )
-            }
-        )
-    ) );
-
-
-    se_query_result_t query_result;
-    se->query_entities ( &query_result, &se_query_params_m (
-        .component_count = 2,
-        .components = { se_test_component_0_m, se_test_component_1_m }
-    ) );
-
-    se_stream_iterator_t c0_it = se_component_iterator_m ( &query_result.components[0], 0 );
-    se_stream_iterator_t c1_it = se_component_iterator_m ( &query_result.components[1], 0 );
-
-    for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
-        uint64_t* c0_i = ( uint64_t* ) se_stream_iterator_next ( &c0_it );
-        uint64_t* c1_i = ( uint64_t* ) se_stream_iterator_next ( &c1_it );
-
-        std_assert_m ( *c0_i == c0 );
-        std_assert_m ( *c1_i == c1 );
-    }
-
-    std_module_unload_m ( se_module_name_m );
-}
-
 #include <xf.h>
 #include <xs.h>
 
-#include <std_time.h>
-
 #include <math.h>
 #include <stdlib.h>
-
-#if 1
-static void se_clear_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
-    std_unused_m ( user_args );
-    xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
-    uint64_t key = node_args->base_key;
-
-    // TODO pass this with node_args?
-    //      it is possible that the right solution is to have separate APIs in xg for command buffer recording vs the rest,
-    //      and here is passed the cmd buffer API instead of the whole xg api
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    {
-        xg_color_clear_t color_clear;
-        uint64_t t = 500;
-        color_clear.f32[0] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        color_clear.f32[1] = ( float ) ( ( sin ( std_tick_to_milli_f64 ( std_tick_now() / t ) + 3.14f ) + 1 ) / 2.f );
-        color_clear.f32[2] = ( float ) ( ( cos ( std_tick_to_milli_f64 ( std_tick_now() / t ) ) + 1 ) / 2.f );
-        xg->cmd_clear_texture ( cmd_buffer, key++, node_args->io->copy_texture_writes[0].texture, color_clear );
-    }
-}
 
 typedef struct {
     float pos_x;
@@ -241,8 +134,14 @@ static void run_se_test_2 ( void ) {
     }
 
     xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "se_test_sdb" ) );
-    xs->add_database_folder ( sdb, "data/se_test/shader/" );
-    xs->set_output_folder ( sdb, "bake/se_test/shader/" );
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
     xs->build_database ( sdb );
 
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle") );
@@ -361,7 +260,6 @@ static void run_se_test_2 ( void ) {
     std_module_unload_m ( wm_module_name_m );
     std_module_unload_m ( se_module_name_m );
 }
-#endif
 
 void std_main ( void ) {
     run_se_test_2();
