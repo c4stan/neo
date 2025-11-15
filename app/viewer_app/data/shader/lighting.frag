@@ -5,6 +5,10 @@
 #include "common.glsl"
 #include "lighting_common.glsl"
 
+//
+// UNUSED
+//
+
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
 layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;

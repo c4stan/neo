@@ -133,7 +133,11 @@ static void xi_test ( void ) {
     // create test font
     xi_font_h font;
     {
-        std_file_h font_file = std_file_open ( "data/xi_test/ProggyVector-Regular.ttf", std_file_read_m );
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_file ( &path, "ProggyVector-Regular.ttf" );
+        std_file_h font_file = std_file_open ( path_buffer, std_file_read_m );
         std_file_info_t font_file_info;
         std_file_info ( &font_file_info, font_file );
         void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );

@@ -18,4 +18,4 @@ se_entity_h spawn_light ( xg_workload_h workload );
 void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time );
 
 void viewapp_build_raytrace_world ( xg_workload_h workload );
-void update_raytrace_world ( void );
+void viewapp_update_raytrace_world ( void );

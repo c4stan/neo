@@ -89,11 +89,14 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             .clear_history = state->render.clear_history,
         };
 
-        // if TAA is off disable jittering
-        xf_node_info_t taa_node_info;
-        xf->get_node_info ( &taa_node_info, state->render.raster_graph,  state->render.taa_node );
-        if ( !taa_node_info.enabled ) {
-            uniforms.jittered_proj_from_view = view_info.proj_matrix;
+        // disable jittering if TAA is off 
+        xf_node_h taa_node = xf->get_node_by_name ( state->render.render_graph, "taa" );
+        if ( taa_node != xf_null_handle_m ) {
+            xf_node_info_t taa_node_info;
+            xf->get_node_info ( &taa_node_info, state->render.render_graph, taa_node );
+            if ( !taa_node_info.enabled ) {
+                uniforms.jittered_proj_from_view = view_info.proj_matrix;
+            }
         }
 
         xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
@@ -143,7 +146,7 @@ static void viewapp_bind_mouse_pick_graph_routines ( void ) {
     bind_object_id_routine ( graph );
 }
 
-void viewapp_boot_mouse_pick_graph ( void ) {
+void viewapp_load_mouse_pick_graph ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_device_h device = state->render.device;    
     uint32_t resolution_x = state->render.resolution_x;
@@ -226,14 +229,14 @@ void viewapp_boot_mouse_pick_graph ( void ) {
 
 static void viewapp_bind_raytrace_graph_routines ( void ) {
     viewapp_state_t* state = viewapp_state_get();
-    xf_graph_h graph = state->render.raytrace_graph;
+    xf_graph_h graph = state->render.render_graph;
     if ( graph == xf_null_handle_m ) return;
     bind_raytrace_setup_routine ( graph );
     //bind_raytrace_routine ( graph );
     bind_ui_routine ( graph );
 }
 
-void viewapp_boot_raytrace_graph ( void ) {
+static void viewapp_boot_raytrace_graph ( void ) {
 #if xg_enable_raytracing_m
     viewapp_state_t* state = viewapp_state_get();
     xg_device_h device = state->render.device;    
@@ -246,9 +249,9 @@ void viewapp_boot_raytrace_graph ( void ) {
 
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
         .device = device,
-        .debug_name = "raytrace_graph"
+        .debug_name = "raytrace"
     ) );
-    state->render.raytrace_graph = graph;
+    state->render.render_graph = graph;
 
     // gbuffer laydown
     xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
@@ -338,7 +341,7 @@ void viewapp_boot_raytrace_graph ( void ) {
 
     add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
 
-    // raytrace
+    // restir di
     xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
         .width = resolution_x,
         .height = resolution_y,
@@ -532,7 +535,6 @@ void viewapp_boot_raytrace_graph ( void ) {
         ),
     ) );
     xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
-    //xf_node_h taa_node = 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "taa",
         .type = xf_node_type_compute_pass_m,
@@ -564,7 +566,6 @@ void viewapp_boot_raytrace_graph ( void ) {
             }
         )
     ) );
-    //state->render.taa_node = taa_node;
 
     // tonemap
     xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
@@ -599,6 +600,7 @@ void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     // ui
+    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
     add_ui_pass ( graph, tonemap_texture, state->render.export_dest );
 
     // present
@@ -617,14 +619,12 @@ void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     xf->finalize_graph ( graph );
-#else
-    state->render.raytrace_graph = xf_null_handle_m;
 #endif
 }
 
 static void viewapp_bind_raster_graph_routines ( void ) {
     viewapp_state_t* state = viewapp_state_get();
-    xf_graph_h graph = state->render.raster_graph;
+    xf_graph_h graph = state->render.render_graph;
     if ( graph == xf_null_handle_m ) return;
     bind_geometry_routine ( graph );
     bind_shadow_routine ( graph );
@@ -633,7 +633,7 @@ static void viewapp_bind_raster_graph_routines ( void ) {
     bind_ui_routine ( graph );
 }
 
-void viewapp_boot_raster_graph ( void ) {
+static void viewapp_boot_raster_graph ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_device_h device = state->render.device;    
     xg_swapchain_h swapchain = state->render.swapchain;    
@@ -646,10 +646,10 @@ void viewapp_boot_raster_graph ( void ) {
 
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
         .device = device,
-        .debug_name = "raster_graph",
+        .debug_name = "raster",
         .flags = xf_graph_flag_alias_memory_m | xf_graph_flag_alias_resources_m,// | xf_graph_flag_print_execution_order_m | xf_graph_flag_print_node_deps_m,
     ) );
-    state->render.raster_graph = graph;
+    state->render.render_graph = graph;
 
     uint32_t shadow_size = 1024 * 8;
     xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
@@ -1234,7 +1234,7 @@ void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
     xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
-    xf_node_h taa_node = xf->create_node ( graph, &xf_node_params_m (
+    xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "taa",
         .type = xf_node_type_compute_pass_m,
         .pass.compute = xf_node_compute_pass_params_m (
@@ -1265,7 +1265,6 @@ void viewapp_boot_raster_graph ( void ) {
             }
         )
     ) );
-    state->render.taa_node = taa_node;
 
     // tonemap
     xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
@@ -1300,6 +1299,7 @@ void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // ui
+    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
     add_ui_pass ( graph, tonemap_texture, state->render.export_dest );
 
     // present
@@ -1320,8 +1320,40 @@ void viewapp_boot_raster_graph ( void ) {
     xf->finalize_graph ( graph );
 }
 
+void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h workload ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xf_i* xf = state->modules.xf;
+    
+    if ( state->render.render_graph != xf_null_handle_m ) {
+        xf->destroy_graph ( state->render.render_graph, workload );
+    }
+
+    if ( graph == viewapp_render_graph_raster_m ) {
+        viewapp_boot_raster_graph();
+    } else if ( graph == viewapp_render_graph_restir_di_m ) {
+        viewapp_boot_raytrace_graph();
+    } else {
+        std_assert_m ( false );
+    }
+    state->render.active_render_graph = graph;
+}
+
 void viewapp_reload_graphs ( void ) {
-    viewapp_bind_raster_graph_routines();
-    viewapp_bind_raytrace_graph_routines();
+    viewapp_state_t* state = viewapp_state_get();
+    xf_graph_h graph = state->render.render_graph;
+
+    if ( graph == viewapp_render_graph_raster_m ) {
+        viewapp_bind_raster_graph_routines();
+    } else if ( graph == viewapp_render_graph_restir_di_m ) {
+        viewapp_bind_raytrace_graph_routines();
+    } else {
+        std_assert_m ( false );
+    }
+
     viewapp_bind_mouse_pick_graph_routines();
+}
+
+bool viewapp_is_raytrace_world_used ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+    return state->render.active_render_graph == viewapp_render_graph_restir_di_m;
 }

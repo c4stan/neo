@@ -113,5 +113,9 @@ void main ( void ) {
     float temporal_p_hat = light_p ( temporal_reservoir.light, world_geo_pos, world_normal, base_color );
     update_reservoir_weight ( temporal_reservoir, temporal_p_hat );
 
+    if ( frame_uniforms.clear_history > 0 ) {
+        temporal_reservoir = reservoir;
+    }
+
     reservoir_buffer.data[reservoir_idx] = temporal_reservoir;
 }

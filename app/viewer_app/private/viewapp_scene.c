@@ -1162,7 +1162,7 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
     std_log_info_m ( "Scene imported in " std_fmt_f32_dec_m(3) "s", time_ms / 1000.f );
 }
 
-void update_raytrace_world ( void ) {
+void viewapp_update_raytrace_world ( void ) {
 #if xg_enable_raytracing_m
     viewapp_state_t* state = viewapp_state_get();
     state->render.raytrace_world_update = true;
@@ -1290,7 +1290,7 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
-    update_raytrace_world();
+    viewapp_update_raytrace_world();
     return entity;
 }
 
@@ -1349,7 +1349,7 @@ se_entity_h spawn_sphere ( xg_workload_h workload ) {
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
-    update_raytrace_world();
+    viewapp_update_raytrace_world();
     return entity;
 }
 
@@ -1448,6 +1448,6 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
 
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
-    update_raytrace_world();
+    viewapp_update_raytrace_world();
     return entity;
 }

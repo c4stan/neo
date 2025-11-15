@@ -14,6 +14,7 @@
 #include <xg_geo_util.h>
 
 #include "viewapp_scene.h"
+#include "viewapp_render.h"
 
 // Modules
 typedef struct {
@@ -27,24 +28,9 @@ typedef struct {
 } viewapp_modules_state_t;
 
 // Scene
-#if 0
-typedef struct {
-    char name[32];
-    xg_geo_util_geometry_data_t data;
-    xg_geo_util_geometry_gpu_data_t gpu_data;
-} viewapp_scene_mesh_t;
-
-typedef struct {
-    viewapp_scene_mesh_t* mesh;
-    float local_transform[16];
-    float global_transform[16];
-} viewapp_scene_mesh_instance_t;
-#endif
 typedef struct {
     viewapp_scene_e active_scene;
     char custom_scene_path[128];
-    //uint32_t entity_count;
-    //se_entity_h entities[128];
 } viewapp_scene_state_t;
 
 #define viewapp_scene_state_m( ... ) ( viewapp_scene_state_t ) { \
@@ -54,7 +40,6 @@ typedef struct {
 }
 
 // Render
-// Keep in sync with lighting.frag!
 #define viewapp_max_lights_m 1024
 
 typedef struct {
@@ -80,14 +65,12 @@ typedef struct {
     xs_database_h sdb;
     bool supports_raytrace;
 
-    xf_graph_h raster_graph;
-    xf_graph_h raytrace_graph;
-    xf_graph_h active_graph;
-
+    xf_graph_h render_graph;
+    viewapp_render_graph_e active_render_graph;
+    bool load_render_graph;
     xf_graph_h mouse_pick_graph;
     xg_texture_h object_id_readback_texture;
 
-    xf_node_h taa_node;
     xg_raytrace_world_h raytrace_world;
     xg_resource_bindings_layout_h workload_bindings_layout;
 
@@ -106,20 +89,23 @@ typedef struct {
     .time_ms = 0, \
     .delta_time_ms = 0, \
     .update_time_ms = 0, \
+    .frame_tick = 0, \
+    .target_fps = 120, \
     .next_object_id = 1, \
     .window = wm_null_handle_m, \
+    .window_info = {}, \
+    .input_state = {}, \
     .device = xg_null_handle_m, \
     .swapchain = xg_null_handle_m, \
     .sdb = xs_null_handle_m, \
-    .raster_graph = xf_null_handle_m, \
-    .raytrace_graph = xf_null_handle_m, \
-    .active_graph = xf_null_handle_m, \
-    .taa_node = xf_null_handle_m, \
+    .supports_raytrace = false, \
+    .render_graph = xf_null_handle_m, \
+    .active_render_graph = 0, \
+    .load_render_graph = false, \
+    .mouse_pick_graph = xf_null_handle_m, \
+    .object_id_readback_texture = xg_null_handle_m, \
     .raytrace_world = xg_null_handle_m, \
-    .window_info = {}, \
-    .input_state = {}, \
-    .frame_tick = 0, \
-    .target_fps = 120, \
+    .workload_bindings_layout = xg_null_handle_m, \
     .clear_history = false, \
     .allow_graph_aliasing = true, \
     .raytrace_world_update = false, \
@@ -139,7 +125,6 @@ typedef struct {
     xi_section_state_t xf_graph_section_state;
     xi_section_state_t scene_section_state;
     xi_section_state_t entities_section_state;
-    xi_section_state_t xf_textures_state;
 
     uint64_t expanded_nodes_bitset[1];
     uint64_t expanded_entities_bitset[8];
@@ -165,9 +150,13 @@ typedef struct {
     .xf_graph_section_state = xi_section_state_m(), \
     .entities_section_state = xi_section_state_m(), \
     .export_texture = xg_null_handle_m, \
+    .export_source = xf_null_handle_m, \
+    .export_id = 0, \
+    .export_node = xf_null_handle_m, \
     .export_channels = { xf_export_channel_r, xf_export_channel_g, xf_export_channel_b, xf_export_channel_a }, \
     .mouse_pick_entity = se_null_handle_m, \
     .target_fps_values = { 120, 90, 60, 30, 24, 8 }, \
+    .target_fps_idx = 0, \
     __VA_ARGS__ \
 }
 

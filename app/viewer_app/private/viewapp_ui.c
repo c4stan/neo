@@ -12,14 +12,20 @@ void viewapp_boot_ui ( xg_device_h device ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
     xi_i* xi = state->modules.xi;
-    xf_i* xf = state->modules.xf;
 
     xg_workload_h workload = xg->create_workload ( device );
 
     xi->load_shaders ( device );
     xi->init_geos ( device, workload );
 
-    std_file_h font_file = std_file_open ( "data/viewer_app/ProggyVector-Regular.ttf", std_file_read_m );
+    std_file_h font_file;
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_file ( &path, "ProggyVector-Regular.ttf" );
+        font_file = std_file_open ( path_buffer, std_file_read_m );
+    }
     std_file_info_t font_file_info;
     std_file_info ( &font_file_info, font_file );
     void* font_data_alloc = std_virtual_heap_alloc_m ( font_file_info.size, 16 );
@@ -54,9 +60,8 @@ void viewapp_boot_ui ( xg_device_h device ) {
     state->ui.frame_section_state = xi_section_state_m ( .title = "frame" );
     state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
     state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
-    state->ui.xf_graph_section_state = xi_section_state_m ( .title = "xf graph" );
+    state->ui.xf_graph_section_state = xi_section_state_m ( .title = "rendergraph" );
     state->ui.entities_section_state = xi_section_state_m ( .title = "entities", .style = xi_default_style_m() );
-    state->ui.xf_textures_state = xi_section_state_m ( .title = "xf textures" );
 
     state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
         .device = device,
@@ -66,8 +71,6 @@ void viewapp_boot_ui ( xg_device_h device ) {
         .allowed_usage = xg_texture_usage_bit_storage_m | xg_texture_usage_bit_sampled_m,
         .debug_name = "export",
     ) );
-
-    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
 
     xg->submit_workload ( workload );
 }
@@ -338,7 +341,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xi_select_state_t graph_select = xi_select_state_m (
             .items = graph_select_items,
             .item_count = std_static_array_count_m ( graph_select_items ),
-            .item_idx = state->render.active_graph == state->render.raster_graph ? 0 : 1,
+            .item_idx = state->render.active_render_graph,
             .width = 100,
             .sort_order = 1,
             .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
@@ -346,23 +349,24 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         xi->add_select ( xi_workload, &graph_select );
 
-        xf_graph_h active_graph = graph_select.item_idx == 0 ? state->render.raster_graph : state->render.raytrace_graph;
-        if ( state->render.active_graph != active_graph ) {
-            state->render.active_graph = active_graph;
+        viewapp_render_graph_e selected_graph = graph_select.item_idx;
+        if ( state->render.active_render_graph != selected_graph ) {
+            state->render.active_render_graph = selected_graph;
+            state->render.load_render_graph = true;
         }
 
         xi->newline();
 
         xf_graph_info_t graph_info;
-        xf->get_graph_info ( &graph_info, state->render.active_graph );
+        xf->get_graph_info ( &graph_info, state->render.render_graph );
 
-        const uint64_t* timings = xf->get_graph_timings ( state->render.active_graph );
+        const uint64_t* timings = xf->get_graph_timings ( state->render.render_graph );
 
         std_assert_m ( graph_info.node_count < 64 );
         uint64_t timestamp_sum = 0;
         for ( uint32_t i = 0, node_id = -1; i < graph_info.node_count; ++i ) {
             xf_node_info_t node_info;
-            xf->get_node_info ( &node_info, state->render.active_graph, graph_info.nodes[i] );
+            xf->get_node_info ( &node_info, state->render.render_graph, graph_info.nodes[i] );
 
             if ( std_str_cmp ( node_info.debug_name, "export" ) == 0 ) {
                 continue;
@@ -418,7 +422,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                 xi->add_switch ( xi_workload, &node_switch );
 
                 if ( node_switch.value != node_enabled ) {
-                    xf->node_set_enabled ( state->render.active_graph, graph_info.nodes[i], node_switch.value );
+                    xf->node_set_enabled ( state->render.render_graph, graph_info.nodes[i], node_switch.value );
                     state->render.clear_history = true;
                 }
             }
@@ -529,7 +533,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                                 state->render.clear_history = true;
                             }
 
-                            xf->set_graph_texture_export ( state->render.active_graph, state->ui.export_node, state->ui.export_source, state->render.export_dest, state->ui.export_channels );
+                            xf->set_graph_texture_export ( state->render.render_graph, state->ui.export_node, state->ui.export_source, state->render.export_dest, state->ui.export_channels );
                         }
 
                         xi->newline();
@@ -576,10 +580,10 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
         ) ) ) {
             xf_graph_info_t info;
-            xf->get_graph_info ( &info, state->render.active_graph );
+            xf->get_graph_info ( &info, state->render.render_graph );
 
             for ( uint32_t i = 0; i < info.node_count; ++i ) {
-                xf->disable_node ( state->render.active_graph, info.nodes[i] );
+                xf->disable_node ( state->render.render_graph, info.nodes[i] );
             }
         }
         if ( xi->add_button ( xi_workload, &xi_button_state_m ( 
@@ -588,10 +592,10 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m  
         ) ) ) {
             xf_graph_info_t info;
-            xf->get_graph_info ( &info, state->render.active_graph );
+            xf->get_graph_info ( &info, state->render.render_graph );
 
             for ( uint32_t i = 0; i < info.node_count; ++i ) {
-                xf->enable_node ( state->render.active_graph, info.nodes[i] );
+                xf->enable_node ( state->render.render_graph, info.nodes[i] );
             }
         }
     }
@@ -741,7 +745,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg_null_handle_m;
         if ( destroy_count > 0 ) {
             resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-            update_raytrace_world();
+            viewapp_update_raytrace_world();
         }
         for ( uint32_t i = 0; i < destroy_count; ++i ) {
             uint32_t entity_idx = destroy_list[i];
@@ -784,7 +788,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
     // raytrace update
     if ( entity_edit ) {
-        update_raytrace_world();
+        viewapp_update_raytrace_world();
     }
 
     // geos
@@ -809,7 +813,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                 || transform->orientation[2] != xform.rotation[2]
                 || transform->orientation[3] != xform.rotation[3]
                 )
-                && state->render.active_graph == state->render.raytrace_graph )
+                && viewapp_is_raytrace_world_used() )
             {
                 rtworld_needs_update = true;
             }
@@ -823,7 +827,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             transform->orientation[3] = xform.rotation[3];
 
             if ( rtworld_needs_update ) {
-                update_raytrace_world();
+                viewapp_update_raytrace_world();
             }
         }
     }

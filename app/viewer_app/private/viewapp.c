@@ -172,13 +172,8 @@ static void viewapp_boot ( void ) {
 
     viewapp_load_scene ( state->scene.active_scene );
 
-    viewapp_boot_raster_graph();
-    if ( state->render.supports_raytrace ) {
-        viewapp_boot_raytrace_graph();
-    }
-    viewapp_boot_mouse_pick_graph();
-
-    state->render.active_graph = state->render.raster_graph;
+    viewapp_load_render_graph ( state->render.active_render_graph, xg_null_handle_m );
+    viewapp_load_mouse_pick_graph();
 }
 
 static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_state_t* new_input_state, float dt ) {
@@ -494,6 +489,11 @@ static std_app_state_e viewapp_update ( void ) {
         viewapp_reload_graphs();
     }
 
+    if ( state->render.load_render_graph ) {
+        viewapp_load_render_graph ( state->render.active_render_graph, workload );
+        state->render.load_render_graph = false;
+    }
+
     wm_window_info_t new_window_info;
     wm->get_window_info ( &new_window_info, window );
 
@@ -508,7 +508,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     viewapp_update_workload_uniforms ( workload );
 
-    xf->execute_graph ( state->render.active_graph, workload, 0 );
+    xf->execute_graph ( state->render.render_graph, workload, 0 );
     xg->submit_workload ( workload );
     xg->present_swapchain ( state->render.swapchain, workload );
 
@@ -518,8 +518,6 @@ static std_app_state_e viewapp_update ( void ) {
         xg->wait_all_workload_complete();
         xg_workload_h workload = xg->create_workload ( state->render.device );
         viewapp_build_raytrace_world ( workload );
-        xf->destroy_graph ( state->render.raytrace_graph, workload );
-        viewapp_boot_raytrace_graph();
         xg->submit_workload ( workload );
         state->render.raytrace_world_update = false;
     }
