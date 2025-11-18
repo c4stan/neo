@@ -12,6 +12,83 @@
 
 #include "viewapp_state.h"
 
+#include <std_file.h>
+
+void viewapp_boot_render ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+    uint32_t resolution_x = 1920;
+    uint32_t resolution_y = 1024;
+
+    state->render.resolution_x = resolution_x;
+    state->render.resolution_y = resolution_y;
+
+    wm_i* wm = state->modules.wm;
+    wm_window_h window;
+    {
+        wm_window_params_t window_params = {
+            .name = "viewer_app",
+            .x = 0,
+            .y = 0,
+            .width = resolution_x,
+            .height = resolution_y,
+            .gain_focus = true,
+            .borderless = false
+        };
+        std_log_info_m ( "Creating window "std_fmt_str_m, window_params.name );
+        window = wm->create_window ( &window_params );
+    }
+    state->render.window = window;
+    wm->get_window_info ( &state->render.window_info, window );
+    wm->get_window_input_state ( window, &state->render.input_state );
+
+    xg_device_h device;
+    xg_device_info_t device_info;
+    xg_i* xg = state->modules.xg;
+    {
+        size_t device_count = xg->get_devices_count();
+        std_assert_m ( device_count > 0 );
+        xg_device_h devices[16];
+        xg->get_devices ( devices, 16 );
+        device = devices[0];
+        bool activate_result = xg->activate_device ( device );
+        std_assert_m ( activate_result );
+        xg->get_device_info ( &device_info, device );
+        std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
+    }
+    xg_swapchain_h swapchain = xg->create_window_swapchain ( &xg_swapchain_window_params_m (
+        .window = window,
+        .device = device,
+        .texture_count = 3,
+        .format = xg_format_a2b10g10r10_unorm_pack32_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m,
+        .debug_name = "swapchain",
+    ) );
+    std_assert_m ( swapchain != xg_null_handle_m );
+
+    state->render.device = device;
+    state->render.swapchain = swapchain;
+    state->render.supports_raytrace = device_info.supports_raytrace;
+
+    xs_i* xs = state->modules.xs;
+    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "viewapp_sdb" ) );
+    state->render.sdb = sdb;
+    {
+        char path_buffer[128];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "shader" );
+        xs->add_data_folder ( sdb, path_buffer );
+    }
+    xs->set_output_folder ( sdb, "shader" );
+    xs_database_build_result_t build_result = xs->build_database ( sdb );
+    std_assert_m ( build_result.failed_pipeline_states == 0 );
+
+    xf_i* xf = state->modules.xf;
+    xf->load_shaders ( device );
+
+    viewapp_boot_workload_resources_layout();
+}
+
 void viewapp_boot_workload_resources_layout ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
@@ -227,16 +304,14 @@ void viewapp_load_mouse_pick_graph ( void ) {
     xf->finalize_graph ( graph );
 }
 
-static void viewapp_bind_raytrace_graph_routines ( void ) {
+static void viewapp_bind_restir_di_graph_routines ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_graph_h graph = state->render.render_graph;
-    if ( graph == xf_null_handle_m ) return;
     bind_raytrace_setup_routine ( graph );
-    //bind_raytrace_routine ( graph );
     bind_ui_routine ( graph );
 }
 
-static void viewapp_boot_raytrace_graph ( void ) {
+static void viewapp_boot_restir_di_graph ( void ) {
 #if xg_enable_raytracing_m
     viewapp_state_t* state = viewapp_state_get();
     xg_device_h device = state->render.device;    
@@ -249,7 +324,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
 
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
         .device = device,
-        .debug_name = "raytrace"
+        .debug_name = "restir_di"
     ) );
     state->render.render_graph = graph;
 
@@ -622,10 +697,289 @@ static void viewapp_boot_raytrace_graph ( void ) {
 #endif
 }
 
+static void viewapp_bind_raytrace_graph_routines ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xf_graph_h graph = state->render.render_graph;
+    bind_raytrace_setup_routine ( graph );
+    bind_ui_routine ( graph );
+}
+
+static void viewapp_boot_raytrace_graph ( void ) {
+#if xg_enable_raytracing_m
+    viewapp_state_t* state = viewapp_state_get();
+    xg_device_h device = state->render.device;    
+    xg_swapchain_h swapchain = state->render.swapchain;    
+    uint32_t resolution_x = state->render.resolution_x;
+    uint32_t resolution_y = state->render.resolution_y;
+    xf_i* xf = state->modules.xf;
+    xs_i* xs = state->modules.xs;
+    xg_i* xg = state->modules.xg;
+
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
+        .device = device,
+        .debug_name = "raytrace"
+    ) );
+    state->render.render_graph = graph;
+
+    // gbuffer laydown
+    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "color_texture",
+    ) );
+
+    xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "normal_texture",
+    ) );
+
+    xf_texture_h material_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .debug_name = "material_texture"
+    ) );
+
+    xf_texture_h radiosity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "radiosity_texture"
+    ) );
+
+    xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_r8g8b8a8_uint_m,
+            .debug_name = "gbuffer_object_id",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m()
+        ),
+    ) );
+
+    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_r16g16_unorm_m,
+        .debug_name = "velocity_texture",
+    ) );
+
+    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_d32_sfloat_m,
+            .debug_name = "depth_texture",
+            .clear_on_create = true,
+            .clear.depth_stencil = xg_depth_stencil_clear_m ()
+        ),
+    ) );
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "geometry_clear",
+        .type = xf_node_type_clear_pass_m,
+        .pass.clear = xf_node_clear_pass_params_m (
+            .textures = { 
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m() ),
+                xf_texture_clear_m ( .color = xg_color_clear_m( .f32 = { 0.5, 0.5, 0, 0 } ) ),
+            }
+        ),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 7,
+            .copy_texture_writes = {
+                xf_copy_texture_dependency_m ( .texture = depth_texture ),
+                xf_copy_texture_dependency_m ( .texture = color_texture ),
+                xf_copy_texture_dependency_m ( .texture = normal_texture ),
+                xf_copy_texture_dependency_m ( .texture = material_texture ),
+                xf_copy_texture_dependency_m ( .texture = radiosity_texture ),
+                xf_copy_texture_dependency_m ( .texture = object_id_texture ),
+                xf_copy_texture_dependency_m ( .texture = velocity_texture ),
+            }
+        ),
+    ) );
+
+    add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
+
+    // raytrace
+    xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_a2b10g10r10_unorm_pack32_m,
+        .debug_name = "lighting_texture"
+    ));
+
+    xf_buffer_h instance_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = raytrace_instance_data_size(),
+        .debug_name = "instance_buffer",
+    ) );
+
+    xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = raytrace_light_data_size(),
+        .debug_name = "light_buffer",
+    ) );
+    
+    add_raytrace_setup_pass ( graph, instance_buffer, light_buffer );
+
+    xf_texture_h reservoir_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
+        .buffer = xf_buffer_params_m (
+            .size = 32 * resolution_x * resolution_y, // TODO
+            .debug_name = "reservoir_buffer",
+            .clear_on_create = true,
+            .clear_value = 0
+        ),
+        .multi_buffer_count = 2,
+    ) );
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "raytrace",
+        .type = xf_node_type_raytrace_pass_m,
+        .pass.raytrace = xf_node_raytrace_pass_params_m (
+            .thread_count = { resolution_x, resolution_y, 1 },
+            .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "raytrace" ) ),
+            .raytrace_worlds_count = 1,
+            .raytrace_worlds = { state->render.raytrace_world },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_buffer_reads_count = 3,
+            .storage_buffer_reads = {
+                xf_shader_buffer_dependency_m ( .buffer = instance_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
+                xf_shader_buffer_dependency_m ( .buffer = light_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
+                xf_shader_buffer_dependency_m ( .buffer = reservoir_buffer, .stage = xg_pipeline_stage_bit_raytrace_shader_m ), 
+            },
+            .sampled_textures_count = 5,
+            .sampled_textures = {
+                xf_shader_texture_dependency_m ( .texture = color_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = normal_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = material_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = radiosity_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = depth_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+            },
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { 
+                xf_shader_texture_dependency_m ( .texture = lighting_texture, .stage = xg_pipeline_stage_bit_raytrace_shader_m ),
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) ), 
+            }
+        ),
+    ) );
+
+    // taa
+    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+        .texture = xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_b10g11r11_ufloat_pack32_m,
+            .debug_name = "taa_accumulation_texture",
+            .clear_on_create = true,
+            .clear.color = xg_color_clear_m()
+        ),
+    ) );
+    xg_texture_h taa_history_texture = xf->get_multi_texture ( taa_accumulation_texture, -1 );
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "taa",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "taa" ) ),
+            .samplers_count = 2,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = taa_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 5,
+            .sampled_textures = { 
+                xf_compute_texture_dependency_m ( .texture = lighting_texture ), 
+                xf_compute_texture_dependency_m ( .texture = depth_texture ), 
+                xf_compute_texture_dependency_m ( .texture = taa_history_texture ), 
+                xf_compute_texture_dependency_m ( .texture = object_id_texture ),
+                xf_compute_texture_dependency_m ( .texture = velocity_texture ) 
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { 
+                xf_texture_passthrough_m ( 
+                    .mode = xf_passthrough_mode_copy_m, 
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = lighting_texture ) 
+                ) 
+            }
+        )
+    ) );
+
+    // tonemap
+    xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_a2b10g10r10_unorm_pack32_m,
+        .debug_name = "tonemap_texture",
+    ) );
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "tonemap",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "tonemap" ) ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = tonemap_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .sampled_textures_count = 1,
+            .sampled_textures = { xf_compute_texture_dependency_m ( .texture = taa_accumulation_texture ) },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { xf_texture_passthrough_m (
+                    .mode = xf_passthrough_mode_copy_m,
+                    .copy_source = xf_copy_texture_dependency_m ( .texture = taa_accumulation_texture ),
+                )
+            },
+        ),
+    ) );
+
+    // ui
+    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
+    add_ui_pass ( graph, tonemap_texture, state->render.export_dest );
+
+    // present
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "present",
+        .type = xf_node_type_copy_pass_m,
+        .pass.copy = xf_node_copy_pass_params_m(),
+        .resources = xf_node_resource_params_m (
+            .copy_texture_writes_count = 1,
+            .copy_texture_writes = { xf_copy_texture_dependency_m ( .texture = swapchain_multi_texture ) },
+            .copy_texture_reads_count = 1,
+            .copy_texture_reads = { xf_copy_texture_dependency_m ( .texture = tonemap_texture ) },
+            .presentable_texture = swapchain_multi_texture,
+        )
+    ) );
+#else
+    state->render.render_graph = xf_null_handle_m;
+#endif
+}
+
 static void viewapp_bind_raster_graph_routines ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_graph_h graph = state->render.render_graph;
-    if ( graph == xf_null_handle_m ) return;
     bind_geometry_routine ( graph );
     bind_shadow_routine ( graph );
     bind_hiz_mip0_gen_routine ( graph );
@@ -1328,32 +1682,82 @@ void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h wor
         xf->destroy_graph ( state->render.render_graph, workload );
     }
 
-    if ( graph == viewapp_render_graph_raster_m ) {
+    state->render.active_render_graph = graph;
+
+    if ( viewapp_render_graph_is_raytrace ( graph ) ) {
+        viewapp_build_raytrace_world();
+    }
+
+    switch ( graph ) {
+    case viewapp_render_graph_raster_m:
         viewapp_boot_raster_graph();
-    } else if ( graph == viewapp_render_graph_restir_di_m ) {
+        break;
+    case viewapp_render_graph_restir_di_m:
+        viewapp_boot_restir_di_graph();
+        break;
+    case viewapp_render_graph_raytrace_m:
         viewapp_boot_raytrace_graph();
-    } else {
+        break;
+    default:
         std_assert_m ( false );
     }
-    state->render.active_render_graph = graph;
+
+    state->render.load_render_graph = false;
+
+    //if ( viewapp_render_graph_is_raytrace ( graph ) ) {
+    //    state->render.raytrace_world_update = true;
+    //}
 }
 
 void viewapp_reload_graphs ( void ) {
     viewapp_state_t* state = viewapp_state_get();
-    xf_graph_h graph = state->render.render_graph;
+    viewapp_render_graph_e graph = state->render.active_render_graph;
 
-    if ( graph == viewapp_render_graph_raster_m ) {
+    switch ( graph ) {
+    case viewapp_render_graph_raster_m:
         viewapp_bind_raster_graph_routines();
-    } else if ( graph == viewapp_render_graph_restir_di_m ) {
+        break;
+    case viewapp_render_graph_restir_di_m:
+        viewapp_bind_restir_di_graph_routines();
+        break;
+    case viewapp_render_graph_raytrace_m:
         viewapp_bind_raytrace_graph_routines();
-    } else {
+        break;
+    default:
         std_assert_m ( false );
     }
 
     viewapp_bind_mouse_pick_graph_routines();
 }
 
-bool viewapp_is_raytrace_world_used ( void ) {
+bool viewapp_render_graph_is_raytrace ( viewapp_render_graph_e render_graph ) {
+    switch ( render_graph ) {
+    case viewapp_render_graph_raster_m:
+        return false;
+    case viewapp_render_graph_restir_di_m:
+    case viewapp_render_graph_raytrace_m:
+        return true;
+    default:
+        std_assert_m ( false );
+    }
+
+    return false;
+}
+
+xs_database_pipeline_h viewapp_get_render_graph_raytrace_pipeline ( viewapp_render_graph_e render_graph ) {
     viewapp_state_t* state = viewapp_state_get();
-    return state->render.active_render_graph == viewapp_render_graph_restir_di_m;
+    xs_i* xs = state->modules.xs;
+
+    switch ( render_graph ) {
+    case viewapp_render_graph_raster_m:
+        return xf_null_handle_m;
+    case viewapp_render_graph_restir_di_m:
+        return xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "restir_di_sample" ) );
+    case viewapp_render_graph_raytrace_m:
+        return xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "raytrace" ) );
+    default:
+        std_assert_m ( false );
+    }
+
+    return false;
 }

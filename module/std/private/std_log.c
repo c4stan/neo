@@ -324,7 +324,7 @@ void std_log_os_error ( std_log_scope_t scope ) {
     std_string_append ( &string, ": " );
 
     // TODO avoid heap alloc, prefix os msg with something
-    FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), ( LPSTR ) string.len, string.cap - string.len, NULL );
+    FormatMessage ( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error_code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), ( LPSTR ) string.str, string.cap - string.len, NULL );
 
     std_log_msg_t msg;
     msg.scope = scope;

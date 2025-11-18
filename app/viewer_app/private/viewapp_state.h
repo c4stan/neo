@@ -49,7 +49,6 @@ typedef struct {
     bool capture_frame;
     float time_ms;
     float delta_time_ms;
-    float update_time_ms;
     std_tick_t frame_tick;
     float target_fps;
 
@@ -72,6 +71,7 @@ typedef struct {
     xg_texture_h object_id_readback_texture;
 
     xg_raytrace_world_h raytrace_world;
+    xs_database_pipeline_h raytrace_pipeline;
     xg_resource_bindings_layout_h workload_bindings_layout;
 
     bool clear_history;
@@ -88,7 +88,6 @@ typedef struct {
     .capture_frame = false, \
     .time_ms = 0, \
     .delta_time_ms = 0, \
-    .update_time_ms = 0, \
     .frame_tick = 0, \
     .target_fps = 120, \
     .next_object_id = 1, \

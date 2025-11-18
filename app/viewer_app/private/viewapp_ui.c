@@ -8,8 +8,9 @@
 
 #include <std_file.h>
 
-void viewapp_boot_ui ( xg_device_h device ) {
+void viewapp_boot_ui ( void ) {
     viewapp_state_t* state = viewapp_state_get();
+    xg_device_h device = state->render.device;
     xg_i* xg = state->modules.xg;
     xi_i* xi = state->modules.xi;
 
@@ -334,7 +335,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
         xi->add_label ( xi_workload, &graph_select_label );
 
 #if xg_enable_raytracing_m
-        const char* graph_select_items[] = { "raster", "raytrace" };
+        const char* graph_select_items[] = { "raster", "restir_di", "raytrace" };
 #else
         const char* graph_select_items[] = { "raster" };
 #endif
@@ -813,7 +814,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                 || transform->orientation[2] != xform.rotation[2]
                 || transform->orientation[3] != xform.rotation[3]
                 )
-                && viewapp_is_raytrace_world_used() )
+                && viewapp_render_graph_is_raytrace ( state->render.active_render_graph ) )
             {
                 rtworld_needs_update = true;
             }

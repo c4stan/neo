@@ -10,6 +10,7 @@
 #include <std_log.h>
 #include <std_allocator.h>
 #include <std_sort.h>
+#include <std_time.h>
 
 static xf_graph_state_t* xf_graph_state;
 

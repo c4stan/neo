@@ -1076,6 +1076,29 @@ const char* xg_shader_binding_set_str ( xg_shader_binding_set_e set ) {
     }
 }
 
+const char* xg_resource_binding_str ( xg_resource_binding_e binding ) {
+    switch ( binding ) {
+    case xg_resource_binding_sampler_m:
+        return "sampler";
+    case xg_resource_binding_texture_to_sample_m:
+        return "sampled_texture";
+    case xg_resource_binding_texture_storage_m:
+        return "storage_texture";
+    case xg_resource_binding_buffer_uniform_m:
+        return "uniform_buffer";
+    case xg_resource_binding_buffer_storage_m:
+        return "storage_buffer";
+    case xg_resource_binding_buffer_texel_uniform_m:
+        return "uniform_texel_buffer";
+    case xg_resource_binding_buffer_texel_storage_m:
+        return "storage_texel_buffer";
+    case xg_resource_binding_raytrace_world_m:
+        return "raytrace_world";
+    default:
+        return "Unknown";
+    }
+}
+
 xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage ) {
     switch ( stage ) {
         case xg_shading_stage_vertex_m:

@@ -15,58 +15,6 @@
 
 static void viewapp_boot ( void ) {
     viewapp_state_t* state = viewapp_state_get();
-    uint32_t resolution_x = 1920;
-    uint32_t resolution_y = 1024;
-
-    state->render.resolution_x = resolution_x;
-    state->render.resolution_y = resolution_y;
-
-    wm_i* wm = state->modules.wm;
-    wm_window_h window;
-    {
-        wm_window_params_t window_params = {
-            .name = "viewer_app",
-            .x = 0,
-            .y = 0,
-            .width = resolution_x,
-            .height = resolution_y,
-            .gain_focus = true,
-            .borderless = false
-        };
-        std_log_info_m ( "Creating window "std_fmt_str_m, window_params.name );
-        window = wm->create_window ( &window_params );
-    }
-    state->render.window = window;
-    wm->get_window_info ( &state->render.window_info, window );
-    wm->get_window_input_state ( window, &state->render.input_state );
-
-    xg_device_h device;
-    xg_device_info_t device_info;
-    xg_i* xg = state->modules.xg;
-    {
-        size_t device_count = xg->get_devices_count();
-        std_assert_m ( device_count > 0 );
-        xg_device_h devices[16];
-        xg->get_devices ( devices, 16 );
-        device = devices[0];
-        bool activate_result = xg->activate_device ( device );
-        std_assert_m ( activate_result );
-        xg->get_device_info ( &device_info, device );
-        std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
-    }
-    xg_swapchain_h swapchain = xg->create_window_swapchain ( &xg_swapchain_window_params_m (
-        .window = window,
-        .device = device,
-        .texture_count = 3,
-        .format = xg_format_a2b10g10r10_unorm_pack32_m,
-        .allowed_usage = xg_texture_usage_bit_copy_dest_m,
-        .debug_name = "swapchain",
-    ) );
-    std_assert_m ( swapchain != xg_null_handle_m );
-
-    state->render.device = device;
-    state->render.swapchain = swapchain;
-    state->render.supports_raytrace = device_info.supports_raytrace;
 
     se_i* se = state->modules.se;
 
@@ -149,31 +97,13 @@ static void viewapp_boot ( void ) {
         }
     ) );
 
-    xs_i* xs = state->modules.xs;
-    xs_database_h sdb = xs->create_database ( &xs_database_params_m ( .device = device, .debug_name = "viewapp_sdb" ) );
-    state->render.sdb = sdb;
-    {
-        char path_buffer[128];
-        std_string_t path = std_static_string_m ( path_buffer );
-        std_path_append_dir ( &path, std_source_data_path_m );
-        std_path_append_dir ( &path, "shader" );
-        xs->add_data_folder ( sdb, path_buffer );
-    }
-    xs->set_output_folder ( sdb, "shader" );
-    xs_database_build_result_t build_result = xs->build_database ( sdb );
-    std_assert_m ( build_result.failed_pipeline_states == 0 );
-
-    viewapp_boot_ui ( device );
-
-    xf_i* xf = state->modules.xf;
-    xf->load_shaders ( device );
-
-    viewapp_boot_workload_resources_layout();
-
-    viewapp_load_scene ( state->scene.active_scene );
+    viewapp_boot_render();
+    viewapp_boot_ui();
 
     viewapp_load_render_graph ( state->render.active_render_graph, xg_null_handle_m );
     viewapp_load_mouse_pick_graph();
+
+    viewapp_load_scene ( state->scene.active_scene );
 }
 
 static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_state_t* new_input_state, float dt ) {
@@ -433,7 +363,6 @@ static std_app_state_e viewapp_update ( void ) {
     float target_fps = state->render.target_fps;
     float target_frame_period = target_fps > 0.f ? 1.f / target_fps * 1000.f : 0.f;
     std_tick_t frame_tick = state->render.frame_tick;
-    float time_ms = state->render.time_ms;
 
     std_tick_t new_tick = std_tick_now();
     float delta_ms = std_tick_to_milli_f32 ( new_tick - frame_tick );
@@ -444,12 +373,10 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_tick_m;
     }
 
-    time_ms += delta_ms;
-    state->render.time_ms = time_ms;
+    state->render.frame_tick = new_tick;
+    state->render.frame_id += 1;
+    state->render.time_ms += delta_ms;
     state->render.delta_time_ms = delta_ms;
-
-    frame_tick = new_tick;
-    state->render.frame_tick = frame_tick;
 
     wm->update_window ( window );
 
@@ -463,6 +390,9 @@ static std_app_state_e viewapp_update ( void ) {
 
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
         xs->build_databases();
+        if ( viewapp_render_graph_is_raytrace ( state->render.active_render_graph ) ) {
+            state->render.raytrace_world_update = true;
+        }
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
@@ -477,8 +407,6 @@ static std_app_state_e viewapp_update ( void ) {
         state->render.capture_frame = true;
     }
 
-    state->render.frame_id += 1;
-
     xg_workload_h workload = xg->create_workload ( state->render.device );
     if ( state->render.capture_frame ) {
         xg->debug_capture_workload ( workload );
@@ -491,7 +419,10 @@ static std_app_state_e viewapp_update ( void ) {
 
     if ( state->render.load_render_graph ) {
         viewapp_load_render_graph ( state->render.active_render_graph, workload );
-        state->render.load_render_graph = false;
+    }
+
+    if ( state->render.raytrace_world_update ) {
+        viewapp_build_raytrace_world();
     }
 
     wm_window_info_t new_window_info;
@@ -514,19 +445,6 @@ static std_app_state_e viewapp_update ( void ) {
 
     xs->update_pipeline_states ( workload );
 
-    if ( state->render.raytrace_world_update ) {
-        xg->wait_all_workload_complete();
-        xg_workload_h workload = xg->create_workload ( state->render.device );
-        viewapp_build_raytrace_world ( workload );
-        xg->submit_workload ( workload );
-        state->render.raytrace_world_update = false;
-    }
-
-    std_tick_t update_tick = std_tick_now();
-    float update_ms = std_tick_to_milli_f32 ( update_tick - new_tick );
-    state->render.update_time_ms = update_ms;
-    state->reload = false;
-
     return std_app_state_tick_m;
 }
 
@@ -534,6 +452,8 @@ std_app_state_e viewapp_tick ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     if ( state->render.frame_id == 0 ) {
         viewapp_boot();
+        state->render.frame_tick = std_tick_now();
+        state->render.frame_id = 1;
     }
 
     return viewapp_update();

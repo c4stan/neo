@@ -64,7 +64,7 @@ static void viewapp_build_raytrace_geo ( xg_workload_h workload ) {
     }
 }
 
-void viewapp_build_raytrace_world ( xg_workload_h workload ) {
+void viewapp_build_raytrace_world ( void ) {
 #if xg_enable_raytracing_m
     viewapp_state_t* state = viewapp_state_get();
     if ( !state->render.supports_raytrace ) {
@@ -75,6 +75,11 @@ void viewapp_build_raytrace_world ( xg_workload_h workload ) {
     xg_i* xg = state->modules.xg;
     xs_i* xs = state->modules.xs;
     se_i* se = state->modules.se;
+
+    // Must wait for any workload using the world to finish before destroying
+    // TODO cmd_destroy on resource cmd buffer?
+    xg->wait_all_workload_complete();
+    xg_workload_h workload = xg->create_workload ( device );
 
     if ( state->render.raytrace_world != xg_null_handle_m ) {
         xg->destroy_raytrace_world ( state->render.raytrace_world );
@@ -123,7 +128,8 @@ void viewapp_build_raytrace_world ( xg_workload_h workload ) {
     }
 
     // TODO
-    xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "restir_di_sample" ) );
+    //xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "restir_di_sample" ) );
+    xs_database_pipeline_h rt_pipeline = viewapp_get_render_graph_raytrace_pipeline ( state->render.active_render_graph );
     xg_raytrace_pipeline_state_h rt_pipeline_state = xs->get_pipeline_state ( rt_pipeline );
 
     xg_raytrace_world_h rt_world = xg->create_raytrace_world ( workload, 0, &xg_raytrace_world_params_m (
@@ -136,8 +142,11 @@ void viewapp_build_raytrace_world ( xg_workload_h workload ) {
 
     std_virtual_heap_free ( rt_instances );
 
+    xg->submit_workload ( workload );
+
     state->render.raytrace_world = rt_world;
 #endif
+    state->render.raytrace_world_update = false;
 }
 
 static sm_vec_3f_t viewapp_light_view_dir ( uint32_t idx ) {
@@ -1229,10 +1238,16 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     state->scene.active_scene = scene;
     viewapp_build_raytrace_geo ( workload );
     xg->submit_workload ( workload );
-    xg->wait_all_workload_complete();
-    workload = xg->create_workload ( state->render.device );
-    viewapp_build_raytrace_world ( workload );
-    xg->submit_workload ( workload );
+    xg->wait_all_workload_complete(); // TODO
+
+//    if ( viewapp_is_raytrace_world_used() ) 
+//    {
+//        xg->wait_all_workload_complete(); // TODO is this necessary
+//        workload = xg->create_workload ( state->render.device );
+//        viewapp_build_raytrace_world ( workload );
+//        xg->submit_workload ( workload );
+//    }
+
 }
 
 se_entity_h spawn_plane ( xg_workload_h workload ) {

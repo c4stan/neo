@@ -2,6 +2,9 @@
 
 #include <std_atomic.h>
 #include <std_sort.h>
+#if xg_debug_enable_measure_workload_wait_time_m
+#include <std_time.h>
+#endif
 
 #include <xg_enum.h>
 
@@ -528,7 +531,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                                 break;
 
                             default:
-                                std_not_implemented_m();
+                                std_log_error_m ( "Trying to bind buffer " std_fmt_str_m " to shader register " std_fmt_u32_m " (" std_fmt_str_m "). Binding type not supported for this resource type.", buffer->params.debug_name, binding_idx, xg_resource_binding_str ( binding_type ) );
                         }
                     }
 
@@ -565,7 +568,8 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                                 break;
 
                             default:
-                                std_not_implemented_m();
+                                const xg_vk_texture_t* texture = xg_vk_texture_get ( binding->texture );
+                                std_log_error_m ( "Trying to bind texture " std_fmt_str_m " to shader register " std_fmt_u32_m " (" std_fmt_str_m "). Binding type not supported for this resource type.", texture->params.debug_name, binding_idx, xg_resource_binding_str ( binding_type ) );
                         }
                     }
 
@@ -2396,7 +2400,7 @@ static void xg_vk_workload_wait ( xg_vk_workload_device_context_t* device_contex
             break;
         }
 
-        //uint64_t timeout = 0;
+        uint64_t wait_timeout = timeout;
         xg_workload_h workload_handle = workload_context->workload;
         const xg_vk_workload_t* workload = xg_vk_workload_get ( workload_handle );
 #if xg_debug_enable_measure_workload_wait_time_m
@@ -2410,19 +2414,17 @@ static void xg_vk_workload_wait ( xg_vk_workload_device_context_t* device_contex
                 " workloads queued up already, busy waiting on gpu workload " std_fmt_u64_m " to complete...", workload->id );
             wait_start_tick = std_tick_now();
 #endif
-            timeout = UINT64_MAX;
+            wait_timeout = UINT64_MAX;
         }
 
         const xg_vk_cpu_queue_event_t* fence = xg_vk_cpu_queue_event_get ( workload->execution_complete_cpu_event );
-        VkResult fence_status = vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, timeout );
+        VkResult fence_status = vkWaitForFences ( device->vk_handle, 1, &fence->vk_fence, VK_TRUE, wait_timeout );
 
 #if xg_debug_enable_measure_workload_wait_time_m
-
         if ( count == xg_workload_max_queued_workloads_m ) {
             float wait_time_ms = std_tick_to_milli_f32 ( std_tick_now() - wait_start_tick );
-            std_log_warn_m ( "Busy waited for " std_fmt_f32_dec_m ( 2 ) " on gpu workload " std_fmt_u64_m, wait_time_ms, workload->id );
+            std_log_warn_m ( "Busy waited for " std_fmt_f32_dec_m ( 2 ) "ms on gpu workload " std_fmt_u64_m, wait_time_ms, workload->id );
         }
-
 #endif
 
         if ( fence_status == VK_TIMEOUT ) {

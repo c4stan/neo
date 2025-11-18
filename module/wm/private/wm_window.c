@@ -63,6 +63,7 @@ static wm_window_state_t* wm_window_state;
 */
 
 #define wm_window_bitset_u64_count_m std_div_round_up_m ( wm_max_windows_m, 64 )
+#define wm_window_class_name_m "wm_window_class"
 
 void wm_window_load ( wm_window_state_t* state ) {
     wm_window_state = state;
@@ -80,6 +81,27 @@ void wm_window_load ( wm_window_state_t* state ) {
     void* map_keys = std_virtual_heap_alloc_array_m ( wm_window_h, wm_max_windows_m * 2 );
     void* map_values = std_virtual_heap_alloc_array_m ( uint64_t, wm_max_windows_m * 2 );
     wm_window_state->map = std_hash_map ( map_keys, map_values, wm_max_windows_m * 2 );
+
+    WNDCLASSEX wc = {0};
+    wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+    wc.lpfnWndProc = wm_window_os_callback;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = GetModuleHandle ( NULL );
+    wc.hIcon = LoadIcon ( NULL, IDI_WINLOGO );
+    wc.hIconSm = wc.hIcon;
+    wc.hCursor = LoadCursor ( NULL, IDC_ARROW );
+    wc.hbrBackground = ( HBRUSH ) BLACK_BRUSH;
+    wc.lpszMenuName = NULL;
+    wc.lpszClassName = wm_window_class_name_m;
+    wc.cbSize = sizeof ( WNDCLASSEXA );
+    // TODO convert class_name from u8 to wchar and call RegisterClassExW
+    if ( !RegisterClassExA ( &wc ) ) {
+        DWORD err = GetLastError();
+        if ( err != ERROR_CLASS_ALREADY_EXISTS ) {
+            std_log_os_error_m();
+        }
+    }
 #endif
 
 #if defined(std_platform_linux_m)
@@ -107,6 +129,10 @@ void wm_window_unload ( void ) {
         wm_window_h handle = idx;
         wm_window_destroy ( handle );
         ++idx;
+    }
+
+    if ( !UnregisterClassA ( wm_window_class_name_m, GetModuleHandle ( NULL ) ) ) {
+        std_log_os_error_m();
     }
 
     std_virtual_heap_free ( wm_window_state->windows_array );
@@ -1591,8 +1617,6 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
     bool is_focus;
 #if defined(std_platform_win32_m)
     {
-        // TODO convert class_name from u8 to wchar and call RegisterClassExW
-        const char* class_name = params->name;
         DWORD wstyle = params->borderless ? WS_POPUP : WS_OVERLAPPEDWINDOW;
         std_assert_m ( params->width <= LONG_MAX );
         std_assert_m ( params->height <= LONG_MAX );
@@ -1600,29 +1624,9 @@ wm_window_h wm_window_create ( const wm_window_params_t* params ) {
         AdjustWindowRect ( &rect, wstyle, false );
         int outer_width = rect.right - rect.left;
         int outer_height = rect.bottom - rect.top;
-        WNDCLASSEX wc = {0};
         HINSTANCE instance = GetModuleHandle ( NULL );
-        //instance = ( HINSTANCE ) params->os_module;
-        wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-        wc.lpfnWndProc = wm_window_os_callback;
-        wc.cbClsExtra = 0;
-        wc.cbWndExtra = 0;
-        wc.hInstance = instance;
-        wc.hIcon = LoadIcon ( NULL, IDI_WINLOGO );
-        wc.hIconSm = wc.hIcon;
-        wc.hCursor = LoadCursor ( NULL, IDC_ARROW );
-        wc.hbrBackground = ( HBRUSH ) BLACK_BRUSH;
-        wc.lpszMenuName = NULL;
-        wc.lpszClassName = class_name;
-        wc.cbSize = sizeof ( WNDCLASSEXA );
 
-        if ( !RegisterClassExA ( &wc ) ) {
-            std_log_os_error_m();
-            return wm_null_handle_m;
-        }
-
-        HWND hwnd = CreateWindow ( class_name, params->name, wstyle, params->x, params->y, outer_width, outer_height, NULL, NULL, instance, NULL );
-
+        HWND hwnd = CreateWindow ( wm_window_class_name_m, params->name, wstyle, params->x, params->y, outer_width, outer_height, NULL, NULL, instance, NULL );
         if ( hwnd == NULL ) {
             return wm_null_handle_m;
         }
@@ -1781,10 +1785,6 @@ bool wm_window_destroy ( wm_window_h handle ) {
 #if defined(std_platform_win32_m)
     if ( !window->info.is_console ) {
         if ( !DestroyWindow ( ( HWND ) window->info.os_handle.window ) ) {
-            std_log_os_error_m();
-        }
-        HINSTANCE instance = GetModuleHandle ( NULL );
-        if ( !UnregisterClassA ( window->params.name, instance ) ) {
             std_log_os_error_m();
         }
         uint64_t hash = std_hash_64_m ( ( uint64_t ) window->info.os_handle.window );

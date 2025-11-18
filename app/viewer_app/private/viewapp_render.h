@@ -1,10 +1,14 @@
 #pragma once
 
 #include <xg.h>
+#include <xs.h>
+
+void viewapp_boot_render ( void );
 
 typedef enum {
     viewapp_render_graph_raster_m,
     viewapp_render_graph_restir_di_m,
+    viewapp_render_graph_raytrace_m,
     viewapp_render_graph_count_m,
 } viewapp_render_graph_e;
 
@@ -16,4 +20,5 @@ void viewapp_load_mouse_pick_graph ( void );
 
 void viewapp_reload_graphs ( void );
 
-bool viewapp_is_raytrace_world_used ( void );
+bool viewapp_render_graph_is_raytrace ( viewapp_render_graph_e graph );
+xs_database_pipeline_h viewapp_get_render_graph_raytrace_pipeline ( viewapp_render_graph_e graph );

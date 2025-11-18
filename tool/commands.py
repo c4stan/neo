@@ -768,6 +768,7 @@ def split_run_args(args):
     return flags, params
 
 def execute(string):
+    string = string.strip()
     tokens = string.split(' ')
     cmd = tokens[0]
 
