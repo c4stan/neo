@@ -50,6 +50,8 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 #if xg_vk_enable_sync2_m
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_sync2_pipeline_barrier, "vkCmdPipelineBarrier2KHR" );
 #endif
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_pipeline_executables, "vkGetPipelineExecutablePropertiesKHR" );
+    xg_vk_device_ext_init_pfn_m ( &device->ext_api.get_pipeline_executable_statistics, "vkGetPipelineExecutableStatisticsKHR" );
 
 #if xg_enable_raytracing_m
 #if xg_vk_enable_nv_raytracing_ext_m
@@ -867,6 +869,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         //"VK_KHR_shader_non_semantic_info",
         // vkGetQueueCheckpointDataNV
         "VK_NV_device_diagnostic_checkpoints",
+        VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
     };
     size_t required_extensions_count = std_static_array_count_m ( required_extensions );
 
@@ -932,50 +935,60 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
         .geometryShader = VK_TRUE,
         .shaderInt64 = VK_TRUE,
     };
+    void* last_feature = NULL;
 
     // Enable sync2 API
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_KHR_synchronization2.html
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_feature = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
-        .pNext = NULL,
+        .pNext = last_feature,
         .synchronization2 = VK_TRUE,
     };
+    last_feature = &sync2_feature;
 
     // Enable imageless framebuffers
     // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_KHR_imageless_framebuffer.html
     VkPhysicalDeviceImagelessFramebufferFeatures imageless_framebuffer_feature = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES,
-        .pNext = &sync2_feature,
+        .pNext = last_feature,
         .imagelessFramebuffer = VK_TRUE,
     };
+    last_feature = &imageless_framebuffer_feature;
+
+    // Enable Pipeline executable info
+    // https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_pipeline_executable_properties.html
+    VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR pipeline_executable_info_feature = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR,
+        .pNext = last_feature,
+        .pipelineExecutableInfo = VK_TRUE,
+    };
+    last_feature = &pipeline_executable_info_feature;
 
 #if xg_enable_raytracing_m
     // Enable buffer device address
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_feature = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-        .pNext = &imageless_framebuffer_feature,
+        .pNext = last_feature,
         .bufferDeviceAddress = VK_TRUE,
     };
+    last_feature = &buffer_device_address_feature;
 
     // Enable acceleration strucutre
     // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_strucutre_feature = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-        .pNext = &buffer_device_address_feature,
+        .pNext = last_feature,
         .accelerationStructure = VK_TRUE,
         //.accelerationStructureHostCommands = VK_TRUE,
     };
+    last_feature = &acceleration_strucutre_feature;
 #endif
 
     // Create Device
     VkDeviceCreateInfo device_create_info;
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-#if xg_enable_raytracing_m
-    device_create_info.pNext = &acceleration_strucutre_feature;
-#else
-    device_create_info.pNext = &imageless_framebuffer_feature;
-#endif
+    device_create_info.pNext = last_feature;
     device_create_info.flags = 0;
     device_create_info.queueCreateInfoCount = device->queue_create_info_count;
     device_create_info.pQueueCreateInfos = queue_create_info;

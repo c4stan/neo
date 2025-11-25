@@ -207,6 +207,8 @@ void xs_database_set_build_params ( xs_database_h db_handle, const xs_database_b
     for ( uint32_t i = 0; i < params->global_definition_count; ++i ) {
         db->global_definitions[i] = params->global_definitions[i];
     }
+    db->pipeline_flags = params->pipeline_flags;
+    db->build_flags = params->build_flags;
 
     db->dirty_build_params = true;
 }
@@ -262,6 +264,20 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
 
     if ( dirty_headers ) {
         db->pipeline_state_headers_last_build_timestamp = std_timestamp_now_utc();
+    }
+
+    char output_path_buffer[std_path_size_m];
+    std_string_t output_path = std_static_string_m ( output_path_buffer );
+    std_string_append ( &output_path, db->output_path );
+    std_directory_create ( output_path.str );
+
+    std_file_h stats_file = std_file_null_handle_m;
+    if ( db->build_flags & xs_database_build_flag_bit_output_statistics_m ) {
+        char stats_path_buffer[std_path_size_m];
+        std_string_t stats_path = std_static_string_m ( stats_path_buffer );
+        std_string_copy ( &stats_path, output_path.str );
+        std_path_append_file ( &stats_path, "stats.txt" );
+        stats_file = std_file_create ( stats_path.str, std_file_write_m, std_path_already_existing_overwrite_m );
     }
 
     // check pipeline states
@@ -349,17 +365,6 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
         std_string_append ( &input_path, pipeline_state->path );
         std_path_pop ( &input_path );
 
-        char output_path_buffer[std_path_size_m];
-        std_string_t output_path = std_static_string_m ( output_path_buffer );
-
-        if ( db->output_path[0] ) {
-            std_string_append ( &output_path, db->output_path );
-        } else {
-            std_string_append ( &output_path, input_path.str );
-        }
-
-        std_directory_create ( output_path.str );
-
         shader_bytecode_t shader_bytecode[xs_shader_parser_max_shader_references_m];
         char shader_path_buffer[std_path_size_m];
         char binary_path_buffer[std_path_size_m];
@@ -415,11 +420,26 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
             continue;
         }
 
+        // Build
         {
             xs_parser_graphics_pipeline_state_t* graphics_state = &parsed_pipeline_state.graphics;
             xs_parser_compute_pipeline_state_t* compute_state = &parsed_pipeline_state.compute;
             xs_parser_raytrace_pipeline_state_t* raytrace_state = &parsed_pipeline_state.raytrace;
 
+            // apply flags
+            switch ( pipeline_state->type ) {
+                case xg_pipeline_graphics_m:
+                    graphics_state->params.flags = db->pipeline_flags;
+                    break;
+                case xg_pipeline_compute_m:
+                    compute_state->params.flags = db->pipeline_flags;
+                    break;
+                case xg_pipeline_raytrace_m:
+                    raytrace_state->params.flags = db->pipeline_flags;
+                    break;
+            }
+
+            // compile shaders
             size_t shader_success = 0;
             size_t shader_fail = 0;
             size_t shader_skip = 0;
@@ -624,6 +644,43 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
                     break;
             }
 
+            if ( db->build_flags & xs_database_build_flag_bit_output_statistics_m ) {
+                std_assert_m ( db->pipeline_flags & xg_pipeline_flag_bit_capture_statistics_m ); // TODO auto-enable?
+                char buffer[2048]; // TODO
+                std_stack_t stack = std_static_stack_m ( buffer );
+                xg_pipeline_info_t pipe_info;
+                xg->get_pipeline_info ( &pipe_info, pipeline_handle, &stack );
+
+                //void* begin = stack.top;
+                std_string_t string = std_stack_alloc_string ( &stack, std_stack_unused_size ( &stack ) );
+                std_string_append_format ( &string, std_fmt_str_m "\n", pipeline_state->name );
+                for ( uint32_t exec_it = 0; exec_it < pipe_info.executables_count; ++exec_it ) {
+                    xg_pipeline_executable_info_t* exec = &pipe_info.executables_array[exec_it];
+
+                    std_string_append_format ( &string, std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m "\n", exec->name, exec->desc );
+
+                    for ( uint32_t stat_it = 0; stat_it < exec->statistics_count; ++stat_it ) {
+                        xg_pipeline_statistic_t* stat = &exec->statistics_array[stat_it];
+                        switch ( stat->type ) {
+                        case xg_pipeline_statistic_type_b32_m:
+                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_u32_m "\n", stat->name, stat->desc, stat->value.b32 );
+                            break;
+                        case xg_pipeline_statistic_type_u64_m:
+                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_u64_m "\n", stat->name, stat->desc, stat->value.u64 );
+                            break;
+                        case xg_pipeline_statistic_type_i64_m:
+                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_i64_m "\n", stat->name, stat->desc, stat->value.i64 );
+                            break;
+                        case xg_pipeline_statistic_type_f64_m:
+                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_f64_m "\n", stat->name, stat->desc, stat->value.f64 );
+                            break;
+                        }
+                    }
+                }
+
+                std_file_write ( stats_file, string.str, string.len );
+            }
+
             if ( pipeline_handle == xg_null_handle_m ) {
                 std_log_warn_m ( "Pipeline state " std_fmt_str_m " creation failed", pipeline_state->name );
             }
@@ -642,6 +699,10 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
             result.successful_shaders += shader_success;
             result.skipped_shaders += shader_skip;
         }
+    }
+
+    if ( std_file_handle_is_null_m ( stats_file ) ) {
+        std_file_close ( stats_file );
     }
 
     std_log_info_m ( "Shader database build " std_fmt_str_m std_fmt_newline_m 

@@ -648,6 +648,12 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         VkPipeline pipeline;
         uint32_t group_count = 0;
         {
+            VkPipelineCreateFlagBits flags = 0;
+
+            if ( params->flags & xg_pipeline_flag_bit_capture_statistics_m ) {
+                flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+            }
+
 #if xg_vk_enable_nv_raytracing_ext_m
             // TODO have a separate define for max_groups
             VkRayTracingShaderGroupCreateInfoNV groups[xg_raytrace_shader_state_max_shaders_m] = {};
@@ -691,7 +697,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
             VkRayTracingPipelineCreateInfoNV info = {
                 .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV,
                 .pNext = NULL,
-                .flags = 0,
+                .flags = flags,
                 .stageCount = params->state.shader_state.shader_count,
                 .pStages = shader_info,
                 .groupCount = group_count,
@@ -707,7 +713,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
             VkRayTracingPipelineCreateInfoKHR info = {
                 .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
                 .pNext = NULL,
-                .flags = 0,
+                .flags = flags,
                 .stageCount = shader_count,
                 .pStages = shader_info,
                 .groupCount = 0,
@@ -852,6 +858,7 @@ xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
         xg_vk_pipeline->common.type = xg_pipeline_raytrace_m;
+        xg_vk_pipeline->common.flags = params->flags;
 
         std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->raytrace_pipelines_map, pipeline_hash, xg_vk_pipeline_handle ) );
     }
@@ -967,10 +974,16 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         // Pipeline
         VkPipeline pipeline;
         {
+            VkPipelineCreateFlagBits flags = 0;
+
+            if ( params->flags & xg_pipeline_flag_bit_capture_statistics_m ) {
+                flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+            }
+
             VkComputePipelineCreateInfo info = {
                 .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
                 .pNext = NULL,
-                .flags = 0,
+                .flags = flags,
                 .stage = shader_info,
                 .layout = vk_pipeline_layout,
                 .basePipelineHandle = VK_NULL_HANDLE,
@@ -1019,6 +1032,7 @@ xg_compute_pipeline_state_h xg_vk_compute_pipeline_create ( xg_device_h device_h
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
         xg_vk_pipeline->common.type = xg_pipeline_compute_m;
+        xg_vk_pipeline->common.flags = params->flags;
 
         std_verify_m ( std_hash_map_insert ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline_hash, xg_vk_pipeline_handle ) );
     }
@@ -1548,36 +1562,44 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         // Pipeline
         VkPipeline pipeline;
         {
-            VkGraphicsPipelineCreateInfo info;
-            info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-            info.pNext = NULL;
-            info.flags = 0;
-            info.stageCount = ( uint32_t ) shader_count;
-            info.pStages = shader_info;
-            info.pVertexInputState = &vertex_layout;
-            info.pInputAssemblyState = &input_assembly;
-            info.pTessellationState = NULL;
-            info.pViewportState = &viewport;
-            info.pRasterizationState = &rasterizer;
-            info.pMultisampleState = &msaa;
-            info.pDepthStencilState = &ds;
-            info.pColorBlendState = &bs;
-            info.pDynamicState = &dynamic_state;
-            info.layout = vk_pipeline_layout;
-            info.renderPass = vk_renderpass;
-            info.subpass = 0;
-            info.basePipelineHandle = VK_NULL_HANDLE;
-            info.basePipelineIndex = 0;
+            VkPipelineCreateFlagBits flags = 0;
+
+            if ( params->flags & xg_pipeline_flag_bit_capture_statistics_m ) {
+                flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+            }
+
+            VkGraphicsPipelineCreateInfo info = {
+                .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                .pNext = NULL,
+                .flags = flags,
+                .stageCount = ( uint32_t ) shader_count,
+                .pStages = shader_info,
+                .pVertexInputState = &vertex_layout,
+                .pInputAssemblyState = &input_assembly,
+                .pTessellationState = NULL,
+                .pViewportState = &viewport,
+                .pRasterizationState = &rasterizer,
+                .pMultisampleState = &msaa,
+                .pDepthStencilState = &ds,
+                .pColorBlendState = &bs,
+                .pDynamicState = &dynamic_state,
+                .layout = vk_pipeline_layout,
+                .renderPass = vk_renderpass,
+                .subpass = 0,
+                .basePipelineHandle = VK_NULL_HANDLE,
+                .basePipelineIndex = 0,
+            };
             VkResult result = vkCreateGraphicsPipelines ( device->vk_handle, VK_NULL_HANDLE, 1, &info, xg_vk_cpu_allocator(), &pipeline );
             std_verify_m ( result == VK_SUCCESS );
 
             if ( params->debug_name[0] ) {
-                VkDebugUtilsObjectNameInfoEXT debug_name_info;
-                debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-                debug_name_info.pNext = NULL;
-                debug_name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
-                debug_name_info.objectHandle = ( uint64_t ) pipeline;
-                debug_name_info.pObjectName = params->debug_name;
+                VkDebugUtilsObjectNameInfoEXT debug_name_info = {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                    .pNext = NULL,
+                    .objectType = VK_OBJECT_TYPE_PIPELINE,
+                    .objectHandle = ( uint64_t ) pipeline,
+                    .pObjectName = params->debug_name,
+                };
                 xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
             }
         }
@@ -1614,6 +1636,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
         xg_vk_pipeline->common.device_handle = device_handle;
         xg_vk_pipeline->common.reference_count = 1;
         xg_vk_pipeline->common.type = xg_pipeline_graphics_m;
+        xg_vk_pipeline->common.flags = params->flags;
 
         std_hash_map_insert ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline_hash, xg_vk_pipeline_handle );
     } else {
@@ -1931,8 +1954,84 @@ const xg_vk_resource_bindings_t* xg_vk_pipeline_resource_group_get ( xg_device_h
     return group;
 }
 
-void xg_vk_pipeline_get_info ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline_handle ) {
+void xg_vk_pipeline_get_info ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline_handle, std_stack_t* stack ) {
     xg_vk_pipeline_common_t* common_pipeline = xg_vk_common_pipeline_get ( pipeline_handle );
     info->type = common_pipeline->type;
     info->debug_name = common_pipeline->debug_name;
+
+    // extract pipe statistics
+    if ( ( common_pipeline->flags & xg_pipeline_flag_bit_capture_statistics_m ) == 0 ) {
+        info->executables_count = 0;
+        info->executables_array = NULL;
+        return;
+    }
+
+    const xg_vk_device_t* device = xg_vk_device_get ( common_pipeline->device_handle );
+    VkPipelineInfoKHR vk_pipeline_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR,
+        .pipeline = common_pipeline->vk_handle
+    };
+
+    uint32_t exec_count = 0;
+    device->ext_api.get_pipeline_executables ( device->vk_handle, &vk_pipeline_info, &exec_count, NULL );
+
+    VkPipelineExecutablePropertiesKHR exec_array[8] = {};
+    std_assert_m ( exec_count <= std_static_array_count_m ( exec_array ) );
+    for ( uint32_t i = 0; i < std_static_array_count_m ( exec_array ); ++i ) {
+        exec_array[i].sType = VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR;
+    }
+    device->ext_api.get_pipeline_executables ( device->vk_handle, &vk_pipeline_info, &exec_count, exec_array );
+
+    info->executables_count = exec_count;
+    info->executables_array = std_stack_alloc_array_m ( stack, xg_pipeline_executable_info_t, exec_count );
+
+    for ( uint32_t exec_it = 0; exec_it < exec_count; ++exec_it ) {
+        xg_pipeline_executable_info_t* exec_info = &info->executables_array[exec_it];
+        exec_info->stages = xg_shading_stage_from_vk ( exec_array[exec_it].stages );
+        exec_info->name = std_stack_string_copy ( stack, exec_array[exec_it].name );
+        exec_info->desc = std_stack_string_copy ( stack, exec_array[exec_it].description );
+
+        VkPipelineExecutableInfoKHR vk_exec_info = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INFO_KHR,
+            .pipeline = common_pipeline->vk_handle,
+            .executableIndex = exec_it
+        };
+
+        uint32_t stat_count = 0;
+        device->ext_api.get_pipeline_executable_statistics ( device->vk_handle, &vk_exec_info, &stat_count, NULL );
+
+        VkPipelineExecutableStatisticKHR stat_array[64] = {};
+        std_assert_m ( stat_count <= std_static_array_count_m ( stat_array ) );
+        for ( uint32_t i = 0; i < std_static_array_count_m ( stat_array ); ++i ) {
+            stat_array[i].sType = VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR;
+        }
+        device->ext_api.get_pipeline_executable_statistics ( device->vk_handle, &vk_exec_info, &stat_count, stat_array );
+
+        exec_info->statistics_count = stat_count;
+        exec_info->statistics_array = std_stack_alloc_array_m ( stack, xg_pipeline_statistic_t, stat_count );
+
+        for ( uint32_t stat_it = 0; stat_it < stat_count; ++stat_it ) {
+            exec_info->statistics_array[stat_it].name = std_stack_string_copy ( stack, stat_array[stat_it].name );
+            exec_info->statistics_array[stat_it].desc = std_stack_string_copy ( stack, stat_array[stat_it].description );
+            switch ( stat_array[stat_it].format ) {
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_BOOL32_KHR:
+                exec_info->statistics_array[stat_it].type = xg_pipeline_statistic_type_b32_m;
+                exec_info->statistics_array[stat_it].value.b32 = stat_array[stat_it].value.b32;
+                break;
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_INT64_KHR:
+                exec_info->statistics_array[stat_it].type = xg_pipeline_statistic_type_i64_m;
+                exec_info->statistics_array[stat_it].value.i64 = stat_array[stat_it].value.i64;
+                break;
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_UINT64_KHR:
+                exec_info->statistics_array[stat_it].type = xg_pipeline_statistic_type_u64_m;
+                exec_info->statistics_array[stat_it].value.u64 = stat_array[stat_it].value.u64;
+                break;
+            case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_FLOAT64_KHR:
+                exec_info->statistics_array[stat_it].type = xg_pipeline_statistic_type_f64_m;
+                exec_info->statistics_array[stat_it].value.f64 = stat_array[stat_it].value.f64;
+                break;
+            default:
+            }
+        }
+    }
 }

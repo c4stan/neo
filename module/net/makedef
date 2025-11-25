@@ -1,7 +1,6 @@
 name = net
 code = public, private
 defs = public.def
-configs = debug, release
 output = dll
 deps = std
 if win32

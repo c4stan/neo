@@ -205,6 +205,20 @@ typedef struct {
         VkCommandBuffer                             commandBuffer,
         const void*                                 pCheckpointMarker);
 
+    // vkGetPipelineExecutablePropertiesKHR
+    VkResult ( *get_pipeline_executables ) (
+        VkDevice                                    device,
+        const VkPipelineInfoKHR*                    pPipelineInfo,
+        uint32_t*                                   pExecutableCount,
+        VkPipelineExecutablePropertiesKHR*          pProperties );
+
+    // vkGetPipelineExecutableStatisticsKHR
+    VkResult ( *get_pipeline_executable_statistics ) (
+        VkDevice                                    device,
+        const VkPipelineExecutableInfoKHR*          pExecutableInfo,
+        uint32_t*                                   pStatisticCount,
+        VkPipelineExecutableStatisticKHR*           pStatistics );
+
 } xg_vk_device_ext_api_i;
 
 typedef struct {

@@ -338,7 +338,6 @@ def parse_makedef_bindings(path):
 # manifest example:
 #   name = fs
 #   output = dll
-#   configs = debug, release
 #   defs = public.def
 #   deps = std
 #   code = public, private

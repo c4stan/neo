@@ -152,6 +152,11 @@ typedef struct {
     char name[xs_shader_definition_name_max_len_m];
 } xs_shader_definition_t;
 
+typedef enum {
+    xs_database_build_flag_bit_none_m = 0,
+    xs_database_build_flag_bit_output_statistics_m = 1 << 0,
+} xs_database_build_flag_bit_e;
+
 // TODO use dynamic pipeline state for viewport size
 // https://stackoverflow.com/questions/57950008/must-a-vulkan-pipeline-be-recreate-when-changing-the-size-of-the-window
 typedef struct {
@@ -163,6 +168,8 @@ typedef struct {
     xg_raytrace_pipeline_state_t* base_raytrace_state;
     xs_shader_definition_t global_definitions[xs_database_build_max_global_definitions_m];
     uint32_t global_definition_count;
+    xg_pipeline_flag_bit_e pipeline_flags;
+    xs_database_build_flag_bit_e build_flags;
 } xs_database_build_params_t;
 
 #define xs_database_build_params_m( ... ) ( xs_database_build_params_t ) { \
@@ -171,7 +178,9 @@ typedef struct {
     .base_raytrace_state = NULL, \
     .global_definitions = { 0 }, \
     .global_definition_count = 0, \
-    ##__VA_ARGS__ \
+    .pipeline_flags = xg_pipeline_flag_bit_none_m, \
+    .build_flags = xs_database_build_flag_bit_none_m, \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -200,7 +209,7 @@ typedef struct {
 #define xs_database_params_m(...) ( xs_database_params_t ) { \
     .device = xg_null_handle_m, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {

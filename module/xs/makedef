@@ -1,7 +1,6 @@
 name = xs
 code = public, private
 defs = public.def
-configs = debug, release
 output = dll
 deps = std, xg
 bindings = shader_compiler

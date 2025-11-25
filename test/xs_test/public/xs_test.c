@@ -435,6 +435,8 @@ static void xs_test ( void ) {
             .viewport_state.width = 600,
             .viewport_state.height = 400,
         ),
+        .pipeline_flags = xg_pipeline_flag_bit_capture_statistics_m,
+        .build_flags = xs_database_build_flag_bit_output_statistics_m,
     ) );
     xs->build_database ( sdb );
 

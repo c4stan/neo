@@ -1,6 +1,5 @@
 name = xg
 output = dll
-configs = debug, release
 defs = public.def
 code = public, private, private/vulkan
 deps = std, wm

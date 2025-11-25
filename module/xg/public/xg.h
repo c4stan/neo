@@ -1025,6 +1025,11 @@ typedef struct {
 }
 
 typedef enum {
+    xg_pipeline_flag_bit_none_m = 0,
+    xg_pipeline_flag_bit_capture_statistics_m = 1 << 0,
+} xg_pipeline_flag_bit_e;
+
+typedef enum {
     xg_graphics_pipeline_dynamic_state_viewport_m,
     xg_graphics_pipeline_dynamic_state_scissor_m,
     xg_graphics_pipeline_dynamic_state_count_m,
@@ -1036,8 +1041,6 @@ typedef enum {
     xg_graphics_pipeline_dynamic_state_bit_scissor_m  = 1 << xg_graphics_pipeline_dynamic_state_scissor_m,
 } xg_graphics_pipeline_dynamic_state_bit_e;
 
-// -- Graphics Pipeline State --
-// depends on both bindings and attachments
 // TODO rename to raster_pipeline?
 typedef struct {
     xg_pipeline_state_shader_t vertex_shader;
@@ -1064,11 +1067,13 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+// TODO group <resource_layouts, constat_layout, flags, debug_name> into a struct and use that in all 3 pipe params? 
 typedef struct {
     xg_graphics_pipeline_state_t    state;
     xg_render_textures_layout_t     render_textures_layout;
     xg_resource_bindings_layout_h   resource_layouts[xg_shader_binding_set_count_m];
     xg_constant_bindings_layout_t   constant_layout;
+    xg_pipeline_flag_bit_e          flags;
     char                            debug_name[xg_debug_name_size_m];
 } xg_graphics_pipeline_params_t;
 
@@ -1077,6 +1082,7 @@ typedef struct {
     .render_textures_layout = xg_render_textures_layout_m(), \
     .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
     .constant_layout = xg_constant_bindings_layout_m(), \
+    .flags = xg_pipeline_flag_bit_none_m, \
     .debug_name = { 0 }, \
     __VA_ARGS__ \
 }
@@ -1093,6 +1099,7 @@ typedef struct {
     xg_compute_pipeline_state_t     state;
     xg_resource_bindings_layout_h   resource_layouts[xg_shader_binding_set_count_m];
     xg_constant_bindings_layout_t   constant_layout;
+    xg_pipeline_flag_bit_e          flags;
     char                            debug_name[xg_debug_name_size_m];
 } xg_compute_pipeline_params_t;
 
@@ -1190,6 +1197,7 @@ typedef struct {
     xg_raytrace_pipeline_state_t    state;
     xg_resource_bindings_layout_h   resource_layouts[xg_shader_binding_set_count_m];
     xg_constant_bindings_layout_t   constant_layout;
+    xg_pipeline_flag_bit_e          flags;
     char                            debug_name[xg_debug_name_size_m];
 } xg_raytrace_pipeline_params_t;
 
@@ -1207,9 +1215,39 @@ typedef enum {
     xg_pipeline_raytrace_m,
 } xg_pipeline_e;
 
+// VK_KHR_pipeline_executable_properties
+typedef enum {
+    xg_pipeline_statistic_type_b32_m,
+    xg_pipeline_statistic_type_u64_m,
+    xg_pipeline_statistic_type_i64_m,
+    xg_pipeline_statistic_type_f64_m,
+} xg_pipeline_statistic_type_e;
+
+typedef struct {
+    char* name;
+    char* desc;
+    xg_pipeline_statistic_type_e type;
+    union {
+        bool b32;
+        uint64_t u64;
+        int64_t i64;
+        double f64;
+    } value;
+} xg_pipeline_statistic_t;
+
+typedef struct {
+    xg_shading_stage_bit_e stages;
+    char* name;
+    char* desc;
+    uint32_t statistics_count;
+    xg_pipeline_statistic_t* statistics_array;
+} xg_pipeline_executable_info_t;
+
 typedef struct {
     xg_pipeline_e type;
     const char* debug_name;
+    uint32_t executables_count;
+    xg_pipeline_executable_info_t* executables_array;
 } xg_pipeline_info_t;
 
 // -- Resource Management --
@@ -2599,7 +2637,7 @@ typedef struct {
     void                    ( *destroy_compute_pipeline )           ( xg_compute_pipeline_state_h pipeline );
     void                    ( *destroy_raytrace_pipeline )          ( xg_raytrace_pipeline_state_h pipeline );
 
-    void                    ( *get_pipeline_info )                  ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline );
+    void                    ( *get_pipeline_info )                  ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline, std_stack_t* allocator );
 
     void                    ( *get_allocator_info )                 ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
 

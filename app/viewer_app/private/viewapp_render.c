@@ -80,6 +80,10 @@ void viewapp_boot_render ( void ) {
         xs->add_data_folder ( sdb, path_buffer );
     }
     xs->set_output_folder ( sdb, "shader" );
+    xs->set_build_params ( sdb, &xs_database_build_params_m (
+        .pipeline_flags = xg_pipeline_flag_bit_capture_statistics_m,
+        .build_flags = xs_database_build_flag_bit_output_statistics_m,
+    ) );
     xs_database_build_result_t build_result = xs->build_database ( sdb );
     std_assert_m ( build_result.failed_pipeline_states == 0 );
 
@@ -1121,8 +1125,6 @@ static void viewapp_boot_raster_graph ( void ) {
     add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
 
     // lighting
-    uint32_t light_grid_size[3] = { 16, 8, 24 };
-    uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
     xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
@@ -1130,25 +1132,35 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "lighting_texture",
     ) );
 
-    // TODO rename these buffers more appropriately both here and in shader code
+    // see lighting_common.glsl for data types
+
+    // the frustum is split in 16 x 8 x 24 partitions (clusters)
+    // cluster buffer contains one enclosing view-space aabb per cluster each defined as <min,max> (light_cluster_t)
+    // filled by light_cluster_build
+    uint32_t light_grid_size[3] = { 16, 8, 24 };
+    uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
+    xf_buffer_h light_cluster_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = sizeof ( float ) * 4 * 2 * light_cluster_count,
+        .debug_name = "light_clusters"
+    ) );
+
+    // light buffer contains the lights and their data (light_t)
+    // filled by the light update pass
     xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = light_data_size(),
         .debug_name = "light_data",
     ) );
 
+    // light list buffer contains lists of relevant lights (u32 indices to light data), one per cluster but stored out of order
+    // light grid buffer contains for each cluster an <offset,count> pair (light_grid_t) that identifies the cluster's list of lights inside the light list buffer
+    // both are filled by light_cull
     xf_buffer_h light_list_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = sizeof ( uint32_t ) * light_cluster_count * viewapp_max_lights_m,
         .debug_name = "light_list",
     ) );
-
     xf_buffer_h light_grid_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = sizeof ( uint32_t ) * 2 * light_cluster_count,
         .debug_name = "light_grid"
-    ) );
-
-    xf_buffer_h light_cluster_buffer = xf->create_buffer ( &xf_buffer_params_m (
-        .size = sizeof ( float ) * 4 * 2 * light_cluster_count,
-        .debug_name = "light_clusters"
     ) );
 
     xf_node_h light_update_node = add_light_update_pass ( graph, light_buffer );

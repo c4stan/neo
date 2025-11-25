@@ -40,6 +40,8 @@ typedef struct {
     xg_raytrace_pipeline_state_t base_raytrace_state;
     xs_shader_definition_t global_definitions[xs_database_build_max_global_definitions_m];
     uint32_t global_definition_count;
+    xg_pipeline_flag_bit_e pipeline_flags;
+    xs_database_build_flag_bit_e build_flags;
 
     const char* folders[xs_database_max_folders_m];
     size_t folders_count;

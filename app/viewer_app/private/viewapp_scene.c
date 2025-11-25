@@ -71,6 +71,11 @@ void viewapp_build_raytrace_world ( void ) {
         return;
     }
 
+    xs_database_pipeline_h rt_pipeline = viewapp_get_render_graph_raytrace_pipeline ( state->render.active_render_graph );
+    if ( rt_pipeline == xs_null_handle_m ) {
+        return;
+    }
+
     xg_device_h device = state->render.device;
     xg_i* xg = state->modules.xg;
     xs_i* xs = state->modules.xs;
@@ -129,7 +134,6 @@ void viewapp_build_raytrace_world ( void ) {
 
     // TODO
     //xs_database_pipeline_h rt_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "restir_di_sample" ) );
-    xs_database_pipeline_h rt_pipeline = viewapp_get_render_graph_raytrace_pipeline ( state->render.active_render_graph );
     xg_raytrace_pipeline_state_h rt_pipeline_state = xs->get_pipeline_state ( rt_pipeline );
 
     xg_raytrace_world_h rt_world = xg->create_raytrace_world ( workload, 0, &xg_raytrace_world_params_m (

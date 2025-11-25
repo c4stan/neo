@@ -1370,7 +1370,7 @@ bool std_file_write ( std_file_h file, const void* source, size_t size ) {
         BOOL write_retcode = WriteFile ( ( HANDLE ) file.u64, p, remaining_size, &write_size, NULL );
 
         if ( write_retcode == FALSE ) {
-            std_log_warn_m ( "File write failed with code " std_fmt_u32_m, write_retcode );
+            std_log_os_error_m();
             return false;
         }
 

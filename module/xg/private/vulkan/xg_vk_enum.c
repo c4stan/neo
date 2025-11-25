@@ -720,6 +720,36 @@ xg_pipeline_stage_bit_e xg_pipeline_stage_from_vk ( VkPipelineStageFlags flags )
     return flags;
 }
 
+xg_shading_stage_bit_e xg_shading_stage_from_vk ( VkShaderStageFlags flags ) {
+    xg_shading_stage_bit_e stages = 0;
+
+    if ( flags & VK_SHADER_STAGE_VERTEX_BIT ) {
+        stages |= xg_shading_stage_bit_vertex_m;
+    }
+
+    if ( flags & VK_SHADER_STAGE_FRAGMENT_BIT ) {
+        stages |= xg_shading_stage_bit_fragment_m;
+    }
+
+    if ( flags & VK_SHADER_STAGE_COMPUTE_BIT ) {
+        stages |= xg_shading_stage_bit_compute_m;
+    }
+
+    if ( flags & VK_SHADER_STAGE_RAYGEN_BIT_KHR ) {
+        stages |= xg_shading_stage_bit_ray_gen_m;
+    }
+
+    if ( flags & VK_SHADER_STAGE_MISS_BIT_KHR ) {
+        stages |= xg_shading_stage_bit_ray_miss_m;
+    }
+
+    if ( flags & VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR ) {
+        stages |= xg_shading_stage_bit_ray_hit_closest_m;
+    }
+
+    return stages;
+}
+
 const char* xg_vk_image_aspect_str ( VkImageAspectFlags aspect ) {
     if ( aspect == VK_IMAGE_ASPECT_COLOR_BIT ) {
         return "color";

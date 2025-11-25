@@ -38,6 +38,7 @@ typedef struct {
     uint32_t reference_count;
 
     xg_pipeline_e type;
+    xg_pipeline_flag_bit_e flags;
     char debug_name[xg_debug_name_size_m];
 } xg_vk_pipeline_common_t;
 
@@ -162,4 +163,4 @@ void xg_vk_pipeline_update_resource_bindings ( xg_device_h device, xg_resource_b
 void xg_vk_pipeline_destroy_resource_bindings ( xg_device_h device, xg_resource_bindings_h group );
 const xg_vk_resource_bindings_t* xg_vk_pipeline_resource_group_get ( xg_device_h device, xg_resource_bindings_h group );
 
-void xg_vk_pipeline_get_info ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline_handle );
+void xg_vk_pipeline_get_info ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline_handle, std_stack_t* allocator );

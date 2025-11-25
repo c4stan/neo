@@ -4,6 +4,7 @@
 #include "lighting_common.glsl"
 
 #extension GL_EXT_debug_printf : enable
+#extension GL_KHR_shader_subgroup_ballot : enable
 
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform uniform_buffer_t {
     uvec3 grid_size;
@@ -105,6 +106,9 @@ float light_falloff ( float distance, float radius ) {
     return y / ( distance * distance + 1 );
 }
 
+// TODO
+#define scalar_light_loop_m 1
+
 void main ( void ) {
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
 
@@ -136,94 +140,106 @@ void main ( void ) {
         + ( - ( uniform_buffer.grid_size.z * log ( frame_uniforms.z_near ) ) / log ( frame_uniforms.z_far / frame_uniforms.z_near ) )
         , 0 ) );
     cluster_3d_idx.xy = uvec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 * uniform_buffer.grid_size.xy );
-
     uint cluster_idx = cluster_3d_idx.x + uniform_buffer.grid_size.x * cluster_3d_idx.y + ( uniform_buffer.grid_size.x * uniform_buffer.grid_size.y ) * cluster_3d_idx.z;
 
-    light_grid_t grid = light_grid_buffer.grid[cluster_idx];
-    for ( uint i = 0; i < grid.count; ++i ) {
-        uint list_idx = grid.offset + i;
-        uint light_idx = light_list_buffer.list[list_idx];
-        light_t light = light_buffer.lights[light_idx];
-
-        vec3 world_light_pos = light.pos;
-        float light_emissive = light.emissive;
-        vec3 light_color = light.color;
-
-        vec4 shadow_view = light.view_from_world * world_geo_pos;
-        vec3 shadow_screen = screen_from_view ( light.proj_from_view, shadow_view.xyz );
-        vec2 shadow_texel = light.shadow_tile.xy + shadow_screen.xy * light.shadow_tile.z;
-
-        float shadow = 0;
-
-        if ( any ( greaterThan ( shadow_screen, vec3(1.0) ) ) || any ( lessThan ( shadow_screen, vec3(0.0) ) ) ) {
-            continue;
-        }
-
-        float texel_size = ( 1.f / uniform_buffer.shadow_size );
-
-#if 1
-        int pcf_radius = 8;
-        for ( int dx = -pcf_radius; dx <= pcf_radius; dx += 1 ) {
-            for ( int dy = -pcf_radius; dy <= pcf_radius; dy += 1 ) {
-                vec2 shadow_uv = shadow_texel + vec2 ( dx, dy );
-                //shadow_uv = shadow_uv - fract ( shadow_uv );
-                //shadow_uv += vec2 ( 0.5 );
-                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 0.5 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 0.5 ) );
-                shadow_uv *= ( 1.f / uniform_buffer.shadow_size );
-                float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_linear ), shadow_uv ).x;
-
-                float shadow_bias = 0.00002;
-                float shadow_contribution = shadow_screen.z - shadow_bias > shadow_depth ? 1.f : 0.f;
-
-                if ( shadow_screen.z > 1.f ) {
-                    shadow_contribution = 0;
-                }
-
-                shadow += shadow_contribution;
-            }
-        }
-
-        shadow /= ( pcf_radius * 2 + 1 ) * ( pcf_radius * 2 + 1 );
-
+#if scalar_light_loop_m
+    while ( true ) {
+        uint scalar_cluster_idx = subgroupBroadcastFirst ( cluster_idx );
+        if ( scalar_cluster_idx == cluster_idx ) {
+            light_grid_t grid = light_grid_buffer.grid[scalar_cluster_idx];
 #else
-        float shadow_bias = 0.00002;
-
-        vec2 shadow_uv = shadow_texel + vec2 (-1.0, -1.0 );
-        shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-        shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-        
-        shadow_uv = ( shadow_texel + vec2 ( +1.0, -1.0 ) );
-        shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-        shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-        
-        shadow_uv = ( shadow_texel + vec2 ( -1.0, +1.0 ) );
-        shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-        shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-        
-        shadow_uv = ( shadow_texel + vec2 ( +1.0, +1.0 ) );
-        shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-        shadow_uv *= texel_size;
-        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-
-        shadow /= 16.0;
+            light_grid_t grid = light_grid_buffer.grid[cluster_idx];
 #endif
 
-        float light_visibility = ( 1.f - shadow );
+            for ( uint i = 0; i < grid.count; ++i ) {
+                uint list_idx = grid.offset + i;
+                uint light_idx = light_list_buffer.list[list_idx];
+                light_t light = light_buffer.lights[light_idx];
 
-        vec3 view_light_pos = ( frame_uniforms.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
-        vec3 view_light_dir = normalize ( view_light_pos - view_geo_pos );
+                vec3 world_light_pos = light.pos;
+                float light_emissive = light.emissive;
+                vec3 light_color = light.color;
 
-        vec3 surface = brdf ( view_light_dir, view_normal, normalize ( -view_geo_pos ), base_color, roughness, metalness );
+                vec4 shadow_view = light.view_from_world * world_geo_pos;
+                vec3 shadow_screen = screen_from_view ( light.proj_from_view, shadow_view.xyz );
+                vec2 shadow_texel = light.shadow_tile.xy + shadow_screen.xy * light.shadow_tile.z;
 
-        float nl = clamp ( dot ( view_light_dir, view_normal ), 0, 1 );
-        float dist = distance ( view_geo_pos, view_light_pos );
+                float shadow = 0;
 
-        //irradiance += light_visibility * light_emissive * light_color * surface * nl / ( dist * dist );
-        irradiance += light_visibility * light_emissive * light_color * surface * nl * light_falloff ( dist, light.radius );
+                if ( any ( greaterThan ( shadow_screen, vec3(1.0) ) ) || any ( lessThan ( shadow_screen, vec3(0.0) ) ) ) {
+                    continue;
+                }
+
+                float texel_size = ( 1.f / uniform_buffer.shadow_size );
+        #if 0
+                int pcf_radius = 8;
+                for ( int dx = -pcf_radius; dx <= pcf_radius; dx += 1 ) {
+                    for ( int dy = -pcf_radius; dy <= pcf_radius; dy += 1 ) {
+                        vec2 shadow_uv = shadow_texel + vec2 ( dx, dy );
+                        //shadow_uv = shadow_uv - fract ( shadow_uv );
+                        //shadow_uv += vec2 ( 0.5 );
+                        shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 0.5 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 0.5 ) );
+                        shadow_uv *= ( 1.f / uniform_buffer.shadow_size );
+                        float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_linear ), shadow_uv ).x;
+
+                        float shadow_bias = 0.00002;
+                        float shadow_contribution = shadow_screen.z - shadow_bias > shadow_depth ? 1.f : 0.f;
+
+                        if ( shadow_screen.z > 1.f ) {
+                            shadow_contribution = 0;
+                        }
+
+                        shadow += shadow_contribution;
+                    }
+                }
+
+                shadow /= ( pcf_radius * 2 + 1 ) * ( pcf_radius * 2 + 1 );
+
+        #else
+                float shadow_bias = 0.00002;
+
+                vec2 shadow_uv = shadow_texel + vec2 (-1.0, -1.0 );
+                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
+                shadow_uv *= texel_size;
+                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
+                
+                shadow_uv = ( shadow_texel + vec2 ( +1.0, -1.0 ) );
+                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
+                shadow_uv *= texel_size;
+                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
+                
+                shadow_uv = ( shadow_texel + vec2 ( -1.0, +1.0 ) );
+                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
+                shadow_uv *= texel_size;
+                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
+                
+                shadow_uv = ( shadow_texel + vec2 ( +1.0, +1.0 ) );
+                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
+                shadow_uv *= texel_size;
+                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
+
+                shadow /= 16.0;
+        #endif
+
+                float light_visibility = ( 1.f - shadow );
+
+                vec3 view_light_pos = ( frame_uniforms.view_from_world * vec4 ( world_light_pos, 1 ) ).xyz;
+                vec3 view_light_dir = normalize ( view_light_pos - view_geo_pos );
+
+                vec3 surface = brdf ( view_light_dir, view_normal, normalize ( -view_geo_pos ), base_color, roughness, metalness );
+
+                float nl = clamp ( dot ( view_light_dir, view_normal ), 0, 1 );
+                float dist = distance ( view_geo_pos, view_light_pos );
+
+                //irradiance += light_visibility * light_emissive * light_color * surface * nl / ( dist * dist );
+                irradiance += light_visibility * light_emissive * light_color * surface * nl * light_falloff ( dist, light.radius );
+            }
+
+#if scalar_light_loop_m
+            break;
+        }
     }
+#endif
 
     float ambient_emissive = light_buffer.light_count > 0 ? 0.00 : 0.2;
     vec3 ambient_color = vec3 ( 1, 1, 1 );

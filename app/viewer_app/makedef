@@ -1,7 +1,6 @@
 name = viewer_app
 code = public, private
 defs = public.def
-configs = debug, release
 output = app
 deps = std, rv, xs, xf, se, sm, xi
 if win32

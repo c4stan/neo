@@ -596,7 +596,6 @@ def create_local_workspace(root, name):
         "name = " + name + "\n"\
         "code = public, private\n"\
         "defs = public.def\n"\
-        "configs = debug, release\n"\
         "output = " + output + "\n"\
         "deps = std\n"\
     )
