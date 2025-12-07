@@ -985,6 +985,7 @@ std_file_h std_file_create ( const char* path, std_file_access_t access, std_pat
     HANDLE h = CreateFileW ( t_path_buffer, os_access, 0, NULL, create, FILE_ATTRIBUTE_NORMAL, NULL );
 
     if ( h == INVALID_HANDLE_VALUE ) {
+        std_log_os_error_m();
         return std_file_null_handle_m;
     }
 
@@ -1003,6 +1004,7 @@ std_file_h std_file_create ( const char* path, std_file_access_t access, std_pat
     int fd = open ( path, flags | O_CREAT, 0700 );
 
     if ( fd == -1 ) {
+        std_log_os_error_m();
         return std_file_null_handle_m;
     }
 

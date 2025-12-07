@@ -14,31 +14,8 @@
 
 static xg_vk_allocator_state_t* xg_vk_allocator_state;
 
-void xg_vk_allocator_load ( xg_vk_allocator_state_t* state ) {
-    xg_vk_allocator_state = state;
-
-    state->allocations_array = std_virtual_heap_alloc_array_m ( xg_vk_alloc_t, xg_vk_max_allocations_m );
-    state->allocations_freelist = std_freelist_m ( state->allocations_array, xg_vk_max_allocations_m );
-    
-    for ( uint32_t i = 0; i < xg_max_active_devices_m; ++i ) {
-        for ( uint32_t j = 0; j < xg_memory_type_count_m; ++j ) {
-            state->device_contexts[i].heaps[j].gpu_alloc = xg_null_alloc_m;
-            // TODO rest?
-        }
-    }
-
-    std_mutex_init ( &state->allocations_mutex );
-}
-
-void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state ) {
-    xg_vk_allocator_state = state;
-}
-
-void xg_vk_allocator_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
-    
-    std_mutex_deinit ( &xg_vk_allocator_state->allocations_mutex );
-}
+#define xg_vk_allocator_bitset_u64_count_m std_bitset_u64_count_m ( xg_vk_max_allocations_m )
+#define xg_vk_allocator_debug_records_bitset_u64_count_m std_bitset_u64_count_m ( xg_vk_allocator_max_debug_records_m )
 
 // --------------------------
 
@@ -121,6 +98,41 @@ static void xg_vk_allocator_simple_free ( xg_memory_h memory_handle ) {
     vkFreeMemory ( device->vk_handle, alloc->vk_handle, xg_vk_cpu_allocator() );
     std_list_push ( &xg_vk_allocator_state->allocations_freelist, alloc );
     std_mutex_unlock ( &xg_vk_allocator_state->allocations_mutex );
+}
+
+// --------------------------
+
+void xg_vk_allocator_load ( xg_vk_allocator_state_t* state ) {
+    xg_vk_allocator_state = state;
+
+    state->allocations_array = std_virtual_heap_alloc_array_m ( xg_vk_alloc_t, xg_vk_max_allocations_m );
+    state->allocations_freelist = std_freelist_m ( state->allocations_array, xg_vk_max_allocations_m );
+    state->allocations_bitset = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_allocator_bitset_u64_count_m );
+    std_mem_zero_array_m ( state->allocations_bitset, xg_vk_allocator_bitset_u64_count_m );
+    
+    for ( uint32_t i = 0; i < xg_max_active_devices_m; ++i ) {
+        for ( uint32_t j = 0; j < xg_memory_type_count_m; ++j ) {
+            state->device_contexts[i].heaps[j] = xg_vk_allocator_tlsf_heap_m();
+        }
+    }
+
+    std_mutex_init ( &state->allocations_mutex );
+}
+
+void xg_vk_allocator_reload ( xg_vk_allocator_state_t* state ) {
+    xg_vk_allocator_state = state;
+}
+
+void xg_vk_allocator_unload ( void ) {
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xg_vk_allocator_state->allocations_bitset, idx, xg_vk_allocator_bitset_u64_count_m ) ) {
+        xg_vk_allocator_simple_free ( ( xg_memory_h ) { .id = idx } );
+    }
+
+    std_virtual_heap_free ( xg_vk_allocator_state->allocations_array );
+    std_virtual_heap_free ( xg_vk_allocator_state->allocations_bitset );
+    
+    std_mutex_deinit ( &xg_vk_allocator_state->allocations_mutex );
 }
 
 // --------------------------
@@ -225,7 +237,7 @@ void xg_vk_allocator_tlsf_retire_segment ( xg_vk_allocator_tlsf_heap_t* heap, xg
 }
 
 void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_device_h device, xg_memory_type_e type, uint64_t size ) {
-    std_mem_zero_m ( heap );
+    *heap = xg_vk_allocator_tlsf_heap_m();
 
     std_mutex_init ( &heap->mutex );
 
@@ -245,6 +257,13 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
     heap->memory_type = type;
     heap->device_idx = xg_vk_device_get_idx ( device );
 
+#if std_build_debug_m
+    heap->debug_records_array = std_virtual_heap_alloc_array_m ( xg_vk_allocator_debug_record_t, xg_vk_allocator_max_debug_records_m );
+    heap->debug_records_freelist = std_freelist_m ( heap->debug_records_array, xg_vk_allocator_max_debug_records_m );
+    heap->debug_records_bitset = std_virtual_heap_alloc_array_m ( uint64_t, xg_vk_allocator_debug_records_bitset_u64_count_m );
+    std_mem_zero_array_m ( heap->debug_records_bitset, xg_vk_allocator_debug_records_bitset_u64_count_m);
+#endif
+
     xg_vk_allocator_tlsf_segment_t* segment = xg_vk_allocator_tlsf_acquire_new_segment ( heap );
     segment->offset = 0;
     segment->size = size;
@@ -253,15 +272,32 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
 }
 
 static void xg_vk_allocator_tlsf_heap_deinit ( xg_vk_allocator_tlsf_heap_t* heap ) {
+#if std_build_debug_m
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, heap->debug_records_bitset, idx, xg_vk_allocator_debug_records_bitset_u64_count_m ) ) {
+        xg_vk_allocator_debug_record_t* record = &heap->debug_records_array[idx];
+        std_log_warn_m ( "MEMLEAK: " std_fmt_str_m " " std_fmt_str_m ":" std_fmt_size_m, record->scope.file, record->scope.function, record->scope.line );
+        ++idx;
+    }
+
+    std_virtual_heap_free ( heap->debug_records_array );
+    std_virtual_heap_free ( heap->debug_records_bitset );
+#endif
+
     xg_vk_allocator_simple_free ( heap->gpu_alloc.handle );
-    std_mutex_deinit ( &heap->mutex );
     heap->gpu_alloc = xg_null_alloc_m;
     std_virtual_heap_free ( heap->segments );
+    std_mutex_deinit ( &heap->mutex );
+    *heap = xg_vk_allocator_tlsf_heap_m();
 }
 
 #define xg_vk_allocator_tlsf_debug_print 0
 
+#if std_build_debug_m
+xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align, std_alloc_scope_t scope ) {
+#else
 xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align ) {
+#endif
     // check size
     //size = std_align ( size, 8 );
     size += align;
@@ -349,6 +385,16 @@ xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t s
     
     std_assert_m ( alloc.offset < heap->gpu_alloc.size );
 
+#if std_build_debug_m
+    xg_vk_allocator_debug_record_t* debug_record = std_list_pop_m ( &heap->debug_records_freelist );
+    if ( debug_record ) {
+        debug_record->scope = scope;
+        debug_record->user = alloc.handle;
+        std_bitset_set ( heap->debug_records_bitset, debug_record - heap->debug_records_array );
+    }
+    segment->debug_record = debug_record;
+#endif
+
     return alloc;
 }
 
@@ -356,6 +402,14 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
     std_auto_m segment = ( xg_vk_allocator_tlsf_segment_t* ) handle.id;
 
     std_mutex_lock ( &heap->mutex );
+
+#if std_build_debug_m
+    std_auto_m debug_record = segment->debug_record;
+    if ( debug_record ) {
+        std_list_push ( &heap->debug_records_freelist, debug_record );
+        std_bitset_clear ( heap->debug_records_bitset, debug_record - heap->debug_records_array );
+    }
+#endif
 
     // load segment
     //xg_vk_allocator_tlsf_segment_t new_segment = *segment;
@@ -445,14 +499,24 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
 
 // --------------------------
 
+#if std_build_debug_m
+xg_alloc_t xg_alloc ( const xg_alloc_params_t* params, std_alloc_scope_t scope ) {
+#else
 xg_alloc_t xg_alloc ( const xg_alloc_params_t* params ) {
+#endif
+
 #if 1
     uint64_t device_idx = xg_vk_device_get_idx ( params->device );
     xg_vk_allocator_device_context_t* context = &xg_vk_allocator_state->device_contexts[device_idx];
     xg_memory_type_e type = params->type;
     std_assert_m ( type < xg_memory_type_count_m );
     xg_vk_allocator_tlsf_heap_t* heap = &context->heaps[type];
+#if std_build_debug_m
+    return xg_vk_tlsf_heap_alloc ( heap, params->size, params->align, scope );
+#else
     return xg_vk_tlsf_heap_alloc ( heap, params->size, params->align );
+#endif
+
 #else
     return xg_vk_allocator_simple_alloc ( params->device, params->size, params->type );
 #endif

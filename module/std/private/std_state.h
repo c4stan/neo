@@ -50,6 +50,7 @@ typedef struct {
 
 //==============================================================================
 
+// TODO unused - remove?
 typedef struct {
     std_stack_t nodes_stack;
     //std_virtual_buffer_t nodes_buffer;
@@ -66,7 +67,7 @@ typedef struct {
     // used/unused segment instead of having to do a lin search would be good.
 } std_allocator_virtual_heap_t;
 
-// TODO remove?
+// TODO unused - remove?
 typedef struct {
     //std_alloc_t bins_alloc;
     //std_virtual_buffer_t bins_buffer;

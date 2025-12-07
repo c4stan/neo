@@ -644,45 +644,45 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
                     break;
             }
 
-            if ( db->build_flags & xs_database_build_flag_bit_output_statistics_m ) {
-                std_assert_m ( db->pipeline_flags & xg_pipeline_flag_bit_capture_statistics_m ); // TODO auto-enable?
-                char buffer[2048]; // TODO
-                std_stack_t stack = std_static_stack_m ( buffer );
-                xg_pipeline_info_t pipe_info;
-                xg->get_pipeline_info ( &pipe_info, pipeline_handle, &stack );
-
-                //void* begin = stack.top;
-                std_string_t string = std_stack_alloc_string ( &stack, std_stack_unused_size ( &stack ) );
-                std_string_append_format ( &string, std_fmt_str_m "\n", pipeline_state->name );
-                for ( uint32_t exec_it = 0; exec_it < pipe_info.executables_count; ++exec_it ) {
-                    xg_pipeline_executable_info_t* exec = &pipe_info.executables_array[exec_it];
-
-                    std_string_append_format ( &string, std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m "\n", exec->name, exec->desc );
-
-                    for ( uint32_t stat_it = 0; stat_it < exec->statistics_count; ++stat_it ) {
-                        xg_pipeline_statistic_t* stat = &exec->statistics_array[stat_it];
-                        switch ( stat->type ) {
-                        case xg_pipeline_statistic_type_b32_m:
-                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_u32_m "\n", stat->name, stat->desc, stat->value.b32 );
-                            break;
-                        case xg_pipeline_statistic_type_u64_m:
-                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_u64_m "\n", stat->name, stat->desc, stat->value.u64 );
-                            break;
-                        case xg_pipeline_statistic_type_i64_m:
-                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_i64_m "\n", stat->name, stat->desc, stat->value.i64 );
-                            break;
-                        case xg_pipeline_statistic_type_f64_m:
-                            std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_f64_m "\n", stat->name, stat->desc, stat->value.f64 );
-                            break;
-                        }
-                    }
-                }
-
-                std_file_write ( stats_file, string.str, string.len );
-            }
-
             if ( pipeline_handle == xg_null_handle_m ) {
                 std_log_warn_m ( "Pipeline state " std_fmt_str_m " creation failed", pipeline_state->name );
+            } else {
+                if ( db->build_flags & xs_database_build_flag_bit_output_statistics_m ) {
+                    std_assert_m ( db->pipeline_flags & xg_pipeline_flag_bit_capture_statistics_m ); // TODO auto-enable?
+                    char buffer[2048]; // TODO
+                    std_stack_t stack = std_static_stack_m ( buffer );
+                    xg_pipeline_info_t pipe_info;
+                    xg->get_pipeline_info ( &pipe_info, pipeline_handle, &stack );
+
+                    //void* begin = stack.top;
+                    std_string_t string = std_stack_alloc_string ( &stack, std_stack_unused_size ( &stack ) );
+                    std_string_append_format ( &string, std_fmt_str_m "\n", pipeline_state->name );
+                    for ( uint32_t exec_it = 0; exec_it < pipe_info.executables_count; ++exec_it ) {
+                        xg_pipeline_executable_info_t* exec = &pipe_info.executables_array[exec_it];
+
+                        std_string_append_format ( &string, std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m "\n", exec->name, exec->desc );
+
+                        for ( uint32_t stat_it = 0; stat_it < exec->statistics_count; ++stat_it ) {
+                            xg_pipeline_statistic_t* stat = &exec->statistics_array[stat_it];
+                            switch ( stat->type ) {
+                            case xg_pipeline_statistic_type_b32_m:
+                                std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_u32_m "\n", stat->name, stat->desc, stat->value.b32 );
+                                break;
+                            case xg_pipeline_statistic_type_u64_m:
+                                std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_u64_m "\n", stat->name, stat->desc, stat->value.u64 );
+                                break;
+                            case xg_pipeline_statistic_type_i64_m:
+                                std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_i64_m "\n", stat->name, stat->desc, stat->value.i64 );
+                                break;
+                            case xg_pipeline_statistic_type_f64_m:
+                                std_string_append_format ( &string, std_fmt_tab_m std_fmt_tab_m std_fmt_str_m " - " std_fmt_str_m " : " std_fmt_f64_m "\n", stat->name, stat->desc, stat->value.f64 );
+                                break;
+                            }
+                        }
+                    }
+
+                    std_file_write ( stats_file, string.str, string.len );
+                }
             }
 
             // TODO add these pipelines to a separate list, to avoid having to iterate all pipelines in update_pipelines
@@ -701,7 +701,7 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
         }
     }
 
-    if ( std_file_handle_is_null_m ( stats_file ) ) {
+    if ( !std_file_handle_is_null_m ( stats_file ) ) {
         std_file_close ( stats_file );
     }
 

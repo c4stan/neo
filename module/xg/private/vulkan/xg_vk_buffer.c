@@ -124,7 +124,7 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
         .type = params->memory_type,
     );
     std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
-    xg_alloc_t alloc = xg_alloc ( &alloc_params );
+    xg_alloc_t alloc = xg_alloc_m ( &alloc_params );
     VkResult result = vkBindBufferMemory ( device->vk_handle, buffer->vk_handle, ( VkDeviceMemory ) alloc.base, ( VkDeviceSize ) alloc.offset );
     std_assert_m ( result == VK_SUCCESS );
 

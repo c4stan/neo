@@ -1814,7 +1814,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         align = std_align_u64 ( align, committed_textures_array[i].req.align );
     }
 
-    xg_alloc_t heap_alloc = xg->alloc_memory ( &xg_alloc_params_m (
+    xg_alloc_t heap_alloc = xg_alloc_memory_m ( xg, &xg_alloc_params_m (
         .device = graph->params.device,
         .size = heap.size,
         .align = align, 

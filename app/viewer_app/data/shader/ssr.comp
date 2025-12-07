@@ -175,6 +175,9 @@ void main ( void ) {
 
     float hit_distance = 0;
 
+    // helps with self intersections on bad/low poly geometries
+    float normal_offset = 0.1f;
+
     bool ssr_enabled = mat_sample.x == 1;
     if ( ssr_enabled && depth < 1 ) {
         vec3 hit_screen_pos;
@@ -186,7 +189,7 @@ void main ( void ) {
         //} else {
         //    hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 10 );
         //}
-        hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 100 );
+        hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_ray_dir * normal_offset, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 100 );
         //hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 10 );
 
         if ( hit ) {

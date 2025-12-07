@@ -443,7 +443,7 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
             .type = params->memory_type
         );
         std_str_copy_static_m ( alloc_params.debug_name, params->debug_name );
-        xg_alloc_t alloc = xg_alloc ( &alloc_params );
+        xg_alloc_t alloc = xg_alloc_m ( &alloc_params );
         alloc_base = ( VkDeviceMemory ) alloc.base;
         alloc_offset = alloc.offset;
 

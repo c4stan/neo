@@ -27,7 +27,6 @@ typedef struct {
     size_t line;
 } std_alloc_scope_t;
 
-//#define std_alloc_scope_m() ( std_alloc_scope_t ) { .module = std_pp_eval_string_m(std_module_name_m), .file = std_pp_eval_string_m(std_file_name_m), .function = std_func_name_m, .line = std_line_num_m }
 #define std_alloc_scope_m() ( { \
     std_alloc_scope_t s; \
     std_str_copy_static_m ( s.module, std_pp_eval_string_m ( std_module_name_m ) ); \

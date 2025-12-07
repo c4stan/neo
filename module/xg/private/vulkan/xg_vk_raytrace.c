@@ -159,7 +159,7 @@ xg_raytrace_geometry_h xg_vk_raytrace_geometry_create ( xg_workload_h workload, 
     );
     xg_buffer_h scratch_buffer_handle = xg_buffer_create ( &scratch_buffer_params );
 
-    xg_alloc_t as_memory_alloc = xg_alloc ( &xg_alloc_params_m (
+    xg_alloc_t as_memory_alloc = xg_alloc_m ( &xg_alloc_params_m (
         .device = device_handle,
         .size = as_memory_requirements.memoryRequirements.size,
         .align = as_memory_requirements.memoryRequirements.alignment,
@@ -441,7 +441,7 @@ xg_raytrace_world_h xg_vk_raytrace_world_create ( xg_workload_h workload, uint64
     );
     xg_buffer_h scratch_buffer_handle = xg_buffer_create ( &scratch_buffer_params );
 
-    xg_alloc_t as_memory_alloc = xg_alloc ( &xg_alloc_params_m (
+    xg_alloc_t as_memory_alloc = xg_alloc_m ( &xg_alloc_params_m (
         .device = device_handle,
         .size = as_memory_requirements.memoryRequirements.size,
         .align = as_memory_requirements.memoryRequirements.alignment,

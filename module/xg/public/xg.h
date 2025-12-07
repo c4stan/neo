@@ -2599,7 +2599,11 @@ typedef struct {
 
     xg_memory_requirement_t ( *get_texture_memory_requirement )     ( const xg_texture_params_t* params );
 
+#if std_build_debug_m
+    xg_alloc_t              ( *alloc_memory )                       ( const xg_alloc_params_t* params, std_alloc_scope_t scope );
+#else
     xg_alloc_t              ( *alloc_memory )                       ( const xg_alloc_params_t* params );
+#endif
     void                    ( *free_memory )                        ( xg_memory_h handle );
 
     xg_query_pool_h         ( *create_query_pool )                  ( const xg_query_pool_params_t* params );
@@ -2648,3 +2652,9 @@ typedef struct {
     void                    ( *wait_all_workload_complete )         ( void );
     void                    ( *wait_for_workload )                  ( xg_workload_h workload );
 } xg_i;
+
+#if std_build_debug_m
+    #define xg_alloc_memory_m( xg, params ) xg->alloc_memory ( params, std_alloc_scope_m() )
+#else
+    #define xg_alloc_memory_m( xg, params ) xg->alloc_memory ( params )
+#endif

@@ -196,7 +196,7 @@ void main ( void ) {
                 shadow /= ( pcf_radius * 2 + 1 ) * ( pcf_radius * 2 + 1 );
 
         #else
-                float shadow_bias = 0.00002;
+                float shadow_bias = 0.00001;
 
                 vec2 shadow_uv = shadow_texel + vec2 (-1.0, -1.0 );
                 shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
