@@ -3,6 +3,8 @@
 #include <xg.h>
 #include <se.h>
 
+void viewapp_boot_scene ( void );
+
 typedef enum {
     viewapp_scene_cornell_box_m,
     viewapp_scene_field_m,

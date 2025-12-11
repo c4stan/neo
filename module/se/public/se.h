@@ -176,18 +176,19 @@ typedef struct {
 #endif
 
 typedef struct {
-    // Take component list instead of mask so that the user can define the components ordering to expect in the result
-    uint32_t component_count;
-    uint32_t components[se_max_components_per_entity_m];
+    uint32_t include_component_count;
+    se_component_e include_components[se_max_components_per_entity_m];
+    uint32_t exclude_component_count;
+    se_component_e exclude_components[se_max_components_per_entity_m];
 } se_query_params_t;
 
 #define se_query_params_m( ... ) ( se_query_params_t ) { \
-    .component_count = 0, \
-    .components = { 0 }, \
-    ##__VA_ARGS__ \
+    .include_component_count = 0, \
+    .include_components = { [0 ... se_max_components_per_entity_m - 1] = se_null_component_id_m }, \
+    .exclude_component_count = 0, \
+    .exclude_components = { [0 ... se_max_components_per_entity_m - 1] = se_null_component_id_m }, \
+    __VA_ARGS__ \
 }
-
-#define se_default_query_params_m se_query_params_m()
 
 // TODO dynamic allocate some of the following instead of using static arrays?
 typedef struct {

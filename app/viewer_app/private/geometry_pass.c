@@ -35,11 +35,11 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( 
-        .component_count = 2, 
-        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
+        .include_component_count = 2, 
+        .include_components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
     ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 1 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
@@ -48,7 +48,7 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->geometry_pipeline );
 
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
         //sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
         //sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );
@@ -232,11 +232,11 @@ static void object_id_pass ( const xf_node_execute_args_t* node_args, void* user
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( 
-        .component_count = 2, 
-        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
+        .include_component_count = 2, 
+        .include_components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
     ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 1 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     xs_i* xs = std_module_get_m ( xs_module_name_m );
@@ -245,7 +245,7 @@ static void object_id_pass ( const xf_node_execute_args_t* node_args, void* user
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->object_id_pipeline );
 
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
         //sm_vec_3f_t up = {
         //    .x = transform_component->up[0],

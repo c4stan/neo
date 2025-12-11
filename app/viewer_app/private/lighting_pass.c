@@ -51,11 +51,11 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
 
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( 
-        .component_count = 2, 
-        .components = { viewapp_light_component_id_m, viewapp_transform_component_id_m } 
+        .include_component_count = 2, 
+        .include_components = { viewapp_light_component_id_m, viewapp_transform_component_id_m } 
     ) );
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &light_query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &light_query_result.components[1], 1 );
     uint64_t light_count = light_query_result.entity_count;
     light_count = std_min ( light_count, viewapp_max_lights_m );
 
@@ -67,7 +67,7 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
 
     for ( uint64_t light_it = 0; light_it < light_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
         for ( uint32_t view_it = 0; view_it < light_component->view_count; ++view_it) {
             rv_view_info_t view_info;

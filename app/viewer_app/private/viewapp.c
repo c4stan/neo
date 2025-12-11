@@ -16,87 +16,7 @@
 static void viewapp_boot ( void ) {
     viewapp_state_t* state = viewapp_state_get();
 
-    se_i* se = state->modules.se;
-
-    se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 1,
-        .components = { se_component_layout_m (
-            .id = viewapp_camera_component_id_m,
-            .stream_count = 1,
-            .streams = { sizeof ( viewapp_camera_component_t ) }
-        ) }
-    ) );
-
-    se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 2,
-        .components = { 
-            se_component_layout_m (
-                .id = viewapp_mesh_component_id_m,
-                .streams = { sizeof ( viewapp_mesh_component_t ) }
-            ),
-            se_component_layout_m (
-                .id = viewapp_transform_component_id_m,
-                .streams = { sizeof ( viewapp_transform_component_t ) }
-            ),
-        }
-    ) );
-
-    se->set_component_properties ( viewapp_transform_component_id_m, "Transform", &se_component_properties_params_m (
-        .count = 3,
-        .properties = {
-            se_field_property_m ( 0, viewapp_transform_component_t, position, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_transform_component_t, orientation, se_property_4f32_m ),
-            se_field_property_m ( 0, viewapp_transform_component_t, scale, se_property_f32_m ),
-        }
-    ) );
-
-    se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh", &se_component_properties_params_m (
-        .count = 5,
-        .properties = {
-            se_field_property_m ( 0, viewapp_mesh_component_t, material.base_color, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, material.emissive, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, material.roughness, se_property_f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, material.metalness, se_property_f32_m ),
-            se_field_property_m ( 0, viewapp_mesh_component_t, material.ssr, se_property_bool_m ),
-        }
-    ) );
-
-    se->set_component_properties ( viewapp_light_component_id_m, "Light", &se_component_properties_params_m (
-        .count = 5,
-        .properties = {
-            se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_light_component_t, intensity, se_property_f32_m ),
-            se_field_property_m ( 0, viewapp_light_component_t, color, se_property_3f32_m ),
-            se_field_property_m ( 0, viewapp_light_component_t, radius, se_property_f32_m ),
-            se_field_property_m ( 0, viewapp_light_component_t, shadow_casting, se_property_bool_m ),
-        }
-    ) );
-
-    se->set_component_properties ( viewapp_camera_component_id_m, "Camera", &se_component_properties_params_m (
-        .count = 1, // TODO
-        .properties = {
-            se_field_property_m ( 0, viewapp_camera_component_t, enabled, se_property_bool_m ),
-        }
-    ) );
-
-    se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 3,
-        .components = { 
-            se_component_layout_m (
-                .id = viewapp_light_component_id_m,
-                .streams = { sizeof ( viewapp_light_component_t ) }
-            ),
-            se_component_layout_m (
-                .id = viewapp_mesh_component_id_m,
-                .streams = { sizeof ( viewapp_mesh_component_t ) }
-            ),
-            se_component_layout_m (
-                .id = viewapp_transform_component_id_m,
-                .streams = { sizeof ( viewapp_transform_component_t ) }
-            )
-        }
-    ) );
-
+    viewapp_boot_scene();
     viewapp_boot_render();
     viewapp_boot_ui();
 
@@ -113,11 +33,16 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
     rv_i* rv = state->modules.rv;
 
     se_query_result_t camera_query_result;
-    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
+    se->query_entities ( &camera_query_result, &se_query_params_m ( .include_component_count = 2, .include_components = { 
+        viewapp_camera_component_id_m,
+        viewapp_transform_component_id_m
+    } ) );
 
-    se_stream_iterator_t camera_iterator = se_component_iterator_m ( camera_query_result.components, 0 );
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &camera_query_result.components[1], 0 );
     for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
         viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
         if ( !camera_component->enabled ) {
             continue;
@@ -269,9 +194,75 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
         if ( dirty_xform ) {
             rv->update_view_transform ( camera_component->view, &xform );
         }
+
+        // write out view transform into transform component
+        // writes to local xform but the view xform is supposed to be global
+        // if assumption is camera is never parented and local = global then it works out.
+        std_mem_copy_static_array_m ( transform_component->position, xform.position );
+        std_mem_copy_static_array_m ( transform_component->orientation, xform.orientation );
+        transform_component->scale = 1;
     }
 }
 
+static void viewapp_update_global_transforms ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+    se_i* se = state->modules.se;
+
+    // process transforms without parents
+    // move local to global
+    {
+        se_query_result_t query_result;
+        se->query_entities ( &query_result, &se_query_params_m (
+            .include_component_count = 1,
+            .include_components = { viewapp_transform_component_id_m },
+            .exclude_component_count = 1,
+            .exclude_components = { viewapp_parent_component_id_m },
+        ) );
+        se_stream_iterator_t local_transform_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+        se_stream_iterator_t global_transform_iterator = se_component_iterator_m ( &query_result.components[0], 1 );
+
+        for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
+            viewapp_transform_t* local_transform = se_stream_iterator_next ( &local_transform_iterator );
+            viewapp_transform_t* global_transform = se_stream_iterator_next ( &global_transform_iterator );
+
+            std_mem_copy_static_array_m ( global_transform->position, local_transform->position );
+            std_mem_copy_static_array_m ( global_transform->orientation, local_transform->orientation );
+            global_transform->scale = local_transform->scale;
+        }
+    }
+
+    // process transforms with parents
+    // TODO process full hierarchy, not just 1 level
+    {
+        se_query_result_t query_result;
+        se->query_entities ( &query_result, &se_query_params_m (
+            .include_component_count = 2,
+            .include_components = { viewapp_transform_component_id_m, viewapp_parent_component_id_m },
+        ) );
+        se_stream_iterator_t local_transform_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+        se_stream_iterator_t global_transform_iterator = se_component_iterator_m ( &query_result.components[0], 1 );
+        se_stream_iterator_t parent_iterator = se_component_iterator_m ( &query_result.components[1], 0 );
+
+        for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
+            viewapp_transform_t* local_transform = se_stream_iterator_next ( &local_transform_iterator );
+            viewapp_transform_t* global_transform = se_stream_iterator_next ( &global_transform_iterator );
+            se_entity_h* parent_ptr = se_stream_iterator_next ( &parent_iterator );
+
+            viewapp_transform_t result_transform = *local_transform;
+
+            se_entity_h parent = *parent_ptr;
+            if ( parent != se_null_handle_m ) {
+                viewapp_transform_t* parent_transform = se->get_entity_component ( parent, viewapp_transform_component_id_m, 1 );
+                // TODO multiply local xform by parent xform
+                result_transform = *parent_transform;
+            }
+
+            std_mem_copy_static_array_m ( global_transform->position, result_transform.position );
+            std_mem_copy_static_array_m ( global_transform->orientation, result_transform.orientation );
+            global_transform->scale = result_transform.scale;
+        }
+    }
+}
 
 static void viewapp_update_lights ( void ) {
     viewapp_state_t* state = viewapp_state_get();
@@ -280,16 +271,16 @@ static void viewapp_update_lights ( void ) {
 
     se_query_result_t query_result;
     se->query_entities ( &query_result, &se_query_params_m ( 
-        .component_count = 2,
-        .components = { viewapp_light_component_id_m, viewapp_transform_component_id_m }
+        .include_component_count = 2,
+        .include_components = { viewapp_light_component_id_m, viewapp_transform_component_id_m }
     ) );
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &query_result.components[1], 1 );
     se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &query_result.entities );
 
     for ( uint32_t light_it = 0; light_it < query_result.entity_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
         for ( uint32_t view_it = 0; view_it < viewapp_light_max_views_m; ++view_it ) {
             rv_view_info_t view_info;
@@ -333,17 +324,16 @@ static void viewapp_update_meshes ( void ) {
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( 
-        .component_count = 2,
-        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m }
+        .include_component_count = 2,
+        .include_components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m }
     ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 1 );
 
     for ( uint32_t i = 0; i < mesh_query_result.entity_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
         mesh_component->prev_transform = *transform_component;
-        // TODO update transform...
     }
 }
 
@@ -430,6 +420,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
 
+    viewapp_update_global_transforms();
     viewapp_update_meshes();
     viewapp_update_lights();
     viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
@@ -492,7 +483,7 @@ void viewer_app_unload ( void ) {
 
     se_i* se = state->modules.se;
     se_query_result_t mesh_query_result;
-    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { viewapp_mesh_component_id_m } ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 

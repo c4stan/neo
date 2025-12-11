@@ -10,6 +10,132 @@
 #include <sm.h>
 #include <std_file.h>
 
+void viewapp_boot_scene ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+
+    se_i* se = state->modules.se;
+
+    se->set_component_properties ( viewapp_transform_component_id_m, "Transform", &se_component_properties_params_m (
+        .count = 3,
+        .properties = {
+            se_field_property_m ( 0, viewapp_transform_component_t, local.position, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, local.orientation, se_property_4f32_m ),
+            se_field_property_m ( 0, viewapp_transform_component_t, local.scale, se_property_f32_m ),
+        }
+    ) );
+
+    se->set_component_properties ( viewapp_mesh_component_id_m, "Mesh", &se_component_properties_params_m (
+        .count = 5,
+        .properties = {
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.base_color, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.emissive, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.roughness, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.metalness, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_mesh_component_t, material.ssr, se_property_bool_m ),
+        }
+    ) );
+
+    se->set_component_properties ( viewapp_light_component_id_m, "Light", &se_component_properties_params_m (
+        .count = 5,
+        .properties = {
+            se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, intensity, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, color, se_property_3f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, radius, se_property_f32_m ),
+            se_field_property_m ( 0, viewapp_light_component_t, shadow_casting, se_property_bool_m ),
+        }
+    ) );
+
+    se->set_component_properties ( viewapp_camera_component_id_m, "Camera", &se_component_properties_params_m (
+        .count = 1, // TODO
+        .properties = {
+            se_field_property_m ( 0, viewapp_camera_component_t, enabled, se_property_bool_m ),
+        }
+    ) );
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 2,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_camera_component_id_m,
+                .stream_count = 1,
+                .streams = { sizeof ( viewapp_camera_component_t ) },
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .stream_count = 2,
+                .streams = { 
+                    std_field_size_m ( viewapp_transform_component_t, local ), 
+                    std_field_size_m ( viewapp_transform_component_t, global ) 
+                }
+            ),
+            // TODO xform component?
+        }
+    ) );
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 2,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_mesh_component_id_m,
+                .streams = { sizeof ( viewapp_mesh_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .stream_count = 2,
+                .streams = { 
+                    std_field_size_m ( viewapp_transform_component_t, local ), 
+                    std_field_size_m ( viewapp_transform_component_t, global ) 
+                }
+            ),
+        }
+    ) );
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 3,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_light_component_id_m,
+                .streams = { sizeof ( viewapp_light_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_mesh_component_id_m,
+                .streams = { sizeof ( viewapp_mesh_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .stream_count = 2,
+                .streams = { 
+                    std_field_size_m ( viewapp_transform_component_t, local ), 
+                    std_field_size_m ( viewapp_transform_component_t, global ) 
+                }
+            ),
+        }
+    ) );
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 3,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_light_component_id_m,
+                .streams = { sizeof ( viewapp_light_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .stream_count = 2,
+                .streams = { 
+                    std_field_size_m ( viewapp_transform_component_t, local ), 
+                    std_field_size_m ( viewapp_transform_component_t, global ) 
+                }
+            ),
+            se_component_layout_m (
+                .id = viewapp_parent_component_id_m,
+                .streams = { sizeof ( viewapp_parent_component_t ) },
+            )
+        }
+    ) );
+}
+
 static void viewapp_build_mesh_raytrace_geo ( xg_workload_h workload, se_entity_h entity, viewapp_mesh_component_t* mesh ) {
     viewapp_state_t* state = viewapp_state_get();
     if ( !state->render.supports_raytrace ) {
@@ -51,7 +177,7 @@ static void viewapp_build_raytrace_geo ( xg_workload_h workload ) {
     se_i* se = state->modules.se;
 
     se_query_result_t mesh_query_result;
-    se->query_entities ( &mesh_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se->query_entities ( &mesh_query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { viewapp_mesh_component_id_m } ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
     uint64_t mesh_count = mesh_query_result.entity_count;
@@ -92,18 +218,18 @@ void viewapp_build_raytrace_world ( void ) {
 
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( 
-        .component_count = 2, 
-        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
+        .include_component_count = 2, 
+        .include_components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m } 
     ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 1 );
     uint64_t mesh_count = mesh_query_result.entity_count;
 
     xg_raytrace_geometry_instance_t* rt_instances = std_virtual_heap_alloc_array_m ( xg_raytrace_geometry_instance_t, mesh_count );
 
     for ( uint64_t i = 0; i < mesh_count; ++i ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
         sm_vec_3f_t up = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 1, 0 ) );
         sm_vec_3f_t dir = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 0, 1 ) );
@@ -216,7 +342,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
             )
         );
 
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        viewapp_transform_t transform = viewapp_transform_m (
             .position = { -1.1, -1.45, 1 },
         );
 
@@ -231,8 +357,8 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &transform_component ) }
-                    )
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
                 }
             )
         ) );
@@ -262,7 +388,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
             )
         );
 
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        viewapp_transform_t transform = viewapp_transform_m (
             .position = { 1, -1.5, 0.5 },
             .orientation =  { 0, -0.6, 0, 0.7 },
             .scale = 2,
@@ -279,8 +405,8 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &transform_component ) }
-                    )
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
                 }
             )
         ) );
@@ -334,7 +460,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
             ),
         );
 
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        viewapp_transform_t transform = viewapp_transform_m (
             .position = {
                 plane_pos[i][0],
                 plane_pos[i][1],
@@ -359,8 +485,8 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &transform_component ) }
-                    )
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
                 }
             )
         ) );
@@ -391,7 +517,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
             )
         );
 
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        viewapp_transform_t transform = viewapp_transform_m (
             .position = { 0, 1.5, 0 },
         );
 
@@ -444,8 +570,8 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = ( se_stream_update_m ( .data = &transform_component ) )
-                    )
+                        .streams = ( se_stream_update_m ( .data = &transform ) )
+                    ),
                 }
             )
         ) );
@@ -553,7 +679,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
             ),          
         );
 
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m ();
+        viewapp_transform_t transform = viewapp_transform_m ();
 
         se->create_entity ( &se_entity_params_m(
             .debug_name = "ground",
@@ -566,8 +692,8 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &transform_component ) }
-                    ) 
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
                 }
             )            
         ) );
@@ -599,7 +725,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
         );
 
         sm_quat_t rot = sm_quat_from_vec ( sm_vec_3f_set ( 0, 1, 0 ) );
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        viewapp_transform_t transform = viewapp_transform_m (
             .position = { x, 10, 50 },
             .orientation = { rot.x, rot.y, rot.z, rot.w }
         );
@@ -615,13 +741,94 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &transform_component ) }
-                    ) 
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
                 }
             )
         ) );
 
         x += 20;
+    }
+
+    // camera light
+    {
+        viewapp_transform_t transform = viewapp_transform_m ();
+
+        viewapp_light_component_t light_component = viewapp_light_component_m (
+            .intensity = 1000,
+            .color = { 1, 1, 1 },
+            .shadow_casting = true,
+            .view_count = viewapp_light_max_views_m,
+        );
+        for ( uint32_t i = 0; i < viewapp_light_max_views_m; ++i ) {
+            sm_quat_t orientation = sm_quat_from_vec ( viewapp_light_view_dir ( i ) );
+            rv_view_params_t view_params = rv_view_params_m (
+                .transform = rv_view_transform_m (
+                    .position = {
+                        transform.position[0],
+                        transform.position[1],
+                        transform.position[2],
+                    },
+                    .orientation = {
+                        orientation.e[0],
+                        orientation.e[1],
+                        orientation.e[2],
+                        orientation.e[3],
+                    },
+                ),
+                .proj_params.perspective = rv_perspective_projection_params_m (
+                    .aspect_ratio = 1,
+                    .near_z = 0.01,
+                    .far_z = 100,
+                    .reverse_z = false, // TODO ?
+                ),
+            );
+            light_component.views[i] = rv->create_view ( &view_params );
+        }
+
+        // get flycam
+        se_entity_h flycam_entity = se_null_handle_m;
+        {
+            se_query_result_t query_result;
+            se->query_entities ( &query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { 
+                viewapp_camera_component_id_m,
+            } ) );
+
+            se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &query_result.entities );
+            se_stream_iterator_t camera_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+            for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
+                viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+                se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
+
+                if ( camera_component->type == viewapp_camera_type_flycam_m ) {
+                    flycam_entity = *entity;
+                    break;
+                }
+            }
+        }
+
+        viewapp_parent_component_t parent_component = viewapp_parent_component_m ( .parent = flycam_entity );
+
+        se->create_entity ( &se_entity_params_m ( 
+            .debug_name = "camera_light",
+            .update = se_entity_update_m (
+                .component_count = 3,
+                .components = { 
+                    se_component_update_m (
+                        .id = viewapp_light_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &light_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_transform_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_parent_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &parent_component ) }
+                    ),
+                }
+            )
+        ) );
     }
 
     // light
@@ -649,7 +856,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
             )
         );
 
-        viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+        viewapp_transform_t transform = viewapp_transform_m (
             .position = { 0, 30, -10 },
         );
 
@@ -665,9 +872,9 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
             rv_view_params_t view_params = rv_view_params_m (
                 .transform = rv_view_transform_m (
                     .position = {
-                        transform_component.position[0],
-                        transform_component.position[1],
-                        transform_component.position[2],
+                        transform.position[0],
+                        transform.position[1],
+                        transform.position[2],
                     },
                     .orientation = {
                         orientation.e[0],
@@ -701,8 +908,8 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &transform_component ) }
-                    )
+                        .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
                 }
             )
         ) );
@@ -747,20 +954,28 @@ static void viewapp_create_cameras ( void ) {
     se->create_entity ( &se_entity_params_m (
         .debug_name = "arcball_camera",
         .update = se_entity_update_m (
-            .components = { se_component_update_m (
-                .id = viewapp_camera_component_id_m,
-                .streams = { se_stream_update_m ( .data = &arcball_camera_component ) }
-            ) }
+            .component_count = 2,
+            .components = { 
+                se_component_update_m (
+                    .id = viewapp_camera_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &arcball_camera_component ) }
+                ),
+                se_component_update_m ( .id = viewapp_transform_component_id_m ),
+            }
         )
     ) );
 
     se->create_entity ( &se_entity_params_m (
         .debug_name = "flycam_camera",
         .update = se_entity_update_m (
-            .components = { se_component_update_m (
-                .id = viewapp_camera_component_id_m,
-                .streams = { se_stream_update_m ( .data = &flycam_camera_component ) }
-            ) }
+            .component_count = 2,
+            .components = { 
+                se_component_update_m (
+                    .id = viewapp_camera_component_id_m,
+                    .streams = { se_stream_update_m ( .data = &flycam_camera_component ) }
+                ),
+                se_component_update_m ( .id = viewapp_transform_component_id_m ),
+            }
         )
     ) );
 }
@@ -1100,7 +1315,7 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                 .material = mesh_material,
             );
 
-            viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+            viewapp_transform_t transform = viewapp_transform_m (
                 .position = { 0, 0, 0 },
             );
 
@@ -1114,8 +1329,8 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                         ),
                         se_component_update_m (
                             .id = viewapp_transform_component_id_m,
-                            .streams = { se_stream_update_m ( .data = &transform_component ) }
-                        ) 
+                            .streams = { se_stream_update_m ( .data = &transform ) }
+                        ),
                     }
                 )
             );
@@ -1265,7 +1480,7 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
         )
     );
 
-    viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+    viewapp_transform_t transform = viewapp_transform_m (
         .position = { 0, 0, 0 },
     );
 
@@ -1281,7 +1496,7 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
                 ),
                 se_component_update_m (
                     .id = viewapp_transform_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    .streams = { se_stream_update_m ( .data = &transform ) }
                 ),
             }
         )
@@ -1324,7 +1539,7 @@ se_entity_h spawn_sphere ( xg_workload_h workload ) {
         )
     );
 
-    viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+    viewapp_transform_t transform = viewapp_transform_m (
         .position = { 0, 0, 0 },
     );
 
@@ -1340,7 +1555,7 @@ se_entity_h spawn_sphere ( xg_workload_h workload ) {
                 ),
                 se_component_update_m (
                     .id = viewapp_transform_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    .streams = { se_stream_update_m ( .data = &transform ) }
                 ),
             }
         )
@@ -1385,7 +1600,7 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
         )
     );
 
-    viewapp_transform_component_t transform_component = viewapp_transform_component_m (
+    viewapp_transform_t transform = viewapp_transform_m (
         .position = { 0, 0, 0 },
         .scale = 0.1,
     );
@@ -1435,12 +1650,12 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
                 ),
                 se_component_update_m (
                     .id = viewapp_transform_component_id_m,
-                    .streams = { se_stream_update_m ( .data = &transform_component ) }
+                    .streams = { se_stream_update_m ( .data = &transform ) }
                 ),
                 se_component_update_m (
                     .id = viewapp_light_component_id_m,
                     .streams = { se_stream_update_m ( .data = &light_component ) }
-                )
+                ),
             }
         )
     ) );

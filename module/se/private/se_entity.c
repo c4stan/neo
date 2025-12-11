@@ -203,7 +203,8 @@ void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t
         for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
             std_u64_to_bin_str ( buffer + 64 * i, mask.u64[se_component_mask_block_count_m - i - 1] );
         }
-        std_log_error_m ( "Missing family " std_fmt_str_m, buffer );
+        se_entity_name_t* name = &se_entity_state->entity_meta->names[entity_handle];
+        std_log_error_m ( "Missing family for entity " std_fmt_str_m " " std_fmt_str_m, name->string, buffer );
     }
 #endif
 
@@ -245,6 +246,7 @@ void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t
             }
 
             // zero init
+            // TODO store somewhere a default value per component per stream, use that instead of zero
             uint32_t page_sub_idx = family_idx % items_per_page;
             uint32_t stride = stream->stride;
             std_mem_zero ( stream->pages[page_idx] + stride * page_sub_idx, stride );
@@ -281,6 +283,7 @@ void se_entity_update ( se_entity_h entity_handle,  const se_entity_update_t* up
 
         for ( uint32_t j = 0; j < component->stream_count; ++j ) {
             const se_stream_update_t* stream = &component->streams[j];
+            if ( !stream->data ) continue;
 
             se_entity_family_stream_t* family_stream = &family_component->streams[stream->id];
 
@@ -316,9 +319,9 @@ se_entity_h se_entity_create_init ( const se_entity_params_t* params ) {
         std_bitset_set ( mask.u64, id );
     }
     se_entity_h entity = se_entity_reserve();
+    se_entity_set_name ( entity, params->debug_name );
     se_entity_alloc_components ( entity, mask );
     se_entity_update ( entity, &params->update );
-    se_entity_set_name ( entity, params->debug_name );
     return entity;
 }
 
@@ -376,12 +379,17 @@ static void se_entity_extract_stream ( se_data_stream_t* result, const se_entity
 }
 
 void se_entity_query ( se_query_result_t* result, const se_query_params_t* params ) {
-    // fill query mask from query components
-    se_component_mask_t query_mask;
-    std_mem_zero_m ( &query_mask );
+    se_component_mask_t include_mask;
+    se_component_mask_t exclude_mask;
+    std_mem_zero_m ( &include_mask );
+    std_mem_zero_m ( &exclude_mask );
 
-    for ( uint32_t i = 0; i < params->component_count; ++i ) {
-        std_bitset_set ( query_mask.u64, params->components[i] );
+    for ( uint32_t i = 0; i < params->include_component_count; ++i ) {
+        std_bitset_set ( include_mask.u64, params->include_components[i] );
+    }
+
+    for ( uint32_t i = 0; i < params->exclude_component_count; ++i ) {
+        std_bitset_set ( exclude_mask.u64, params->exclude_components[i] );
     }
 
     // clear result
@@ -390,11 +398,20 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
     // iterate entity families
     uint64_t family_idx = 0;
     while ( std_bitset_scan ( &family_idx, se_entity_state->family_bitset, family_idx, std_entity_family_bitset_block_count_m ) ) {
-        se_component_mask_t mask = se_entity_state->family_mask_array[family_idx];
+        se_component_mask_t family_mask = se_entity_state->family_mask_array[family_idx];
         bool skip = false;
 
         for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
-            if ( ( query_mask.u64[i] & mask.u64[i] ) != query_mask.u64[i] ) {
+            // if included component is missing
+            if ( ( family_mask.u64[i] & include_mask.u64[i] ) != include_mask.u64[i] ) {
+                skip = true;
+                break;
+            }
+        }
+
+        for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
+            // if excluded component is present
+            if ( ( family_mask.u64[i] & exclude_mask.u64[i] ) != 0 ) {
                 skip = true;
                 break;
             }
@@ -408,40 +425,18 @@ void se_entity_query ( se_query_result_t* result, const se_query_params_t* param
         se_entity_family_t* family = &se_entity_state->family_array[family_idx];
         uint32_t entity_count = family->entity_count;
 
-        for ( uint32_t i = 0; i < params->component_count; ++i ) {
-            uint32_t component_id = params->components[i];
+        // extract included components
+        for ( uint32_t i = 0; i < params->include_component_count; ++i ) {
+            uint32_t component_id = params->include_components[i];
             uint8_t family_slot = family->component_slots[component_id];
             std_assert_m ( family_slot != 0xff );
             se_entity_family_component_t* component = &family->components[family_slot];
 
             se_component_data_t* result_component = &result->components[i];
-            
             result_component->stream_count = component->stream_count;
 
             for ( uint32_t j = 0; j < component->stream_count; ++j ) {
-                #if 0
-                const se_entity_family_stream_t* stream = &component->streams[j];
-                
-                uint32_t capacity = stream->items_per_page;
-                
-                result_component->streams[j].page_capacity = capacity;
-                result_component->streams[j].data_stride = stream->stride;
-
-                uint32_t base = result_component->streams[j].page_count;
-                uint32_t count = 0;
-
-                for ( uint32_t k = 0; k < stream->page_count; ++k ) {
-                    result_component->streams[j].pages[base + k].data = stream->pages[k];
-                    result_component->streams[j].pages[base + k].count += count + capacity <= entity_count ? capacity : entity_count - count;
-                    
-                    count += capacity;
-                }
-
-                result_component->streams[j].page_count += stream->page_count;
-                std_assert_m ( result_component->streams[j].page_count <= se_entity_family_max_pages_per_stream_m );
-                #else
                 se_entity_extract_stream ( &result_component->streams[j], &component->streams[j], entity_count );
-                #endif
             }
         }
 

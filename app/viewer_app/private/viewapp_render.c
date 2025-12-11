@@ -134,7 +134,10 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
     bool camera_found = false;
 
     se_query_result_t camera_query_result;
-    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
+    se->query_entities ( &camera_query_result, &se_query_params_m ( 
+        .include_component_count = 1, 
+        .include_components = { viewapp_camera_component_id_m } 
+    ) );
     se_stream_iterator_t camera_iterator = se_component_iterator_m ( &camera_query_result.components[0], 0 );
     for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
         viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );

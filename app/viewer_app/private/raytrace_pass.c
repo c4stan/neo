@@ -41,8 +41,8 @@ static void raytrace_setup_pass ( const xf_node_execute_args_t* node_args, void*
     // Fill instance buffer
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m ( 
-        .component_count = 1, 
-        .components = { viewapp_mesh_component_id_m } 
+        .include_component_count = 1, 
+        .include_components = { viewapp_mesh_component_id_m } 
     ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
     uint64_t mesh_count = mesh_query_result.entity_count;
@@ -77,11 +77,11 @@ static void raytrace_setup_pass ( const xf_node_execute_args_t* node_args, void*
     // Fill light buffer
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m ( 
-        .component_count = 3, 
-        .components = { viewapp_light_component_id_m, viewapp_transform_component_id_m, viewapp_mesh_component_id_m } 
+        .include_component_count = 3, 
+        .include_components = { viewapp_light_component_id_m, viewapp_transform_component_id_m, viewapp_mesh_component_id_m } 
     ) );
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
-    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &light_query_result.components[1], 0 );
+    se_stream_iterator_t transform_iterator = se_component_iterator_m ( &light_query_result.components[1], 1 );
     se_stream_iterator_t light_mesh_iterator = se_component_iterator_m ( &light_query_result.components[2], 0 );
     uint64_t light_count = light_query_result.entity_count;
     light_count = std_min ( light_count, viewapp_max_lights_m );
@@ -90,7 +90,7 @@ static void raytrace_setup_pass ( const xf_node_execute_args_t* node_args, void*
 
     for ( uint64_t light_it = 0; light_it < light_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
-        viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+        viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &light_mesh_iterator );
     
         light_data->lights[light_it] = ( light_data_t ) {

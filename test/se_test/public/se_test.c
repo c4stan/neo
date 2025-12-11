@@ -44,8 +44,8 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
     se_query_result_t query_result;
     se->query_entities ( &query_result, &se_query_params_m (
-        .component_count = 1,
-        .components = { se_test_pass_component_m }
+        .include_component_count = 1,
+        .include_components = { se_test_pass_component_m }
     ) );
 
     se_stream_iterator_t it = se_component_iterator_m ( &query_result.components[0], 0 );
@@ -81,7 +81,7 @@ static void update_entities ( float t ) {
     se_i* se = std_module_get_m ( se_module_name_m );
 
     se_query_result_t query_result;
-    se->query_entities ( &query_result, &se_query_params_m ( .component_count = 1, .components = { se_test_pass_component_m } ) );
+    se->query_entities ( &query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { se_test_pass_component_m } ) );
     se_stream_iterator_t iterator = se_component_iterator_m ( &query_result.components[0], 0 );
 
     for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {

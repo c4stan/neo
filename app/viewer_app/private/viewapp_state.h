@@ -165,6 +165,7 @@ typedef struct {
 #define viewapp_light_component_id_m 2
 #define viewapp_raytrace_mesh_component_id 3
 #define viewapp_transform_component_id_m 4
+#define viewapp_parent_component_id_m 5
 
 typedef struct {
     float base_color[3];
@@ -193,12 +194,32 @@ typedef struct {
     float position[3];
     float scale;
     float orientation[4];
-} viewapp_transform_component_t;
+} viewapp_transform_t;
 
-#define viewapp_transform_component_m( ... ) { \
+#define viewapp_transform_m( ... ) ( viewapp_transform_t ) { \
     .position = { 0, 0, 0 }, \
     .scale = 1, \
     .orientation = { 0, 0, 0, 1 }, \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    viewapp_transform_t local;
+    viewapp_transform_t global;
+} viewapp_transform_component_t;
+
+#define viewapp_transform_component_m( ... ) ( viewapp_transform_component_t ) { \
+    .local = viewapp_transform_m(), \
+    .global = viewapp_transform_m(), \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    se_entity_h parent;
+} viewapp_parent_component_t;
+
+#define viewapp_parent_component_m( ... ) ( viewapp_parent_component_t ) { \
+    .parent = se_null_handle_m, \
     __VA_ARGS__ \
 }
 
@@ -208,7 +229,7 @@ typedef struct {
     xs_database_pipeline_h object_id_pipeline;
     xs_database_pipeline_h geometry_pipeline;
     xs_database_pipeline_h shadow_pipeline;
-    viewapp_transform_component_t prev_transform;
+    viewapp_transform_t prev_transform;
     uint32_t object_id;
     viewapp_material_data_t material;
     xg_raytrace_geometry_h rt_geo;
@@ -220,7 +241,7 @@ typedef struct {
     .object_id_pipeline = xs_null_handle_m, \
     .geometry_pipeline = xs_null_handle_m, \
     .shadow_pipeline = xs_null_handle_m, \
-    .prev_transform = viewapp_transform_component_m(), \
+    .prev_transform = viewapp_transform_m(), \
     .object_id = 0, \
     .material = viewapp_material_data_m(), \
     .rt_geo = xg_null_handle_m, \
@@ -259,7 +280,7 @@ typedef struct {
     bool shadow_casting;
     rv_view_h views[viewapp_light_max_views_m];
     uint32_t view_count;
-    float position[3];
+    float position[3]; // TODO remove, always only use xform
     float radius;
     float color[3];
     float intensity;

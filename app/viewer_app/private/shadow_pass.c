@@ -35,13 +35,13 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
 
     se_query_result_t light_query_result;
     se->query_entities ( &light_query_result, &se_query_params_m (
-        .component_count = 1,
-        .components = { viewapp_light_component_id_m }
+        .include_component_count = 1,
+        .include_components = { viewapp_light_component_id_m }
     ) );
     se_query_result_t mesh_query_result;
     se->query_entities ( &mesh_query_result, &se_query_params_m (
-        .component_count = 2,
-        .components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m }
+        .include_component_count = 2,
+        .include_components = { viewapp_mesh_component_id_m, viewapp_transform_component_id_m }
     ) );
     se_stream_iterator_t light_iterator = se_component_iterator_m ( &light_query_result.components[0], 0 );
     uint64_t light_count = light_query_result.entity_count;
@@ -114,13 +114,13 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
             xg->cmd_set_dynamic_viewport ( node_args->cmd_buffer, key, &viewport );
 
             se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-            se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 0 );
+            se_stream_iterator_t transform_iterator = se_component_iterator_m ( &mesh_query_result.components[1], 1 );
             uint64_t mesh_count = mesh_query_result.entity_count;
             for ( uint64_t j = 0; j < mesh_count; ++j ) {
                 viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
                 xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( mesh_component->shadow_pipeline );
 
-                viewapp_transform_component_t* transform_component = se_stream_iterator_next ( &transform_iterator );
+                viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
                 //sm_vec_3f_t up = sm_vec_3f ( transform_component->up );
                 //sm_vec_3f_t dir = sm_vec_3f ( transform_component->orientation );

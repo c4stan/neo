@@ -103,7 +103,10 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
 
     se_i* se = state->modules.se;
     se_query_result_t query_result;
-    se->query_entities ( &query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_mesh_component_id_m } ) );
+    se->query_entities ( &query_result, &se_query_params_m ( 
+        .include_component_count = 1, 
+        .include_components = { viewapp_mesh_component_id_m } 
+    ) );
     se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
     se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &query_result.entities );
     uint32_t mesh_count = query_result.entity_count;
@@ -130,7 +133,10 @@ static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
     rv_i* rv = state->modules.rv;
 
     se_query_result_t camera_query_result;
-    se->query_entities ( &camera_query_result, &se_query_params_m ( .component_count = 1, .components = { viewapp_camera_component_id_m } ) );
+    se->query_entities ( &camera_query_result, &se_query_params_m ( 
+        .include_component_count = 1, 
+        .include_components = { viewapp_camera_component_id_m } 
+    ) );
 
     se_stream_iterator_t camera_iterator = se_component_iterator_m ( camera_query_result.components, 0 );
     for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
@@ -701,6 +707,9 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
                 for ( uint32_t j = 0; j < props.component_count; ++j ) {
                     se_component_properties_t* component = &props.components[j];
+                    if ( component->name[0] == '\0' ) {
+                        continue;
+                    }
 
                     // component label
                     xi_label_state_t label = xi_label_state_m();
@@ -795,7 +804,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
     // geos
     bool transform_drag = false;
     if ( state->ui.mouse_pick_entity != se_null_handle_m ) {
-        viewapp_transform_component_t* transform = se->get_entity_component ( state->ui.mouse_pick_entity, viewapp_transform_component_id_m, 0 );
+        viewapp_transform_t* transform = se->get_entity_component ( state->ui.mouse_pick_entity, viewapp_transform_component_id_m, 0 );
         if ( transform ) {
             xi_transform_state_t xform = xi_transform_state_m (
                 .position = { transform->position[0], transform->position[1], transform->position[2] },
