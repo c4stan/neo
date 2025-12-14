@@ -41,6 +41,10 @@ typedef struct {
 
 // Render
 #define viewapp_max_lights_m 1024
+// to change reverse_z setting: viewapp_state, common.glsl, reverse_z param at view creation time, depth_write_dxx instead of depth_write_reverse_dxx in .xsg files 
+//      TODO automate this to only one place/setting
+#define viewapp_main_view_reverse_z_m false
+#define viewapp_main_view_depth_clear_m ( viewapp_main_view_reverse_z_m ? xg_depth_clear_reverse_m : xg_depth_clear_regular_m )
 
 typedef struct {
     uint32_t resolution_x;

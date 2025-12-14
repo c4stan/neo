@@ -264,7 +264,7 @@ void viewapp_load_mouse_pick_graph ( void ) {
         .pass.clear = {
             .textures = { 
                 xf_texture_clear_m (),
-                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m ) ),
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m ) ),
             }
         },
         .resources = xf_node_resource_params_m (
@@ -389,7 +389,7 @@ static void viewapp_boot_restir_di_graph ( void ) {
             .format = xg_format_d32_sfloat_m,
             .debug_name = "depth_texture",
             .clear_on_create = true,
-            .clear.depth_stencil = xg_depth_stencil_clear_m ()
+            .clear.depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m )
         ),
     ) );
 
@@ -398,7 +398,7 @@ static void viewapp_boot_restir_di_graph ( void ) {
         .type = xf_node_type_clear_pass_m,
         .pass.clear = xf_node_clear_pass_params_m (
             .textures = { 
-                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m ) ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
@@ -782,7 +782,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
             .format = xg_format_d32_sfloat_m,
             .debug_name = "depth_texture",
             .clear_on_create = true,
-            .clear.depth_stencil = xg_depth_stencil_clear_m ()
+            .clear.depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m )
         ),
     ) );
 
@@ -791,7 +791,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .type = xf_node_type_clear_pass_m,
         .pass.clear = xf_node_clear_pass_params_m (
             .textures = { 
-                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m ) ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
@@ -1016,7 +1016,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
         .width = shadow_size,
         .height = shadow_size,
-        .format = xg_format_d16_unorm_m,
+        .format = xg_format_d32_sfloat_m,
         .debug_name = "shadow_texture"
     ) );
 
@@ -1026,7 +1026,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .pass.clear = {
             .textures = { xf_texture_clear_m ( 
                 .type = xf_texture_clear_depth_stencil_m,
-                .depth_stencil = xg_depth_stencil_clear_m ( .depth = xg_depth_clear_regular_m )
+                .depth_stencil = xg_depth_stencil_clear_m()
             ) }
         },
         .resources = xf_node_resource_params_m (
@@ -1093,7 +1093,7 @@ static void viewapp_boot_raster_graph ( void ) {
             .format = xg_format_d32_sfloat_m,//xg_format_d24_unorm_s8_uint_m,
             .debug_name = "depth_texture",
             .clear_on_create = true,
-            .clear.depth_stencil = xg_depth_stencil_clear_m ()
+            .clear.depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m )
         ),
     ) );
 
@@ -1102,7 +1102,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .type = xf_node_type_clear_pass_m,
         .pass.clear = xf_node_clear_pass_params_m (
             .textures = { 
-                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m() ),
+                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m ) ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),
                 xf_texture_clear_m ( .color = xg_color_clear_m() ),

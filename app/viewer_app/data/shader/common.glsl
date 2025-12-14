@@ -1,10 +1,13 @@
 #include <xs.glsl>
 
 #define PI 3.1415f
-#define REVERSE_Z 0 // TODO
+#define reverse_depth_m 0
 
+#if defined enable_debug_print_m
+#extension GL_EXT_debug_printf : enable
 // %v3f etc for vectors
-#define print debugPrintfEXT
+#define debug_print_m debugPrintfEXT
+#endif
 
 // ======================================================================================= //
 //                                     U N I F O R M S
@@ -99,11 +102,35 @@ bool proj_depth_cmp_gt ( float a, float b ) {
 #endif
 }
 
+bool proj_depth_cmp_le ( float a, float b ) {
+#if reverse_depth_m
+    return a >= b;
+#else
+    return a <= b;
+#endif
+}
+
+bool proj_depth_cmp_lt ( float a, float b ) {
+#if reverse_depth_m
+    return a > b;
+#else
+    return a < b;
+#endif
+}
+
 float proj_depth_diff ( float a, float b ) {
 #if reverse_depth_m
-    return a - b;
-#else
     return b - a;
+#else
+    return a - b;
+#endif
+}
+
+bool proj_depth_is_out ( float d ) {
+#if reverse_depth_m
+    return d <= 0;
+#else
+    return d >= 1;
 #endif
 }
 
@@ -121,11 +148,15 @@ float proj_depth_diff ( float a, float b ) {
     viewport:   screen remapped to pixel coordinates via viewport transform.
 */
 
-// https://stackoverflow.com/questions/51108596/linearize-depth
+// can be computed by solving [depth = A + B / z_eye] for z_eye given A,B from proj matrix
 float linearize_depth ( float d ) {
     float z_near = frame_uniforms.z_near;
     float z_far = frame_uniforms.z_far;
+#if reverse_depth_m
+    return z_near * z_far / ( z_near + d * ( z_far - z_near ) );
+#else
     return z_near * z_far / ( z_far + d * ( z_near - z_far ) );
+#endif
 }
 
 // https://mynameismjp.wordpress.com/2009/03/10/reconstructing-position-from-depth/
@@ -365,11 +396,11 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     // :: go into screen space ::
     //
     vec3 view_ray_start = view_pos;
-    vec3 screen_ray_start = screen_from_view ( frame_uniforms.proj_from_view, view_ray_start );
     vec3 view_ray_hemisphere_sample = view_ray_start + hemisphere_normal;
     if ( view_ray_hemisphere_sample.z < 0 ) { 
         return false;
     }
+    vec3 screen_ray_start = screen_from_view ( frame_uniforms.proj_from_view, view_ray_start );
     vec3 screen_ray_hemisphere_sample = screen_from_view ( frame_uniforms.proj_from_view, view_ray_hemisphere_sample );
     vec3 screen_ray_dir = normalize ( screen_ray_hemisphere_sample - screen_ray_start );
 
@@ -403,7 +434,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     // :: ray trace ::
     //
     // trace the ray
-    bool screen_ray_is_backward = screen_ray_dir.z < 0;
+    bool screen_ray_is_backward = proj_depth_cmp_lt ( screen_ray_dir.z, 0 );
 
     uint sample_it = 0;
     float depth_threshold = 0.5;
@@ -425,6 +456,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
         // use the sampled depth to move along the ray path
         vec3 screen_ray_sample_depth_step = screen_ray_sample;
         float depth_delta = ( linearize_depth ( sample_depth ) - linearize_depth ( screen_ray_sample.z ) ); // delta from the ray z to the sampled depth. positive if the sample is in front (not occluded) by the depth.
+        //float depth_delta = proj_depth_diff ( sample_depth, screen_ray_sample.z );
 
         if ( depth_delta > 0 && !screen_ray_is_backward ) {
             float depth_t = ( sample_depth - screen_ray_start.z ) / ( screen_ray_path.z );
@@ -458,7 +490,7 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
             } else {
                 out_screen_pos = screen_ray_sample;
                 out_depth = sample_depth;
-                return sample_depth < 1;
+                return !proj_depth_is_out ( sample_depth );
             }
         }
 

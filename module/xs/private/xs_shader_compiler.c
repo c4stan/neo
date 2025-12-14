@@ -56,26 +56,25 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             args[argc++] = std_stack_string_copy ( &stack, include_path );
         }
 
-        if ( params->global_definitions != NULL && params->global_definition_count > 0 ) {
+
+        for ( size_t i = 0; i < params->global_definition_count; ++i ) {
+            args[argc++] = std_stack_string_copy ( &stack, "-D" );
+            std_stack_string_append ( &stack, params->global_definitions[i].name );
+            std_stack_string_append ( &stack, "=" );
             char u32_buffer[32];
+            size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );
+            std_assert_m ( len > 0 && len < 32 );
+            std_stack_string_append ( &stack, u32_buffer );
+        }
 
-            for ( size_t i = 0; i < params->global_definition_count; ++i ) {
-                args[argc++] = std_stack_string_copy ( &stack, "-D" );
-                std_stack_string_append ( &stack, params->global_definitions[i].name );
-                std_stack_string_append ( &stack, "=" );
-                size_t len = std_u32_to_str ( u32_buffer, 32, params->global_definitions[i].value, 0 );
-                std_assert_m ( len > 0 && len < 32 );
-                std_stack_string_append ( &stack, u32_buffer );
-            }
-
-            for ( size_t i = 0; i < params->shader_definition_count; ++i ) {
-                args[argc++] = std_stack_string_copy ( &stack, "-D" );
-                std_stack_string_append ( &stack, params->shader_definitions[i].name );
-                std_stack_string_append ( &stack, "=" );
-                size_t len = std_u32_to_str ( u32_buffer, 32, params->shader_definitions[i].value, 0 );
-                std_assert_m ( len > 0 && len < 32 );
-                std_stack_string_append ( &stack, u32_buffer );
-            }
+        for ( size_t i = 0; i < params->shader_definition_count; ++i ) {
+            args[argc++] = std_stack_string_copy ( &stack, "-D" );
+            std_stack_string_append ( &stack, params->shader_definitions[i].name );
+            std_stack_string_append ( &stack, "=" );
+            char u32_buffer[32];
+            size_t len = std_u32_to_str ( u32_buffer, 32, params->shader_definitions[i].value, 0 );
+            std_assert_m ( len > 0 && len < 32 );
+            std_stack_string_append ( &stack, u32_buffer );
         }
     }
 

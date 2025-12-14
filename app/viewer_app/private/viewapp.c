@@ -246,20 +246,18 @@ static void viewapp_update_global_transforms ( void ) {
         for ( uint32_t i = 0; i < query_result.entity_count; ++i ) {
             viewapp_transform_t* local_transform = se_stream_iterator_next ( &local_transform_iterator );
             viewapp_transform_t* global_transform = se_stream_iterator_next ( &global_transform_iterator );
-            se_entity_h* parent_ptr = se_stream_iterator_next ( &parent_iterator );
+            se_entity_h* parent = se_stream_iterator_next ( &parent_iterator );
 
             viewapp_transform_t result_transform = *local_transform;
 
-            se_entity_h parent = *parent_ptr;
-            if ( parent != se_null_handle_m ) {
-                viewapp_transform_t* parent_transform = se->get_entity_component ( parent, viewapp_transform_component_id_m, 1 );
+            se_entity_h parent_handle = *parent;
+            if ( parent_handle != se_null_handle_m ) {
+                viewapp_transform_t* parent_transform = se->get_entity_component ( parent_handle, viewapp_transform_component_id_m, 1 );
                 // TODO multiply local xform by parent xform
                 result_transform = *parent_transform;
             }
 
-            std_mem_copy_static_array_m ( global_transform->position, result_transform.position );
-            std_mem_copy_static_array_m ( global_transform->orientation, result_transform.orientation );
-            global_transform->scale = result_transform.scale;
+            *global_transform = result_transform;
         }
     }
 }
@@ -381,7 +379,8 @@ static std_app_state_e viewapp_update ( void ) {
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
         xs->build_databases();
         if ( viewapp_render_graph_is_raytrace ( state->render.active_render_graph ) ) {
-            state->render.raytrace_world_update = true;
+            //state->render.raytrace_world_update = true;
+            viewapp_update_raytrace_world();
         }
     }
 
@@ -411,19 +410,20 @@ static std_app_state_e viewapp_update ( void ) {
         viewapp_load_render_graph ( state->render.active_render_graph, workload );
     }
 
+    wm_window_info_t new_window_info;
+    wm->get_window_info ( &new_window_info, window );
+    viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
+
+    viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
+
+    viewapp_update_meshes();
+    viewapp_update_global_transforms();
+
     if ( state->render.raytrace_world_update ) {
         viewapp_build_raytrace_world();
     }
 
-    wm_window_info_t new_window_info;
-    wm->get_window_info ( &new_window_info, window );
-
-    viewapp_update_camera ( input_state, &new_input_state, delta_ms * 1000 );
-
-    viewapp_update_global_transforms();
-    viewapp_update_meshes();
     viewapp_update_lights();
-    viewapp_update_ui ( &new_window_info, input_state, &new_input_state, workload );
 
     state->render.window_info = new_window_info;
     state->render.input_state = new_input_state;

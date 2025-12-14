@@ -1,6 +1,5 @@
 #version 460
 #extension GL_EXT_scalar_block_layout : enable
-#extension GL_EXT_debug_printf : require
 
 #include <xs.glsl>
 
@@ -120,7 +119,7 @@ void main ( void ) {
         float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
         //float d = distance ( light_pos, world_pos );
         //float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
-        print ( "%d %d %f %f %d %f", screen_tex.x, screen_tex.y, spatial_reservoir.weight, spatial_p_hat, spatial_reservoir.light, cos_theta );
+        debug_print_m ( "%d %d %f %f %d %f", screen_tex.x, screen_tex.y, spatial_reservoir.weight, spatial_p_hat, spatial_reservoir.light, cos_theta );
     }
 #endif
 

@@ -24,7 +24,7 @@ layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 // https://github.com/GameTechDev/XeGTAO
 float gtao ( rng_wang_state_t rng_state, vec2 screen_uv ) {
     float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
-    if ( depth == 1 ) {
+    if ( proj_depth_is_out ( depth ) ) {
         return 0;
     }
     vec3 position = view_from_depth ( screen_uv, depth );
@@ -178,7 +178,7 @@ vec3 ssilvb_horizon_sample ( bool forward_dir, vec3 position, vec2 sample_uv, ve
 
     float sample_depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), sample_uv, 0 ).x;
     
-    if ( sample_depth == 1 ) {
+    if ( proj_depth_is_out ( sample_depth ) ) {
         is_out = true;
         return vec3 ( 0 );
     }
@@ -210,7 +210,7 @@ vec3 ssilvb_horizon_sample ( bool forward_dir, vec3 position, vec2 sample_uv, ve
 
 vec4 ssilvb ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
     float depth = textureLod ( sampler2D ( tex_hiz, sampler_linear ), screen_uv, 0 ).x;
-    if ( depth == 1 ) {
+    if ( proj_depth_is_out ( depth ) ) {
         return vec4 ( 0 );
     }
     vec3 position = view_from_depth ( screen_uv, depth );
@@ -413,7 +413,7 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
 
     vec3 sample_color = vec3 ( 0, 0, 0 );
 
-    if ( depth < 1 ) {
+    if ( !proj_depth_is_out ( depth ) ) {
         for ( uint ray_it = 0; ray_it < SSRT_RAY_COUNT; ++ray_it ) {
             // sample hemisphere
             vec2 e2 = vec2 ( ex, ey );

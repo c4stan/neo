@@ -4,8 +4,6 @@
 
 #include "common.glsl"
 
-#extension GL_EXT_debug_printf : enable
-
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_uniforms_t {
     vec2 resolution_f32;
     uint hiz_mip_count;
@@ -179,26 +177,20 @@ void main ( void ) {
     float normal_offset = 0.1f;
 
     bool ssr_enabled = mat_sample.x == 1;
-    if ( ssr_enabled && depth < 1 ) {
+    if ( ssr_enabled && !proj_depth_is_out ( depth ) ) {
         vec3 hit_screen_pos;
         float hit_depth;
         bool hit;
 
-        //if ( roughness < 0.09 ) {
-        //    hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 100 );
-        //} else {
-        //    hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 10 );
-        //}
         hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_ray_dir * normal_offset, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 100 );
-        //hit = trace_screen_space_ray_linear ( hit_screen_pos, hit_depth, view_pos, view_ray_dir, tex_hiz, sampler_point, 100, 10 );
 
         if ( hit ) {
             if ( length ( screen_uv - hit_screen_pos.xy ) < 0.01 ) {
                 //draw_debug_line ( img_color, screen_uv, hit_screen_pos.xy, vec4 ( 1, 0, 0, 1 ) );
             }
             vec3 hit_color = texture ( sampler2D ( tex_color, sampler_point ), hit_screen_pos.xy ).xyz;
-            float depth_delta = - ( linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ) );
-            float depth_threshold = 0.4;
+            //float depth_delta = - ( linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ) );
+            //float depth_threshold = 0.4;
             //sample_color = mix ( hit_color, vec3 ( 0, 0, 0 ), clamp ( depth_delta, 0, depth_threshold ) * 1.f / depth_threshold );
             hit_color = clamp ( hit_color, vec3(0), vec3(1) );
             sample_color = hit_color;

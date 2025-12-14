@@ -182,7 +182,7 @@ static void rv_view_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_persp
         eye -> NDC (ze -> zn)
             ze in [znear, zfar]
             zn in [0, 1]
-            zn = (A*ze + B) / ze
+            zn = (A*ze + B) / ze ( = A + B / ze )
             [the target remapping rewritten as system]
             | (A*znear + B) / znear = 0
             | (A*zfar + B) / zfar = 1

@@ -3,8 +3,6 @@
 #include "common.glsl"
 #include "lighting_common.glsl"
 
-#extension GL_EXT_debug_printf : enable
-
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform uniform_buffer_t {
     uvec3 grid_size;
 } uniform_buffer;

@@ -19,6 +19,10 @@ void main() {
     vec2 dst_to_src = draw_uniforms.src_resolution_f32 / draw_uniforms.dst_resolution_f32;
     vec2 src_uv = ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) * dst_to_src / draw_uniforms.src_resolution_f32;
     vec4 depths = textureGather ( sampler2D ( tex_depth, sampler_point ), src_uv );
-    float min_depth = min ( min ( depths.x, depths.y ), min ( depths.z, depths.w ) );
-    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( min_depth ) );
+#if reverse_depth_m
+    float depth = max ( max ( depths.x, depths.y ), max ( depths.z, depths.w ) );
+#else
+    float depth = min ( min ( depths.x, depths.y ), min ( depths.z, depths.w ) );
+#endif
+    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( depth ) );
 }

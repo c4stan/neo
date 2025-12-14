@@ -114,11 +114,15 @@ void viewapp_boot_scene ( void ) {
     ) );
 
     se->create_entity_family ( &se_entity_family_params_m (
-        .component_count = 3,
+        .component_count = 4,
         .components = { 
             se_component_layout_m (
                 .id = viewapp_light_component_id_m,
                 .streams = { sizeof ( viewapp_light_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_mesh_component_id_m,
+                .streams = { sizeof ( viewapp_mesh_component_t ) }
             ),
             se_component_layout_m (
                 .id = viewapp_transform_component_id_m,
@@ -658,7 +662,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
 
     // ground
     {
-        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_grid ( 1000, 1000, 0.5f, viewapp_scene_field_height );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_grid ( 1000, 1000, 2.5f, viewapp_scene_field_height );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
@@ -752,6 +756,29 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
 
     // camera light
     {
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 300, 300 );
+        xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
+
+        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+            .geo_data = geo,
+            .geo_gpu_data = gpu_data,
+            .geometry_pipeline = geometry_pipeline_state,
+            .shadow_pipeline = shadow_pipeline_state,
+            .object_id_pipeline = object_id_pipeline_state,
+            .object_id = state->render.next_object_id++,
+            .material = viewapp_material_data_m (
+                .base_color = { 
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 240 / 255.f, 2.2 ),
+                    powf ( 250 / 255.f, 2.2 )
+                },
+                .ssr = false,
+                .roughness = 0.01,
+                .metalness = 0,
+                .emissive = { 1, 1, 1 },
+            )
+        );
+
         viewapp_transform_t transform = viewapp_transform_m ();
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
@@ -780,7 +807,6 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                     .aspect_ratio = 1,
                     .near_z = 0.01,
                     .far_z = 100,
-                    .reverse_z = false, // TODO ?
                 ),
             );
             light_component.views[i] = rv->create_view ( &view_params );
@@ -812,11 +838,15 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
         se->create_entity ( &se_entity_params_m ( 
             .debug_name = "camera_light",
             .update = se_entity_update_m (
-                .component_count = 3,
+                .component_count = 4,
                 .components = { 
                     se_component_update_m (
                         .id = viewapp_light_component_id_m,
                         .streams = { se_stream_update_m ( .data = &light_component ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
                     ),
                     se_component_update_m (
                         .id = viewapp_transform_component_id_m,
@@ -887,7 +917,6 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                     .aspect_ratio = 1,
                     .near_z = 0.01,
                     .far_z = 100,
-                    .reverse_z = false, // TODO ?
                 ),
             );
             light_component.views[i] = rv->create_view ( &view_params );
@@ -934,7 +963,7 @@ static void viewapp_create_cameras ( void ) {
             .far_z = 10000,
             .fov_y = 50.f * rv_deg_to_rad_m,
             .jitter = { 1.f / resolution_x, 1.f / resolution_y },
-            .reverse_z = false,
+            .reverse_z = viewapp_main_view_reverse_z_m,
         ),
     );
 
@@ -1439,13 +1468,11 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     xg->submit_workload ( workload );
     xg->wait_all_workload_complete(); // TODO
 
-//    if ( viewapp_is_raytrace_world_used() ) 
-//    {
-//        xg->wait_all_workload_complete(); // TODO is this necessary
-//        workload = xg->create_workload ( state->render.device );
-//        viewapp_build_raytrace_world ( workload );
-//        xg->submit_workload ( workload );
-//    }
+    if ( viewapp_render_graph_is_raytrace ( state->render.active_render_graph ) ) 
+    {
+        viewapp_update_raytrace_world();
+        //viewapp_build_raytrace_world();
+    }
 
 }
 
@@ -1633,7 +1660,6 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
                 .aspect_ratio = 1,
                 .near_z = 0.01,
                 .far_z = 100,
-                .reverse_z = false, // TODO ?
             ),
         );
         light_component.views[i] = rv->create_view ( &view_params );
