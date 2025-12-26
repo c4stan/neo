@@ -165,11 +165,8 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
     }
 }
 
-xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h radiosity, xf_texture_h object_id, xf_texture_h velocity, xf_texture_h depth ) {
+xf_node_h add_geometry_node ( xf_graph_h graph, const gbuffer_textures_t* gbuffer, xf_texture_h depth ) {
     xf_i* xf = std_module_get_m ( xf_module_name_m );
-
-    xf_texture_info_t color_info;
-    xf->get_texture_info ( &color_info, color );
 
     xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "geometry",
@@ -181,12 +178,12 @@ xf_node_h add_geometry_node ( xf_graph_h graph, xf_texture_h color, xf_texture_h
         .resources = xf_node_resource_params_m (
             .render_targets_count = 6,
             .render_targets = {
-                xf_render_target_dependency_m ( .texture = color ),
-                xf_render_target_dependency_m ( .texture = normal ),
-                xf_render_target_dependency_m ( .texture = material ),
-                xf_render_target_dependency_m ( .texture = radiosity ),
-                xf_render_target_dependency_m ( .texture = object_id ),
-                xf_render_target_dependency_m ( .texture = velocity ),
+                xf_render_target_dependency_m ( .texture = gbuffer->color ),
+                xf_render_target_dependency_m ( .texture = gbuffer->normal ),
+                xf_render_target_dependency_m ( .texture = gbuffer->material ),
+                xf_render_target_dependency_m ( .texture = gbuffer->radiosity ),
+                xf_render_target_dependency_m ( .texture = gbuffer->object_id ),
+                xf_render_target_dependency_m ( .texture = gbuffer->velocity ),
             },
             .depth_stencil_target = depth,
         ),
@@ -312,9 +309,6 @@ static void object_id_pass ( const xf_node_execute_args_t* node_args, void* user
 
 xf_node_h add_object_id_node ( xf_graph_h graph, xf_texture_h object_id, xf_texture_h depth ) {
     xf_i* xf = std_module_get_m ( xf_module_name_m );
-
-    xf_texture_info_t info;
-    xf->get_texture_info ( &info, object_id );
 
     xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "object_id",

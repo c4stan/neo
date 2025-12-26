@@ -975,8 +975,8 @@ const char* xg_pipeline_stage_str ( xg_pipeline_stage_bit_e stage ) {
         return "none";
     } else if ( stage == xg_pipeline_stage_bit_top_of_pipe_m ) {
         return "top_of_pipe";
-    } else if ( stage == xg_pipeline_stage_bit_draw_m ) {
-        return "draw";
+    } else if ( stage == xg_pipeline_stage_bit_indirect_command_m ) {
+        return "draw_indirect";
     } else if ( stage == xg_pipeline_stage_bit_vertex_input_m ) {
         return "vertex_input";
     } else if ( stage == xg_pipeline_stage_bit_vertex_shader_m ) {
@@ -1009,8 +1009,8 @@ const char* xg_pipeline_stage_str ( xg_pipeline_stage_bit_e stage ) {
 const char* xg_memory_access_str ( xg_memory_access_bit_e access ) {
     if ( access == xg_memory_access_bit_none_m ) {
         return "none";
-    } else if ( access == xg_memory_access_bit_command_read_m ) {
-        return "command_read";
+    } else if ( access == xg_memory_access_bit_indirect_command_read_m ) {
+        return "indirect_command_read";
     } else if ( access == xg_memory_access_bit_index_read_m ) {
         return "index_read";
     } else if ( access == xg_memory_access_bit_vertex_attribute_read_m ) {

@@ -54,6 +54,8 @@ typedef enum {
     xg_cmd_draw_m,
     xg_cmd_compute_m,
     xg_cmd_raytrace_m,
+    xg_cmd_draw_indirect_m,
+    xg_cmd_compute_indirect_m,
 
     xg_cmd_copy_buffer_m,
     xg_cmd_copy_texture_m,
@@ -173,11 +175,13 @@ void xg_cmd_dynamic_viewport ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const x
 void xg_cmd_dynamic_scissor ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_scissor_state_t* scissor );
 
 void xg_cmd_buffer_cmd_draw ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );
+void xg_cmd_buffer_cmd_draw_indirect ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_indirect_params_t* params );
 
 // ======================================================================================= //
 //                                      C O M P U T E
 // ======================================================================================= //
 void xg_cmd_buffer_cmd_compute ( xg_cmd_buffer_h buffer, uint64_t key, const xg_cmd_compute_params_t* params );
+void xg_cmd_buffer_cmd_compute_indirect ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_compute_indirect_params_t* params );
 
 // ======================================================================================= //
 //                                     R A Y T R A C E

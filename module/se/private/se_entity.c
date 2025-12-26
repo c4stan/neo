@@ -199,12 +199,23 @@ void se_entity_alloc_components ( se_entity_h entity_handle, se_component_mask_t
     se_entity_family_t* family = se_entity_family_get ( mask );
 #if std_log_error_enabled_m
     if ( !family ) {
-        char buffer[64 * se_component_mask_block_count_m];
-        for ( uint32_t i = 0; i < se_component_mask_block_count_m; ++i ) {
-            std_u64_to_bin_str ( buffer + 64 * i, mask.u64[se_component_mask_block_count_m - i - 1] );
+        char buffer[128];
+        std_string_t string = std_static_string_m ( buffer );
+        uint64_t component_id = 0;
+        while ( std_bitset_scan ( &component_id, mask.u64, component_id, se_component_mask_block_count_m ) ) {
+            se_entity_component_properties_t* component_properties = &se_entity_state->component_meta->property_array[component_id];
+            if ( string.len > 0 ) {
+                std_string_append ( &string, "|" );
+            }
+            if ( component_properties->name[0] != '\0' ) {
+                std_string_append ( &string, component_properties->name );
+            } else {
+                std_string_append ( &string, "?" );
+            }
+            ++component_id;
         }
         se_entity_name_t* name = &se_entity_state->entity_meta->names[entity_handle];
-        std_log_error_m ( "Missing family for entity " std_fmt_str_m " " std_fmt_str_m, name->string, buffer );
+        std_log_error_m ( "Missing family for entity \"" std_fmt_str_m "\". Requested components: " std_fmt_str_m, name->string, buffer );
     }
 #endif
 

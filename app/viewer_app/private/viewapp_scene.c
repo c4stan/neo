@@ -15,6 +15,7 @@ void viewapp_boot_scene ( void ) {
 
     se_i* se = state->modules.se;
 
+    // Properties
     se->set_component_properties ( viewapp_transform_component_id_m, "Transform", &se_component_properties_params_m (
         .count = 3,
         .properties = {
@@ -53,6 +54,10 @@ void viewapp_boot_scene ( void ) {
         }
     ) );
 
+    se->set_component_properties ( viewapp_tessellation_mesh_component_id_m, "Tessellation", &se_component_properties_params_m (
+    ) );
+
+    // Families
     se->create_entity_family ( &se_entity_family_params_m (
         .component_count = 2,
         .components = { 
@@ -69,7 +74,6 @@ void viewapp_boot_scene ( void ) {
                     std_field_size_m ( viewapp_transform_component_t, global ) 
                 }
             ),
-            // TODO xform component?
         }
     ) );
 
@@ -79,6 +83,24 @@ void viewapp_boot_scene ( void ) {
             se_component_layout_m (
                 .id = viewapp_mesh_component_id_m,
                 .streams = { sizeof ( viewapp_mesh_component_t ) }
+            ),
+            se_component_layout_m (
+                .id = viewapp_transform_component_id_m,
+                .stream_count = 2,
+                .streams = { 
+                    std_field_size_m ( viewapp_transform_component_t, local ), 
+                    std_field_size_m ( viewapp_transform_component_t, global ) 
+                }
+            ),
+        }
+    ) );
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 2,
+        .components = { 
+            se_component_layout_m (
+                .id = viewapp_tessellation_mesh_component_id_m,
+                .streams = { sizeof ( viewapp_tessellation_mesh_component_t ) }
             ),
             se_component_layout_m (
                 .id = viewapp_transform_component_id_m,
@@ -582,72 +604,6 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
     }
 }
 
-// https://mrl.cs.nyu.edu/~perlin/noise/
-static float fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-static float lerp(float t, float a, float b) { return a + t * (b - a); }
-static float grad(int hash, float x, float y, float z) {
-  int h = hash & 15;                      // CONVERT LO 4 BITS OF HASH CODE
-  float u = h<8 ? x : y,                  // INTO 12 GRADIENT DIRECTIONS.
-        v = h<4 ? y : h==12||h==14 ? x : z;
-  return ((h&1) == 0 ? u : -u) + ((h&2) == 0 ? v : -v);
-}
-float noise(float x, float y, float z) {
-    static int p[] = { 151,160,137,91,90,15,
-        131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
-        190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
-        88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
-        77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
-        102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
-        135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
-        5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
-        223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
-        129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
-        251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
-        49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
-        138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,
-        151,160,137,91,90,15,
-        131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
-        190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,
-        88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
-        77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,
-        102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
-        135,130,116,188,159,86,164,100,109,198,173,186, 3,64,52,217,226,250,124,123,
-        5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
-        223,183,170,213,119,248,152, 2,44,154,163, 70,221,153,101,155,167, 43,172,9,
-        129,22,39,253, 19,98,108,110,79,113,224,232,178,185, 112,104,218,246,97,228,
-        251,34,242,193,238,210,144,12,191,179,162,241, 81,51,145,235,249,14,239,107,
-        49,192,214, 31,181,199,106,157,184, 84,204,176,115,121,50,45,127, 4,150,254,
-        138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
-    };
-
-    int X = (int)floorf(x) & 255,                   // FIND UNIT CUBE THAT
-        Y = (int)floorf(y) & 255,                   // CONTAINS POINT.
-        Z = (int)floorf(z) & 255;
-  x -= floorf(x);                                   // FIND RELATIVE X,Y,Z
-  y -= floorf(y);                                   // OF POINT IN CUBE.
-  z -= floorf(z);
-  float u = fade(x),                                // COMPUTE FADE CURVES
-        v = fade(y),                                // FOR EACH OF X,Y,Z.
-        w = fade(z);
-  int A = p[X  ]+Y, AA = p[A]+Z, AB = p[A+1]+Z,      // HASH COORDINATES OF
-      B = p[X+1]+Y, BA = p[B]+Z, BB = p[B+1]+Z;      // THE 8 CUBE CORNERS,
-
-  return lerp(w, lerp(v, lerp(u, grad(p[AA  ], x  , y  , z   ),  // AND ADD
-                                 grad(p[BA  ], x-1, y  , z   )), // BLENDED
-                         lerp(u, grad(p[AB  ], x  , y-1, z   ),  // RESULTS
-                                 grad(p[BB  ], x-1, y-1, z   ))),// FROM  8
-                 lerp(v, lerp(u, grad(p[AA+1], x  , y  , z-1 ),  // CORNERS
-                                 grad(p[BA+1], x-1, y  , z-1 )), // OF CUBE
-                         lerp(u, grad(p[AB+1], x  , y-1, z-1 ),
-                                 grad(p[BB+1], x-1, y-1, z-1 ))));
-}
-
-static float viewapp_scene_field_height ( float x, float z ) {
-    float param_scale = 0.1f;
-    float height_scale = 10.f;
-    return noise ( x * param_scale, 0, z * param_scale ) * height_scale;
-}
-
 static void viewapp_boot_scene_field ( xg_workload_h workload ) {
     viewapp_state_t* state = viewapp_state_get();
     se_i* se = state->modules.se;
@@ -662,15 +618,13 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
 
     // ground
     {
-        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_grid ( 1000, 1000, 2.5f, viewapp_scene_field_height );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_grid ( 1000, 1000, 2.f, NULL );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
-        viewapp_mesh_component_t mesh_component = viewapp_mesh_component_m (
+        // TODO
+        viewapp_tessellation_mesh_component_t tessellation_component = viewapp_tessellation_mesh_component_m (
             .geo_data = geo,
             .geo_gpu_data = gpu_data,
-            .geometry_pipeline = geometry_pipeline_state,
-            .shadow_pipeline = shadow_pipeline_state,
-            .object_id_pipeline = object_id_pipeline_state,
             .object_id = state->render.next_object_id++,
             .material = viewapp_material_data_m (
                 .base_color = {
@@ -680,7 +634,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                 },
                 .ssr = true,
                 .roughness = 0.01,
-            ),          
+            ),
         );
 
         viewapp_transform_t transform = viewapp_transform_m ();
@@ -691,12 +645,12 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                 .component_count = 2,
                 .components = { 
                     se_component_update_m (
-                        .id = viewapp_mesh_component_id_m,
-                        .streams = { se_stream_update_m ( .data = &mesh_component ) }
-                    ),
-                    se_component_update_m (
                         .id = viewapp_transform_component_id_m,
                         .streams = { se_stream_update_m ( .data = &transform ) }
+                    ),
+                    se_component_update_m (
+                        .id = viewapp_tessellation_mesh_component_id_m,
+                        .streams = { se_stream_update_m ( .data = &tessellation_component ) }
                     ),
                 }
             )            
@@ -1430,6 +1384,12 @@ void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h worklo
         if ( mesh_component->rt_geo != xg_null_handle_m ) {
             xg->destroy_raytrace_geometry ( mesh_component->rt_geo );
         }
+    }
+
+    viewapp_tessellation_mesh_component_t* tessellation_mesh_component = se->get_entity_component ( entity, viewapp_tessellation_mesh_component_id_m, 0 );
+    if ( tessellation_mesh_component ) {
+        xg_geo_util_free_data ( &tessellation_mesh_component->geo_data );
+        xg_geo_util_free_gpu_data ( &tessellation_mesh_component->geo_gpu_data, workload, time );
     }
 }
 

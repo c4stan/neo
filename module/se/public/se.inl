@@ -37,6 +37,11 @@ static inline void* se_stream_iterator_next ( se_stream_iterator_t* iterator ) {
     return data;
 }
 
+static inline void se_stream_iterator_reset ( se_stream_iterator_t* iterator ) {
+    iterator->page = 0;
+    iterator->page_count = 0;
+}
+
 // Entity params allocator
 
 #if 0

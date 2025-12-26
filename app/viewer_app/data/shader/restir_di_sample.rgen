@@ -146,7 +146,7 @@ void main ( void ) {
     float light_pdf = 1.0 / light_pool;
     reservoir_t reservoir = reservoir_init();
     
-    if ( depth < 1 ) {
+    if ( !proj_depth_is_out ( depth ) ) {
         for ( uint i = 0; i < light_pool; ++i ) {
             uint light_idx = int ( rng_wang ( rng_state ) * light_pool );
             float p_hat = light_p ( light_idx, world_geo_pos, world_normal, base_color );

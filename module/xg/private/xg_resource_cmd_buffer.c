@@ -114,7 +114,7 @@ static void* xg_resource_cmd_buffer_record_cmd ( xg_resource_cmd_buffer_t* cmd_b
 }
 #define xg_resource_cmd_buffer_record_cmd_m(cmd_buffer, cmd_type, args_type) (args_type*) xg_resource_cmd_buffer_record_cmd(cmd_buffer, cmd_type, sizeof(args_type))
 
-xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_texture_params_t* params, xg_texture_init_t* init ) {
+xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_texture_params_t* params, const xg_texture_init_t* init ) {
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
     xg_resource_cmd_texture_create_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_texture_create_m, xg_resource_cmd_texture_create_t );
 
@@ -153,7 +153,7 @@ void xg_resource_cmd_buffer_texture_destroy ( xg_resource_cmd_buffer_h cmd_buffe
     cmd_args->destroy_time = destroy_time;
 }
 
-xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_buffer_params_t* params, xg_buffer_init_t* init ) {
+xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_buffer_handle, const xg_buffer_params_t* params, const xg_buffer_init_t* init ) {
     xg_buffer_h buffer_handle;
 
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
@@ -165,7 +165,7 @@ xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_
     cmd_args->buffer = buffer_handle;
 
     if ( init ) {
-        cmd_args->init = true;
+        //cmd_args->init = true;
         cmd_args->init_mode = init->mode;
         if ( init->mode == xg_buffer_init_mode_upload_m ) {
             size_t size = params->size;
@@ -174,7 +174,7 @@ xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_
             cmd_args->clear = init->clear;
         }
     } else {
-        cmd_args->init = false;
+        cmd_args->init_mode = xg_buffer_init_mode_uninitialized_m;
     }
 
     return buffer_handle;

@@ -430,6 +430,12 @@ static std_app_state_e viewapp_update ( void ) {
 
     viewapp_update_workload_uniforms ( workload );
 
+    static bool first = true;
+    if ( first ) {
+        //xg->debug_capture_workload ( workload );
+        first = false;
+    }
+
     xf->execute_graph ( state->render.render_graph, workload, 0 );
     xg->submit_workload ( workload );
     xg->present_swapchain ( state->render.swapchain, workload );
@@ -480,17 +486,18 @@ void viewer_app_unload ( void ) {
     xg->wait_all_workload_complete();
 
     xg_workload_h workload = xg->create_workload ( state->render.device );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
     se_i* se = state->modules.se;
     se_query_result_t mesh_query_result;
-    se->query_entities ( &mesh_query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { viewapp_mesh_component_id_m } ) );
-    se_stream_iterator_t mesh_iterator = se_component_iterator_m ( &mesh_query_result.components[0], 0 );
-    uint64_t mesh_count = mesh_query_result.entity_count;
+    se->query_entities ( &mesh_query_result, &se_query_params_m() );
+    se_stream_iterator_t entity_iterator = se_entity_iterator_m ( &mesh_query_result.entities );
+    uint64_t entity_count = mesh_query_result.entity_count;
 
-    for ( uint64_t i = 0; i < mesh_count; ++i ) {
-        viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
-        xg_geo_util_free_data ( &mesh_component->geo_data );
-        xg_geo_util_free_gpu_data ( &mesh_component->geo_gpu_data, workload, xg_resource_cmd_buffer_time_workload_start_m );
+    for ( uint64_t i = 0; i < entity_count; ++i ) {
+        se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
+        viewapp_destroy_entity_resources ( *entity, workload, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_start_m );
+        se->destroy_entity ( *entity );
     }
 
     xg->submit_workload ( workload );

@@ -23,9 +23,21 @@ typedef struct {
     xg_buffer_h idx_buffer;
 } xg_geo_util_geometry_gpu_data_t;
 
+#define xg_geo_util_geometry_gpu_data_m( ... ) ( xg_geo_util_geometry_gpu_data_t ) { \
+    .device = xg_null_handle_m, \
+    .pos_buffer = xg_null_handle_m, \
+    .nor_buffer = xg_null_handle_m, \
+    .tan_buffer = xg_null_handle_m, \
+    .bitan_buffer = xg_null_handle_m, \
+    .uv_buffer = xg_null_handle_m, \
+    .idx_buffer = xg_null_handle_m, \
+    __VA_ARGS__ \
+}
+
 typedef float ( xg_geo_height_f ) ( float, float );
 
 xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t meridians_count, uint32_t parallels_count );
+xg_geo_util_geometry_data_t xg_geo_util_generate_triangle ( float side );
 xg_geo_util_geometry_data_t xg_geo_util_generate_plane ( float side );
 xg_geo_util_geometry_data_t xg_geo_util_generate_cube ( float side );
 xg_geo_util_geometry_data_t xg_geo_util_generate_grid ( uint32_t x_cells, uint32_t z_cells, float cell_scale, xg_geo_height_f height_fun );

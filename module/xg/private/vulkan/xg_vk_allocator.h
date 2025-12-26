@@ -10,7 +10,6 @@
 #include "xg_vk.h"
 
 #include <std_mutex.h>
-#include <std_queue.h>
 
 #if std_build_debug_m
 typedef struct {

@@ -7,8 +7,6 @@ xs_shader_name_max_len_m                64
 
 xs_shader_definition_name_max_len_m     64
 
-xs_debug_print_shader_compiler_line_m std_on_m
-
 xs_database_max_memory_pages_m          8
 xs_database_max_folders_m               16
 xs_database_max_pipeline_states_m       1024

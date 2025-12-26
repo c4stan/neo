@@ -377,6 +377,10 @@ VkBufferUsageFlags xg_buffer_usage_to_vk ( xg_buffer_usage_bit_e usage ) {
         flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     }
 
+    if ( usage & xg_buffer_usage_bit_indirect_command_m ) {
+        flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    }
+
 #if xg_enable_raytracing_m
     if ( usage & xg_buffer_usage_bit_shader_device_address_m ) {
         flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;

@@ -166,6 +166,8 @@ typedef struct {
 
     xf_render_target_resource_t render_targets[xf_node_max_render_targets_m];
     xg_texture_h depth_stencil_target;
+
+    xg_buffer_h indirect_command_read; // TODO array?
 } xf_node_io_t;
 
 typedef struct {
@@ -281,6 +283,8 @@ typedef struct {
     size_t render_targets_count;
     xf_texture_h depth_stencil_target;
 
+    xf_buffer_h indirect_command_read; // TODO array?
+
     xf_texture_h presentable_texture;
 
 #if 0
@@ -319,6 +323,8 @@ typedef struct {
     .render_targets_count = 0, \
     .depth_stencil_target = xf_null_handle_m, \
     \
+    .indirect_command_read = xf_null_handle_m, \
+    \
     .presentable_texture = xf_null_handle_m, \
     ##__VA_ARGS__ \
 }
@@ -348,11 +354,27 @@ typedef struct {
 } xf_node_compute_pass_params_t;
 
 #define xf_node_compute_pass_params_m( ... ) ( xf_node_compute_pass_params_t ) { \
-    .pipeline = xg_null_handle_m, \
+    .pipeline = xs_null_handle_m, \
     .workgroup_count = { 1, 1, 1 }, \
     .copy_uniform_data = true, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
     ##__VA_ARGS__ \
+}
+
+typedef struct {
+    xs_database_pipeline_h pipeline;
+    uint64_t indirect_offset;
+    std_buffer_t uniform_data;
+    bool copy_uniform_data;
+    xg_sampler_h samplers[xg_pipeline_resource_max_samplers_per_set_m];
+    uint32_t samplers_count;
+} xf_node_compute_indirect_pass_params_t;
+
+#define xf_node_compute_indirect_pass_params_m( ... ) ( xf_node_compute_indirect_pass_params_t ) { \
+    .pipeline = xs_null_handle_m, \
+    .copy_uniform_data = true, \
+    .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -420,6 +442,7 @@ typedef struct {
         xf_node_raytrace_pass_params_t raytrace;
         xf_node_copy_pass_params_t copy;
         xf_node_clear_pass_params_t clear;
+        xf_node_compute_indirect_pass_params_t compute_indirect;
     };
 } xf_node_pass_params_t;
 
@@ -429,6 +452,7 @@ typedef enum {
     xf_node_type_raytrace_pass_m,
     xf_node_type_copy_pass_m,
     xf_node_type_clear_pass_m,
+    xf_node_type_compute_indirect_pass_m,
 } xf_node_type_e;
 
 typedef struct {
@@ -501,18 +525,12 @@ typedef struct {
 typedef struct {
     size_t size;
     bool allow_aliasing;
-    bool upload;
+    xg_buffer_init_t* init;
     char debug_name[xf_debug_name_size_m];
-    bool clear_on_create;
-    uint32_t clear_value;
 } xf_buffer_params_t;
 
 #define xf_buffer_params_m( ... ) ( xf_buffer_params_t ) { \
-    .size = 0, \
-    .allow_aliasing = false, \
-    .debug_name = {0}, \
-    .clear_on_create = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -532,13 +550,14 @@ typedef struct {
     xf_buffer_params_t buffer;
     uint32_t multi_buffer_count;
     bool auto_advance;
+    xg_buffer_init_t* init[xf_resource_multi_buffer_max_buffers_m];
 } xf_multi_buffer_params_t;
 
 #define xf_multi_buffer_params_m( ... ) ( xf_multi_buffer_params_t ) { \
     .buffer = xf_buffer_params_m(), \
     .multi_buffer_count = 2, \
     .auto_advance = true, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -569,14 +588,18 @@ typedef struct {
 } xf_graph_info_t;
 
 typedef enum {
+    // reads
     xf_resource_access_sampled_m,
+    xf_resource_access_indirect_command_m,
     xf_resource_access_uniform_m,
     xf_resource_access_storage_read_m,
     xf_resource_access_copy_read_m,
+    // writes
     xf_resource_access_render_target_m,
     xf_resource_access_depth_target_m,
     xf_resource_access_storage_write_m,
     xf_resource_access_copy_write_m,
+    
     xf_resource_access_invalid_m,
 } xf_resource_access_e;
 
@@ -654,10 +677,11 @@ typedef struct {
     void ( *advance_multi_texture ) ( xf_texture_h multi_texture );
     void ( *advance_multi_buffer ) ( xf_buffer_h multi_buffer );
     xf_texture_h ( *get_multi_texture ) ( xf_texture_h multi_texture, int32_t offset );
-    xf_buffer_h ( *get_multi_buffer ) ( xf_texture_h multi_buffer, int32_t offset );
+    xf_buffer_h ( *get_multi_buffer ) ( xf_buffer_h multi_buffer, int32_t offset );
 
     xf_texture_h ( *create_multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
     xf_texture_h ( *create_texture_from_external ) ( xg_texture_h texture );
+    xf_buffer_h ( *create_buffer_from_external ) ( xg_buffer_h buffer );
     void ( *refresh_external_texture ) ( xf_texture_h texture );
 
     void ( *get_texture_info ) ( xf_texture_info_t* info, xf_texture_h texture );

@@ -170,6 +170,7 @@ typedef struct {
 #define viewapp_raytrace_mesh_component_id 3
 #define viewapp_transform_component_id_m 4
 #define viewapp_parent_component_id_m 5
+#define viewapp_tessellation_mesh_component_id_m 6
 
 typedef struct {
     float base_color[3];
@@ -228,6 +229,19 @@ typedef struct {
 }
 
 typedef struct {
+    // TODO
+    xg_geo_util_geometry_data_t geo_data;
+    xg_geo_util_geometry_gpu_data_t geo_gpu_data;
+    uint32_t object_id;
+    viewapp_material_data_t material;
+} viewapp_tessellation_mesh_component_t;
+
+#define viewapp_tessellation_mesh_component_m( ... ) ( viewapp_tessellation_mesh_component_t ) { \
+    .geo_gpu_data = xg_geo_util_geometry_gpu_data_m(), \
+    __VA_ARGS__ \
+}
+
+typedef struct {
     xg_geo_util_geometry_data_t geo_data;
     xg_geo_util_geometry_gpu_data_t geo_gpu_data;
     xs_database_pipeline_h object_id_pipeline;
@@ -240,8 +254,7 @@ typedef struct {
 } viewapp_mesh_component_t;
 
 #define viewapp_mesh_component_m( ... ) ( viewapp_mesh_component_t ) { \
-    .geo_data = { 0 }, \
-    .geo_gpu_data = { 0 }, \
+    .geo_gpu_data = xg_geo_util_geometry_gpu_data_m(), \
     .object_id_pipeline = xs_null_handle_m, \
     .geometry_pipeline = xs_null_handle_m, \
     .shadow_pipeline = xs_null_handle_m, \

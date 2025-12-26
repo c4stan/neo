@@ -9,13 +9,6 @@
 #include <se.h>
 #include <se.inl>
 
-typedef struct {
-    xs_database_pipeline_h pipeline_state;
-    xg_sampler_h sampler;
-    uint32_t width;
-    uint32_t height;
-} lighting_pass_args_t;
-
 typedef enum {
     light_type_point_m,
     light_type_spot_m,

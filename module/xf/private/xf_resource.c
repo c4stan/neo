@@ -516,12 +516,37 @@ void xf_resource_buffer_destroy ( xf_buffer_h buffer_handle ) {
 xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params ) {
     xf_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->buffers_freelist );
     *buffer = xf_buffer_m ( .params = *params );
-    if ( params->clear_on_create ) {
+    if ( params->init && params->init->mode != xg_buffer_init_mode_uninitialized_m ) {
         buffer->required_usage |= xg_texture_usage_bit_copy_dest_m;
+        buffer->init = *params->init;
     }
     xf_buffer_h handle = ( xf_buffer_h ) ( buffer - xf_resource_state->buffers_array );
     std_bitset_set ( xf_resource_state->buffers_bitset, handle );
     return handle;
+}
+
+void xf_resource_buffer_update_info ( xf_buffer_h buffer_handle, const xg_buffer_info_t* info ) {
+    xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
+    buffer->params.size = info->size;
+    std_str_copy_static_m ( buffer->params.debug_name, info->debug_name );
+}
+
+xf_buffer_h xf_resource_buffer_create_from_external ( xg_buffer_h xg_buffer ) {
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+
+    xg_buffer_info_t info;
+    std_verify_m ( xg->get_buffer_info ( &info, xg_buffer ) );
+
+    xf_buffer_params_t buffer_params = xf_buffer_params_m (
+        .allow_aliasing = false,
+    );
+    std_str_copy_static_m ( buffer_params.debug_name, info.debug_name );
+    xf_buffer_h buffer_handle = xf_resource_buffer_create ( &buffer_params );
+    xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
+    buffer->is_external = true;
+    xf_resource_buffer_update_info ( buffer_handle, &info );
+    xf_resource_buffer_map_to_new ( buffer_handle, xg_buffer, info.allowed_usage );
+    return buffer_handle;
 }
 
 void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer_handle ) {
@@ -839,6 +864,11 @@ xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* pa
         std_string_append ( &string, "(" );
         std_string_append ( &string, id );
         std_string_append ( &string, ")" );
+        if ( params->init[i] ) {
+            buffer_params.init = params->init[i];
+        } else {
+            buffer_params.init = params->buffer.init;
+        }
         xf_buffer_h handle = xf_resource_buffer_create ( &buffer_params );
         xf_buffer_t* buffer = xf_resource_buffer_get ( handle );
         buffer->is_multi = true;
@@ -961,7 +991,7 @@ void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resou
     while ( std_bitset_scan ( &idx, xf_resource_state->buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_buffers_m ) ) ) {
         xf_buffer_t* buffer = &xf_resource_state->buffers_array[idx];
         if ( buffer->ref_count == 0 ) {
-            if ( buffer->xg_handle != xg_null_handle_m ) {
+            if ( buffer->xg_handle != xg_null_handle_m && !buffer->is_external ) {
                 xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, time );
             }
             xf_resource_buffer_destroy ( idx );

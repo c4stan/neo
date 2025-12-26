@@ -18,7 +18,8 @@ layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_uni
     uvec2 resolution_u32;
     uint frame_id; // TODO enable GL_ARB_gpu_shader_int64 and use uint64_t
     float time_ms;
-    uvec2 _pad0;
+    uint clear_history;
+    uint _pad0;
 
     mat4 view_from_world;
     mat4 proj_from_view;
@@ -27,10 +28,11 @@ layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_uni
     mat4 world_from_view;
     mat4 prev_view_from_world;
     mat4 prev_proj_from_view;
+    vec3 cam_world_pos;
     float z_near;
     float z_far;
-
-    uint clear_history;
+    float fov_y;
+    uvec2 _pad1;
 } frame_uniforms;
 
 // ======================================================================================= //

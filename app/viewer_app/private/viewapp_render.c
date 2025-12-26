@@ -9,6 +9,7 @@
 #include <ui_pass.h>
 #include <shadow_pass.h>
 #include <raytrace_pass.h>
+#include <tessellation_pass.h>
 
 #include "viewapp_state.h"
 
@@ -112,7 +113,8 @@ typedef struct {
     uint32_t resolution_y_u32;
     uint32_t frame_id;
     float time_ms;
-    uint32_t _pad0[2];
+    uint32_t clear_history;
+    uint32_t _pad0[1];
     rv_matrix_4x4_t view_from_world;
     rv_matrix_4x4_t proj_from_view;
     rv_matrix_4x4_t jittered_proj_from_view;
@@ -120,9 +122,11 @@ typedef struct {
     rv_matrix_4x4_t world_from_view;
     rv_matrix_4x4_t prev_view_from_world;
     rv_matrix_4x4_t prev_proj_from_view;
+    float cam_pos[3];
     float z_near;
     float z_far;
-    uint32_t clear_history;
+    float v_fov;
+    uint32_t _pad1[2];
 } workload_uniforms_t;
 
 void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
@@ -161,6 +165,7 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             .resolution_y_u32 = ( uint32_t ) state->render.resolution_y,
             .resolution_x_f32 = ( float ) state->render.resolution_x,
             .resolution_y_f32 = ( float ) state->render.resolution_y,
+            .clear_history = state->render.clear_history,
             .view_from_world = view_info.view_matrix,
             .proj_from_view = view_info.proj_matrix,
             .jittered_proj_from_view = view_info.jittered_proj_matrix,
@@ -170,7 +175,12 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             .prev_proj_from_view = view_info.prev_frame_proj_matrix,
             .z_near = view_info.proj_params.perspective.near_z,
             .z_far = view_info.proj_params.perspective.far_z,
-            .clear_history = state->render.clear_history,
+            .v_fov = view_info.proj_params.perspective.fov_y,
+            .cam_pos = {
+                view_info.transform.position[0], 
+                view_info.transform.position[1], 
+                view_info.transform.position[2], 
+            },
         };
 
         // disable jittering if TAA is off 
@@ -421,7 +431,15 @@ static void viewapp_boot_restir_di_graph ( void ) {
         ),
     ) );
 
-    add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
+    gbuffer_textures_t gbuffer = {
+        .color = color_texture,
+        .normal = normal_texture,
+        .material = material_texture,
+        .radiosity = radiosity_texture,
+        .object_id = object_id_texture,
+        .velocity = velocity_texture,
+    };
+    add_geometry_node ( graph, &gbuffer, depth_texture );
 
     // restir di
     xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
@@ -447,8 +465,10 @@ static void viewapp_boot_restir_di_graph ( void ) {
         .buffer = xf_buffer_params_m (
             .size = 32 * resolution_x * resolution_y, // TODO
             .debug_name = "reservoir_buffer",
-            .clear_on_create = true,
-            .clear_value = 0
+            .init = &xg_buffer_init_m (
+                .mode = xg_buffer_init_mode_clear_m,
+                .clear = 0,
+            ),
         ),
         .multi_buffer_count = 2,
     ) );
@@ -814,7 +834,15 @@ static void viewapp_boot_raytrace_graph ( void ) {
         ),
     ) );
 
-    add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
+    gbuffer_textures_t gbuffer = {
+        .color = color_texture,
+        .normal = normal_texture,
+        .material = material_texture,
+        .radiosity = radiosity_texture,
+        .object_id = object_id_texture,
+        .velocity = velocity_texture,
+    };
+    add_geometry_node ( graph, &gbuffer, depth_texture );
 
     // raytrace
     xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
@@ -840,8 +868,10 @@ static void viewapp_boot_raytrace_graph ( void ) {
         .buffer = xf_buffer_params_m (
             .size = 32 * resolution_x * resolution_y, // TODO
             .debug_name = "reservoir_buffer",
-            .clear_on_create = true,
-            .clear_value = 0
+            .init = &xg_buffer_init_m (
+                .mode = xg_buffer_init_mode_clear_m,
+                .clear = 0,
+            ),
         ),
         .multi_buffer_count = 2,
     ) );
@@ -1125,7 +1155,115 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    add_geometry_node ( graph, color_texture, normal_texture, material_texture, radiosity_texture, object_id_texture, velocity_texture, depth_texture );
+    gbuffer_textures_t gbuffer = {
+        .color = color_texture,
+        .normal = normal_texture,
+        .material = material_texture,
+        .radiosity = radiosity_texture,
+        .object_id = object_id_texture,
+        .velocity = velocity_texture,
+    };
+    add_geometry_node ( graph, &gbuffer, depth_texture );
+
+    // tessellation
+    // TODO remove the setup pass, have a proper susystem that suballocates multiple meshes vertex/index/meta data into buffers, properly render on gbuffer, shadows, ...
+    xg_workload_h tess_workload = xg->create_workload ( device );
+    xf_buffer_h tess_vertex_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = 1024 * 1024 * 32,
+        .debug_name = "tessellation_vbuffer"
+    ) );
+    xf_buffer_h tess_index_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = 1024 * 1024 * 32,
+        .debug_name = "tessellation_ibuffer"
+    ) );
+    float tess_instance_vertex_data[6] = {
+        0, 0,
+        0, 1,
+        1, 0,
+    };
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( tess_workload );
+    xg_buffer_h tess_instance_vertex_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
+        .size = sizeof ( tess_instance_vertex_data ),
+        .memory_type = xg_memory_type_gpu_only_m,
+        .device = device,
+        .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
+            | xg_buffer_usage_bit_vertex_buffer_m,
+        .debug_name = "tess_instance_vertex_buffer",
+    ), &xg_buffer_init_m (
+        .mode = xg_buffer_init_mode_upload_m,
+        .upload_data = tess_instance_vertex_data,
+    ) );
+
+    xg->submit_workload ( tess_workload );
+    xg->wait_all_workload_complete();
+    
+    xf_buffer_h tess_subdivision_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
+        .buffer = xf_buffer_params_m (
+            .size = sizeof ( uint32_t ) * 1024 * 1024 * 128,
+            .debug_name = "tessellation_subdivision_buffer",
+            .init = &xg_buffer_init_m (
+                .mode = xg_buffer_init_mode_clear_m,
+                .clear = 0,
+            ),
+        ),
+    ) );
+    xf_buffer_h tess_prev_subdivision_buffer = xf->get_multi_buffer ( tess_subdivision_buffer, -1 );
+
+    xf_buffer_h tess_update_indirect_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = sizeof ( xg_compute_indirect_gpu_args_t ) + 4,
+        .debug_name = "tessellation_indirect_update",
+    ) );
+
+    add_tessellation_setup_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_update_indirect_buffer, tess_prev_subdivision_buffer );
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "tessellation_update",
+        .type = xf_node_type_compute_indirect_pass_m,
+        .pass.compute_indirect = xf_node_compute_indirect_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "tessellation_update" ) ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_buffer_reads_count = 3,
+            .storage_buffer_reads = {
+                xf_compute_buffer_dependency_m ( .buffer = tess_vertex_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = tess_index_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = tess_prev_subdivision_buffer ),
+            },
+            .storage_buffer_writes_count = 1,
+            .storage_buffer_writes = {
+                xf_compute_buffer_dependency_m ( .buffer = tess_subdivision_buffer ),
+            },
+            .indirect_command_read = tess_update_indirect_buffer,
+        ),
+    ) );
+
+    xf_buffer_h tess_draw_indirect_buffer = xf->create_buffer ( &xf_buffer_params_m (
+        .size = sizeof ( xg_draw_indirect_gpu_args_t ),
+        .debug_name = "tessellation_indirect_draw"
+    ) );
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "tessellation_prepare",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "tessellation_prepare" ) ),
+            .workgroup_count = { 1, 1, 1 },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_buffer_reads_count = 1,
+            .storage_buffer_reads = {
+                xf_compute_buffer_dependency_m ( .buffer = tess_subdivision_buffer ),
+            },
+            .storage_buffer_writes_count = 3,
+            .storage_buffer_writes = {
+                xf_compute_buffer_dependency_m ( .buffer = tess_prev_subdivision_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = tess_draw_indirect_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = tess_update_indirect_buffer ),
+            },
+        ),
+    ) );
+
+    add_tessellation_draw_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_subdivision_buffer, tess_draw_indirect_buffer, tess_instance_vertex_buffer, &gbuffer, depth_texture, sdb );
 
     // lighting
     xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m (

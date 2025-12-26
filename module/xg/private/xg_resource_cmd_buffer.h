@@ -61,7 +61,6 @@ typedef struct {
 
 typedef struct {
     xg_buffer_h buffer;
-    bool init;
     xg_buffer_init_mode_e init_mode;
     union {
         uint32_t clear;
@@ -121,10 +120,10 @@ xg_resource_cmd_buffer_t* xg_resource_cmd_buffer_get ( xg_resource_cmd_buffer_h 
 // ======================================================================================= //
 //                                     R E S O U R C E
 // ======================================================================================= //
-xg_texture_h    xg_resource_cmd_buffer_texture_create           ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params, xg_texture_init_t* init );
+xg_texture_h    xg_resource_cmd_buffer_texture_create           ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params, const xg_texture_init_t* init );
 void            xg_resource_cmd_buffer_texture_destroy          ( xg_resource_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_resource_cmd_buffer_time_e destroy_time );
 
-xg_buffer_h     xg_resource_cmd_buffer_buffer_create            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params, xg_buffer_init_t* init );
+xg_buffer_h     xg_resource_cmd_buffer_buffer_create            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params, const xg_buffer_init_t* init );
 void            xg_resource_cmd_buffer_buffer_destroy           ( xg_resource_cmd_buffer_h cmd_buffer, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e destroy_time );
 
 xg_resource_bindings_h xg_resource_cmd_buffer_resource_bindings_create ( xg_resource_cmd_buffer_h cmd_buffer, const xg_resource_bindings_params_t* params );

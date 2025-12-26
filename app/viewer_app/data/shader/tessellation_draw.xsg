@@ -1,0 +1,39 @@
+vertex_shader tessellation_draw.vert
+fragment_shader tessellation_draw.frag
+
+include common_graphics.xsi
+include depth_write_d32.xsi
+
+begin render_target 0 // xyz: color, w: metalness
+    format R8G8B8A8_UNORM
+end
+
+begin render_target 1 // xyz: normals, w: roughness
+    format R8G8B8A8_UNORM
+end
+
+begin render_target 2 // x: matId, yzw: material data
+    format R8G8B8A8_UNORM
+end
+
+begin render_target 3 // xyz: radiosity
+    format B10G11R11_UFLOAT
+end
+
+begin render_target 4 // xy: object id, zw: triangle id
+    format R8G8B8A8_UINT
+end
+
+begin render_target 5 // xy: velocity
+    format R16G16_UNORM
+end
+
+begin input 0
+    pos R32G32_FLOAT
+end
+
+begin bindings
+    buffer uniform vertex
+    buffer uniform fragment
+    buffer[3] storage
+end

@@ -113,6 +113,8 @@ typedef struct {
     xf_buffer_params_t params;
     uint32_t ref_count;
     bool is_multi;
+    bool is_external;
+    xg_buffer_init_t init;
 } xf_buffer_t;
 
 #define xf_buffer_m( ... ) ( xf_buffer_t ) { \
@@ -123,6 +125,7 @@ typedef struct {
     .params = xf_buffer_params_m(), \
     .ref_count = 0, \
     .is_multi = false, \
+    .init = xg_buffer_init_m(), \
     ##__VA_ARGS__ \
 }
 
@@ -218,10 +221,10 @@ void xf_resource_load ( xf_resource_state_t* state );
 void xf_resource_reload ( xf_resource_state_t* state );
 void xf_resource_unload ( void );
 
-// TODO rename _declare to _create?
 xf_texture_h xf_resource_texture_create ( const xf_texture_params_t* params );
 xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h texture );
 xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params );
+xf_buffer_h xf_resource_buffer_create_from_external ( xg_buffer_h buffer );
 
 void xf_resource_texture_destroy ( xf_texture_h texture );
 void xf_resource_buffer_destroy ( xf_buffer_h buffer );
@@ -241,6 +244,7 @@ void xf_resource_texture_unmap ( xf_texture_h texture );
 void xf_resource_buffer_unmap ( xf_buffer_h buffer );
 
 void xf_resource_texture_update_info ( xf_texture_h texture, const xg_texture_info_t* info );
+void xf_resource_buffer_update_info ( xf_buffer_h buffer_handle, const xg_buffer_info_t* info );
 
 void xf_resource_texture_add_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
 void xf_resource_buffer_add_usage ( xf_buffer_h buffer, xg_buffer_usage_bit_e usage );

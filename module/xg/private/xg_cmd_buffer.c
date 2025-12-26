@@ -394,7 +394,6 @@ static void* xg_cmd_buffer_record_cmd ( xg_cmd_buffer_t* cmd_buffer, xg_cmd_type
 void xg_cmd_buffer_cmd_renderpass_begin ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_renderpass_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_graphics_renderpass_begin_m, key, xg_cmd_renderpass_params_t );
-
     *cmd_args = *params;
 }
 
@@ -418,49 +417,54 @@ void xg_cmd_dynamic_scissor ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, c
 void xg_cmd_buffer_cmd_draw ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_draw_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_draw_m, key, xg_cmd_draw_params_t );
+    *cmd_args = *params;
+}
 
+void xg_cmd_buffer_cmd_draw_indirect ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_draw_indirect_params_t* params ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_draw_indirect_m, key, xg_cmd_draw_indirect_params_t );
     *cmd_args = *params;
 }
 
 void xg_cmd_buffer_cmd_compute ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_compute_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_compute_m, key, xg_cmd_compute_params_t );
+    *cmd_args = *params;
+}
 
+void xg_cmd_buffer_cmd_compute_indirect ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_compute_indirect_params_t* params ) {
+    xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_compute_indirect_m, key, xg_cmd_compute_indirect_params_t );
     *cmd_args = *params;
 }
 
 void xg_cmd_buffer_cmd_raytrace ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_cmd_raytrace_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_raytrace_m, key, xg_cmd_raytrace_params_t );
-
     *cmd_args = *params;
 }
 
 void xg_cmd_buffer_copy_buffer ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_buffer_copy_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_copy_buffer_m, key, xg_buffer_copy_params_t );
-
     *cmd_args = *params;
 }
 
 void xg_cmd_buffer_copy_texture ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_texture_copy_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_copy_texture_m, key, xg_texture_copy_params_t );
-
     *cmd_args = *params;
 }
 
 void xg_cmd_buffer_copy_buffer_to_texture ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_buffer_to_texture_copy_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_copy_buffer_to_texture_m, key, xg_buffer_to_texture_copy_params_t );
-
     *cmd_args = *params;
 }
 
 void xg_cmd_buffer_copy_texture_to_buffer ( xg_cmd_buffer_h cmd_buffer_handle, uint64_t key, const xg_texture_to_buffer_copy_params_t* params ) {
     xg_cmd_buffer_t* cmd_buffer = xg_cmd_buffer_get ( cmd_buffer_handle );
     std_auto_m cmd_args = xg_cmd_buffer_record_cmd_m ( cmd_buffer, xg_cmd_copy_texture_to_buffer_m, key, xg_texture_to_buffer_copy_params_t );
-
     *cmd_args = *params;
 }
 

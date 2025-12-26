@@ -1281,9 +1281,10 @@ typedef enum {
     xg_buffer_usage_bit_storage_m                       = 1 << 5,
     xg_buffer_usage_bit_index_buffer_m                  = 1 << 6,
     xg_buffer_usage_bit_vertex_buffer_m                 = 1 << 7,
-    xg_buffer_usage_bit_shader_device_address_m         = 1 << 8,
-    xg_buffer_usage_bit_raytrace_geometry_buffer_m      = 1 << 9,
-    // Note: internal code might extend this, check before adding something
+    xg_buffer_usage_bit_indirect_command_m              = 1 << 8,
+    xg_buffer_usage_bit_shader_device_address_m         = 1 << 9,
+    xg_buffer_usage_bit_raytrace_geometry_buffer_m      = 1 << 10,
+    xg_buffer_usage_bit_count_m = 11
 } xg_buffer_usage_bit_e;
 
 typedef enum {
@@ -1330,7 +1331,7 @@ typedef enum {
 typedef enum {
     xg_pipeline_stage_bit_none_m                                = 0,
     xg_pipeline_stage_bit_top_of_pipe_m                         = 0x00000001,
-    xg_pipeline_stage_bit_draw_m                                = 0x00000002,
+    xg_pipeline_stage_bit_indirect_command_m                    = 0x00000002,
     xg_pipeline_stage_bit_vertex_input_m                        = 0x00000004,
     xg_pipeline_stage_bit_vertex_shader_m                       = 0x00000008,
     // xg_pipeline_stage_tessellation_control_shader_m       = 0x00000010,
@@ -1360,24 +1361,24 @@ typedef struct {
 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccessFlagBits.html
 // TODO add and use acceleration_structure related bits
 typedef enum {
-    xg_memory_access_bit_none_m                       = 0,
-    xg_memory_access_bit_command_read_m               = 0x00000001,
-    xg_memory_access_bit_index_read_m                 = 0x00000002,
-    xg_memory_access_bit_vertex_attribute_read_m      = 0x00000004,
-    xg_memory_access_bit_uniform_read_m               = 0x00000008,
-    xg_memory_access_bit_input_render_texture_read_m  = 0x00000010,
-    xg_memory_access_bit_shader_read_m                = 0x00000020,
-    xg_memory_access_bit_shader_write_m               = 0x00000040,
-    xg_memory_access_bit_color_read_m                 = 0x00000080,
-    xg_memory_access_bit_color_write_m                = 0x00000100,
-    xg_memory_access_bit_depth_stencil_read_m         = 0x00000200,
-    xg_memory_access_bit_depth_stencil_write_m        = 0x00000400,
-    xg_memory_access_bit_transfer_read_m              = 0x00000800,
-    xg_memory_access_bit_transfer_write_m             = 0x00001000,
-    xg_memory_access_bit_host_read_m                  = 0x00002000,
-    xg_memory_access_bit_host_write_m                 = 0x00004000,
-    xg_memory_access_bit_memory_read_m                = 0x00008000,
-    xg_memory_access_bit_memory_write_m               = 0x00010000,
+    xg_memory_access_bit_none_m                         = 0,
+    xg_memory_access_bit_indirect_command_read_m        = 0x00000001,
+    xg_memory_access_bit_index_read_m                   = 0x00000002,
+    xg_memory_access_bit_vertex_attribute_read_m        = 0x00000004,
+    xg_memory_access_bit_uniform_read_m                 = 0x00000008,
+    xg_memory_access_bit_input_render_texture_read_m    = 0x00000010,
+    xg_memory_access_bit_shader_read_m                  = 0x00000020,
+    xg_memory_access_bit_shader_write_m                 = 0x00000040,
+    xg_memory_access_bit_color_read_m                   = 0x00000080,
+    xg_memory_access_bit_color_write_m                  = 0x00000100,
+    xg_memory_access_bit_depth_stencil_read_m           = 0x00000200,
+    xg_memory_access_bit_depth_stencil_write_m          = 0x00000400,
+    xg_memory_access_bit_transfer_read_m                = 0x00000800,
+    xg_memory_access_bit_transfer_write_m               = 0x00001000,
+    xg_memory_access_bit_host_read_m                    = 0x00002000,
+    xg_memory_access_bit_host_write_m                   = 0x00004000,
+    xg_memory_access_bit_memory_read_m                  = 0x00008000,
+    xg_memory_access_bit_memory_write_m                 = 0x00010000,
 } xg_memory_access_bit_e;
 
 /*
@@ -1709,6 +1710,26 @@ typedef struct {
 }
 
 typedef struct {
+    xg_compute_pipeline_state_h pipeline;
+    xg_resource_bindings_h bindings[xg_shader_binding_set_count_m];
+    xg_buffer_h indirect_buffer;
+    uint64_t indirect_offset;
+} xg_cmd_compute_indirect_params_t;
+
+#define xg_cmd_compute_indirect_params_m( ... ) ( xg_cmd_compute_indirect_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .bindings = { [0 ... xg_shader_binding_set_count_m - 1] = xg_null_handle_m }, \
+    .indirect_buffer = xg_null_handle_m, \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t workgroup_count_x;
+    uint32_t workgroup_count_y;
+    uint32_t workgroup_count_z;
+} xg_compute_indirect_gpu_args_t;
+
+typedef struct {
     xg_graphics_pipeline_state_h pipeline;
     xg_resource_bindings_h bindings[xg_shader_binding_set_count_m];
     xg_buffer_h index_buffer;
@@ -1731,8 +1752,37 @@ typedef struct {
     .vertex_buffers_count = 0, \
     .instance_count = 1, \
     .instance_offset = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
+
+typedef struct {
+    xg_graphics_pipeline_state_h pipeline;
+    xg_resource_bindings_h bindings[xg_shader_binding_set_count_m];
+    xg_buffer_h indirect_buffer;
+    xg_buffer_h index_buffer;
+    xg_buffer_h vertex_buffers[xg_input_layout_max_streams_m];
+    //uint32_t index_offset;
+    //uint32_t vertex_offset;
+    uint32_t vertex_buffers_count;
+    uint32_t indirect_offset;
+    uint32_t indirect_count;
+    uint32_t indirect_stride;
+} xg_cmd_draw_indirect_params_t;
+
+#define xg_cmd_draw_indirect_params_m( ... ) ( xg_cmd_draw_indirect_params_t ) { \
+    .pipeline = xg_null_handle_m, \
+    .bindings = { [0 ... xg_shader_binding_set_count_m - 1] = xg_null_handle_m }, \
+    .index_buffer = xg_null_handle_m, \
+    .indirect_buffer = xg_null_handle_m, \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    uint32_t vertex_count;
+    uint32_t instance_count;
+    uint32_t first_vertex;
+    uint32_t first_instance;
+} xg_draw_indirect_gpu_args_t;
 
 typedef struct {
     uint32_t width;
@@ -1848,23 +1898,22 @@ typedef struct {
 }
 
 typedef enum {
+    xg_buffer_init_mode_uninitialized_m,
     xg_buffer_init_mode_clear_m,
     xg_buffer_init_mode_upload_m,
-    xg_buffer_init_mode_uninitialized_m,
 } xg_buffer_init_mode_e;
 
 typedef struct {
     xg_buffer_init_mode_e mode;
     union {
         uint32_t clear;
-        void* upload_data;
+        void* upload_data; // TODO make this a std_buffer_t and respect upload size
     };
 } xg_buffer_init_t;
 
 #define xg_buffer_init_m( ... ) ( xg_buffer_init_t ) { \
-    .mode = xg_texture_init_mode_uninitialized_m, \
-    .upload_data = NULL, \
-    ##__VA_ARGS__ \
+    .mode = xg_buffer_init_mode_uninitialized_m, \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1879,11 +1928,7 @@ typedef struct {
 #define xg_buffer_params_m( ... ) ( xg_buffer_params_t ) { \
     .memory_type = xg_memory_type_gpu_only_m, \
     .device = xg_null_handle_m, \
-    .size = 0, \
-    .align = 0, \
-    .allowed_usage = 0, \
-    .debug_name = {0}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -2549,8 +2594,10 @@ typedef struct {
     void                    ( *cmd_barrier_set )                    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_barrier_set_t* barrier_set );
     
     void                    ( *cmd_compute )                        ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_compute_params_t* params );
+    void                    ( *cmd_compute_indirect )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_compute_indirect_params_t* params );
     void                    ( *cmd_begin_renderpass )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_renderpass_params_t* params );
     void                    ( *cmd_draw )                           ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_params_t* params );
+    void                    ( *cmd_draw_indirect )                  ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_cmd_draw_indirect_params_t* params );
     void                    ( *cmd_end_renderpass )                 ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
     void                    ( *cmd_copy_texture )                   ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_texture_copy_params_t* params );
     void                    ( *cmd_copy_buffer )                    ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_buffer_copy_params_t* params );
@@ -2584,8 +2631,8 @@ typedef struct {
     void                    ( *cmd_begin_debug_region )             ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const char* name, uint32_t color );
     void                    ( *cmd_end_debug_region )               ( xg_cmd_buffer_h cmd_buffer, uint64_t key );
 
-    xg_buffer_h             ( *cmd_create_buffer )                  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params, xg_buffer_init_t* init );
-    xg_texture_h            ( *cmd_create_texture )                 ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params, xg_texture_init_t* init );
+    xg_buffer_h             ( *cmd_create_buffer )                  ( xg_resource_cmd_buffer_h cmd_buffer, const xg_buffer_params_t* params, const xg_buffer_init_t* init );
+    xg_texture_h            ( *cmd_create_texture )                 ( xg_resource_cmd_buffer_h cmd_buffer, const xg_texture_params_t* params, const xg_texture_init_t* init );
     void                    ( *cmd_destroy_buffer )                 ( xg_resource_cmd_buffer_h cmd_buffer, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e time );
     void                    ( *cmd_destroy_texture )                ( xg_resource_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_resource_cmd_buffer_time_e time );
 

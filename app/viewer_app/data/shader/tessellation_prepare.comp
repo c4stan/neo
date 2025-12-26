@@ -1,0 +1,62 @@
+#version 450
+
+#include "xs.glsl"
+#include "common.glsl"
+
+#extension GL_EXT_debug_printf : enable
+
+//
+// GPU Zen 2 - Adaptive GPU Tessellation with Compute Shaders
+//
+
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) buffer readonly subdivision_buffer_t {
+    uint count;
+    uint _pad0[3];
+    uvec2 data[];
+} subdivision_buffer;
+
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) buffer prev_subdivision_buffer_t {
+    uint count;
+    uint _pad0[3];
+    uvec2 data[];
+} prev_subdivision_buffer;
+
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) buffer indirect_draw_buffer_t {
+    uint vertex_count;
+    uint instance_count;
+    uint first_vertex;
+    uint first_instance;
+} indirect_draw_buffer;
+
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) buffer indirect_dispatch_buffer_t {
+    uvec3 workgroup_count;
+    bool enabled;
+} indirect_dispatch_buffer;
+
+layout ( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
+void main ( void ) {
+    if ( indirect_dispatch_buffer.enabled ) {
+        // prepare for render
+        indirect_draw_buffer.vertex_count = 3;
+        indirect_draw_buffer.instance_count = subdivision_buffer.count;
+        indirect_draw_buffer.first_vertex = 0;
+        indirect_draw_buffer.first_instance = 0;
+
+        // prepare for next subdivision
+        indirect_dispatch_buffer.workgroup_count.x = ( subdivision_buffer.count + 63 ) / 64;
+        indirect_dispatch_buffer.workgroup_count.y = 1;
+        indirect_dispatch_buffer.workgroup_count.z = 1;
+        prev_subdivision_buffer.count = 0;
+    } else {
+        // prepare for render
+        indirect_draw_buffer.vertex_count = 3;
+        indirect_draw_buffer.instance_count = 0;
+        indirect_draw_buffer.first_vertex = 0;
+        indirect_draw_buffer.first_instance = 0;
+
+        // prepare for next subdivision
+        indirect_dispatch_buffer.workgroup_count.x = 0;
+        indirect_dispatch_buffer.workgroup_count.y = 0;
+        indirect_dispatch_buffer.workgroup_count.z = 0;
+    }
+}

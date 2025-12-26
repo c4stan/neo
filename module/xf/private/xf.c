@@ -50,6 +50,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->destroy_texture = xf_resource_texture_destroy;
 
     xf->create_texture_from_external = xf_resource_texture_create_from_external;
+    xf->create_buffer_from_external = xf_resource_buffer_create_from_external;
     xf->get_multi_texture = xf_resource_multi_texture_get_texture;
     xf->get_multi_buffer = xf_resource_multi_buffer_get_buffer;
 

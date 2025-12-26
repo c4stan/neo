@@ -886,6 +886,7 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
             cmd_chunk = xg_vk_workload_cmd_chunk_m ( .queue = queue_chunk.queue );
             break;
         case xg_cmd_draw_m:
+        case xg_cmd_draw_indirect_m:
         case xg_cmd_dynamic_viewport_m:
         case xg_cmd_dynamic_scissor_m:
             std_assert_m ( in_renderpass );
@@ -893,6 +894,7 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
             if ( cmd_chunk.begin == -1 ) cmd_chunk.begin = cmd_it;
             break;
         case xg_cmd_compute_m:
+        case xg_cmd_compute_indirect_m:
         case xg_cmd_raytrace_m:
         case xg_cmd_texture_clear_m:
         case xg_cmd_texture_depth_stencil_clear_m:
@@ -991,6 +993,10 @@ static void xg_vk_workload_debug_print_cmd_headers ( const xg_cmd_header_t* cmd_
         break;
         case xg_cmd_draw_m: {
             std_log_info_m ( "draw" );
+            break;
+        }
+        case xg_cmd_draw_indirect_m: {
+            std_log_info_m ( "draw_indirect" );
             break;
         }
         case xg_cmd_compute_m: {
@@ -1231,7 +1237,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 
                 vkCmdBindPipeline ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->common.vk_handle );
 
-                if ( pipeline->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_viewport_m && !( cache.dynamic_flags & xg_graphics_pipeline_dynamic_state_bit_viewport_m ) ) {                        
+                if ( pipeline->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_viewport_m && !( cache.dynamic_flags & xg_graphics_pipeline_dynamic_state_bit_viewport_m ) ) {
                     VkViewport vk_viewport = {
                         .x = 0,
                         .y = cache.resolution_y,
@@ -1244,7 +1250,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                     cache.dynamic_flags |= xg_graphics_pipeline_dynamic_state_bit_viewport_m;
                 }
 
-                if ( pipeline->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_scissor_m && !( cache.dynamic_flags & xg_graphics_pipeline_dynamic_state_bit_scissor_m ) ) {                        
+                if ( pipeline->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_scissor_m && !( cache.dynamic_flags & xg_graphics_pipeline_dynamic_state_bit_scissor_m ) ) {
                     VkRect2D vk_scissor = {
                         .offset.x = 0,
                         .offset.y = 0,
@@ -1303,14 +1309,13 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 for ( size_t i = 0; i < vertex_buffers_count; ++i ) {
                     const xg_vk_buffer_t* buffer = xg_vk_buffer_get ( args->vertex_buffers[i] );
                     vk_buffers[i] = buffer->vk_handle;
-                    vk_offsets[i] = 0;
+                    vk_offsets[i] = 0; // TODO per buffer offsets?
                 }
 
                 if ( vertex_buffers_count > 0 ) {
                     vkCmdBindVertexBuffers ( vk_cmd_buffer, 0, vertex_buffers_count, vk_buffers, vk_offsets );
                 }
 
-                // TODO instancing
                 uint32_t instance_count = args->instance_count;
                 uint32_t instance_offset = args->instance_offset;
                 uint32_t primitive_count = args->primitive_count;
@@ -1322,6 +1327,108 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                     vkCmdDrawIndexed ( vk_cmd_buffer, primitive_count * 3, instance_count, index_offset, vertex_offset, instance_offset );
                 } else {
                     vkCmdDraw ( vk_cmd_buffer, primitive_count * 3, instance_count, vertex_offset, instance_offset );
+                }
+
+                std_noop_m;
+            }
+            break;
+            case xg_cmd_draw_indirect_m: {
+                std_auto_m args = ( xg_cmd_draw_indirect_params_t* ) header->args;
+                std_assert_m ( in_renderpass );
+
+                const xg_vk_graphics_pipeline_t* pipeline = xg_vk_graphics_pipeline_get ( args->pipeline );
+
+                vkCmdBindPipeline ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->common.vk_handle );
+
+                if ( pipeline->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_viewport_m && !( cache.dynamic_flags & xg_graphics_pipeline_dynamic_state_bit_viewport_m ) ) {
+                    VkViewport vk_viewport = {
+                        .x = 0,
+                        .y = cache.resolution_y,
+                        .width = cache.resolution_x,
+                        .height = - ( float ) cache.resolution_y,
+                        .minDepth = 0,
+                        .maxDepth = 1,
+                    };
+                    vkCmdSetViewport ( vk_cmd_buffer, 0, 1, &vk_viewport );
+                    cache.dynamic_flags |= xg_graphics_pipeline_dynamic_state_bit_viewport_m;
+                }
+
+                if ( pipeline->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_scissor_m && !( cache.dynamic_flags & xg_graphics_pipeline_dynamic_state_bit_scissor_m ) ) {
+                    VkRect2D vk_scissor = {
+                        .offset.x = 0,
+                        .offset.y = 0,
+                        .extent.width = cache.resolution_x,
+                        .extent.height = cache.resolution_y,
+                    };
+                    vkCmdSetScissor ( vk_cmd_buffer, 0, 1, &vk_scissor );
+                    cache.dynamic_flags |= xg_graphics_pipeline_dynamic_state_bit_scissor_m;
+                }
+
+                VkDescriptorSet vk_sets[xg_shader_binding_set_count_m] = { [0 ... xg_shader_binding_set_count_m - 1] = VK_NULL_HANDLE };
+                if ( global_set ) {
+                    const xg_vk_resource_bindings_t* global_bindings = xg_vk_pipeline_resource_group_get ( device_handle, workload->global_bindings );
+                    if ( pipeline->common.resource_layouts[0] == global_bindings->layout ) {
+                        vk_sets[0] = global_set;
+                    }
+                }
+                
+                for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
+                    xg_resource_bindings_h group_handle = args->bindings[i];
+
+                    if ( group_handle == xg_null_handle_m ) {
+                        continue;
+                    }
+                    
+                    if ( xg_vk_resource_group_handle_is_workload_m ( group_handle ) ) {
+                        group_handle = xg_vk_resource_group_handle_remove_tag_m ( group_handle );
+                        vk_sets[i] = workload->desc_sets_array[group_handle];
+                    } else {
+                        const xg_vk_resource_bindings_t* group = xg_vk_pipeline_resource_group_get ( device_handle, group_handle );
+                        vk_sets[i] = group->vk_handle;
+                    }
+                }
+
+                for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ) {
+                    if ( vk_sets[i] == VK_NULL_HANDLE ) {
+                        ++i;
+                        continue;
+                    }
+
+                    uint32_t j = i + 1;
+                    while ( j < xg_shader_binding_set_count_m && vk_sets[j] != VK_NULL_HANDLE ) {
+                        ++j;
+                    }
+
+                    vkCmdBindDescriptorSets ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->common.vk_layout_handle, i, j - i, &vk_sets[i], 0, NULL );
+                    i = j;
+                }
+
+                VkBuffer vk_buffers[xg_vertex_stream_max_bindings_m];
+                VkDeviceSize vk_offsets[xg_vertex_stream_max_bindings_m];
+
+                uint32_t vertex_buffers_count = args->vertex_buffers_count;
+
+                for ( size_t i = 0; i < vertex_buffers_count; ++i ) {
+                    const xg_vk_buffer_t* buffer = xg_vk_buffer_get ( args->vertex_buffers[i] );
+                    vk_buffers[i] = buffer->vk_handle;
+                    vk_offsets[i] = 0; // TODO per buffer offsets?
+                }
+
+                if ( vertex_buffers_count > 0 ) {
+                    vkCmdBindVertexBuffers ( vk_cmd_buffer, 0, vertex_buffers_count, vk_buffers, vk_offsets );
+                }
+
+                const xg_vk_buffer_t* indirect_buffer = xg_vk_buffer_get ( args->indirect_buffer );
+                uint32_t indirect_count = args->indirect_count;
+                uint32_t indirect_offset = args->indirect_offset;
+                uint32_t indirect_stride = args->indirect_stride;
+                xg_buffer_h index_buffer = args->index_buffer;
+                if ( index_buffer != xg_null_handle_m ) {
+                    const xg_vk_buffer_t* ibuffer = xg_vk_buffer_get ( index_buffer );
+                    vkCmdBindIndexBuffer ( vk_cmd_buffer, ibuffer->vk_handle, 0, VK_INDEX_TYPE_UINT32 ); // TODO read index type from buffer
+                    vkCmdDrawIndexedIndirect ( vk_cmd_buffer, indirect_buffer->vk_handle, indirect_offset, indirect_count, indirect_stride );
+                } else {
+                    vkCmdDrawIndirect ( vk_cmd_buffer, indirect_buffer->vk_handle, indirect_offset, indirect_count, indirect_stride );
                 }
 
                 std_noop_m;
@@ -1375,6 +1482,57 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 }
 
                 vkCmdDispatch ( vk_cmd_buffer, args->workgroup_count_x, args->workgroup_count_y, args->workgroup_count_z );
+            }
+            break;
+            case xg_cmd_compute_indirect_m: {
+                std_auto_m args = ( xg_cmd_compute_indirect_params_t* ) header->args;
+                std_assert_m ( !in_renderpass );
+
+                const xg_vk_compute_pipeline_t* pipeline = xg_vk_compute_pipeline_get ( args->pipeline );
+
+                vkCmdBindPipeline ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->common.vk_handle );
+
+                VkDescriptorSet vk_sets[xg_shader_binding_set_count_m] = { [0 ... xg_shader_binding_set_count_m - 1] = VK_NULL_HANDLE };
+                if ( global_set ) {
+                    const xg_vk_resource_bindings_t* global_bindings = xg_vk_pipeline_resource_group_get ( device_handle, workload->global_bindings );
+                    if ( pipeline->common.resource_layouts[0] == global_bindings->layout ) {
+                        vk_sets[0] = global_set;
+                    }
+                }
+                
+                for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
+                    xg_resource_bindings_h group_handle = args->bindings[i];
+                    
+                    if ( group_handle == xg_null_handle_m ) {
+                        continue;
+                    }
+
+                    if ( xg_vk_resource_group_handle_is_workload_m ( group_handle ) ) {
+                        group_handle = xg_vk_resource_group_handle_remove_tag_m ( group_handle );
+                        vk_sets[i] = workload->desc_sets_array[group_handle];
+                    } else {
+                        const xg_vk_resource_bindings_t* group = xg_vk_pipeline_resource_group_get ( device_handle, group_handle );
+                        vk_sets[i] = group->vk_handle;
+                    }
+                }
+
+                for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ) {
+                    if ( vk_sets[i] == VK_NULL_HANDLE ) {
+                        ++i;
+                        continue;
+                    }
+
+                    uint32_t j = i + 1;
+                    while ( j < xg_shader_binding_set_count_m && vk_sets[j] != VK_NULL_HANDLE ) {
+                        ++j;
+                    }
+
+                    vkCmdBindDescriptorSets ( vk_cmd_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline->common.vk_layout_handle, i, j - i, &vk_sets[i], 0, NULL );
+                    i = j;
+                }
+
+                const xg_vk_buffer_t* indirect_buffer = xg_vk_buffer_get ( args->indirect_buffer );
+                vkCmdDispatchIndirect ( vk_cmd_buffer, indirect_buffer->vk_handle, args->indirect_offset );
             }
             break;
             case xg_cmd_raytrace_m: {
@@ -1442,7 +1600,9 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 
                 uint64_t size = args->size;
                 if ( size == xg_buffer_whole_size_m ) {
-                    size = dest->params.size; // TODO
+                    uint64_t dest_size = dest->params.size - args->destination_offset;
+                    uint64_t source_size = source->params.size - args->source_offset;
+                    size = std_min_u64 ( dest_size, source_size );
                 }
 
                 VkBufferCopy copy;
@@ -1451,6 +1611,8 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 copy.size = size;
 
                 vkCmdCopyBuffer ( vk_cmd_buffer, source->vk_handle, dest->vk_handle, 1, &copy );
+
+                std_noop_m;
             }
             break;
             case xg_cmd_copy_texture_m: {
@@ -2265,36 +2427,34 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
                     
                     xg_buffer_h buffer_handle = args->buffer;
                     std_verify_m ( xg_buffer_alloc ( buffer_handle ) );
-                    if ( args->init ) {
-                        switch ( args->init_mode ) {
-                        case xg_buffer_init_mode_clear_m:
-                            xg_cmd_buffer_clear_buffer ( cmd_buffer, 0, buffer_handle, args->clear );
-                            break;
-                        case xg_buffer_init_mode_upload_m:
-                            // TODO batch
-                            xg_cmd_buffer_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
-                                .buffer_memory_barriers_count = 1,
-                                .buffer_memory_barriers = &xg_buffer_memory_barrier_m (
-                                    .buffer = buffer_handle,
-                                    .offset = 0,
-                                    .size = xg_buffer_whole_size_m,
-                                    .memory.flushes = xg_memory_access_bit_none_m,
-                                    .memory.invalidations = xg_memory_access_bit_transfer_write_m,
-                                    .execution.blocker = xg_pipeline_stage_bit_transfer_m,
-                                    .execution.blocked = xg_pipeline_stage_bit_transfer_m,
-                                ),
-                            ) );
-                            // TODO handle mip/array
-                            xg_cmd_buffer_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m (
-                                .source = args->staging.handle,
-                                .source_offset = args->staging.offset,
-                                .destination = buffer_handle,
-                                .size = args->staging.size,
-                            ) );
-                            break;
-                        default:
-                            break;
-                        }
+                    switch ( args->init_mode ) {
+                    case xg_buffer_init_mode_clear_m:
+                        xg_cmd_buffer_clear_buffer ( cmd_buffer, 0, buffer_handle, args->clear );
+                        break;
+                    case xg_buffer_init_mode_upload_m:
+                        // TODO batch
+                        xg_cmd_buffer_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+                            .buffer_memory_barriers_count = 1,
+                            .buffer_memory_barriers = &xg_buffer_memory_barrier_m (
+                                .buffer = buffer_handle,
+                                .offset = 0,
+                                .size = xg_buffer_whole_size_m,
+                                .memory.flushes = xg_memory_access_bit_none_m,
+                                .memory.invalidations = xg_memory_access_bit_transfer_write_m,
+                                .execution.blocker = xg_pipeline_stage_bit_transfer_m,
+                                .execution.blocked = xg_pipeline_stage_bit_transfer_m,
+                            ),
+                        ) );
+                        // TODO handle mip/array
+                        xg_cmd_buffer_copy_buffer ( cmd_buffer, 0, &xg_buffer_copy_params_m (
+                            .source = args->staging.handle,
+                            .source_offset = args->staging.offset,
+                            .destination = buffer_handle,
+                            .size = args->staging.size,
+                        ) );
+                        break;
+                    default:
+                        break;
                     }
                 }
                 break;

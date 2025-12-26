@@ -1008,7 +1008,6 @@ void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint
 {
 #if std_build_debug_m
     size += 8;
-    align = std_align ( align, 8 );
 #endif
 
     // check size
