@@ -1032,8 +1032,14 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
     xi_font_info_t font_info;
     xi_font_get_info ( &font_info, style.font );
 
-    uint32_t text_width = xi_ui_string_width ( state->text, style.font );
-    uint32_t width = std_max_u32 ( text_width, state->width );
+    char buffer[xi_textfield_text_size_m + 1];
+    std_string_t string = std_static_string_m ( buffer );
+    std_string_append ( &string, "_" );
+    std_string_append ( &string, state->text );
+    uint32_t text_width = xi_ui_string_width ( string.str + 1, style.font );
+    std_string_append ( &string, "_" );
+    uint32_t field_width = xi_ui_string_width ( string.str, style.font );
+    uint32_t width = std_max_u32 ( field_width, state->width );
     uint32_t height = std_max_u32 ( font_info.pixel_height, state->height );
 
     int32_t x, y;
@@ -1067,8 +1073,7 @@ bool xi_ui_textfield_internal ( xi_workload_h workload, xi_textfield_state_t* st
 
     // string update
     //bool changed = false;
-    char buffer[xi_textfield_text_size_m + 1];
-    std_string_t string = std_static_string_m ( buffer );
+    std_string_clear ( &string );
     std_string_append ( &string, state->text );
 
     bool has_focus = ( xi_ui_state->focused_id == state->id && xi_ui_state->focused_sub_id == sub_id );

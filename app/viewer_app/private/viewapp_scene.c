@@ -575,7 +575,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
                 .proj_params.perspective = rv_perspective_projection_params_m (
                     .aspect_ratio = 1,
                     .near_z = 0.01,
-                    .far_z = 1000,
+                    .infinite_far_z = true,
                 ),
             );
             light_component.views[i] = rv->create_view ( &view_params );
@@ -760,7 +760,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                 .proj_params.perspective = rv_perspective_projection_params_m (
                     .aspect_ratio = 1,
                     .near_z = 0.01,
-                    .far_z = 100,
+                    .infinite_far_z = true,
                 ),
             );
             light_component.views[i] = rv->create_view ( &view_params );
@@ -847,6 +847,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
         viewapp_light_component_t light_component = viewapp_light_component_m (
             .position = { 0, 30, -10 },
             .intensity = 2000,
+            .radius = 1000,
             .color = { 1, 1, 1 },
             .shadow_casting = true,
             .view_count = viewapp_light_max_views_m,
@@ -870,7 +871,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
                 .proj_params.perspective = rv_perspective_projection_params_m (
                     .aspect_ratio = 1,
                     .near_z = 0.01,
-                    .far_z = 100,
+                    .infinite_far_z = true,
                 ),
             );
             light_component.views[i] = rv->create_view ( &view_params );
@@ -1619,7 +1620,7 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
             .proj_params.perspective = rv_perspective_projection_params_m (
                 .aspect_ratio = 1,
                 .near_z = 0.01,
-                .far_z = 100,
+                .infinite_far_z = true,
             ),
         );
         light_component.views[i] = rv->create_view ( &view_params );

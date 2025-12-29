@@ -193,12 +193,22 @@ static void rv_view_perspective_proj_matrix ( rv_matrix_4x4_t* m, const rv_persp
     // Row 2
     m->f[8] = 0;
     m->f[9] = 0;
-    m->f[10] = far_z / ( far_z - near_z );
-    m->f[11] = - ( far_z * near_z ) / ( far_z - near_z );
-
     if ( params->reverse_z ) {
-        m->f[10] = near_z / ( near_z - far_z );
-        m->f[11] = - ( far_z * near_z ) / ( near_z - far_z );        
+        if ( params->infinite_far_z ) {
+            m->f[10] = 1e-6;
+            m->f[11] = near_z * ( 1 - 1e-6 );
+        } else {
+            m->f[10] = near_z / ( near_z - far_z );
+            m->f[11] = - ( far_z * near_z ) / ( near_z - far_z );        
+        }
+    } else {
+        if ( params->infinite_far_z ) {
+            m->f[10] = 1 - 1e-6;
+            m->f[11] = -near_z * ( 1 - 1e-6 );
+        } else {
+            m->f[10] = far_z / ( far_z - near_z );
+            m->f[11] = - ( far_z * near_z ) / ( far_z - near_z );
+        }
     }
 
     // Row 3
