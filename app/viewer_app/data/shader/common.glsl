@@ -33,6 +33,7 @@ layout ( binding = 0, set = xs_shader_binding_set_workload_m ) uniform frame_uni
     float z_far;
     float fov_y;
     uvec2 _pad1;
+    vec4 frustum_planes[6];
 } frame_uniforms;
 
 // ======================================================================================= //
@@ -222,6 +223,9 @@ bool is_outside_screen ( vec2 uv ) {
     return any ( lessThan ( uv, vec2 ( 0 ) ) ) || any ( greaterThan ( uv, vec2 ( 1 ) ) );
 }
 
+#define compute_screen_uv_m() vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 )
+#define fragment_screen_uv_m() vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 )
+
 // ======================================================================================= //
 //                                 C O L O R   S P A C E S
 // ======================================================================================= //
@@ -289,6 +293,19 @@ vec4 sample_catmull_rom ( texture2D tex2d, sampler sampler_linear, vec2 uv, vec2
 }
 
 // ======================================================================================= //
+//                                         H A S H
+// ======================================================================================= //
+
+uint hash_u32 ( uint h ) {
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    return h;
+}
+
+// ======================================================================================= //
 //                              R A N D O M   S A M P L I N G
 // ======================================================================================= //
 
@@ -297,7 +314,7 @@ struct rng_wang_state_t {
     uint v;
 };
 
-float wang_hash ( inout uint seed ) {
+uint rng_wang_hash ( inout uint seed ) {
     seed = uint ( seed ^ uint ( 61 ) ) ^ uint ( seed >> uint ( 16 ) );
     seed *= uint ( 9 );
     seed = seed ^ ( seed >> 4 );
@@ -307,7 +324,7 @@ float wang_hash ( inout uint seed ) {
 }
 
 float rng_wang ( inout rng_wang_state_t state ) {
-    return float ( wang_hash ( state.v ) ) / 4294967296.0;
+    return float ( rng_wang_hash ( state.v ) ) / 4294967296.0;
 }
 
 rng_wang_state_t rng_wang_init ( uvec2 screen_tex ) {

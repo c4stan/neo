@@ -3,5 +3,5 @@ compute_shader tessellation_prepare.comp
 include common.xsi
 
 begin bindings
-    buffer[4] storage
+    buffer[5] storage
 end

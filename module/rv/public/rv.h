@@ -145,6 +145,15 @@ typedef struct {
     uint64_t renderable_mask;
 } rv_query_params_t;
 
+typedef enum {
+    rv_frustum_plane_left_m,
+    rv_frustum_plane_right_m,
+    rv_frustum_plane_top_m,
+    rv_frustum_plane_bottom_m,
+    rv_frustum_plane_near_m,
+    rv_frustum_plane_far_m,
+} rv_frustum_plane_m;
+
 // TODO store float[16] instead of matrices ?
 typedef struct {
     uint32_t layer_mask;
@@ -158,6 +167,7 @@ typedef struct {
     rv_matrix_4x4_t prev_frame_view_matrix;
     rv_matrix_4x4_t prev_frame_proj_matrix;
     rv_projection_params_t proj_params;
+    float frustum_planes[6][4];
 } rv_view_info_t;
 
 typedef struct {

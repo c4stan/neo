@@ -398,7 +398,7 @@ static std_app_state_e viewapp_update ( void ) {
 
     xg_workload_h workload = xg->create_workload ( state->render.device );
     if ( state->render.capture_frame ) {
-        xg->debug_capture_workload ( workload );
+        //xg->debug_capture_workload ( workload );
         state->render.capture_frame = false;
     }
 

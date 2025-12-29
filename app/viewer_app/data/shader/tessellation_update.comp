@@ -3,15 +3,14 @@
 #include "xs.glsl"
 #include "common.glsl"
 
+#include "tessellation_common.glsl"
+
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_debug_printf : enable
 
 //
 // GPU Zen 2 - Adaptive GPU Tessellation with Compute Shaders
 //
-
-//layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform uniform_buffer_t {
-//} uniform_buffer;
 
 struct vertex_t {
     float pos[3];
@@ -36,6 +35,12 @@ layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) buffer subdivisio
     uint _pad0[3];
     uvec2 data[];
 } subdivision_buffer;
+
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) buffer culled_subdivision_buffer_t {
+    uint count;
+    uint _pad0[3];
+    uvec2 data[];
+} culled_subdivision_buffer;
 
 mat3 bit_to_xform ( uint bit ) {
     float s = float ( bit ) - 0.5;
@@ -88,10 +93,20 @@ void build_prim_verts ( uint prim_id, out vec3 out_verts[3] ) {
     out_verts[2] = load_vert ( prim_id * 3 + 2 );
 }
 
-float compute_lod ( float distance_to_camera ) {
-    float s = 2.0 * distance_to_camera * tan ( frame_uniforms.fov_y / 2 ) * 0.001;
-    float lod = -log2 ( clamp ( s, 0, 1.0 ) );
-    return clamp ( lod, 0, 6 );
+float compute_lod ( vec2 subdivision, float distance_to_camera, float prim_world_size ) {
+    // image plane size at given distance
+    float img_plane_size = 2 * tan ( frame_uniforms.fov_y / 2 ) * distance_to_camera;
+    // how many pixels per unit size at given distance
+    float screen_scale = frame_uniforms.resolution_f32.y / img_plane_size;
+    //float prim_world_size = 10.0;
+    // pixel size of primitive triangle side    
+    float prim_pixel_size = prim_world_size * screen_scale;
+    float target_pixel_size = 10.0;
+    float s = target_pixel_size / prim_pixel_size;
+    // doubled because side size is halved every 2 lod levels
+    float lod = -log2 ( s ) * 2;
+    lod = clamp ( lod, 0, 30 );
+    return lod;
 }
 
 bool is_leaf_key ( uint key ) {
@@ -114,11 +129,88 @@ uvec2 make_children_keys ( uint key ) {
     return uvec2 ( ( key << 1 ) | 0, ( key << 1 ) | 1 );
 }
 
-uint write_subdivision ( uint key, uint prim_id ) {
+bool cull_subdivision ( uvec2 subdivision ) {
+    uint prim_id = subdivision.y;
+    vec3 prim_verts[3];
+    build_prim_verts ( prim_id, prim_verts );
+
+    uint key = subdivision.x;
+    vec3 key_verts[3];
+    build_key_verts ( key, prim_verts, key_verts );
+
+    key_verts[0].y = field_height ( key_verts[0].x, key_verts[0].z );
+    key_verts[1].y = field_height ( key_verts[1].x, key_verts[1].z );
+    key_verts[2].y = field_height ( key_verts[2].x, key_verts[2].z );
+
+    // TODO move planes to world space instead?
+    key_verts[0] = ( frame_uniforms.view_from_world * vec4 ( key_verts[0], 1 ) ).xyz;
+    key_verts[1] = ( frame_uniforms.view_from_world * vec4 ( key_verts[1], 1 ) ).xyz;
+    key_verts[2] = ( frame_uniforms.view_from_world * vec4 ( key_verts[2], 1 ) ).xyz;
+
+#if 1
+    for ( uint i = 0; i < 6; ++i ) {
+        bool outside = true;
+        for ( uint j = 0; j < 3; ++j ) {
+            float d = dot ( vec4 ( key_verts[j], 1 ), frame_uniforms.frustum_planes[i] );
+            outside = outside && d < 0;
+        }
+        
+        if ( outside ) {
+            return false;
+        }
+    }
+
+    return true;
+#endif
+
+    // simple inside test (code from zeux blog). slightly slower than outside test when tested
+#if 0
+    for ( uint i = 0; i < 6; ++i ) {
+        bool inside = false;
+
+        for ( uint j = 0; j < 3; ++j ) {
+            if ( dot ( vec4 ( key_verts[j], 1 ), frame_uniforms.frustum_planes[i] ) > 0 ) {
+                inside = true;
+                break;
+            }
+        }
+
+        if ( !inside ) {
+            return false;
+        }
+    }
+    return true;
+#endif
+
+    // gpu zen 2 source code impl. a bit slower when tested
+#if 0
+    bool inside = true;
+    vec3 aabb_min = vec3 (  10e6 );
+    vec3 aabb_max = vec3 ( -10e6 );
+    aabb_min = min ( aabb_min, key_verts[0].xyz );
+    aabb_min = min ( aabb_min, key_verts[1].xyz );
+    aabb_min = min ( aabb_min, key_verts[2].xyz );
+    aabb_max = max ( aabb_max, key_verts[0].xyz );
+    aabb_max = max ( aabb_max, key_verts[1].xyz );
+    aabb_max = max ( aabb_max, key_verts[2].xyz );
+    for ( uint i = 0; i < 6; ++i ) {
+        bvec3 b = greaterThan ( frame_uniforms.frustum_planes[i].xyz, vec3 ( 0 ) );
+        vec3 n = mix ( aabb_min, aabb_max, b );
+        inside = inside && ( dot ( vec4 ( n, 1.0 ), frame_uniforms.frustum_planes[i] ) >= 0 );
+    }
+    return inside;
+#endif
+}
+
+void write_subdivision ( uvec2 subdivision ) {
     // TODO store capacity in subdivision buffer and test against that to prevent overflow crashes
     uint idx = atomicAdd ( subdivision_buffer.count, 1 );
-    subdivision_buffer.data[idx] = uvec2 ( key, prim_id );
-    return idx;
+    subdivision_buffer.data[idx] = subdivision;
+    
+    if ( cull_subdivision ( subdivision ) ) {
+        uint cull_idx = atomicAdd ( culled_subdivision_buffer.count, 1 );
+        culled_subdivision_buffer.data[cull_idx] = subdivision;
+    }
 }
 
 void update_subdivision ( uvec2 subdivision, int target_lod ) {
@@ -129,20 +221,20 @@ void update_subdivision ( uvec2 subdivision, int target_lod ) {
     if ( key_lod < target_lod && !is_leaf_key ( key ) ) {
         // subdivide
         uvec2 children_keys = make_children_keys ( key );
-        uint i1 = write_subdivision ( children_keys.x, prim_id );
-        uint i2 = write_subdivision ( children_keys.y, prim_id );
+        write_subdivision ( uvec2 ( children_keys.x, prim_id ) );
+        write_subdivision ( uvec2 ( children_keys.y, prim_id ) );
     } else if ( key_lod == target_lod ) {
         // keep
-        write_subdivision ( key, prim_id );
+        write_subdivision ( uvec2 ( key, prim_id ) );
     } else {
         // want to merge...
         if ( is_root_key ( key ) ) {
             // can't, keep
-            write_subdivision ( key, prim_id );
+            write_subdivision ( uvec2 ( key, prim_id ) );
         } else if ( is_child_zero_key ( key ) ) {
             // merge
             uint parent_key = make_parent_key ( key );
-            write_subdivision ( parent_key, prim_id );
+            write_subdivision ( uvec2 ( parent_key, prim_id ) );
         }
     }
 }
@@ -166,7 +258,7 @@ void main ( void ) {
     // TODO
     //  ref impl uses key_verts instead of prim_verts here, which is right? 
     float distance_to_camera = distance ( ( prim_verts[1] + prim_verts[2] ) / 2.0, frame_uniforms.cam_world_pos );
-    int target_lod = int ( compute_lod ( distance_to_camera ) );
+    int target_lod = int ( compute_lod ( subdivision, distance_to_camera, distance ( prim_verts[0], prim_verts[1] ) ) );
 
     update_subdivision ( subdivision, target_lod );
 }

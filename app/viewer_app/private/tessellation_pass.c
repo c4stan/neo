@@ -63,6 +63,7 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
     xg_buffer_h ibuffer = node_args->io->copy_buffer_writes[1];
     xg_buffer_h indirect_buffer = node_args->io->copy_buffer_writes[2];
     xg_buffer_h prev_sub_buffer = node_args->io->copy_buffer_writes[3];
+    xg_buffer_h culled_sub_buffer = node_args->io->copy_buffer_writes[4];
 
     se_query_result_t query_result;
     se->query_entities ( &query_result, &se_query_params_m ( 
@@ -88,14 +89,28 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
         tess_prim_count = mesh_component->geo_data.index_count / 3;
     }
 
-    xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &enabled, sizeof ( enabled ) );
-    xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
-        .destination = indirect_buffer, 
-        .source = range.handle,
-        .source_offset = range.offset,
-        .destination_offset = 12,
-        .size = range.size,
-    ) );
+    {
+        xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &enabled, sizeof ( enabled ) );
+        xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
+            .destination = indirect_buffer, 
+            .source = range.handle,
+            .source_offset = range.offset,
+            .destination_offset = 12,
+            .size = range.size,
+        ) );
+    }
+
+    {
+        uint32_t culled_sub_buffer_write = 0;
+        xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &culled_sub_buffer_write, sizeof ( culled_sub_buffer_write ) );
+        xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
+            .destination = culled_sub_buffer, 
+            .source = range.handle,
+            .source_offset = range.offset,
+            .destination_offset = 0,
+            .size = range.size,
+        ) );
+    }
 
     // TODO this assumes the graph never gets destroyed, which isn't the case at all
     static bool was_enabled = false;
@@ -138,7 +153,7 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
     }
 }
 
-xf_node_h add_tessellation_setup_pass ( xf_graph_h graph, xf_buffer_h vertex_buffer, xf_buffer_h index_buffer, xf_buffer_h indirect_dispatch_buffer, xf_buffer_h prev_subdivision_buffer ) {
+xf_node_h add_tessellation_setup_pass ( xf_graph_h graph, xf_buffer_h vertex_buffer, xf_buffer_h index_buffer, xf_buffer_h indirect_dispatch_buffer, xf_buffer_h prev_subdivision_buffer, xf_buffer_h culled_subdivision_buffer ) {
     xf_i* xf = std_module_get_m ( xf_module_name_m );
     
     xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
@@ -148,8 +163,8 @@ xf_node_h add_tessellation_setup_pass ( xf_graph_h graph, xf_buffer_h vertex_buf
             .routine = tessellation_setup_pass,
         ),
         .resources = xf_node_resource_params_m (
-            .copy_buffer_writes_count = 4,
-            .copy_buffer_writes = { vertex_buffer, index_buffer, indirect_dispatch_buffer, prev_subdivision_buffer },
+            .copy_buffer_writes_count = 5,
+            .copy_buffer_writes = { vertex_buffer, index_buffer, indirect_dispatch_buffer, prev_subdivision_buffer, culled_subdivision_buffer },
         ),
     ) );
 

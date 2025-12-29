@@ -7,12 +7,12 @@ import sublime_plugin
 /* template begin
 
 def<T, P, N> $T add_$P ( $T* a, $T* b ) {
-    $FOR 0 $N
+$FOR 0 $N
     // $i
-    $END_FOR
-    $IF $N > 1
+$END_FOR
+$IF $N > 1
     // 3
-    $END_IF
+$END_IF
     return *a + *b;
 }
 
@@ -48,6 +48,12 @@ typedef union {
 $IF $SIZE > 1
         $TYPE y;
 $END_IF
+$IF $SIZE > 2
+        $TYPE z;
+$END_IF
+$IF $SIZE > 3
+        $TYPE w;
+$END_IF
     };
 } sm_vec_$SIZE$PREFIX_t;
 
@@ -60,6 +66,7 @@ typedef union {
     struct {
         float x;
         float y;
+        float z;
     };
 } sm_vec_3f_t;
 // template generation end
@@ -69,18 +76,57 @@ typedef union {
 /* template begin
 
 def <TYPE, PREFIX, SIZE>
-$IF $SIZE > 1
-    $TYPE x;
+qwe
+$IF $SIZE > 0
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_literal ( float x );
 $END_IF
+$IF $SIZE > 1
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_literal ( float x, float y );
+$END_IF
+$IF $SIZE == 3
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_literal ( float x, float y, float z );
+$END_IF
+$IF $SIZE == 4
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_literal ( float x, float y, float z, float w );
+$END_IF
+
+make <float, f, 1>
+make <float, f, 2>
+
+*/
+// template generation begin
+qwe
+sm_vec_1f_t sm_vec_1f_literal ( float x );
+qwe
+sm_vec_2f_t sm_vec_2f_literal ( float x );
+sm_vec_2f_t sm_vec_2f_literal ( float x, float y );
+// template generation end
+'''
+
+'''
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+$IF $SIZE == 1
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x );
+$END_IF
+$IF $SIZE == 2
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x, float y );
+$END_IF
+$IF $SIZE == 3
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x, float y, float z );
+$END_IF
+$IF $SIZE == 4
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x, float y, float z, float w );
+$END_IF
+
 make <float, f, 3>
 make <float, f, 4>
 
 */
 // template generation begin
-
-    float x;
-
-    float x;
+sm_vec_3f_t sm_vec_3f_set ( float x, float y, float z );
+sm_vec_4f_t sm_vec_4f_set ( float x, float y, float z, float w );
 // template generation end
 '''
 
@@ -178,9 +224,7 @@ def generate_template(body):
             if_args_end = generated_code.find('\n', if_begin)
             if_args = generated_code[if_begin : if_args_end].split(' ')
             if_end = generated_code.find(if_end_token, if_begin)
-            if_body = generated_code[if_args_end+1 : if_end].rstrip()
-
-            print(generated_code[if_begin:if_end])
+            if_body = generated_code[if_args_end : if_end].strip('\n')
 
             assert if_end != -1
 
@@ -201,10 +245,13 @@ def generate_template(body):
 
             # generate if body
             generated_body = ''
-            if op_result:
-                generated_body = if_body
+            if ( if_begin > 0 ):
+                generated_body = '\n'
 
-            generated_code = generated_code[:if_begin].rstrip() + generated_body + generated_code[if_end + len(if_end_token):]
+            if op_result:
+                generated_body = generated_body + if_body + '\n'
+
+            generated_code = generated_code[:if_begin].rstrip('\n') + generated_body + generated_code[if_end + len(if_end_token):].lstrip('\n')
 
             if_begin = generated_code.find(if_begin_token)
 
@@ -223,7 +270,7 @@ def generate_template(body):
         # append resulting gnenerated code to final output
         if output:
             output = output + '\n'
-        output = output + ' ' * leading_space + generated_code + '\n' * trailing_newlines
+        output = output + ' ' * leading_space + generated_code.rstrip() + '\n' * trailing_newlines
 
     return output
 

@@ -28,32 +28,6 @@ static void rv_view_normf3 ( float* dest, const float* a ) {
     dest[2] = a[2] / len;
 }
 
-#if 0
-static void rv_view_rotation_matrix_from_quaternion ( rv_matrix_4x4_t* m, float* q ) {
-    float x2 = q[0] * q[0];
-    float y2 = q[1] * q[1];
-    float z2 = q[2] * q[2];
-    float xy;
-    float xz;
-    float yz;
-    float wx;
-    float wy;
-    float wz;
-
-    m->r0[0] = 1.f - 2.f * ( y2 + z2 );
-    m->r0[1] = 2.f * ( xy - wz );
-    m->r0[2] = 2.f * ( xz + wy );
-
-    m->r1[0] = 2.f * ( xy + wz );
-    m->r1[1] = 1.f - 2.f * ( x2 + z2 );
-    m->r1[2] = 2.f * ( yz - wx );
-
-    m->r2[0] = 2.f * ( xz - wy );
-    m->r2[1] = 2.f * ( yz + wx );
-    m->r2[2] = 1.f - 2.f * ( x2 + y2 );
-}
-#endif
-
 // const float* pos, const float* dir
 static void rv_view_view_matrix ( rv_matrix_4x4_t* m, const rv_view_transform_t* transform ) {
     /*
@@ -102,9 +76,9 @@ static void rv_view_view_matrix ( rv_matrix_4x4_t* m, const rv_view_transform_t*
 #endif
 
 #if 1
-    m->r0[3] = -rv_view_dotf3 ( m->r0, pos );
-    m->r1[3] = -rv_view_dotf3 ( m->r1, pos );
-    m->r2[3] = -rv_view_dotf3 ( m->r2, pos );
+    m->r0[3] = -sm_vec_3f_dot ( sm_vec_3f ( m->r0 ), sm_vec_3f ( pos ) );
+    m->r1[3] = -sm_vec_3f_dot ( sm_vec_3f ( m->r1 ), sm_vec_3f ( pos ) );
+    m->r2[3] = -sm_vec_3f_dot ( sm_vec_3f ( m->r2 ), sm_vec_3f ( pos ) );
     m->r3[3] = 1;
 #else
     m->r0[0] = x_axis[0];
@@ -386,14 +360,10 @@ void rv_view_get_info ( rv_view_info_t* info, rv_view_h view_handle ) {
             }
         }
 
-        float pos[3];
-        pos[0] = info->view_matrix.r0[3];
-        pos[1] = info->view_matrix.r1[3];
-        pos[2] = info->view_matrix.r2[3];
-
-        info->inverse_view_matrix.r0[3] = -rv_view_dotf3 ( info->inverse_view_matrix.r0, pos );
-        info->inverse_view_matrix.r1[3] = -rv_view_dotf3 ( info->inverse_view_matrix.r1, pos );
-        info->inverse_view_matrix.r2[3] = -rv_view_dotf3 ( info->inverse_view_matrix.r2, pos );
+        sm_vec_3f_t pos = sm_vec_3f_set ( info->view_matrix.r0[3], info->view_matrix.r1[3], info->view_matrix.r2[3] );
+        info->inverse_view_matrix.r0[3] = -sm_vec_3f_dot ( sm_vec_3f ( info->inverse_view_matrix.r0 ), pos );
+        info->inverse_view_matrix.r1[3] = -sm_vec_3f_dot ( sm_vec_3f ( info->inverse_view_matrix.r1 ), pos );
+        info->inverse_view_matrix.r2[3] = -sm_vec_3f_dot ( sm_vec_3f ( info->inverse_view_matrix.r2 ), pos );
         info->inverse_view_matrix.r3[3] = 1;
     }
 
@@ -423,6 +393,30 @@ void rv_view_get_info ( rv_view_info_t* info, rv_view_h view_handle ) {
     info->inverse_proj_matrix.f[14] = 1.f / info->jittered_proj_matrix.f[11];
     info->inverse_proj_matrix.f[15] = -info->jittered_proj_matrix.f[10] / ( info->jittered_proj_matrix.f[11] * info->jittered_proj_matrix.f[14] );
 #endif
+
+    // frustum planes
+    sm_vec_4f_t frustum_planes[6];
+    frustum_planes[rv_frustum_plane_left_m] = sm_vec_4f_add ( sm_vec_4f ( info->proj_matrix.r3 ), sm_vec_4f ( info->proj_matrix.r0 ) );
+    frustum_planes[rv_frustum_plane_right_m] = sm_vec_4f_sub ( sm_vec_4f ( info->proj_matrix.r3 ), sm_vec_4f ( info->proj_matrix.r0 ) );
+    frustum_planes[rv_frustum_plane_top_m] = sm_vec_4f_add ( sm_vec_4f ( info->proj_matrix.r3 ), sm_vec_4f ( info->proj_matrix.r1 ) );
+    frustum_planes[rv_frustum_plane_bottom_m] = sm_vec_4f_sub ( sm_vec_4f ( info->proj_matrix.r3 ), sm_vec_4f ( info->proj_matrix.r1 ) );
+    if ( view->params.proj_params.type == rv_projection_perspective_m && view->params.proj_params.perspective.reverse_z ) {
+        frustum_planes[rv_frustum_plane_near_m] = sm_vec_4f_sub ( sm_vec_4f ( info->proj_matrix.r3 ), sm_vec_4f ( info->proj_matrix.r2 ) );
+        frustum_planes[rv_frustum_plane_far_m] = sm_vec_4f ( info->proj_matrix.r2 );
+    } else {
+        frustum_planes[rv_frustum_plane_near_m] = sm_vec_4f ( info->proj_matrix.r2 );
+        frustum_planes[rv_frustum_plane_far_m] = sm_vec_4f_sub ( sm_vec_4f ( info->proj_matrix.r3 ), sm_vec_4f ( info->proj_matrix.r2 ) );
+    }
+    for ( uint32_t i = 0; i < 6; ++i ) {
+        float reciprocal_len = 1.f / sm_vec_3f_len ( sm_vec_4f_to_3f ( frustum_planes[i]) );
+        frustum_planes[i] = sm_vec_4f_mul ( frustum_planes[i], reciprocal_len );
+    }
+    sm_vec_4f_store ( info->frustum_planes[rv_frustum_plane_left_m], frustum_planes[rv_frustum_plane_left_m] );
+    sm_vec_4f_store ( info->frustum_planes[rv_frustum_plane_right_m], frustum_planes[rv_frustum_plane_right_m] );
+    sm_vec_4f_store ( info->frustum_planes[rv_frustum_plane_top_m], frustum_planes[rv_frustum_plane_top_m] );
+    sm_vec_4f_store ( info->frustum_planes[rv_frustum_plane_bottom_m], frustum_planes[rv_frustum_plane_bottom_m] );
+    sm_vec_4f_store ( info->frustum_planes[rv_frustum_plane_near_m], frustum_planes[rv_frustum_plane_near_m] );
+    sm_vec_4f_store ( info->frustum_planes[rv_frustum_plane_far_m], frustum_planes[rv_frustum_plane_far_m] );
 }
 
 void rv_view_update_transform ( rv_view_h view_handle, const rv_view_transform_t* transform ) {

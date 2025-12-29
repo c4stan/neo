@@ -12,6 +12,7 @@
 // r1 = m[1][] = e04 e05 e06 e07
 // r2 = m[2][] = e08 e09 e10 e11
 // r3 = m[3][] = e12 e13 e14 e15
+// m[i][j] -> i = row, j = column
 
 // Vectors can be considered as Nx1 column matrices
 // Matrix vector product follows the M*v convention
@@ -29,21 +30,37 @@ typedef union {
     $TYPE e[$ROWS * $COLS];
     $TYPE m[$ROWS][$COLS];
     struct {
-        $FOR $ROWS
+        $FOR 0 $ROWS
         $TYPE r$i[$COLS];
         $END_FOR
     };
     struct {
-        $FOR $ROWS
+        $FOR 0 $ROWS
         sm_vec_$COLS$PREFIX_t v$i;
         $END_FOR
     };
 } sm_mat_$ROWSx$COLS$PREFIX_t;
 
-make <float, f, 4, 4>
+make <float, f, 3, 3>
 
+make <float, f, 4, 4>
 */
 // template generation begin
+typedef union {
+    float e[3 * 3];
+    float m[3][3];
+    struct {
+        float r0[3];
+        float r1[3];
+        float r2[3];
+    };
+    struct {
+        sm_vec_3f_t v0;
+        sm_vec_3f_t v1;
+        sm_vec_3f_t v2;
+    };
+} sm_mat_3x3f_t;
+
 typedef union {
     float e[4 * 4];
     float m[4][4];
@@ -78,7 +95,6 @@ sm_vec_$SIZE$PREFIX_t sm_matrix_$ROWSx$COLS$PREFIX_transform_$PREFIX$SIZE ( sm_m
 
 make <float, f, 4, 4, 3>
 make <float, f, 4, 4, 4>
-
 */
 // template generation begin
 sm_vec_3f_t sm_matrix_4x4f_transform_f3 ( sm_mat_4x4f_t mat, sm_vec_3f_t vec );
@@ -97,11 +113,20 @@ sm_vec_3f_t sm_matrix_4x4f_transform_f3_dir ( sm_mat_4x4f_t mat, sm_vec_3f_t vec
 // ======================================================================================= //
 //                                      I N V E R S E
 // ======================================================================================= //
+
+// ======================================================================================= //
+//                                    T R A N S P O S E
+// ======================================================================================= //
 /* template begin
 
-def <TYPE, PREFIX, ROWS, COLS>
-sm_matrix_$ROWSx$COLS$PREFIX_t sm_matrix_$ROWSx$COLS$PREFIX_inverse ( sm_mat_$ROWSx$COLS$PREFIX_t mat );
+def <TYPE, PREFIX, ROWS, COLS, SIZE>
+sm_mat_$ROWSx$COLS$PREFIX_t sm_matrix_$ROWSx$COLS$PREFIX_transpose ( sm_mat_$ROWSx$COLS$PREFIX_t mat );
 
-
+make <float, f, 3, 3>
+make <float, f, 4, 4>
 */
-// TODO
+// template generation begin
+sm_mat_3x3f_t sm_matrix_3x3f_transpose ( sm_mat_3x3f_t mat );
+sm_mat_4x4f_t sm_matrix_4x4f_transpose ( sm_mat_4x4f_t mat );
+// template generation end
+

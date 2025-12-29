@@ -127,6 +127,7 @@ typedef struct {
     float z_far;
     float v_fov;
     uint32_t _pad1[2];
+    float frustum_planes[6][4];
 } workload_uniforms_t;
 
 void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
@@ -181,6 +182,14 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
                 view_info.transform.position[1], 
                 view_info.transform.position[2], 
             },
+            .frustum_planes = {
+                { view_info.frustum_planes[0][0], view_info.frustum_planes[0][1], view_info.frustum_planes[0][2], view_info.frustum_planes[0][3] },
+                { view_info.frustum_planes[1][0], view_info.frustum_planes[1][1], view_info.frustum_planes[1][2], view_info.frustum_planes[1][3] },
+                { view_info.frustum_planes[2][0], view_info.frustum_planes[2][1], view_info.frustum_planes[2][2], view_info.frustum_planes[2][3] },
+                { view_info.frustum_planes[3][0], view_info.frustum_planes[3][1], view_info.frustum_planes[3][2], view_info.frustum_planes[3][3] },
+                { view_info.frustum_planes[4][0], view_info.frustum_planes[4][1], view_info.frustum_planes[4][2], view_info.frustum_planes[4][3] },
+                { view_info.frustum_planes[5][0], view_info.frustum_planes[5][1], view_info.frustum_planes[5][2], view_info.frustum_planes[5][3] },
+            }
         };
 
         // disable jittering if TAA is off 
@@ -1169,7 +1178,7 @@ static void viewapp_boot_raster_graph ( void ) {
     // TODO remove the setup pass, have a proper susystem that suballocates multiple meshes vertex/index/meta data into buffers, properly render on gbuffer, shadows, ...
     xg_workload_h tess_workload = xg->create_workload ( device );
     xf_buffer_h tess_vertex_buffer = xf->create_buffer ( &xf_buffer_params_m (
-        .size = 1024 * 1024 * 32,
+        .size = 1024 * 1024 * 16,
         .debug_name = "tessellation_vbuffer"
     ) );
     xf_buffer_h tess_index_buffer = xf->create_buffer ( &xf_buffer_params_m (
@@ -1197,9 +1206,10 @@ static void viewapp_boot_raster_graph ( void ) {
     xg->submit_workload ( tess_workload );
     xg->wait_all_workload_complete();
     
+    uint64_t tess_subdivision_buffer_size = sizeof ( uint32_t ) * 1024 * 1024 * 32;
     xf_buffer_h tess_subdivision_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
         .buffer = xf_buffer_params_m (
-            .size = sizeof ( uint32_t ) * 1024 * 1024 * 128,
+            .size = tess_subdivision_buffer_size,
             .debug_name = "tessellation_subdivision_buffer",
             .init = &xg_buffer_init_m (
                 .mode = xg_buffer_init_mode_clear_m,
@@ -1209,12 +1219,21 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_buffer_h tess_prev_subdivision_buffer = xf->get_multi_buffer ( tess_subdivision_buffer, -1 );
 
+    xf_buffer_h tess_culled_subdivision_buffer = xf->create_buffer ( &xf_buffer_params_m ( 
+        .size = tess_subdivision_buffer_size,
+        .debug_name = "tessellation_culled_buffer",
+        .init = &xg_buffer_init_m (
+            .mode = xg_buffer_init_mode_clear_m,
+            .clear = 0,
+        ),
+    ) );
+
     xf_buffer_h tess_update_indirect_buffer = xf->create_buffer ( &xf_buffer_params_m (
         .size = sizeof ( xg_compute_indirect_gpu_args_t ) + 4,
         .debug_name = "tessellation_indirect_update",
     ) );
 
-    add_tessellation_setup_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_update_indirect_buffer, tess_prev_subdivision_buffer );
+    add_tessellation_setup_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_update_indirect_buffer, tess_prev_subdivision_buffer, tess_culled_subdivision_buffer );
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "tessellation_update",
@@ -1229,9 +1248,10 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_buffer_dependency_m ( .buffer = tess_index_buffer ),
                 xf_compute_buffer_dependency_m ( .buffer = tess_prev_subdivision_buffer ),
             },
-            .storage_buffer_writes_count = 1,
+            .storage_buffer_writes_count = 2,
             .storage_buffer_writes = {
                 xf_compute_buffer_dependency_m ( .buffer = tess_subdivision_buffer ),
+                xf_compute_buffer_dependency_m ( .buffer = tess_culled_subdivision_buffer ),
             },
             .indirect_command_read = tess_update_indirect_buffer,
         ),
@@ -1250,8 +1270,9 @@ static void viewapp_boot_raster_graph ( void ) {
             .workgroup_count = { 1, 1, 1 },
         ),
         .resources = xf_node_resource_params_m (
-            .storage_buffer_reads_count = 1,
+            .storage_buffer_reads_count = 2,
             .storage_buffer_reads = {
+                xf_compute_buffer_dependency_m ( .buffer = tess_culled_subdivision_buffer ),
                 xf_compute_buffer_dependency_m ( .buffer = tess_subdivision_buffer ),
             },
             .storage_buffer_writes_count = 3,
@@ -1263,7 +1284,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    add_tessellation_draw_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_subdivision_buffer, tess_draw_indirect_buffer, tess_instance_vertex_buffer, &gbuffer, depth_texture, sdb );
+    add_tessellation_draw_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_culled_subdivision_buffer, tess_draw_indirect_buffer, tess_instance_vertex_buffer, &gbuffer, depth_texture, sdb );
 
     // lighting
     xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m (
@@ -1363,7 +1384,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
-        .queue = xg_cmd_queue_compute_m,
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ),
             .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
@@ -1670,7 +1691,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssr_ta",
-        .queue = xg_cmd_queue_compute_m,
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ),
             .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssr_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssr_scale, 8 ), 1 },

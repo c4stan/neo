@@ -118,3 +118,43 @@ sm_mat_4x4f_t sm_matrix_4x4f_mul ( sm_mat_4x4f_t a, sm_mat_4x4f_t b ) {
 
     return result;
 }
+
+// ======================================================================================= //
+//                                    T R A N S P O S E
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, ROWS, COLS, SIZE>
+sm_mat_$ROWSx$COLS$PREFIX_t sm_matrix_$ROWSx$COLS$PREFIX_transpose ( sm_mat_$ROWSx$COLS$PREFIX_t mat ) {
+    sm_mat_$ROWSx$COLS$PREFIX_t result;
+    for ( uint32_t i = 0; i < $ROWS; ++i ) {
+        for ( uint32_t j = 0; j < $COLS; ++j ) {
+            result.m[i][j] = mat.m[j][i];
+        }
+    }
+    return result;
+}
+
+make <float, f, 3, 3>
+make <float, f, 4, 4>
+*/
+// template generation begin
+sm_mat_3x3f_t sm_matrix_3x3f_transpose ( sm_mat_3x3f_t mat ) {
+    sm_mat_3x3f_t result;
+    for ( uint32_t i = 0; i < 3; ++i ) {
+        for ( uint32_t j = 0; j < 3; ++j ) {
+            result.m[i][j] = mat.m[j][i];
+        }
+    }
+    return result;
+}
+sm_mat_4x4f_t sm_matrix_4x4f_transpose ( sm_mat_4x4f_t mat ) {
+    sm_mat_4x4f_t result;
+    for ( uint32_t i = 0; i < 4; ++i ) {
+        for ( uint32_t j = 0; j < 4; ++j ) {
+            result.m[i][j] = mat.m[j][i];
+        }
+    }
+    return result;
+}
+// template generation end

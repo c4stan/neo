@@ -22,6 +22,19 @@ sm_vec_4f_t sm_vec_4f_set ( float x, float y, float z, float w ) {
     return vec;
 }
 
+void sm_vec_3f_store ( float* dest, sm_vec_3f_t vec ) {
+    dest[0] = vec.x;
+    dest[1] = vec.y;
+    dest[2] = vec.z;
+}
+
+void sm_vec_4f_store ( float* dest, sm_vec_4f_t vec ) {
+    dest[0] = vec.x;
+    dest[1] = vec.y;
+    dest[2] = vec.z;
+    dest[3] = vec.w;
+}
+
 sm_vec_3f_t sm_vec_4f_to_3f ( sm_vec_4f_t vec ) {
     sm_vec_3f_t result;
     result.x = vec.x;
@@ -68,6 +81,31 @@ sm_vec_3f_t sm_vec_3f_cross ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     return result;
 }
 
+// ======================================================================================= //
+//                                          M U L
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_mul ( sm_vec_$SIZE$PREFIX_t vec, $TYPE scale ) {
+    sm_vec_$SIZE$PREFIX_t result;
+    result.x = vec.x * scale;
+$IF $SIZE > 1
+    result.y = vec.y * scale;
+$END_IF
+$IF $SIZE > 2
+    result.z = vec.z * scale;
+$END_IF
+$IF $SIZE > 3
+    result.w = vec.w * scale;
+$END_IF
+    return result;
+}
+
+make <float, f, 3>
+make <float, f, 4>
+*/
+// template generation begin
 sm_vec_3f_t sm_vec_3f_mul ( sm_vec_3f_t vec, float scale ) {
     sm_vec_3f_t result;
     result.x = vec.x * scale;
@@ -75,7 +113,41 @@ sm_vec_3f_t sm_vec_3f_mul ( sm_vec_3f_t vec, float scale ) {
     result.z = vec.z * scale;
     return result;
 }
+sm_vec_4f_t sm_vec_4f_mul ( sm_vec_4f_t vec, float scale ) {
+    sm_vec_4f_t result;
+    result.x = vec.x * scale;
+    result.y = vec.y * scale;
+    result.z = vec.z * scale;
+    result.w = vec.w * scale;
+    return result;
+}
+// template generation end
 
+// ======================================================================================= //
+//                                          A D D
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_add ( sm_vec_$SIZE$PREFIX_t a, sm_vec_$SIZE$PREFIX_t b ) {
+    sm_vec_$SIZE$PREFIX_t result;
+    result.x = a.x + b.x;
+$IF $SIZE > 1
+    result.y = a.y + b.y;
+$END_IF
+$IF $SIZE > 2
+    result.z = a.z + b.z;
+$END_IF
+$IF $SIZE > 3
+    result.w = a.w + b.w;
+$END_IF
+    return result;
+}
+
+make <float, f, 3>
+make <float, f, 4>
+*/
+// template generation begin
 sm_vec_3f_t sm_vec_3f_add ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     sm_vec_3f_t result;
     result.x = a.x + b.x;
@@ -83,7 +155,41 @@ sm_vec_3f_t sm_vec_3f_add ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     result.z = a.z + b.z;
     return result;
 }
+sm_vec_4f_t sm_vec_4f_add ( sm_vec_4f_t a, sm_vec_4f_t b ) {
+    sm_vec_4f_t result;
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    result.z = a.z + b.z;
+    result.w = a.w + b.w;
+    return result;
+}
+// template generation end
 
+// ======================================================================================= //
+//                                          S U B
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_sub ( sm_vec_$SIZE$PREFIX_t a, sm_vec_$SIZE$PREFIX_t b ) {
+    sm_vec_$SIZE$PREFIX_t result;
+    result.x = a.x - b.x;
+$IF $SIZE > 1
+    result.y = a.y - b.y;
+$END_IF
+$IF $SIZE > 2
+    result.z = a.z - b.z;
+$END_IF
+$IF $SIZE > 3
+    result.w = a.w - b.w;
+$END_IF
+    return result;
+}
+
+make <float, f, 3>
+make <float, f, 4>
+*/
+// template generation begin
 sm_vec_3f_t sm_vec_3f_sub ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     sm_vec_3f_t result;
     result.x = a.x - b.x;
@@ -91,7 +197,55 @@ sm_vec_3f_t sm_vec_3f_sub ( sm_vec_3f_t a, sm_vec_3f_t b ) {
     result.z = a.z - b.z;
     return result;
 }
-
-sm_vec_3f_t sm_vec_3f_neg ( sm_vec_3f_t a ) {
-    return ( sm_vec_3f_t ) { -a.x, -a.y, -a.z };
+sm_vec_4f_t sm_vec_4f_sub ( sm_vec_4f_t a, sm_vec_4f_t b ) {
+    sm_vec_4f_t result;
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
+    result.w = a.w - b.w;
+    return result;
 }
+// template generation end
+
+// ======================================================================================= //
+//                                          N E G
+// ======================================================================================= //
+/* template begin
+
+def <TYPE, PREFIX, SIZE>
+sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_neg ( sm_vec_$SIZE$PREFIX_t a ) {
+    sm_vec_$SIZE$PREFIX_t result;
+    result.x = -a.x;
+$IF $SIZE > 1
+    result.y = -a.y;
+$END_IF
+$IF $SIZE > 2
+    result.z = -a.z;
+$END_IF
+$IF $SIZE > 3
+    result.w = -a.w;
+$END_IF
+    return result;
+}
+
+make <float, f, 3>
+make <float, f, 4>
+
+*/
+// template generation begin
+sm_vec_3f_t sm_vec_3f_neg ( sm_vec_3f_t a ) {
+    sm_vec_3f_t result;
+    result.x = -a.x;
+    result.y = -a.y;
+    result.z = -a.z;
+    return result;
+}
+sm_vec_4f_t sm_vec_4f_neg ( sm_vec_4f_t a ) {
+    sm_vec_4f_t result;
+    result.x = -a.x;
+    result.y = -a.y;
+    result.z = -a.z;
+    result.w = -a.w;
+    return result;
+}
+// template generation end

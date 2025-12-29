@@ -618,7 +618,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
 
     // ground
     {
-        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_grid ( 1000, 1000, 2.f, NULL );
+        xg_geo_util_geometry_data_t geo = xg_geo_util_generate_grid ( 1000, 1000, 10.f, NULL );
         xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
 
         // TODO
