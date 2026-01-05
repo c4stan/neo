@@ -376,8 +376,10 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
+    xg_workload_h workload = xg->create_workload ( state->render.device );
+
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
-        xs->build_databases();
+        xs->update_databases ( workload );
         if ( viewapp_render_graph_is_raytrace ( state->render.active_render_graph ) ) {
             //state->render.raytrace_world_update = true;
             viewapp_update_raytrace_world();
@@ -396,7 +398,6 @@ static std_app_state_e viewapp_update ( void ) {
         state->render.capture_frame = true;
     }
 
-    xg_workload_h workload = xg->create_workload ( state->render.device );
     if ( state->render.capture_frame ) {
         //xg->debug_capture_workload ( workload );
         state->render.capture_frame = false;

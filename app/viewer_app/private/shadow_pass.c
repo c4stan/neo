@@ -182,6 +182,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
         .device = graph_info.device,
         .resource_count = 1,
         .resources = { xg_resource_binding_layout_m ( .shader_register = 0, .stages = xg_shading_stage_bit_vertex_m, .type = xg_resource_binding_buffer_uniform_m ) },
+        .debug_name = "shadow_pass"
     ) );
 
     shadow_pass_args_t args = {

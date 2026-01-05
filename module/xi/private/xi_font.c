@@ -101,31 +101,23 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
     stbtt_PackEnd ( &pack_context );
 #endif
 
-    xg_texture_h raster_texture;
-    {
-        xg_texture_params_t texture_params = xg_texture_params_m (
-            .memory_type = xg_memory_type_gpu_only_m,
-            .device = params->xg_device,
-            .width = xi_font_texture_atlas_width_m,
-            .height = xi_font_texture_atlas_height_m,
-            .format = xg_format_r8_uint_m,
-            .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_sampled_m,
-        );
-        std_str_copy_static_m ( texture_params.debug_name, "font_atlas_temp" );
-        raster_texture = xg->create_texture ( &texture_params );
-    }
+    xg_texture_h raster_texture = xg->create_texture ( &xg_texture_params_m (
+        .memory_type = xg_memory_type_gpu_only_m,
+        .device = params->xg_device,
+        .width = xi_font_texture_atlas_width_m,
+        .height = xi_font_texture_atlas_height_m,
+        .format = xg_format_r8_uint_m,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_sampled_m,
+        .debug_name = "font_atlas_temp",
+    ) );
 
-    xg_buffer_h staging_buffer;
-    {
-        xg_buffer_params_t buffer_params = xg_buffer_params_m (
-            .memory_type = xg_memory_type_upload_m,
-            .device = params->xg_device,
-            .size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m,
-            .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-            .debug_name = "font_atlas_staging",
-        );
-        staging_buffer = xg->create_buffer ( &buffer_params );
-    }
+    xg_buffer_h staging_buffer = xg->create_buffer ( &xg_buffer_params_m (
+        .memory_type = xg_memory_type_upload_m,
+        .device = params->xg_device,
+        .size = xi_font_texture_atlas_width_m * xi_font_texture_atlas_height_m,
+        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
+        .debug_name = "font_atlas_staging",
+    ) );
 
     xg_workload_h workload = xg->create_workload ( params->xg_device );
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
@@ -160,29 +152,22 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         xg->cmd_barrier_set ( cmd_buffer, key, &barrier_set );
     }
 
-    {
-        xg_buffer_to_texture_copy_params_t copy_params = xg_buffer_to_texture_copy_params_m (
-            .source = staging_buffer,
-            .destination = raster_texture,
-        );
-        xg->cmd_copy_buffer_to_texture ( cmd_buffer, key, &copy_params );
-    }
+    xg->cmd_copy_buffer_to_texture ( cmd_buffer, key, &xg_buffer_to_texture_copy_params_m (
+        .source = staging_buffer,
+        .destination = raster_texture,
+    ) );
 
     xg->cmd_destroy_buffer ( resource_cmd_buffer, staging_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 
-    xg_texture_h atlas_texture;
-    {
-        xg_texture_params_t texture_params = xg_texture_params_m (
-            .memory_type = xg_memory_type_gpu_only_m,
-            .device = params->xg_device,
-            .width = xi_font_texture_atlas_width_m,
-            .height = xi_font_texture_atlas_height_m,
-            .format = xg_format_r8g8b8a8_unorm_m,
-            .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m,
-        );
-        std_str_copy_static_m ( texture_params.debug_name, "font_atlas" );
-        atlas_texture = xg->create_texture ( &texture_params );
-    }
+    xg_texture_h atlas_texture = xg->create_texture ( &xg_texture_params_m (
+        .memory_type = xg_memory_type_gpu_only_m,
+        .device = params->xg_device,
+        .width = xi_font_texture_atlas_width_m,
+        .height = xi_font_texture_atlas_height_m,
+        .format = xg_format_r8g8b8a8_unorm_m,
+        .allowed_usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m,
+        .debug_name = "font_atlas",
+    ) );
 
     // atlas copy_dest -> shader_resource
     // final undefined -> render target
@@ -214,24 +199,17 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
         xg->cmd_barrier_set ( cmd_buffer, key, &barrier_set );
     }
 
-    xg_buffer_h uniform_buffer;
-    {
-        xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-        uniform_buffer = xg->create_buffer ( &xg_buffer_params_m (
+    xg_buffer_h uniform_buffer = xg->create_buffer ( &xg_buffer_params_m (
             .memory_type = xg_memory_type_gpu_mapped_m,
             .device = params->xg_device,
             .size = sizeof ( xi_font_atlas_uniform_data_t ),
             .allowed_usage = xg_buffer_usage_bit_uniform_m,
             .debug_name = "xi_font_uniforms",
         ) );
-
-        xg->cmd_destroy_buffer ( resource_cmd_buffer, uniform_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
-
-        xg_buffer_info_t uniform_buffer_info;
-        xg->get_buffer_info ( &uniform_buffer_info, uniform_buffer );
-        xi_font_state->uniform_data = ( xi_font_atlas_uniform_data_t* ) uniform_buffer_info.allocation.mapped_address;
-    }
+    xg->cmd_destroy_buffer ( resource_cmd_buffer, uniform_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
+    xg_buffer_info_t uniform_buffer_info;
+    xg->get_buffer_info ( &uniform_buffer_info, uniform_buffer );
+    xi_font_state->uniform_data = ( xi_font_atlas_uniform_data_t* ) uniform_buffer_info.allocation.mapped_address;
 
     if ( xi_font_state->renderpass == xg_null_handle_m ) {
         xi_font_state->renderpass = xg->create_renderpass ( &xg_renderpass_params_m (

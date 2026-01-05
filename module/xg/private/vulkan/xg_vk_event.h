@@ -28,10 +28,6 @@ const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h handle );
 /*
     swapchain texture acquire:  vkAcquireNextImageKHR -> vkQueueSubmit
     gpu execution complete:     vkQueueSubmit -> vkQueuePresentKHR
-        seems like Vulkan doesn't offer a way to wait on the Present call to "finish", while requiring
-        the gpu execution complete semaphore to remain alive until then. See https://github.com/KhronosGroup/Vulkan-Docs/issues/152
-        current solution to this is to never kill the semaphore used that way, instead have one per
-        swapchain texture and reuse them when the same texture gets acquired again by the acquire call
 */
 typedef struct {
     xg_queue_event_params_t params;

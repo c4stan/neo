@@ -49,7 +49,7 @@ void std_log_print_callstack ( void ) {
     IMAGEHLP_LINE line = {0};
     line.SizeOfStruct = sizeof ( IMAGEHLP_LINE );
 
-    char buffer[512] = "BACKTRACE ------------\n";
+    char buffer[512] = "-------------- BACKTRACE --------------\n";
     WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
 
     for ( uint32_t i = 0; i < frame_count; ++i ) {
@@ -60,7 +60,7 @@ void std_log_print_callstack ( void ) {
         WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
     }
 
-    std_str_copy_static_m ( buffer, "----------------------\n" );
+    std_str_copy_static_m ( buffer, "---------------------------------------\n" );
     WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
 
     SymCleanup ( process );

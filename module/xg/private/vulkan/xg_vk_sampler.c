@@ -18,10 +18,9 @@ void xg_vk_sampler_load ( xg_vk_sampler_state_t* state ) {
     std_mem_zero_array_m ( xg_vk_sampler_state->samplers_bitset, xg_vk_sampler_bitset_u64_count_m );
     std_mutex_init ( &xg_vk_sampler_state->samplers_mutex );
 
-    for ( uint32_t i = 0; i < xg_vk_max_devices_m; ++i ) {
-        for ( uint32_t j = 0; j < xg_default_sampler_count_m; ++j ) {
-            xg_vk_sampler_state->default_samplers[i][j] = xg_null_handle_m;
-        }
+    for ( uint32_t device_it = 0; device_it < xg_vk_max_devices_m; ++device_it ) {
+        xg_vk_sampler_device_context_t* context = &xg_vk_sampler_state->device_contexts[device_it];
+        context->is_active = false;
     }
 }
 
@@ -29,7 +28,26 @@ void xg_vk_sampler_reload ( xg_vk_sampler_state_t* state ) {
     xg_vk_sampler_state = state;
 }
 
+static void xg_vk_sampler_deactivate_device_context ( uint64_t device_idx ) {
+    xg_vk_sampler_device_context_t* context = &xg_vk_sampler_state->device_contexts[device_idx];
+    if ( !context->is_active ) {
+        return;
+    }
+    context->is_active = false;
+
+    for ( uint32_t i = 0; i < xg_default_sampler_count_m; ++i ) {
+        xg_sampler_h sampler = context->default_samplers[i];
+        if ( sampler != xg_null_handle_m ) {
+            xg_sampler_destroy ( sampler );
+        }
+    }
+}
+
 void xg_vk_sampler_unload ( void ) {
+    for ( uint32_t i = 0; i < xg_default_sampler_count_m; ++i ) {
+        xg_vk_sampler_deactivate_device_context ( i );
+    }
+
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, xg_vk_sampler_state->samplers_bitset, idx, xg_vk_sampler_bitset_u64_count_m ) ) {
         xg_sampler_h handle = idx;
@@ -83,61 +101,50 @@ xg_sampler_h xg_sampler_create ( const xg_sampler_params_t* params ) {
     return handle;
 }
 
-static xg_sampler_h xg_sampler_create_default ( xg_device_h device, xg_default_sampler_e sampler_enum ) {
-    xg_sampler_params_t params;
+void xg_vk_sampler_activate_device ( xg_device_h device_handle ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
+    xg_vk_sampler_device_context_t* context = &xg_vk_sampler_state->device_contexts[device_idx];
+    std_assert_m ( !context->is_active );
+    context->is_active = true;
 
-    switch ( sampler_enum ) {
-        case xg_default_sampler_point_clamp_m:
-            params = xg_sampler_params_m (
-                .device = device,
-                .min_filter = xg_sampler_filter_point_m,
-                .mag_filter = xg_sampler_filter_point_m,
-                .mipmap_filter = xg_sampler_filter_point_m,
-                .address_mode = xg_sampler_address_mode_clamp_m,
-            );
-            std_str_copy_static_m ( params.debug_name, "default_point_clamp" );
-            break;
+    context->default_samplers[xg_default_sampler_point_clamp_m] = xg_sampler_create ( &xg_sampler_params_m (
+        .device = device_handle,
+        .min_filter = xg_sampler_filter_point_m,
+        .mag_filter = xg_sampler_filter_point_m,
+        .mipmap_filter = xg_sampler_filter_point_m,
+        .address_mode = xg_sampler_address_mode_clamp_m,
+        .debug_name = "default_point_clamp",
+    ) );
 
-        case xg_default_sampler_linear_clamp_m:
-            params = xg_sampler_params_m (
-                .device = device,
-                .min_filter = xg_sampler_filter_linear_m,
-                .mag_filter = xg_sampler_filter_linear_m,
-                .mipmap_filter = xg_sampler_filter_linear_m,
-                .address_mode = xg_sampler_address_mode_clamp_m,
-            );
-            std_str_copy_static_m ( params.debug_name, "default_linear_clamp" );
-            break;
+    context->default_samplers[xg_default_sampler_linear_clamp_m] = xg_sampler_create ( &xg_sampler_params_m (
+        .device = device_handle,
+        .min_filter = xg_sampler_filter_linear_m,
+        .mag_filter = xg_sampler_filter_linear_m,
+        .mipmap_filter = xg_sampler_filter_linear_m,
+        .address_mode = xg_sampler_address_mode_clamp_m,
+        .debug_name = "default_linear_clamp",
+    ) );
 
-        case xg_default_sampler_linear_wrap_m:
-            params = xg_sampler_params_m (
-                .device = device,
-                .min_filter = xg_sampler_filter_linear_m,
-                .mag_filter = xg_sampler_filter_linear_m,
-                .mipmap_filter = xg_sampler_filter_linear_m,
-                .address_mode = xg_sampler_address_mode_wrap_m,
-            );
-            std_str_copy_static_m ( params.debug_name, "default_linear_wrap" );
-            break;
-
-        default:
-            std_log_error_m ( "Unkown default sampler" );
-            break;
-    }
-
-    return xg_sampler_create ( &params );
+    context->default_samplers[xg_default_sampler_linear_wrap_m] = xg_sampler_create ( &xg_sampler_params_m (
+        .device = device_handle,
+        .min_filter = xg_sampler_filter_linear_m,
+        .mag_filter = xg_sampler_filter_linear_m,
+        .mipmap_filter = xg_sampler_filter_linear_m,
+        .address_mode = xg_sampler_address_mode_wrap_m,
+        .debug_name = "default_linear_wrap",
+    ) );
 }
 
-// TODO pre-create on device init?
+void xg_vk_sampler_deactivate_device ( xg_device_h device_handle ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
+    xg_vk_sampler_deactivate_device_context ( device_idx );
+}
+
 xg_sampler_h xg_sampler_get_default ( xg_device_h device, xg_default_sampler_e sampler_enum ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device );
-    xg_sampler_h sampler = xg_vk_sampler_state->default_samplers[device_idx][sampler_enum];
-
-    if ( sampler == xg_null_handle_m ) {
-        sampler = xg_sampler_create_default ( device, sampler_enum );
-        xg_vk_sampler_state->default_samplers[device_idx][sampler_enum] = sampler;
-    }
-
+    xg_vk_sampler_device_context_t* context = &xg_vk_sampler_state->device_contexts[device_idx];
+    xg_sampler_h sampler = context->default_samplers[sampler_enum];
+    std_assert_m ( sampler != xg_null_handle_m );
     return sampler;
 }
 

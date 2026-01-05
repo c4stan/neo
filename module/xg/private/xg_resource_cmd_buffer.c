@@ -278,3 +278,19 @@ void xg_resource_cmd_buffer_queue_event_destroy ( xg_resource_cmd_buffer_h cmd_b
     cmd_args->event = event;
     cmd_args->destroy_time = destroy_time;
 }
+
+void xg_resource_cmd_buffer_resource_layout_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_resource_bindings_layout_h layout, xg_resource_cmd_buffer_time_e destroy_time ) {
+    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_queue_resource_bindings_layout_destroy_m, xg_resource_cmd_queue_resource_bindings_layout_destroy_t );
+
+    cmd_args->layout = layout;
+    cmd_args->destroy_time = destroy_time;
+}
+
+void xg_resource_cmd_buffer_pipeline_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_pipeline_state_h pipeline, xg_resource_cmd_buffer_time_e destroy_time ) {
+    xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
+    std_auto_m cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_queue_pipeline_destroy_m, xg_resource_cmd_queue_pipeline_destroy_t );
+
+    cmd_args->pipeline = pipeline;
+    cmd_args->destroy_time = destroy_time;
+}

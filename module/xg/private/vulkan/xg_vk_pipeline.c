@@ -68,6 +68,20 @@ xg_vk_pipeline_common_t* xg_vk_common_pipeline_get ( xg_pipeline_state_h pipelin
     }
 }
 
+void xg_vk_pipeline_destroy ( xg_pipeline_state_h pipeline ) {
+    if ( xg_vk_pipeline_handle_is_graphics_m ( pipeline ) ) {
+        xg_vk_graphics_pipeline_destroy ( pipeline );
+    } else if ( xg_vk_pipeline_handle_is_compute_m ( pipeline ) ) {
+        xg_vk_compute_pipeline_destroy ( pipeline );
+    } else if ( xg_vk_pipeline_handle_is_raytrace_m ( pipeline ) ) {
+        xg_vk_raytrace_pipeline_destroy ( pipeline );
+    } else {
+        std_assert_m ( false );
+        return;
+    }
+
+}
+
 xg_vk_renderpass_t* xg_vk_renderpass_edit ( xg_renderpass_h renderpass_handle ) {
     xg_vk_renderpass_t* xg_vk_renderpass = &xg_vk_pipeline_state->renderpasses_array[renderpass_handle];
     return xg_vk_renderpass;
@@ -893,11 +907,6 @@ void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline_han
 
     //xg_buffer_destroy ( pipeline->sbt_buffer );
 
-    //for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
-    //    xg_resource_bindings_layout_h layout_handle = pipeline->common.resource_layouts[i];
-    //    xg_vk_pipeline_resource_bindings_layout_destroy ( layout_handle );
-    //}
-
     std_virtual_heap_free ( pipeline->sbt_handle_buffer );
 
     std_list_push ( &xg_vk_pipeline_state->raytrace_pipelines_freelist, pipeline );
@@ -1670,11 +1679,6 @@ void xg_vk_graphics_pipeline_destroy ( xg_graphics_pipeline_state_h pipeline_han
     vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, xg_vk_cpu_allocator() );
     vkDestroyRenderPass ( device->vk_handle, pipeline->vk_renderpass, xg_vk_cpu_allocator() );
 
-    //for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
-    //    xg_resource_bindings_layout_h layout_handle = pipeline->common.resource_layouts[i];
-    //    xg_vk_pipeline_resource_bindings_layout_destroy ( layout_handle );
-    //}
-
     std_list_push ( &xg_vk_pipeline_state->graphics_pipelines_freelist, pipeline );
     std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->graphics_pipelines_map, pipeline->common.hash ) );
 }
@@ -1718,11 +1722,6 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline_handl
     
     vkDestroyPipeline ( device->vk_handle, pipeline->common.vk_handle, xg_vk_cpu_allocator() );
     vkDestroyPipelineLayout ( device->vk_handle, pipeline->common.vk_layout_handle, xg_vk_cpu_allocator() );
-
-    //for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
-    //    xg_resource_bindings_layout_h layout_handle = pipeline->common.resource_layouts[i];
-    //    xg_vk_pipeline_resource_bindings_layout_destroy ( layout_handle );
-    //}
 
     std_list_push ( &xg_vk_pipeline_state->compute_pipelines_freelist, pipeline );
     std_verify_m ( std_hash_map_remove_hash ( &xg_vk_pipeline_state->compute_pipelines_map, pipeline->common.hash ) );

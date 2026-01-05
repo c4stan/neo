@@ -14,6 +14,7 @@ const char* xg_memory_access_str ( xg_memory_access_bit_e access );
 const char* xg_memory_type_str ( xg_memory_type_e type );
 const char* xg_shader_binding_set_str ( xg_shader_binding_set_e set );
 const char* xg_resource_binding_str ( xg_resource_binding_e binding );
+const char* xg_resource_binding_str_short ( xg_resource_binding_e binding );
 
 xg_pipeline_stage_bit_e xg_shading_stage_to_pipeline_stage ( xg_shading_stage_e stage );
 bool xg_memory_access_is_write ( xg_memory_access_bit_e access );

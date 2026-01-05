@@ -213,6 +213,14 @@ void xs_database_set_build_params ( xs_database_h db_handle, const xs_database_b
     db->dirty_build_params = true;
 }
 
+static void build_bindings_layout_params_name ( xg_resource_bindings_layout_params_t* layout ) {
+    std_string_t string = std_static_string_m ( layout->debug_name );
+    for ( uint32_t i = 0; i < layout->resource_count; ++i ) {
+        xg_resource_binding_layout_t* resource = &layout->resources[i];
+        std_string_append_format ( &string, std_fmt_str_m, xg_resource_binding_str_short ( resource->type ) );
+    }
+}
+
 typedef struct {
     xg_shading_stage_e stage;
     std_buffer_t buffer;
@@ -225,7 +233,7 @@ static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* 
     shader->buffer = bytecode->buffer;
 }
 
-xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle, bool is_reload ) {
+xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle, xg_workload_h workload ) {
     xs_database_t* db = &xs_database_state->database_array[db_handle];
 
     xs_database_build_result_t result = xs_database_build_result_m();
@@ -279,6 +287,8 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
         std_path_append_file ( &stats_path, "stats.txt" );
         stats_file = std_file_create ( stats_path.str, std_file_write_m, std_path_already_existing_overwrite_m );
     }
+
+    xg_resource_cmd_buffer_h cmd_buffer = xg_null_handle_m;
 
     // check pipeline states
     for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
@@ -605,14 +615,22 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
                 }
             }
 
+            // cleanup old resources
+            if ( pipeline_state->pipeline_handle != xg_null_handle_m ) {
+                std_assert_m ( workload != xg_null_handle_m );
+                if ( cmd_buffer == xg_null_handle_m ) {
+                    cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+                }
+                xg->cmd_destroy_pipeline ( cmd_buffer, pipeline_state->pipeline_handle, xg_resource_cmd_buffer_time_workload_complete_m );
+
+                for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
+                    xg->cmd_destroy_resource_layout ( cmd_buffer, pipeline_state->resource_layouts[i], xg_resource_cmd_buffer_time_workload_complete_m );
+                }
+            }
+
             for ( uint32_t i = 0; i < xg_shader_binding_set_count_m; ++i ) {
                 xg_resource_bindings_layout_params_t* layout_params = &resource_layouts[i];
-                std_string_t string = std_static_string_m ( layout_params->debug_name );
-                // TODO this set will likely get reused by multiple pipeline states, making the name somewhat misleading.
-                //      make a name string that describes the set layout instead?
-                std_string_append ( &string, pipeline_state->name );
-                std_string_append ( &string, "-" );
-                std_string_append ( &string, xg_shader_binding_set_str ( i ) );
+                build_bindings_layout_params_name ( layout_params );
                 xg_resource_bindings_layout_h resource_layout = xg->create_resource_layout ( layout_params );
                 pipeline_state->resource_layouts[i] = resource_layout;
 
@@ -715,6 +733,8 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
         std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed", result.failed_pipeline_states, result.failed_shaders );
     }
 
+    db->dirty_build_params = false;
+
     return result;
 }
 
@@ -785,11 +805,11 @@ void xs_database_update_pipelines ( xg_workload_h last_workload ) {
 }
 
 xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
-    return xs_database_build_internal ( db_handle, false );
+    return xs_database_build_internal ( db_handle, xg_null_handle_m );
 }
 
-xs_database_build_result_t xs_database_update ( xs_database_h db_handle ) {
-    return xs_database_build_internal ( db_handle, true );
+xs_database_build_result_t xs_database_update ( xs_database_h db_handle, xg_workload_h workload ) {
+    return xs_database_build_internal ( db_handle, workload );
 }
 
 void xs_database_build_all ( void ) {
@@ -801,11 +821,11 @@ void xs_database_build_all ( void ) {
     }
 }
 
-void xs_database_update_all ( void ) {
+void xs_database_update_all ( xg_workload_h workload ) {
     uint64_t db_idx = 0;
     while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
         xs_database_h db_handle = db_idx;
-        xs_database_update ( db_handle );
+        xs_database_update ( db_handle, workload );
         ++db_idx;
     }
 }

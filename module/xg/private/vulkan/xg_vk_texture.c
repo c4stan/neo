@@ -24,13 +24,40 @@ void xg_vk_texture_load ( xg_vk_texture_state_t* state ) {
     xg_vk_texture_state->textures_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_div_round_up_m ( xg_vk_max_textures_m, 64 ) );
     std_mem_zero ( xg_vk_texture_state->textures_bitset, 8 * std_div_round_up_m ( xg_vk_max_textures_m, 64 ) );
     std_mutex_init ( &xg_vk_texture_state->textures_mutex );
+
+    for ( uint32_t i = 0; i < xg_vk_max_devices_m; ++i ) {
+        xg_vk_texture_device_context_t* context = &xg_vk_texture_state->device_contexts[i];
+        context->enabled = false;
+    }
+
+    std_mem_zero_static_array_m ( xg_vk_texture_state->device_contexts );
 }
 
 void xg_vk_texture_reload ( xg_vk_texture_state_t* state ) {
     xg_vk_texture_state = state;
 }
 
+static void xg_vk_texture_deactivate_device_context ( uint64_t device_idx ) {
+    xg_vk_texture_device_context_t* context = &xg_vk_texture_state->device_contexts[device_idx];
+    if ( !context->enabled ) {
+        return;
+    }
+    context->enabled = false;
+
+    for ( uint32_t tex_it = 0; tex_it < xg_default_texture_count_m; ++tex_it ) {
+        xg_texture_h texture_handle = context->default_textures[tex_it];
+        if ( texture_handle != xg_null_handle_m ) {
+            xg_texture_destroy ( texture_handle );
+            context->default_textures[tex_it] = xg_null_handle_m;
+        }
+    }
+}
+
 void xg_vk_texture_unload ( void ) {
+    for ( uint32_t i = 0; i < xg_vk_max_devices_m; ++i ) {
+        xg_vk_texture_deactivate_device_context ( i );
+    }
+
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, xg_vk_texture_state->textures_bitset, idx, std_div_round_up_m ( xg_vk_max_textures_m, 64) ) ) {
         xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[idx];
@@ -48,11 +75,15 @@ void xg_vk_texture_unload ( void ) {
 
 void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h workload ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
+    xg_vk_texture_device_context_t* context = &xg_vk_texture_state->device_contexts[device_idx];
+    std_assert_m ( !context->enabled );
+    context->enabled = true;
+
     xg_cmd_buffer_h cmd_buffer = xg_workload_add_cmd_buffer ( workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg_workload_add_resource_cmd_buffer ( workload );
 
     char black[4] = { 0, 0, 0, 0 };
-    xg_vk_texture_state->default_textures[device_idx][xg_default_texture_r8g8b8a8_unorm_black_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+    context->default_textures[xg_default_texture_r8g8b8a8_unorm_black_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
         .device = device_handle,
         .memory_type = xg_memory_type_gpu_only_m,
         .format = xg_format_r8g8b8a8_unorm_m,
@@ -64,7 +95,7 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
     ) );
 
     char white[4] = { 0xff, 0xff, 0xff, 0xff };
-    xg_vk_texture_state->default_textures[device_idx][xg_default_texture_r8g8b8a8_unorm_white_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+    context->default_textures[xg_default_texture_r8g8b8a8_unorm_white_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
         .device = device_handle,
         .memory_type = xg_memory_type_gpu_only_m,
         .format = xg_format_r8g8b8a8_unorm_m,
@@ -76,7 +107,7 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
     ) );
 
     char blue[4] = { 0x7f, 0x7f, 0xff, 0xff };
-    xg_vk_texture_state->default_textures[device_idx][xg_default_texture_r8g8b8a8_unorm_tbn_up_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+    context->default_textures[xg_default_texture_r8g8b8a8_unorm_tbn_up_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
         .device = device_handle,
         .memory_type = xg_memory_type_gpu_only_m,
         .format = xg_format_r8g8b8a8_unorm_m,
@@ -90,7 +121,7 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
     xg_texture_memory_barrier_t barriers[xg_default_texture_count_m];
     for ( uint32_t i = 0; i < xg_default_texture_count_m; ++i ) {
         barriers[i] = xg_texture_memory_barrier_m (
-            .texture = xg_vk_texture_state->default_textures[device_idx][i],
+            .texture = context->default_textures[i],
             .memory.invalidations = xg_memory_access_bit_shader_read_m,
             .layout.new = xg_texture_layout_shader_read_m,
             .execution.blocked = xg_pipeline_stage_bit_all_commands_m,
@@ -100,6 +131,11 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
         .texture_memory_barriers = barriers,
         .texture_memory_barriers_count = xg_default_texture_count_m
     ) );
+}
+
+void xg_vk_texture_deactivate_device ( xg_device_h device_handle ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
+    xg_vk_texture_deactivate_device_context ( device_idx );
 }
 
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params ) {
@@ -627,7 +663,9 @@ const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture_handle
 
 xg_texture_h xg_texture_get_default ( xg_device_h device, xg_default_texture_e texture_enum ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device );
-    xg_texture_h texture = xg_vk_texture_state->default_textures[device_idx][texture_enum];
+    xg_vk_texture_device_context_t* context = &xg_vk_texture_state->device_contexts[device_idx];
+    std_assert_m ( context->enabled );
+    xg_texture_h texture = context->default_textures[texture_enum];
     std_assert_m ( texture != xg_null_handle_m );
     return texture;
 }

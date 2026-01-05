@@ -14,11 +14,16 @@ typedef struct {
 } xg_vk_sampler_t;
 
 typedef struct {
+    bool is_active;
+    xg_sampler_h default_samplers[xg_default_sampler_count_m];
+} xg_vk_sampler_device_context_t;
+
+typedef struct {
     xg_vk_sampler_t* samplers_array;
     xg_vk_sampler_t* samplers_freelist;
     uint64_t* samplers_bitset;
     std_mutex_t samplers_mutex;
-    xg_sampler_h default_samplers[xg_vk_max_devices_m][xg_default_sampler_count_m];
+    xg_vk_sampler_device_context_t device_contexts[xg_vk_max_devices_m];
 } xg_vk_sampler_state_t;
 
 void xg_vk_sampler_load ( xg_vk_sampler_state_t* state );
@@ -32,3 +37,6 @@ bool xg_sampler_get_info ( xg_sampler_h sampler, xg_sampler_info_t* info );
 bool xg_sampler_destroy ( xg_sampler_h sampler );
 
 const xg_vk_sampler_t* xg_vk_sampler_get ( xg_sampler_h sampler );
+
+void xg_vk_sampler_activate_device ( xg_device_h device_handle );
+void xg_vk_sampler_deactivate_device ( xg_device_h device_handle );

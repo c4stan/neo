@@ -2620,6 +2620,8 @@ typedef struct {
 
     void                    ( *set_workload_global_bindings )       ( xg_workload_h workload, xg_resource_bindings_h bindings );
 
+    void                    ( *cmd_destroy_resource_layout )        ( xg_resource_cmd_buffer_h cmd_buffer, xg_resource_bindings_layout_h layout, xg_resource_cmd_buffer_time_e time );
+
     // TOOD
     //void                    ( *cmd_signal_event )                   ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, xg_pipeline_stage_bit_e signal_stages, uint64_t key );
     //void                    ( *cmd_wait_for_event )                 ( xg_cmd_buffer_h cmd_buffer, xg_gpu_event_h event, const xg_barrier_set_t* barrier_set, uint64_t key );
@@ -2687,6 +2689,8 @@ typedef struct {
     void                    ( *destroy_graphics_pipeline )          ( xg_graphics_pipeline_state_h pipeline );
     void                    ( *destroy_compute_pipeline )           ( xg_compute_pipeline_state_h pipeline );
     void                    ( *destroy_raytrace_pipeline )          ( xg_raytrace_pipeline_state_h pipeline );
+
+    void                    ( *cmd_destroy_pipeline )               ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_state_h pipeline, xg_resource_cmd_buffer_time_e time );
 
     void                    ( *get_pipeline_info )                  ( xg_pipeline_info_t* info, xg_pipeline_state_h pipeline, std_stack_t* allocator );
 

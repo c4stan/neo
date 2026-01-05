@@ -476,8 +476,10 @@ static void xs_test ( void ) {
             break;
         }
 
+        xg_workload_h workload = xg->create_workload ( device );
+
         if ( !input_state.keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
-            xs->build_databases();
+            xs->update_databases ( workload );
         }
 
         if ( !input_state.keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
@@ -509,13 +511,11 @@ static void xs_test ( void ) {
                     .viewport_state.height = new_window_info.height,
                 ),
             ) );
-            xs->build_databases();
+            xs->update_databases ( workload );
         }
 
         window_info = new_window_info;
         input_state = new_input_state;
-
-        xg_workload_h workload = xg->create_workload ( device );
 
         xg_graphics_pipeline_state_h graphics_pipeline = xs->get_pipeline_state ( graphics_database_pipeline );
         xg_compute_pipeline_state_h compute_pipeline = xs->get_pipeline_state ( compute_database_pipeline );
@@ -528,8 +528,11 @@ static void xs_test ( void ) {
             .renderpass = renderpass
         } );
 
-        xs->update_pipeline_states ( workload );
+        //xs->update_pipeline_states ( workload );
     }
+
+    xg->wait_all_workload_complete();
+    xg->destroy_renderpass ( renderpass );
 
     std_module_unload_m ( xs_module_name_m );
     std_module_unload_m ( xg_module_name_m );

@@ -294,10 +294,6 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     // Destroy current swapchain
     vkDestroySwapchainKHR ( device->vk_handle, swapchain->vk_handle, NULL );
 
-    //for ( size_t i = 0; i < swapchain->texture_count; ++i ) {
-    //xg_vk_texture_unregister_swapchain_texture ( swapchain->textures[i] );
-    //}
-
     // Create new swapchain
     VkSurfaceTransformFlagBitsKHR vk_transform_flags = 0;
 
@@ -381,7 +377,6 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
 
     for ( size_t i = 0; i < texture_count; ++i ) {
         xg_vk_texture_update_swapchain_texture ( swapchain->textures[i], &swapchain_texture_params, swapchain_textures[i] );
-        //swapchain->textures[i] = xg_vk_texture_register_swapchain_texture ( &swapchain_texture_params, swapchain_textures[i] );
     }
 
     return true;
@@ -685,8 +680,21 @@ void xg_vk_swapchain_destroy ( xg_swapchain_h swapchain_handle ) {
     xg_vk_swapchain_t* swapchain = &xg_vk_swapchain_state->swapchains_array[swapchain_handle];
     const xg_vk_device_t* device = xg_vk_device_get ( swapchain->device );
 
+    ////
+    //
+    // seems like Vulkan doesn't offer a way to wait on the Present call to "finish", while requiring
+    // the gpu execution complete semaphore to remain alive until then
+    // see https://github.com/KhronosGroup/Vulkan-Docs/issues/152
+    // so just wait for the device to become idle instead. this seems to work.
+    //
+    ////
+    vkDeviceWaitIdle ( device->vk_handle );
     for ( size_t i = 0; i < swapchain->texture_count; ++i ) {
         xg_gpu_queue_event_destroy ( swapchain->execution_complete_gpu_events[i] );
+    }
+
+    for ( size_t i = 0; i < swapchain->texture_count; ++i ) {
+        xg_vk_texture_unregister_swapchain_texture ( swapchain->textures[i] );
     }
 
     vkDestroySwapchainKHR ( device->vk_handle, swapchain->vk_handle, NULL );

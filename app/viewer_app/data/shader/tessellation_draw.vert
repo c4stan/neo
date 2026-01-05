@@ -16,12 +16,8 @@ layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_unif
     mat4 prev_world_from_model;
 } draw_uniforms;
 
-struct vertex_t {
-    float pos[3];
-};
-
 layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, scalar ) buffer readonly vertex_buffer_t {
-    vertex_t data[];
+    float data[];
 } vertex_buffer;
 
 layout ( binding = 3, set = xs_shader_binding_set_dispatch_m, scalar ) buffer readonly index_buffer_t {
@@ -73,14 +69,14 @@ void build_key_verts ( uint key, vec3 prim_verts[3], out vec3 out_verts[3] ) {
     out_verts[2] = berp ( prim_verts, u3 );
 }
 
-vec3 load_vec3 ( float[3] f32 ) {
-    return vec3 ( f32[0], f32[1], f32[2] );
-}
-
 vec3 load_vert ( uint vert_id ) {
     uint idx = index_buffer.data[vert_id];
-    float[3] pos = vertex_buffer.data[idx].pos;
-    return load_vec3 ( pos );
+    vec3 pos = vec3 (
+        vertex_buffer.data[idx * 3 + 0],
+        vertex_buffer.data[idx * 3 + 1],
+        vertex_buffer.data[idx * 3 + 2]
+    );
+    return pos;
 }
 
 void build_prim_verts ( uint prim_id, out vec3 out_verts[3] ) {

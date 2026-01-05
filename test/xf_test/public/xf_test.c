@@ -225,8 +225,10 @@ static void xf_test ( void ) {
             break;
         }
 
+        xg_workload_h workload = xg->create_workload ( device );
+
         if ( !input_state.keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
-            xs->build_databases();
+            xs->update_databases ( workload );
         }
 
         wm_window_info_t new_window_info;
@@ -234,8 +236,6 @@ static void xf_test ( void ) {
 
         window_info = new_window_info;
         input_state = new_input_state;
-
-        xg_workload_h workload = xg->create_workload ( device );
 
         uint64_t key = 0;
         key = xf->execute_graph ( graph, workload, key );

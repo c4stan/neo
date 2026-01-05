@@ -18,6 +18,7 @@
     #include "vulkan/xg_vk_workload.h"
     #include "vulkan/xg_vk_pipeline.h"
     #include "vulkan/xg_vk_texture.h"
+    #include "vulkan/xg_vk_sampler.h"
 #endif
 
 /*
@@ -1018,6 +1019,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     xg_workload_h workload = xg_workload_create ( device_handle );
 
     xg_vk_pipeline_activate_device ( device_handle );
+    xg_vk_sampler_activate_device ( device_handle );
     xg_vk_texture_activate_device ( device_handle, workload );
 
     xg_workload_submit ( workload );
@@ -1028,6 +1030,8 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 bool xg_vk_device_deactivate ( xg_device_h device_handle ) {
     xg_vk_workload_deactivate_device ( device_handle );
     xg_vk_pipeline_deactivate_device ( device_handle );
+    xg_vk_texture_deactivate_device ( device_handle );
+    xg_vk_sampler_deactivate_device ( device_handle );
     xg_vk_allocator_deactivate_device ( device_handle );
 
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );

@@ -27,8 +27,8 @@ typedef enum {
 
     xg_resource_cmd_queue_event_destroy_m,
 
-    // TODO pipeline create/destroy
-    //      once that is available, rewrite pipeline destrouction in xs pipeline update to use resource cmd buffers instead of tracking workloads internally?
+    xg_resource_cmd_queue_resource_bindings_layout_destroy_m,
+    xg_resource_cmd_queue_pipeline_destroy_m,
 } xg_resource_cmd_type_e;
 
 #define xg_resource_cmd_buffer_cmd_alignment_m 8
@@ -100,6 +100,16 @@ typedef struct {
     xg_resource_cmd_buffer_time_e destroy_time;
 } xg_resource_cmd_queue_event_destroy_t;
 
+typedef struct {
+    xg_resource_bindings_layout_h layout;
+    xg_resource_cmd_buffer_time_e destroy_time;
+} xg_resource_cmd_queue_resource_bindings_layout_destroy_t;
+
+typedef struct {
+    xg_pipeline_state_h pipeline;
+    xg_resource_cmd_buffer_time_e destroy_time;
+} xg_resource_cmd_queue_pipeline_destroy_t;
+
 // ---
 
 typedef struct {
@@ -134,3 +144,6 @@ void            xg_resource_cmd_buffer_resource_bindings_destroy   ( xg_resource
 void            xg_resource_cmd_buffer_graphics_renderpass_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_renderpass_h renderpass, xg_resource_cmd_buffer_time_e destroy_time );
 
 void            xg_resource_cmd_buffer_queue_event_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_queue_event_h event, xg_resource_cmd_buffer_time_e destroy_time );
+
+void            xg_resource_cmd_buffer_resource_layout_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_resource_bindings_layout_h layout, xg_resource_cmd_buffer_time_e destroy_time );
+void            xg_resource_cmd_buffer_pipeline_destroy ( xg_resource_cmd_buffer_h cmd_buffer, xg_pipeline_state_h pipeline, xg_resource_cmd_buffer_time_e destroy_time );

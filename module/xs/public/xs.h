@@ -340,7 +340,7 @@ typedef struct {
     void ( *set_build_params ) ( xs_database_h database, const xs_database_build_params_t* params );
     xs_database_build_result_t ( *build_database ) ( xs_database_h database );
     void ( *build_databases ) ( void );
-    void ( *update_databases ) ( void );
+    void ( *update_databases ) ( xg_workload_h workload );
 
     // TODO go hash->fx and fx->technique(pipeline state) instead of hash->pipeline state
     xs_database_pipeline_h ( *get_database_pipeline ) ( xs_database_h database, xs_string_hash_t name_hash );

@@ -30,8 +30,8 @@ typedef struct {
     // TODO use fov_x instead?
     float fov_y; // in radians
     float jitter[2];
-    bool reverse_z;         // todo
-    bool infinite_far_z;    // todo
+    bool reverse_z;
+    bool infinite_far_z;
 } rv_perspective_projection_params_t;
 
 #define rv_perspective_projection_params_m( ... ) ( rv_perspective_projection_params_t ) { \

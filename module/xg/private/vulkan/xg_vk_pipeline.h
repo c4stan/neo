@@ -145,6 +145,8 @@ void xg_vk_compute_pipeline_destroy ( xg_compute_pipeline_state_h pipeline );
 xg_raytrace_pipeline_state_h xg_vk_raytrace_pipeline_create ( xg_device_h device, const xg_raytrace_pipeline_params_t* params );
 void xg_vk_raytrace_pipeline_destroy ( xg_raytrace_pipeline_state_h pipeline );
 
+void xg_vk_pipeline_destroy ( xg_pipeline_state_h pipeline );
+
 xg_resource_bindings_layout_h xg_vk_pipeline_resource_bindings_layout_create ( const xg_resource_bindings_layout_params_t* params );
 void xg_vk_pipeline_resource_binding_set_layouts_get ( xg_resource_bindings_layout_h* layouts, xg_pipeline_state_h pipeline );
 xg_resource_bindings_layout_h xg_vk_pipeline_resource_binding_set_layout_get ( xg_pipeline_state_h pipeline, xg_shader_binding_set_e set );

@@ -15,6 +15,7 @@ static void xs_api_init ( xs_i* xs ) {
     xs->get_database_pipeline = xs_database_pipeline_get;
     xs->get_pipeline_state = xs_database_pipeline_state_get;
     xs->update_pipeline_states = xs_database_update_pipelines;
+    xs->update_databases = xs_database_update_all;
 }
 
 void* xs_load ( void* std_runtime ) {

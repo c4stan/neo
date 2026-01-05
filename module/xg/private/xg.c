@@ -37,6 +37,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->present_swapchain = xg_vk_swapchain_present;
     xg->resize_swapchain = xg_vk_swapchain_resize;
     xg->get_swapchain_info = xg_vk_swapchain_get_info;
+    xg->destroy_swapchain = xg_vk_swapchain_destroy;
     // Pipeline
     xg->create_graphics_pipeline = xg_vk_graphics_pipeline_create;
     xg->destroy_graphics_pipeline = xg_vk_graphics_pipeline_destroy;
@@ -100,6 +101,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_destroy_renderpass = xg_resource_cmd_buffer_graphics_renderpass_destroy;
     xg->cmd_create_workload_bindings = xg_resource_cmd_buffer_workload_resource_bindings_create;
     xg->cmd_destroy_queue_event = xg_resource_cmd_buffer_queue_event_destroy;
+    xg->cmd_destroy_resource_layout = xg_resource_cmd_buffer_resource_layout_destroy;
+    xg->cmd_destroy_pipeline = xg_resource_cmd_buffer_pipeline_destroy;
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;
     xg->get_buffer_info = xg_buffer_get_info;

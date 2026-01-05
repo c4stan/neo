@@ -32,6 +32,9 @@ static xg_vk_workload_state_t* xg_vk_workload_state;
 std_warnings_ignore_m ( "-Wint-to-pointer-cast" )
 #endif
 
+#define xg_vk_workload_max_uniform_buffers_m std_div_round_up_m ( xg_workload_max_uniform_size_m, xg_workload_uniform_buffer_size_m )
+#define xg_vk_workload_max_staging_buffers_m std_div_round_up_m ( xg_workload_max_staging_size_m, xg_workload_staging_buffer_size_m )
+
 void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
     xg_vk_workload_state = state;
 
@@ -44,6 +47,10 @@ void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
         workload->gen = 0;
     }
 
+    for ( uint32_t i = 0; i < xg_max_active_devices_m; ++i ) {
+        xg_vk_workload_state->device_contexts[i].is_active = false;
+    }
+
     std_mem_zero_m ( &state->device_contexts );
 }
 
@@ -51,11 +58,56 @@ void xg_vk_workload_reload ( xg_vk_workload_state_t* state ) {
     xg_vk_workload_state = state;
 }
 
+static void xg_vk_workload_deactivate_device_context ( uint64_t device_idx ) {
+    xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
+    if ( !device_context->is_active ) {
+        return;
+    }
+    device_context->is_active = false;
+    const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
+
+    for ( uint32_t i = 0; i < xg_vk_workload_max_uniform_buffers_m; ++i ) {
+        xg_buffer_destroy ( device_context->uniform_buffers_array[i].handle );
+    }
+
+    for ( uint32_t i = 0; i < xg_vk_workload_max_staging_buffers_m; ++i ) {
+        xg_buffer_destroy ( device_context->staging_buffers_array[i].handle );
+    }
+
+    for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
+        xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[i];
+
+        std_virtual_heap_free ( workload_context->chunk.cmd_chunks_array );
+        std_virtual_heap_free ( workload_context->chunk.queue_chunks_array );
+        std_virtual_heap_free ( workload_context->translate.translated_chunks_array );
+        std_virtual_heap_free ( workload_context->sort.result );
+        std_virtual_heap_free ( workload_context->sort.temp );
+
+        // TODO
+        vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_graphics_m].vk_cmd_pool, NULL );
+        vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_compute_m].vk_cmd_pool, NULL );
+        vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_copy_m].vk_cmd_pool, NULL );
+    }
+
+    for ( uint32_t i = 0; i < xg_vk_workload_max_desc_allocators_m; ++i ) {
+        vkDestroyDescriptorPool ( device->vk_handle, device_context->desc_allocators_array[i].vk_desc_pool, NULL );
+    }
+
+    std_virtual_heap_free ( device_context->workload_contexts_array );
+    std_virtual_heap_free ( device_context->desc_allocators_array );
+
+    std_virtual_heap_free ( device_context->uniform_buffers_array );
+    std_virtual_heap_free ( device_context->staging_buffers_array );
+}
+
 void xg_vk_workload_unload ( void ) {
     xg_workload_wait_all_workload_complete();
 
+    for ( uint32_t i = 0; i < xg_max_active_devices_m; ++i ) {
+        xg_vk_workload_deactivate_device_context ( i );
+    }
+
     std_virtual_heap_free ( xg_vk_workload_state->workload_array );
-    // TODO
 }
 
 // ======================================================================================= //
@@ -184,9 +236,6 @@ static void xg_vk_workload_context_init ( xg_vk_workload_context_t* context ) {
     context->is_submitted = false;
 }
 
-#define xg_vk_workload_max_uniform_buffers_m std_div_round_up_m ( xg_workload_max_uniform_size_m, xg_workload_uniform_buffer_size_m )
-#define xg_vk_workload_max_staging_buffers_m std_div_round_up_m ( xg_workload_max_staging_size_m, xg_workload_staging_buffer_size_m )
-
 void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
     std_assert_m ( device_idx < xg_max_active_devices_m );
@@ -284,34 +333,7 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
 
 void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
     uint64_t device_idx = xg_vk_device_get_idx ( device_handle );
-    xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
-    std_assert_m ( device_context->is_active );
-    const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
-
-    for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
-        xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[i];
-
-        std_virtual_heap_free ( workload_context->chunk.cmd_chunks_array );
-        std_virtual_heap_free ( workload_context->chunk.queue_chunks_array );
-        std_virtual_heap_free ( workload_context->translate.translated_chunks_array );
-        std_virtual_heap_free ( workload_context->sort.result );
-        std_virtual_heap_free ( workload_context->sort.temp );
-
-        // TODO
-        vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_graphics_m].vk_cmd_pool, NULL );
-        vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_compute_m].vk_cmd_pool, NULL );
-        vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_copy_m].vk_cmd_pool, NULL );
-    }
-
-    for ( uint32_t i = 0; i < xg_vk_workload_max_desc_allocators_m; ++i ) {
-        vkDestroyDescriptorPool ( device->vk_handle, device_context->desc_allocators_array[i].vk_desc_pool, NULL );
-    }
-
-    std_virtual_heap_free ( device_context->workload_contexts_array );
-    std_virtual_heap_free ( device_context->desc_allocators_array );
-
-    std_virtual_heap_free ( device_context->uniform_buffers_array );
-    std_virtual_heap_free ( device_context->staging_buffers_array );
+    xg_vk_workload_deactivate_device_context ( device_idx );
 }
 
 static xg_vk_desc_allocator_t* xg_vk_desc_allocator_pop ( xg_device_h device_handle, xg_workload_h workload_handle ) {
@@ -2535,6 +2557,28 @@ static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg
                     }
 
                     xg_gpu_queue_event_destroy ( args->event );
+                }
+                break;
+
+                case xg_resource_cmd_queue_pipeline_destroy_m: {
+                    std_auto_m args = ( xg_resource_cmd_queue_pipeline_destroy_t* ) header->args;
+
+                    if ( args->destroy_time != destroy_time ) {
+                        continue;
+                    }
+
+                    xg_vk_pipeline_destroy ( args->pipeline );
+                }
+                break;
+
+                case xg_resource_cmd_queue_resource_bindings_layout_destroy_m: {
+                    std_auto_m args = ( xg_resource_cmd_queue_resource_bindings_layout_destroy_t* ) header->args;
+
+                    if ( args->destroy_time != destroy_time ) {
+                        continue;
+                    }
+
+                    xg_vk_pipeline_resource_bindings_layout_destroy ( args->layout );
                 }
                 break;
             }

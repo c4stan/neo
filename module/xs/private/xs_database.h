@@ -78,10 +78,9 @@ void xs_database_clear ( xs_database_h database );
 
 void xs_database_set_build_params ( xs_database_h database, const xs_database_build_params_t* params );
 xs_database_build_result_t xs_database_build ( xs_database_h database );
-xs_database_build_result_t xs_database_update ( xs_database_h db_handle );
+xs_database_build_result_t xs_database_update ( xs_database_h db_handle, xg_workload_h workload );
 void xs_database_build_all ( void );
-void xs_database_update_all ( void );
+void xs_database_update_all ( xg_workload_h workload );
 xs_database_pipeline_h xs_database_pipeline_get ( xs_database_h database, xs_string_hash_t name_hash );
 xg_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h state );
 void xs_database_update_pipelines ( xg_workload_h last_workload );
-

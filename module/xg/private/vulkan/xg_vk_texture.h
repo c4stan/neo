@@ -52,11 +52,17 @@ typedef struct {
 } xg_vk_texture_t;
 
 typedef struct {
+    bool enabled;
+    xg_texture_h default_textures[xg_default_texture_count_m];
+} xg_vk_texture_device_context_t;
+
+typedef struct {
     xg_vk_texture_t* textures_array;
     xg_vk_texture_t* textures_freelist;
     uint64_t* textures_bitset;
     std_mutex_t textures_mutex;
-    xg_texture_h default_textures[xg_vk_max_devices_m][xg_default_texture_count_m];
+    xg_vk_texture_device_context_t device_contexts[xg_vk_max_devices_m];
+    //xg_texture_h default_textures[xg_vk_max_devices_m][xg_default_texture_count_m];
 } xg_vk_texture_state_t;
 
 void xg_vk_texture_load ( xg_vk_texture_state_t* state );
@@ -64,6 +70,7 @@ void xg_vk_texture_reload ( xg_vk_texture_state_t* state );
 void xg_vk_texture_unload ( void );
 
 void xg_vk_texture_activate_device ( xg_device_h device, xg_workload_h workload );
+void xg_vk_texture_deactivate_device ( xg_device_h device );
 
 // create = reserve + alloc
 xg_texture_h xg_texture_create ( const xg_texture_params_t* params );

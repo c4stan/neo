@@ -140,6 +140,8 @@ static void xg_test_run ( void ) {
         xg_test_frame ( device, swapchain, capture );
     }
 
+    xg->destroy_swapchain ( swapchain );
+
     std_module_unload_m ( xg_module_name_m );
     std_module_unload_m ( wm_module_name_m );
 }
