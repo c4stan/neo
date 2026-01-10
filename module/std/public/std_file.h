@@ -5,6 +5,7 @@
 #include <std_allocator.h>
 #include <std_string.h>
 
+// TODO store an internal list of files and make these handles permanent?
 typedef struct {
     uint64_t u64;
 } std_file_h;

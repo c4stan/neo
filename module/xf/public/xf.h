@@ -75,11 +75,11 @@ typedef struct {
     .stage = xg_pipeline_stage_bit_none_m, \
     .texture = xf_null_handle_m, \
     .view = xg_texture_view_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
-#define xf_compute_texture_dependency_m( ... ) xf_shader_texture_dependency_m ( .stage = xg_pipeline_stage_bit_compute_shader_m, ##__VA_ARGS__ )
-#define xf_fragment_texture_dependency_m( ... ) xf_shader_texture_dependency_m ( .stage = xg_pipeline_stage_bit_fragment_shader_m, ##__VA_ARGS__ )
+#define xf_compute_texture_dependency_m( ... ) xf_shader_texture_dependency_m ( .stage = xg_pipeline_stage_bit_compute_shader_m, __VA_ARGS__ )
+#define xf_fragment_texture_dependency_m( ... ) xf_shader_texture_dependency_m ( .stage = xg_pipeline_stage_bit_fragment_shader_m, __VA_ARGS__ )
 
 typedef struct {
     xf_texture_h texture;
@@ -89,7 +89,7 @@ typedef struct {
 #define xf_copy_texture_dependency_m( ... ) ( xf_copy_texture_dependency_t ) { \
     .texture = xf_null_handle_m, \
     .view = xg_texture_view_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -100,7 +100,7 @@ typedef struct {
 #define xf_render_target_dependency_m( ... ) ( xf_render_target_dependency_t ) { \
     .texture = xf_null_handle_m, \
     .view = xg_texture_view_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -111,10 +111,10 @@ typedef struct {
 #define xf_shader_buffer_dependency_m( ... ) ( xf_shader_buffer_dependency_t ) { \
     .buffer = xg_null_handle_m, \
     .stage = xg_pipeline_stage_bit_none_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
-#define xf_compute_buffer_dependency_m( ... ) xf_shader_buffer_dependency_m ( .stage = xg_pipeline_stage_bit_compute_shader_m, ##__VA_ARGS__ )
+#define xf_compute_buffer_dependency_m( ... ) xf_shader_buffer_dependency_m ( .stage = xg_pipeline_stage_bit_compute_shader_m, __VA_ARGS__ )
 
 // Resources
 typedef struct {
@@ -205,7 +205,7 @@ typedef struct {
 #define xf_texture_passthrough_m( ... ) ( xf_texture_passthrough_t ) { \
     .mode = xf_passthrough_mode_ignore_m, \
     .clear = xg_color_clear_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -219,7 +219,7 @@ typedef struct {
 #define xf_buffer_passthrough_m( ... ) ( xf_buffer_passthrough_t ) { \
     .mode = xf_passthrough_mode_ignore_m, \
     .clear = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -235,7 +235,7 @@ typedef struct {
     .render_targets = { [0 ... xf_node_max_render_targets_m - 1] = xf_texture_passthrough_m() }, \
     .storage_texture_writes = { [0 ... xf_node_max_storage_texture_writes_m - 1] = xf_texture_passthrough_m() }, \
     .storage_buffer_writes = { [0 ... xf_node_max_storage_buffer_writes_m - 1] = xf_buffer_passthrough_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -326,7 +326,7 @@ typedef struct {
     .indirect_command_read = xf_null_handle_m, \
     \
     .presentable_texture = xf_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -341,7 +341,7 @@ typedef struct {
 
 #define xf_node_custom_pass_params_m( ... ) ( xf_node_custom_pass_params_t ) { \
     .copy_args = true, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -358,7 +358,7 @@ typedef struct {
     .workgroup_count = { 1, 1, 1 }, \
     .copy_uniform_data = true, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -394,7 +394,7 @@ typedef struct {
     .thread_count = { 1, 1, 1 }, \
     .copy_uniform_data = true, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_null_handle_m }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -403,7 +403,7 @@ typedef struct {
 
 #define xf_node_copy_pass_params_m( ... ) ( xf_node_copy_pass_params_t ) { \
     .filter = xg_sampler_filter_point_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -422,7 +422,7 @@ typedef struct {
 #define xf_texture_clear_m( ... ) ( xf_texture_clear_t ) { \
     .type = xf_texture_clear_color_m, \
     .color = xg_color_clear_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -432,7 +432,7 @@ typedef struct {
 
 #define xf_node_clear_pass_params_m( ... ) ( xf_node_clear_pass_params_t ) { \
     .textures = { [0 ... xf_node_max_copy_texture_writes_m-1] = xf_texture_clear_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -480,7 +480,7 @@ typedef struct {
     .node_dependencies_count = 0, \
     .frame_bindings = xg_null_handle_m, \
     .view_bindings = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -519,7 +519,7 @@ typedef struct {
     .clear_on_create = false, \
     .view_access = xg_texture_view_access_default_only_m, \
     .usage = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -543,7 +543,7 @@ typedef struct {
     .texture = xf_texture_params_m(), \
     .multi_texture_count = 2, \
     .auto_advance = true, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -637,7 +637,7 @@ typedef struct {
     .device = xg_null_handle_m, \
     .flags = xf_graph_flag_alias_resources_m | xf_graph_flag_alias_memory_m, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {

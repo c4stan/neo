@@ -435,7 +435,7 @@ typedef struct {
     .align = 0, \
     .type = xg_memory_type_null_m, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Input Layout --
@@ -467,7 +467,7 @@ typedef struct {
 #define xg_input_layout_m(...) ( xg_input_layout_t ) { \
     .stream_count = 0, \
     .streams = { 0 } \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #if 0
@@ -525,7 +525,7 @@ typedef struct {
 #define xg_antialiasing_state_m( ... ) ( xg_antialiasing_state_t ) { \
     .mode = xg_antialiasing_none_m, \
     .sample_count = xg_sample_count_1_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch24s07.html
@@ -546,7 +546,7 @@ typedef struct {
     .const_factor = 0, \
     .slope_factor = 0, \
     .clamp = 0 \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -569,7 +569,7 @@ typedef struct {
     .line_width = 1.f, \
     .enable_depth_clamp = false, \
     .disable_rasterization = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Depth Stencil State --
@@ -613,7 +613,7 @@ typedef struct {
     .compare_mask = 0, \
     .write_mask = 0, \
     .reference = 0 \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -626,7 +626,7 @@ typedef struct {
     .enable_test = false, \
     .front_face_op = xg_stencil_op_state_m(), \
     .back_face_op = xg_stencil_op_state_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -645,7 +645,7 @@ typedef struct {
     .compare_op = xg_compare_op_less_m, \
     .enable_test = false, \
     .enable_write = false \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -656,7 +656,7 @@ typedef struct {
 #define xg_depth_stencil_state_m( ... ) ( xg_depth_stencil_state_t ) { \
     .depth = xg_depth_state_m(), \
     .stencil = xg_stencil_state_m() \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Blend State --
@@ -725,7 +725,7 @@ typedef struct {
     .render_targets = { 0 }, \
     .blend_logic_op = xg_blend_logic_op_invalid_m, \
     .enable_blend_logic_op = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Viewport --
@@ -745,7 +745,7 @@ typedef struct {
     .height = 0, \
     .min_depth = 0, \
     .max_depth = 1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -755,15 +755,15 @@ typedef struct {
     uint32_t height;
 } xg_scissor_state_t;
 
-#define xi_scissor_width_full_m 0xffffffff
-#define xi_scissor_height_full_m 0xffffffff
+#define xg_scissor_width_full_m 0xffffffff
+#define xg_scissor_height_full_m 0xffffffff
 
 #define xg_scissor_state_m( ... ) ( xg_scissor_state_t ) { \
     .x = 0, \
     .y = 0, \
-    .width = xi_scissor_width_full_m, \
-    .height = xi_scissor_height_full_m, \
-    ##__VA_ARGS__ \
+    .width = xg_scissor_width_full_m, \
+    .height = xg_scissor_height_full_m, \
+    __VA_ARGS__ \
 }
 
 // -- Render Textures (attachments) --
@@ -794,7 +794,7 @@ typedef union {
     .mip_count = xg_texture_all_mips_m, \
     .array_base = 0, \
     .array_count = xg_texture_whole_array_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -807,7 +807,7 @@ typedef struct {
     .slot = 0, \
     .format = xg_format_undefined_m, \
     .samples_per_pixel = xg_sample_count_1_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -835,7 +835,7 @@ typedef union {
 
 #define xg_color_clear_m( ... ) ( xg_color_clear_t ) { \
     .u32 = {0, 0, 0, 0}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -850,7 +850,7 @@ typedef struct {
 #define xg_render_target_binding_m( ... ) ( xg_render_target_binding_t ) { \
     .texture = xg_null_handle_m, \
     .view = xg_texture_view_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -875,7 +875,7 @@ typedef struct {
 
 #define xg_depth_stencil_binding_m( ... ) ( xg_depth_stencil_binding_t ) { \
     .texture = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // depends only on attachments
@@ -890,7 +890,7 @@ typedef struct {
     .render_targets_count = 0, \
     .render_targets = { [0 ... xg_pipeline_output_max_color_targets_m-1] = xg_render_target_binding_m() }, \
     .depth_stencil = { .texture = xg_null_handle_m }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Resource Bindings --
@@ -975,7 +975,7 @@ typedef struct {
     .shader_register = -1, \
     .stages = xg_shading_stage_null_m, \
     .type = xg_resource_binding_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -993,7 +993,7 @@ typedef struct {
     .device = xg_null_handle_m, \
     .resource_count = 0, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1009,7 +1009,7 @@ typedef struct {
 #define xg_constant_bindings_layout_m( ... ) ( xg_constant_bindings_layout_t ) { \
     .binding_points = { 0 }, \
     .binding_points_count = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1021,7 +1021,7 @@ typedef struct {
 
 #define xg_pipeline_state_shader_m( ... ) ( xg_pipeline_state_shader_t ) { \
     .stage = xg_shading_stage_null_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -1108,7 +1108,7 @@ typedef struct {
     .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
     .constant_layout = xg_constant_bindings_layout_m(), \
     .debug_name = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #if 0
@@ -1122,7 +1122,7 @@ typedef struct {
     .closest = -1, \
     .any = -1, \
     .intersect = -1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 #else
 typedef struct {
@@ -1133,7 +1133,7 @@ typedef struct {
 #define xg_raytrace_pipeline_gen_shader_m( ... ) ( xg_raytrace_pipeline_gen_shader_t ) { \
     .binding = -1, \
     .shader = -1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1144,7 +1144,7 @@ typedef struct {
 #define xg_raytrace_pipeline_miss_shader_m( ... ) ( xg_raytrace_pipeline_miss_shader_t ) { \
     .binding = -1, \
     .shader = -1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1159,7 +1159,7 @@ typedef struct {
     .closest_shader = -1, \
     .any_shader = -1, \
     .intersection_shader = -1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 #endif
 
@@ -1179,7 +1179,7 @@ typedef struct {
     .gen_shaders[0 ... xg_raytrace_shader_state_max_gen_shaders_m-1] = xg_raytrace_pipeline_gen_shader_m(), \
     .miss_shaders[0 ... xg_raytrace_shader_state_max_miss_shaders_m-1] = xg_raytrace_pipeline_miss_shader_m(), \
     .hit_groups[0 ... xg_raytrace_shader_state_max_hit_groups_m-1] = xg_raytrace_pipeline_hit_shader_group_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1190,7 +1190,7 @@ typedef struct {
 #define xg_raytrace_pipeline_state_m( ... ) ( xg_raytrace_pipeline_state_t ) { \
     .shader_state = xg_raytrace_shader_state_m(), \
     .max_recursion = 1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1206,7 +1206,7 @@ typedef struct {
     .resource_layouts = { [0 ... xg_shader_binding_set_count_m-1] = xg_null_handle_m }, \
     .constant_layout = xg_constant_bindings_layout_m(), \
     .debug_name = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -1414,7 +1414,7 @@ typedef struct {
 #define xg_execution_dependency_m( ... ) ( xg_execution_dependency_t ) { \
     .blocker = xg_pipeline_stage_bit_none_m, \
     .blocked = xg_pipeline_stage_bit_none_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1426,7 +1426,7 @@ typedef struct {
 #define xg_memory_dependency_m( ... ) ( xg_memory_dependency_t ) { \
     .flushes = xg_memory_access_bit_none_m, \
     .invalidations = xg_memory_access_bit_none_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // TODO rename to texture_layout_transition_t? not really a dependency
@@ -1438,7 +1438,7 @@ typedef struct {
 #define xg_layout_dependency_m( ... ) ( xg_texture_layout_dependency_t ) { \
     .old = xg_texture_layout_undefined_m, \
     .new = xg_texture_layout_undefined_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1449,7 +1449,7 @@ typedef struct {
 #define xg_queue_ownership_transfer_m( ... ) ( xg_queue_ownership_transfer_t ) { \
     .old = xg_cmd_queue_invalid_m, \
     .new = xg_cmd_queue_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1480,7 +1480,7 @@ typedef struct {
     .memory = xg_memory_dependency_m(), \
     .layout = xg_layout_dependency_m(), \
     .queue = xg_queue_ownership_transfer_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1499,7 +1499,7 @@ typedef struct {
     .execution = xg_execution_dependency_m(), \
     .memory = xg_memory_dependency_m(), \
     .queue = xg_queue_ownership_transfer_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Commands --
@@ -1530,7 +1530,7 @@ typedef struct {
     .resolution_x = -1, \
     .resolution_y = -1, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1543,7 +1543,7 @@ typedef struct {
     .buffer = xg_null_handle_m, \
     .stream_id = -1, \
     .offset = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -1566,7 +1566,7 @@ typedef struct {
     .handle = xg_null_handle_m, \
     .offset = 0, \
     .size = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define xg_buffer_range_whole_buffer_m( _handle ) xg_buffer_range_m ( .handle = _handle, .offset = 0, .size = xg_buffer_whole_size_m )
@@ -1579,7 +1579,7 @@ typedef struct {
 #define xg_buffer_resource_binding_m(...) ( xg_buffer_resource_binding_t ) { \
     .shader_register = -1, \
     .range = { .handle = xg_null_handle_m, .offset = 0, .size = 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -1601,7 +1601,7 @@ typedef struct {
     .texture = xg_null_handle_m, \
     .view = xg_texture_view_m(), \
     .shader_register = -1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1611,7 +1611,7 @@ typedef struct {
 
 #define xg_sampler_resource_binding_m( ... ) ( xg_sampler_resource_binding_t ) { \
     .sampler = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1621,7 +1621,7 @@ typedef struct {
 
 #define xg_raytrace_world_resource_binding_m( ... ) ( xg_raytrace_world_resource_binding_t ) { \
     .world = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // TODO rename to xg_shader_resource_bindings_t?
@@ -1658,7 +1658,7 @@ typedef struct {
     .buffers = NULL, \
     .textures = NULL, \
     .samplers = NULL, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 #else
 #define xg_pipeline_resource_bindings_m( ... ) ( xg_pipeline_resource_bindings_t ) { \
@@ -1669,7 +1669,7 @@ typedef struct {
     .textures = { [0 ... xg_pipeline_resource_max_textures_per_set_m-1] = xg_texture_resource_binding_m() }, \
     .samplers = { [0 ... xg_pipeline_resource_max_samplers_per_set_m-1] = xg_sampler_resource_binding_m() }, \
     .raytrace_worlds = { [0 ... xg_pipeline_resource_max_raytrace_worlds_per_set_m-1] = xg_raytrace_world_resource_binding_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 #endif
 
@@ -1682,7 +1682,7 @@ typedef struct {
 #define xg_resource_bindings_params_m( ... ) ( xg_resource_bindings_params_t ) { \
     .layout = xg_null_handle_m, \
     .bindings = xg_pipeline_resource_bindings_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1706,7 +1706,7 @@ typedef struct {
     .workgroup_count_x = 1, \
     .workgroup_count_y = 1, \
     .workgroup_count_z = 1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1792,7 +1792,7 @@ typedef struct {
 #define xg_dynamic_viewport_state_m( ... ) ( xg_dynamic_viewport_state_t ) { \
     .width = 0, \
     .height = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1807,7 +1807,7 @@ typedef struct {
     .y = 0, \
     .width = 0, \
     .height = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1824,7 +1824,7 @@ typedef struct {
     .renderpass = xg_null_handle_m, \
     .render_targets_count = 0, \
     .depth_stencil = xg_depth_stencil_binding_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 //    .dynamic_state = xg_graphics_pipeline_dynamic_state_bit_none_m, \
 //    .dynamic_viewport = xg_dynamic_viewport_state_m(), \
@@ -1845,7 +1845,7 @@ typedef struct {
     .ray_count_x = 1, \
     .ray_count_y = 1, \
     .ray_count_z = 1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1867,7 +1867,7 @@ typedef struct {
     .buffer_memory_barriers_count = 0, \
     .texture_memory_barriers = NULL, \
     .texture_memory_barriers_count = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef uint64_t xg_queue_event_h;
@@ -1880,7 +1880,7 @@ typedef struct {
 #define xg_queue_event_params_m( ... ) ( xg_queue_event_params_t ) { \
     .device = xg_null_handle_m, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -1894,7 +1894,7 @@ typedef struct {
 
 #define xg_cmd_bind_queue_params_m( ... ) ( xg_cmd_bind_queue_params_t ) { \
     .queue = xg_cmd_queue_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -1951,7 +1951,7 @@ typedef struct {
 #define xg_memory_address_m( ... ) ( xg_memory_address_t ) { \
     .base = 0, \
     .offset = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -1975,7 +1975,7 @@ typedef struct {
     .mode = xg_texture_init_mode_uninitialized_m, \
     .upload_data = NULL, \
     .final_layout = xg_texture_layout_undefined_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2015,7 +2015,7 @@ typedef struct {
     .view_access = xg_texture_view_access_default_only_m, \
     .creation_address = xg_memory_address_m(), \
     .debug_name = {0}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -2033,7 +2033,7 @@ typedef struct {
     .size = 0, \
     .align = 0, \
     .flags = xg_memory_requirement_bit_none_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -2069,7 +2069,7 @@ typedef struct {
     .mip_bias = 0, \
     .address_mode = xg_sampler_address_mode_clamp_m, \
     .debug_name = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -2170,7 +2170,7 @@ typedef struct {
     .texture = xg_null_handle_m, \
     .mip_base = 0, \
     .array_base = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // TODO process multiple copies at once? (sources[] and destinations[] instead of single textures)
@@ -2190,7 +2190,7 @@ typedef struct {
     .array_count = xg_texture_whole_array_m, \
     .aspect = xg_texture_aspect_default_m, \
     .filter = xg_sampler_filter_point_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2205,7 +2205,7 @@ typedef struct {
     .source = xg_null_handle_m, \
     .destination = xg_null_handle_m, \
     .size = xg_buffer_whole_size_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2226,7 +2226,7 @@ typedef struct {
     .mip_base = 0, \
     .array_base = 0, \
     .array_count = 1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2245,7 +2245,7 @@ typedef struct {
     .array_count = 1, \
     .destination = xg_null_handle_m, \
     .destination_offset = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // TODO move out of xg
@@ -2297,7 +2297,7 @@ typedef struct {
     .transform_buffer = xg_null_handle_m, \
     .transform_buffer_offset = 0, \
     .debug_name = {0}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2312,7 +2312,7 @@ typedef struct {
     .geometries = NULL, \
     .geometry_count = 0, \
     .debug_name = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Row major storage
@@ -2356,7 +2356,7 @@ typedef struct {
     .visibility_mask = 0xff, \
     .flags = 0, \
     .hit_shader_group_binding = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -2385,7 +2385,7 @@ typedef struct {
     .instance_count = 0, \
     .flags = 0, \
     .debug_name = { 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -2404,7 +2404,7 @@ typedef struct {
     .type = xg_query_pool_type_timestamp_m, \
     .capacity = 0, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2417,7 +2417,7 @@ typedef struct {
     .pool = xg_null_handle_m, \
     .idx = -1, \
     .stage = xg_pipeline_stage_bit_none_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // -- Display --
@@ -2504,7 +2504,7 @@ typedef struct {
     .debug_name = "swapchain", \
     .device = xg_null_handle_m, \
     .window = wm_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -2701,6 +2701,7 @@ typedef struct {
     xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, void* data, size_t size );
 
     void                    ( *wait_all_workload_complete )         ( void );
+    void                    ( *wait_for_device_workloads )          ( xg_device_h device );
     void                    ( *wait_for_workload )                  ( xg_workload_h workload );
 } xg_i;
 

@@ -998,6 +998,20 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
     heap->debug_records_freelist = std_static_freelist_m ( heap->debug_records_array );
     std_mem_zero_static_array_m ( heap->debug_records_bitset );
 #endif
+
+#if std_allocator_log_allocations_to_file_m
+    std_timestamp_t timestamp = std_timestamp_now_local();
+    char log_path_buffer[std_path_size_m];
+    std_string_t log_path = std_static_string_m ( log_path_buffer );
+    std_string_copy ( &log_path, "std_allocator_log" );
+    std_directory_create ( log_path.str );
+    std_path_append_file ( &log_path, "std_tlsf_heap_log_" );
+    std_string_append_format ( &log_path, std_fmt_u64_m, timestamp.count );
+    std_string_append ( &log_path, ".txt" );
+    heap->log_file = std_file_create ( log_path.str, std_file_write_m, std_path_already_existing_overwrite_m );
+    heap->log_count = 0;
+    heap->file_offset = 0;
+#endif
 }
 
 #if std_build_debug_m
@@ -1084,6 +1098,24 @@ void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint
     }
 
     heap->allocated_size += segment_size;
+
+#if std_allocator_log_allocations_to_file_m
+    std_allocator_log_record_t log_record = {
+        .type = std_allocator_log_record_alloc_m,
+        .timestamp = std_timestamp_now_local(),
+        .address = segment,
+        .size = segment_size,
+        .scope = scope,
+    };
+    uint64_t log_count = heap->log_count + 1;
+    // TODO explicit async write?
+    std_file_seek ( heap->log_file, std_file_start_m, 0 );
+    std_file_write ( heap->log_file, &log_count, sizeof ( log_count ) );
+    std_file_seek ( heap->log_file, std_file_end_m, 0 );
+    std_file_write ( heap->log_file, &log_record, sizeof ( log_record ) );
+    heap->log_count = log_count;
+    heap->file_offset += sizeof ( log_record );
+#endif
 
     std_mutex_unlock ( &heap->mutex );
 
@@ -1205,6 +1237,23 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
 
     heap->allocated_size -= segment_size;
 
+#if std_allocator_log_allocations_to_file_m
+    std_allocator_log_record_t log_record = {
+        .type = std_allocator_log_record_free_m,
+        .timestamp = std_timestamp_now_local(),
+        .address = segment,
+        .size = segment_size,
+    };
+    uint64_t log_count = heap->log_count + 1;
+    // TODO explicit async write?
+    std_file_seek ( heap->log_file, std_file_start_m, 0 );
+    std_file_write ( heap->log_file, &log_count, sizeof ( log_count ) );
+    std_file_seek ( heap->log_file, std_file_end_m, 0 );
+    std_file_write ( heap->log_file, &log_record, sizeof ( log_record ) );
+    heap->log_count = log_count;
+    heap->file_offset += sizeof ( log_record );
+#endif
+
     std_mutex_unlock ( &heap->mutex );
 
     //std_log_info_m ( "FREE " std_fmt_u64_m, segment_size );
@@ -1212,6 +1261,9 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
 
 void std_allocator_tlsf_heap_deinit ( std_allocator_tlsf_heap_t* heap ) {
     std_stack_destroy ( &heap->stack );
+#if std_allocator_log_allocations_to_file_m
+    std_file_close ( heap->log_file );
+#endif
 }
 
 void std_allocator_info ( std_allocator_info_t* info ) {
@@ -1348,4 +1400,5 @@ void std_allocator_shutdown ( void ) {
         ++idx;
     }
 #endif
+    std_allocator_tlsf_heap_deinit ( heap );
 }

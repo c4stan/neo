@@ -10,6 +10,7 @@
 #include <std_allocator.h>
 #include <std_time.h>
 #include <std_handle.h>
+#include <std_file.h>
 
 //==============================================================================
 
@@ -115,6 +116,11 @@ typedef struct {
     std_allocator_debug_record_t debug_records_array[std_allocator_max_debug_records_m];
     std_allocator_debug_record_t* debug_records_freelist;
     uint64_t debug_records_bitset[std_bitset_u64_count_m ( std_allocator_max_debug_records_m )];
+#endif
+#if std_allocator_log_allocations_to_file_m
+    std_file_h log_file;
+    uint64_t log_count;
+    uint64_t file_offset;
 #endif
 } std_allocator_tlsf_heap_t;
 

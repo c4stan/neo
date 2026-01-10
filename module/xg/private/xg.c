@@ -30,8 +30,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->timestamp_to_ns = xg_vk_device_timestamp_period;
     // Swapchain
     xg->create_window_swapchain = xg_vk_swapchain_create_window;
-    xg->create_display_swapchain = NULL;
-    xg->create_virtual_swapchain = NULL;
+    xg->create_display_swapchain = NULL; // TODO
+    xg->create_virtual_swapchain = NULL; // TODO
     xg->acquire_swapchain = xg_vk_swapchain_acquire_next_texture;
     xg->get_swapchain_texture = xg_vk_swapchain_get_texture;
     xg->present_swapchain = xg_vk_swapchain_present;
@@ -60,6 +60,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->write_workload_uniform = xg_workload_write_uniform;
     xg->write_workload_staging = xg_workload_write_staging;
     xg->wait_all_workload_complete = xg_workload_wait_all_workload_complete;
+    xg->wait_for_device_workloads = xg_workload_wait_for_device_workloads;
     xg->set_workload_global_bindings = xg_workload_set_global_resource_group;
     xg->debug_capture_workload = xg_vk_workload_enable_debug_capture;
     xg->wait_for_workload = xg_workload_wait_for_workload;
@@ -83,10 +84,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_copy_buffer_to_texture = xg_cmd_buffer_copy_buffer_to_texture;
     xg->cmd_set_dynamic_viewport = xg_cmd_dynamic_viewport;
     xg->cmd_set_dynamic_scissor = xg_cmd_dynamic_scissor;
-    //#if defined(std_platform_win32_m)
     xg->cmd_start_debug_capture = xg_cmd_buffer_start_debug_capture;
     xg->cmd_stop_debug_capture = xg_cmd_buffer_stop_debug_capture;
-    //#endif
     xg->cmd_begin_debug_region = xg_cmd_buffer_begin_debug_region;
     xg->cmd_end_debug_region = xg_cmd_buffer_end_debug_region;
     xg->cmd_begin_renderpass = xg_cmd_buffer_cmd_renderpass_begin;
@@ -103,6 +102,7 @@ static void xg_api_init ( xg_i* xg ) {
     xg->cmd_destroy_queue_event = xg_resource_cmd_buffer_queue_event_destroy;
     xg->cmd_destroy_resource_layout = xg_resource_cmd_buffer_resource_layout_destroy;
     xg->cmd_destroy_pipeline = xg_resource_cmd_buffer_pipeline_destroy;
+    // Resources
     xg->create_buffer = xg_buffer_create;
     xg->create_texture = xg_texture_create;
     xg->get_buffer_info = xg_buffer_get_info;
@@ -111,11 +111,11 @@ static void xg_api_init ( xg_i* xg ) {
     xg->get_default_sampler = xg_sampler_get_default;
     xg->create_queue_event = xg_gpu_queue_event_create;
     xg->get_default_texture = xg_texture_get_default;
-    // Allocator
-    xg->get_allocator_info = xg_vk_allocator_get_info;
+    xg->get_texture_memory_requirement = xg_texture_memory_requirement;
+    // Memory allocator
     xg->alloc_memory = xg_alloc;
     xg->free_memory = xg_free;
-    xg->get_texture_memory_requirement = xg_texture_memory_requirement;
+    xg->get_allocator_info = xg_vk_allocator_get_info;
     // Query pool
     xg->create_query_pool = xg_vk_query_pool_create;
     xg->read_query_pool = xg_vk_query_pool_read;

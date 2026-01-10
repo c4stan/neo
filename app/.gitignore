@@ -2,5 +2,7 @@
 !.gitignore
 !viewer_app
 !viewer_app/*
+!memview
+!memview/*
 !onda
 !onda/*

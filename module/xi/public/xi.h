@@ -22,7 +22,6 @@ typedef uint32_t xi_scissor_h;
 #define xi_null_scissor_m ( ( xi_scissor_h ) 0xffffffff )
 
 // Color
-
 typedef struct {
     union {
         struct {
@@ -35,7 +34,6 @@ typedef struct {
     };
 } xi_color_t;
 
-//#define xi_color_rgba_u32_m( r, g, b, a ) ( xi_color_t ) { .u32 = ( r | ( g << 8 ) | ( b << 16 ) | ( a << 24 ) ) }
 #define xi_color_rgba_u32_m( r, g, b, a ) ( xi_color_t ) { .u32 = ( (uint32_t) r | ( (uint32_t) g << 8 ) | ( (uint32_t) b << 16 ) | ( (uint32_t) a << 24 ) ) }
 
 #define xi_color_rgb_mul_m( color, scalar )  ( xi_color_t ) xi_color_rgba_u32_m ( (color.r * scalar), (color.g * scalar), (color.b * scalar), color.a )
@@ -115,7 +113,7 @@ typedef struct {
     .horizontal_border_margin = xi_style_border_margin_invalid_m, \
     .horizontal_margin = xi_style_margin_invalid_m, \
     .horizontal_padding = xi_style_padding_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define xi_default_style_m( ... ) ( xi_style_t ) { \
@@ -125,7 +123,7 @@ typedef struct {
     .font_color = xi_color_white_m, \
     .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
     .vertical_alignment = xi_vertical_alignment_bottom_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Elements
@@ -147,6 +145,7 @@ typedef struct {
     bool resizable;
     bool movable;
     bool scrollable;
+    bool minimizable;
     float scroll; 
     xi_id_t id;
     uint64_t sort_order;
@@ -166,11 +165,12 @@ typedef struct {
     .resizable = true, \
     .movable = true, \
     .scrollable = true, \
+    .minimizable = true, \
     .scroll = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_default_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define xi_default_window_state_m xi_window_state_m()
@@ -193,7 +193,7 @@ typedef struct {
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -219,7 +219,7 @@ typedef struct {
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -228,6 +228,7 @@ typedef struct {
     uint32_t width;
     uint32_t height;
     float value;
+    bool delayed; // draw on prev value. allows for external value manipulation
     xi_id_t id;
     uint64_t sort_order;
     xi_style_t style;
@@ -239,10 +240,11 @@ typedef struct {
     .width = 0, \
     .height = 0, \
     .value = 0, \
+    .delayed = false, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #if 0
@@ -286,7 +288,7 @@ typedef struct {
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -305,7 +307,7 @@ typedef struct {
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -325,7 +327,7 @@ typedef struct {
     .font = xi_null_handle_m, \
     .id = xi_line_id_m(), \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -340,7 +342,7 @@ typedef struct {
 #define xi_switch_state_m( ... ) ( xi_switch_state_t ) { \
     .id = xi_line_id_m(), \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -355,7 +357,22 @@ typedef struct {
 #define xi_arrow_state_m( ... ) ( xi_arrow_state_t ) { \
     .id = xi_line_id_m(), \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
+}
+
+// TODO
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    xi_id_t id;
+    uint64_t sort_order;
+    xi_style_t style;
+} xi_canvas_state_t;
+
+#define xi_canvas_state_m( ... ) ( xi_canvas_state_t ) { \
+    .id = xi_line_id_m(), \
+    .style = xi_style_m(), \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -369,7 +386,7 @@ typedef struct {
 #define xi_texture_state_m( ... ) ( xi_texture_state_t ) { \
     .handle = xg_null_handle_m, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -407,7 +424,7 @@ typedef struct {
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef enum {
@@ -431,7 +448,7 @@ typedef struct {
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -466,7 +483,7 @@ typedef struct {
     .char_count = xi_font_char_ascii_count_m, \
     .outline = false, \
     .debug_name = "", \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Update
@@ -483,7 +500,7 @@ typedef struct {
     .input_state = NULL, \
     .input_buffer = NULL, \
     .view_info = NULL, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Rendering
@@ -515,7 +532,7 @@ typedef struct {
 
 #define xi_overlay_texture_state_m( ... ) ( xi_overlay_texture_state_t ) { \
     .handle = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Api
@@ -556,7 +573,7 @@ typedef struct {
     // TODO rename these, remove add_ and leave just element name? replace with draW?
     // TODO return bool true if internal value changed
     bool ( *add_button )    ( xi_workload_h workload, xi_button_state_t* state );
-    void ( *add_slider )    ( xi_workload_h workload, xi_slider_state_t* state );
+    bool ( *add_slider )    ( xi_workload_h workload, xi_slider_state_t* state );
     //void ( *add_text )     ( xi_workload_h workload, xi_text_state_t*   state );
     void ( *add_label )     ( xi_workload_h workload, xi_label_state_t*  state );
     bool ( *add_select )    ( xi_workload_h workload, xi_select_state_t* state );

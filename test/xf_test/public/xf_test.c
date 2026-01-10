@@ -241,8 +241,6 @@ static void xf_test ( void ) {
         key = xf->execute_graph ( graph, workload, key );
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
-
-        xs->update_pipeline_states ( workload );
     }
 
     std_module_unload_m ( xf_module_name_m );

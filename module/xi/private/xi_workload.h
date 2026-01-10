@@ -38,7 +38,7 @@ typedef struct {
     .uv1 = { 0, 0 }, \
     .sort_order = 0, \
     .scissor = xi_null_scissor_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -102,7 +102,7 @@ typedef struct {
     .rotation = { 0, 0, 0, 1 }, \
     .scale = 1, \
     .color = { 1, 1, 1, 1 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

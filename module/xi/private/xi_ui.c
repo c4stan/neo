@@ -609,6 +609,10 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     uint32_t x = 0, y = 0;
     uint32_t triangle_width = header_height  * 0.7;
     uint32_t triangle_height = header_height * 0.7;
+    if ( !state->minimizable ) {
+        triangle_width = 0;
+        triangle_height = 0;
+    }
 
     uint32_t window_height = state->minimized ? header_height : state->height;
     uint32_t window_width = state->width;
@@ -808,18 +812,20 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
     xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.3 ), layer->x, layer->y, window_width, header_height, state->sort_order );
 
     // title triangle
-    if ( !state->minimized ) {
-        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 1 ),
-            layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2,
-            layer->x + x + title_pad_x + triangle_width,        layer->y + y + ( header_height - triangle_height ) / 2,
-            layer->x + x + title_pad_x + triangle_width / 2,    layer->y + y + ( header_height - triangle_height ) / 2 + triangle_height,
-            state->sort_order );
-    } else {
-        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 1 ),
-            layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2,
-            layer->x + x + title_pad_x + triangle_width,        layer->y + y + header_height / 2,
-            layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2 + triangle_height,
-            state->sort_order );
+    if ( state->minimizable ) {
+        if ( !state->minimized ) {
+            xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 1 ),
+                layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2,
+                layer->x + x + title_pad_x + triangle_width,        layer->y + y + ( header_height - triangle_height ) / 2,
+                layer->x + x + title_pad_x + triangle_width / 2,    layer->y + y + ( header_height - triangle_height ) / 2 + triangle_height,
+                state->sort_order );
+        } else {
+            xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 1 ),
+                layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2,
+                layer->x + x + title_pad_x + triangle_width,        layer->y + y + header_height / 2,
+                layer->x + x + title_pad_x,                         layer->y + y + ( header_height - triangle_height ) / 2 + triangle_height,
+                state->sort_order );
+        }
     }
 
     //  title text
@@ -879,12 +885,14 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
 #endif
 
     //  resize corner
-    if ( !state->minimized ) {
-        xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
-            layer->x + window_width, layer->y + layer->height - corner_size,
-            layer->x + window_width, layer->y + layer->height,
-            layer->x + window_width - corner_size, layer->y + layer->height,
-            state->sort_order  );
+    if ( state->resizable ) {
+        if ( !state->minimized ) {
+            xi_ui_draw_tri ( workload, xi_color_rgb_mul_m ( style.color, 0.5 ),
+                layer->x + window_width, layer->y + layer->height - corner_size,
+                layer->x + window_width, layer->y + layer->height,
+                layer->x + window_width - corner_size, layer->y + layer->height,
+                state->sort_order  );
+        }
     }
 
     xi_ui_state->window_id = state->id;
@@ -1251,17 +1259,26 @@ bool xi_ui_arrow ( xi_workload_h workload, xi_arrow_state_t* state ) {
     return changed;
 }
 
-void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
+bool xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
+
+    bool modified = false;
+
+    uint32_t width = state->width;
+    uint32_t height = state->height;
+    if ( height == 0 ) {
+        xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+        height = layer->line_height;
+    }
 
     uint32_t padding = 2;
     int32_t x, y;
 
-    if ( !xi_ui_layer_add_element ( &x, &y, state->width, state->height, &style ) ) {
-        return;
+    if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
+        return modified;
     }
 
-    if ( xi_ui_cursor_test ( x, y, state->width, state->height ) ) {
+    if ( xi_ui_cursor_test ( x, y, width, height ) ) {
         xi_ui_acquire_hovered ( state->id, 0 );
 
         if ( xi_ui_cursor_click() ) {
@@ -1272,21 +1289,30 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     }
 
     // state update
-    uint32_t handle_width = state->width / 10;
-    uint32_t range = state->width - handle_width - padding * 2;
+    float value = state->value;
+    uint32_t handle_width = width / 10;
+    uint32_t range = width - handle_width - padding * 2;
 
     if ( xi_ui_state->active_id == state->id ) {
-        int32_t value = xi_ui_state->update.input_state.cursor_x - x - padding - handle_width / 2;
+        int32_t value_i32 = xi_ui_state->update.input_state.cursor_x - x - padding - handle_width / 2;
 
-        if ( value < 0 ) {
-            value = 0;
+        if ( value_i32 < 0 ) {
+            value_i32 = 0;
         }
 
-        if ( value > range ) {
-            value = range;
+        if ( value_i32 > range ) {
+            value_i32 = range;
         }
 
-        state->value = ( float ) value / range;
+        float new_value = ( float ) value_i32 / range;
+        if ( new_value != value ) {
+            modified = true;
+            state->value = new_value;
+        }
+
+        if ( !state->delayed ) {
+            value = new_value;
+        }
 
         if ( !xi_ui_state->update.mouse_down ) {
             xi_ui_release_active ( state->id );
@@ -1294,9 +1320,11 @@ void xi_ui_slider ( xi_workload_h workload, xi_slider_state_t* state ) {
     }
 
     // Draw
-    uint32_t x_offset = range * state->value + padding;
-    xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.5f ), x, y, state->width, state->height, state->sort_order );
-    xi_ui_draw_rect ( workload, style.color, x + x_offset, y + padding, handle_width, state->height - padding * 2, state->sort_order );
+    uint32_t x_offset = range * value + padding;
+    xi_ui_draw_rect ( workload, xi_color_rgb_mul_m ( style.color, 0.5f ), x, y, width, height, state->sort_order );
+    xi_ui_draw_rect ( workload, style.color, x + x_offset, y + padding, handle_width, height - padding * 2, state->sort_order );
+
+    return modified;
 }
 
 void xi_ui_texture ( xi_workload_h workload, xi_texture_state_t* state ) {

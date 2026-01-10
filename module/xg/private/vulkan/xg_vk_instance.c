@@ -4,10 +4,13 @@
 
 // --------------------------
 
+#include <stdlib.h>
+
 void* xg_vk_instance_cpu_alloc ( void* user, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
     std_unused_m ( user );
     std_unused_m ( scope );
     return std_virtual_heap_alloc_m ( size, alignment );
+    //return malloc(size);
 }
 
 void* xg_vk_instance_cpu_realloc ( void* user, void* original, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
@@ -17,11 +20,13 @@ void* xg_vk_instance_cpu_realloc ( void* user, void* original, size_t size, size
     std_mem_copy ( new, original, size );
     std_virtual_heap_free ( original );
     return new;
+    //return realloc(original, size);
 }
 
 void xg_vk_instance_cpu_free ( void* user, void* memory ) {
     std_unused_m ( user );
     std_virtual_heap_free ( memory );
+    //free(memory);
 }
 
 // --------------------------

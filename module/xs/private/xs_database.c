@@ -99,26 +99,15 @@ static void xs_database_folder_iterator ( const char* name, std_path_flags_t fla
     std_string_t path = xs_database_alloc_string ( params->db, params->base_path.len + 1 );
     std_string_append ( &path, params->base_path.str );
 
-    // TODO remove
-    //std_string_t live_path = xs_database_alloc_string ( params->db, params->base_path.len + 1 );
-    //std_string_append ( &path, std_module_path_m );
-    //std_path_append_dir ( &path, "data" );
-    //std_path_append_dir ( &path, "data" );
-
     if ( is_header ) {
         xs_database_pipeline_state_header_t* header = &params->db->pipeline_state_headers_array[params->db->pipeline_state_headers_count++];
         header->path = path.str;
-
-        // TODO header->live_path
     } else {
         xs_database_pipeline_state_t* pipeline_state = &params->db->pipeline_states[params->db->pipeline_states_count++];
         pipeline_state->path = path.str;
-        // TODO pipeline_state->live_path
         pipeline_state->name = std_path_name_ptr ( &path ); // TODO alloc separate string and remove .xss ext?
         pipeline_state->type = type;
         pipeline_state->pipeline_handle = xg_null_handle_m;
-        pipeline_state->old_pipeline_handle = xg_null_handle_m;
-        pipeline_state->old_pipeline_workload = xg_null_handle_m;
         pipeline_state->last_build_timestamp = std_timestamp_zero_m;
 
         uint64_t name_len = std_str_len ( pipeline_state->name );
@@ -543,30 +532,11 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
                 }
 
                 // read generated shader bytecode
-                #if 0
-                fs_file_h bytecode_file = fs->open_file ( binary_path, fs_file_read_m );
-                std_assert_m ( bytecode_file != fs_null_handle_m );
-
-                fs_file_info_t bytecode_file_info;
-                std_verify_m ( fs->get_file_info ( &bytecode_file_info, bytecode_file ) );
-
-                {
-                    size_t size = bytecode_file_info.size;
-                    void* alloc = std_virtual_heap_alloc ( size, 16 );
-                    shader_bytecode[stage].size = bytecode_file_info.size;
-                    std_verify_m ( fs->read_file ( alloc, size, bytecode_file ) );
-                    shader_bytecode[stage].base = alloc;
-                    shader_bytecode[stage].size = size;
-                }
-                fs->close_file ( bytecode_file );
-                #else
                 if ( verbose ) {
                     std_log_info_m ( "Loading shader binary " std_fmt_str_m " from disk", shader_path.str, binary_path );
                 }
                 bytecode->stage = stage;
                 bytecode->buffer = std_file_read_to_virtual_heap ( binary_path.str );
-                #endif
-                //}
             }
 
             // TODO does this leak when there are multiple permutations?
@@ -703,10 +673,6 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
                 }
             }
 
-            // TODO add these pipelines to a separate list, to avoid having to iterate all pipelines in update_pipelines
-            // Also, right now the case where it creates a new pipeline and there's already a new pipeline pending is broken!
-            // The already pending pipeline is never deleted and leaked!
-            pipeline_state->old_pipeline_handle = pipeline_state->pipeline_handle;
             pipeline_state->pipeline_handle = pipeline_handle;
 
             for ( size_t i = 0; i < shader_references->count; ++i ) {
@@ -759,49 +725,6 @@ xg_pipeline_state_h xs_database_pipeline_state_get ( xs_database_pipeline_h hand
 
     xs_database_pipeline_state_t* state = ( xs_database_pipeline_state_t* ) handle;
     return state->pipeline_handle;
-}
-
-void xs_database_update_pipelines ( xg_workload_h last_workload ) {
-    xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-    uint64_t db_idx = 0;
-    while ( std_bitset_scan ( &db_idx, xs_database_state->database_bitset, db_idx, std_bitset_u64_count_m ( xs_database_max_databases_m ) ) ) {
-        xs_database_t* db = &xs_database_state->database_array[db_idx];
-
-        for ( size_t state_it = 0; state_it < db->pipeline_states_count; ++state_it ) {
-            xs_database_pipeline_state_t* pipeline_state = &db->pipeline_states[state_it];
-
-            xg_graphics_pipeline_state_h old_pipeline_handle = pipeline_state->old_pipeline_handle;
-
-            if ( old_pipeline_handle != xg_null_handle_m ) {
-                xg_workload_h workload = pipeline_state->old_pipeline_workload;
-
-                if ( workload == xg_null_handle_m ) {
-                    pipeline_state->old_pipeline_workload = last_workload;
-                    workload = last_workload;
-                }
-
-                if ( xg->is_workload_complete ( workload ) ) {
-                    switch ( pipeline_state->type ) {
-                    case xg_pipeline_graphics_m:
-                        xg->destroy_graphics_pipeline ( old_pipeline_handle );
-                        break;
-                    case xg_pipeline_compute_m:
-                        xg->destroy_compute_pipeline ( old_pipeline_handle );
-                        break;
-                    case xg_pipeline_raytrace_m:
-                        xg->destroy_raytrace_pipeline ( old_pipeline_handle );
-                        break;
-                    }
-
-                    pipeline_state->old_pipeline_handle = xg_null_handle_m;
-                    pipeline_state->old_pipeline_workload = xg_null_handle_m;
-                }
-            }
-        }
-
-        ++db_idx;
-    }
 }
 
 xs_database_build_result_t xs_database_build ( xs_database_h db_handle ) {
@@ -859,6 +782,7 @@ void xs_database_destroy ( xs_database_h db_handle ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     
     xs_database_t* db = &xs_database_state->database_array[db_handle];
+    xg->wait_for_device_workloads ( db->device );
 
     for ( uint32_t i = 0; i < db->pipeline_states_count; ++i ) {
         xs_database_pipeline_state_t* state = &db->pipeline_states[i];

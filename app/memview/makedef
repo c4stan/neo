@@ -1,0 +1,5 @@
+name = memview
+code = public, private
+defs = public.def
+output = app
+deps = std, wm, xg, xs, xi, xf

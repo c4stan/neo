@@ -586,10 +586,13 @@ def create_local_workspace(root, name):
     push_path(path)
     os.system('mkdir public')
     os.system('mkdir private')
+    os.system('mkdir data')
 
     output = 'dll'
     if root == 'app':
-        output = 'exe'
+        output = 'app'
+    elif root == 'test':
+        output = 'exe' # ?
 
     makedef_file = open('makedef', 'w')
     makedef_file.write(

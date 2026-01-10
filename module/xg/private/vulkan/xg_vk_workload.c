@@ -83,7 +83,6 @@ static void xg_vk_workload_deactivate_device_context ( uint64_t device_idx ) {
         std_virtual_heap_free ( workload_context->sort.result );
         std_virtual_heap_free ( workload_context->sort.temp );
 
-        // TODO
         vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_graphics_m].vk_cmd_pool, NULL );
         vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_compute_m].vk_cmd_pool, NULL );
         vkDestroyCommandPool ( device->vk_handle, workload_context->translate.cmd_allocators[xg_cmd_queue_copy_m].vk_cmd_pool, NULL );
@@ -1235,10 +1234,10 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 std_assert_m ( in_renderpass );
                 uint32_t width = args->width;
                 uint32_t height = args->height;
-                if ( width == xi_scissor_width_full_m ) {
+                if ( width == xg_scissor_width_full_m ) {
                     width = cache.resolution_x;
                 }
-                if ( height == xi_scissor_height_full_m ) {
+                if ( height == xg_scissor_height_full_m ) {
                     height = cache.resolution_y;
                 }
                 VkRect2D vk_scissor = {
@@ -2833,6 +2832,12 @@ void xg_workload_wait_all_workload_complete ( void ) {
         // Wait for all workloads to complete and process on complete events like resource destruction
         xg_vk_workload_wait ( device_context, xg_null_handle_m, UINT64_MAX );
     }
+}
+
+void xg_workload_wait_for_device_workloads ( xg_device_h device ) {
+    uint64_t device_idx = xg_vk_device_get_idx ( device );
+    xg_vk_workload_device_context_t* device_context = &xg_vk_workload_state->device_contexts[device_idx];
+    xg_vk_workload_wait ( device_context, xg_null_handle_m, UINT64_MAX );
 }
 
 #if 0

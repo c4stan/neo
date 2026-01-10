@@ -3,6 +3,7 @@
 #include <std_byte.h>
 #include <std_compiler.h>
 #include <std_string.h>
+#include <std_time.h>
 
 /*
     Virtual memory page allocator
@@ -69,6 +70,22 @@ typedef struct {
 } std_allocator_module_info_t;
 
 void std_virtual_heap_allocator_module_info ( std_allocator_module_info_t* info );
+
+typedef enum {
+    std_allocator_log_record_alloc_m,
+    std_allocator_log_record_free_m,
+} std_allocator_log_record_type_e;
+
+typedef struct {
+    std_allocator_log_record_type_e type;
+    std_timestamp_t timestamp;
+    void* address;
+    uint64_t size;
+    // TODO
+#if std_build_debug_m
+    std_alloc_scope_t scope;
+#endif
+} std_allocator_log_record_t;
 
 // Just a utility buffer struct. Can be used as return value, or to store a memory segment without having to split it into 2 separate fields
 typedef struct {

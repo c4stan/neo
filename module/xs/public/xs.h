@@ -346,6 +346,4 @@ typedef struct {
     xs_database_pipeline_h ( *get_database_pipeline ) ( xs_database_h database, xs_string_hash_t name_hash );
     xg_pipeline_state_h ( *get_pipeline_state ) ( xs_database_pipeline_h xs_state );
     //void ( *release_pipeline_state ) ( xg_graphics_pipeline_state_h pipeline );
-
-    void ( *update_pipeline_states ) ( xg_workload_h workload );
 } xs_i;

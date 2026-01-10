@@ -38,8 +38,8 @@ void std_init ( int argc, char** argv ) {
     mprotect ( state, sizeof ( std_runtime_state_t ), PROT_READ | PROT_WRITE );
 #endif
 
-    std_allocator_init ( &state->allocator_state );
     std_log_init ( &state->log_state );
+    std_allocator_init ( &state->allocator_state );
     std_platform_init ( &state->platform_state );
     std_time_init ( &state->time_state );
     std_process_init ( &state->process_state, argv, ( size_t ) argc );
@@ -64,9 +64,9 @@ void* std_runtime_state_get ( void ) {
 
 void std_runtime_bind ( void* std_runtime ) {
     std_runtime_state = std_runtime;
+    std_log_attach ( &std_runtime_state->log_state );
     std_allocator_attach ( &std_runtime_state->allocator_state );
     std_platform_attach ( &std_runtime_state->platform_state );
-    std_log_attach ( &std_runtime_state->log_state );
     std_time_attach ( &std_runtime_state->time_state );
     std_process_attach ( &std_runtime_state->process_state );
     std_thread_attach ( &std_runtime_state->thread_state );

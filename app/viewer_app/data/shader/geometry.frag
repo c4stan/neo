@@ -39,7 +39,7 @@ void main() {
     // color
     vec4 color_sample = texture ( sampler2D ( color_texture, sampler_linear ), in_uv );
     out_color = vec4 ( draw_uniforms.color * color_sample.xyz, draw_uniforms.metalness * color_sample.w );
-    
+
     // normals
 #if 0
     float backface_flip = gl_FrontFacing ? 1.f : -1.f;

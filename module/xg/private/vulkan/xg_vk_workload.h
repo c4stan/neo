@@ -108,7 +108,7 @@ typedef struct {
     .execution_complete_gpu_event = xg_null_handle_m, \
     .execution_complete_cpu_event = xg_null_handle_m, \
     .global_bindings = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -127,7 +127,7 @@ typedef struct {
     .begin = -1, \
     .end = -1, \
     .queue = xg_cmd_queue_graphics_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -148,7 +148,7 @@ typedef struct {
     .signal_events = { [0 ... xg_cmd_bind_queue_max_signal_events_m-1] = xg_null_handle_m }, \
     .wait_events = { [0 ... xg_cmd_bind_queue_max_wait_events_m-1] = xg_null_handle_m }, \
     .wait_stages = { [0 ... xg_cmd_bind_queue_max_wait_events_m-1] = xg_pipeline_stage_bit_none_m }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -245,6 +245,7 @@ void xg_vk_workload_activate_device ( xg_device_h device );
 void xg_vk_workload_deactivate_device ( xg_device_h device );
 
 void xg_workload_wait_all_workload_complete ( void );
+void xg_workload_wait_for_device_workloads ( xg_device_h device );
 void xg_workload_wait_for_workload ( xg_workload_h workload );
 
 typedef struct {

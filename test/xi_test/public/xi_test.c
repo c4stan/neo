@@ -27,7 +27,7 @@ typedef struct {
     xi_switch_state_t state;
 } ui_switch_component_t;
 
-std_warnings_ignore_m ( "-Wunused-function" )
+std_warnings_ignore_m ( "-Wunused-function" );
 
 typedef struct {
     xg_device_h device;
@@ -41,37 +41,21 @@ static void ui_pass ( const xf_node_execute_args_t* node_args, void* user_args )
     xg_cmd_buffer_h cmd_buffer = node_args->cmd_buffer;
     xg_resource_cmd_buffer_h resource_cmd_buffer = node_args->resource_cmd_buffer;
     uint64_t key = node_args->base_key;
-
     xf_ui_pass_args_t* args = ( xf_ui_pass_args_t* ) user_args;
 
-    //xg_i* xg = std_module_get_m ( xg_module_name_m );
-
-#if 0
-    // Bind swapchain texture as render target
-    {
-        xg_render_textures_binding_t render_textures;
-        render_textures.render_targets_count = 1;
-        render_textures.render_targets[0] = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-        render_textures.depth_stencil.texture = xg_null_handle_m;
-        xg->cmd_set_render_textures ( cmd_buffer, &render_textures, key );
-    }
-#endif
+    xi_flush_params_t params;
+    params.device = args->device;
+    params.workload = args->xg_workload;
+    params.cmd_buffer = cmd_buffer;
+    params.resource_cmd_buffer = resource_cmd_buffer;
+    params.key = key;
+    params.render_target_format = xg_format_b8g8r8a8_unorm_m;
+    params.viewport.width = args->resolution_x;
+    params.viewport.height = args->resolution_y;
+    params.render_target_binding = xf_render_target_binding_m ( node_args->io->render_targets[0] );
 
     xi_i* xi = std_module_get_m ( xi_module_name_m );
-    {
-        xi_flush_params_t params;
-        params.device = args->device;
-        params.workload = args->xg_workload;
-        params.cmd_buffer = cmd_buffer;
-        params.resource_cmd_buffer = resource_cmd_buffer;
-        params.key = key;
-        params.render_target_format = xg_format_b8g8r8a8_unorm_m;
-        params.viewport.width = args->resolution_x;
-        params.viewport.height = args->resolution_y;
-        params.render_target_binding = xf_render_target_binding_m ( node_args->io->render_targets[0] );
-
-        key = xi->flush_workload ( args->xi_workload, &params );
-    }
+    key = xi->flush_workload ( args->xi_workload, &params );
 }
 
 static void xi_test ( void ) {
@@ -464,7 +448,6 @@ static void xi_test ( void ) {
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
 
-        xs->update_pipeline_states ( workload );
     }
 
     std_virtual_heap_free ( select_alloc );

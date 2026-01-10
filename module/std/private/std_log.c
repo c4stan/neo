@@ -67,17 +67,15 @@ void std_log_print_callstack ( void ) {
 }
 #endif
 
-#if std_enable_log_colored_console_output_m
-    #define std_terminal_color_reset_m    "\x1B[0m"
-    //#define std_terminal_color_bright_m   "\x1B[1m"
-    #define std_terminal_color_red_m      "\x1B[1m\x1B[31m"
-    //#define std_terminal_color_green_m    "\x1B[1m\x1B[32m"
-    #define std_terminal_color_yellow_m   "\x1B[1m\x1B[33m"
-    //#define std_terminal_color_blue_m     "\x1B[1m\x1B[34m"
-    //#define std_terminal_color_magenta_m  "\x1B[1m\x1B[35m"
-    //#define std_terminal_color_cyan_m     "\x1B[1m\x1B[36m"
-    //#define std_terminal_color_white_m    "\x1B[1m\x1B[37m"
-#endif
+#define std_terminal_color_reset_m    "\x1B[0m"
+//#define std_terminal_color_bright_m   "\x1B[1m"
+#define std_terminal_color_red_m      "\x1B[1m\x1B[31m"
+//#define std_terminal_color_green_m    "\x1B[1m\x1B[32m"
+#define std_terminal_color_yellow_m   "\x1B[1m\x1B[33m"
+//#define std_terminal_color_blue_m     "\x1B[1m\x1B[34m"
+//#define std_terminal_color_magenta_m  "\x1B[1m\x1B[35m"
+//#define std_terminal_color_cyan_m     "\x1B[1m\x1B[36m"
+//#define std_terminal_color_white_m    "\x1B[1m\x1B[37m"
 
 // TODO avoid printf, print to actual std_process out/err handles
 // TODO give option to print to file instead
@@ -262,6 +260,43 @@ static void std_log_boot_callback ( const std_log_msg_t* msg ) {
     printf ( msg->payload );
     fflush ( stdout );
     //std_debug_break_m ();
+
+    const char* type_prefix = "";
+
+    if ( msg->level == std_log_level_crash_m ) {
+        type_prefix = "[BOOT-CRASH] ";
+    } else if ( msg->level == std_log_level_error_m ) {
+        type_prefix = "[BOOT-ERROR] ";
+    } else if ( msg->level == std_log_level_warn_m ) {
+        type_prefix = "[BOOT-WARN] ";
+    } else if ( msg->level == std_log_level_info_m ) {
+        type_prefix = "[BOOT-INFO] ";
+    }
+
+    const char* color_prefix = "";
+    const char* color_postfix = "";
+#if std_enable_log_colored_console_output_m
+    if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
+        color_prefix = std_terminal_color_red_m;
+    } else if ( ( 1 << msg->level ) & std_log_level_bit_warn_m ) {
+        color_prefix = std_terminal_color_yellow_m;
+    }
+
+    color_postfix = std_terminal_color_reset_m;
+#endif
+
+    printf ( std_fmt_str_m std_fmt_str_m std_fmt_str_m std_fmt_str_m, color_prefix, type_prefix, msg->payload, color_postfix );
+
+    uint64_t exit_mask = std_log_level_bit_crash_m;
+#if std_log_crash_on_error_m
+    if ( !std_log_state->is_debugger_attached ) {
+        exit_mask |= std_log_level_bit_error_m;
+    }
+#endif
+    if ( ( 1 << msg->level ) & exit_mask ) {
+        fflush ( stdout );
+        std_process_this_exit ( std_process_exit_code_error_m );
+    }
 }
 
 void std_log_boot ( void ) {

@@ -11,9 +11,9 @@ std_xorshift64_state_t std_xorshift64_state ( void );
 uint64_t std_xorshift64 ( std_xorshift64_state_t* state );
 
 // Return value:
-// < 0 => a before b
-// > 0 => a after b
-//   0 => a and b maintain input order if stable, unspecified if not
+// < 0 -> a before b
+// > 0 -> a after b
+//   0 -> a and b maintain input order if stable, unspecified if not
 typedef int ( std_sort_comp_f ) ( const void* a, const void* b, const void* arg );
 
 // tmp is used to temporarily store the pivot element while sorting

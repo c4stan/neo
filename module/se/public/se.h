@@ -34,7 +34,7 @@ typedef struct {
     .id = 0, \
     .stream_count = 1, \
     .streams = { [0 ... se_component_max_streams_m - 1] = 0 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -45,7 +45,7 @@ typedef struct {
 #define se_entity_family_params_m( ... ) ( se_entity_family_params_t ) { \
     .component_count = 0, \
     .components = { [0 ... se_max_components_per_entity_m - 1] = se_component_layout_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define se_component_mask_block_count_m std_div_round_up_m ( se_max_component_types_m, sizeof ( uint64_t ) )
@@ -67,7 +67,7 @@ typedef struct {
 #define se_component_stream_update_m( ... ) ( se_component_stream_update_t ) { \
     .id = 0, \
     .data = NULL, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -80,7 +80,7 @@ typedef struct {
     .id = 0, \
     .stream_count = 0, \
     .streams = { [0 ... se_component_max_streams_m - 1] = se_component_stream_update_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #define se_component_update_monostream_m( _id, _data ) ( se_component_update_t ) { \
@@ -111,7 +111,7 @@ typedef struct se_entity_update_t {
 #define se_entity_update_m( ... ) ( se_entity_update_t ) { \
     .component_count = 0, \
     .components = { [0 ... se_max_components_per_entity_m - 1] = se_component_update_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -122,7 +122,7 @@ typedef struct {
 #define se_entity_params_m( ... ) ( se_entity_params_t ) { \
     .component_mask = { 0 }, \
     .update = se_entity_update_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 #else
 
@@ -135,7 +135,7 @@ typedef struct {
 #define se_stream_update_m( ... ) ( se_stream_update_t ) { \
     .id = 0, \
     .data = NULL, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -148,7 +148,7 @@ typedef struct {
     .id = se_null_component_id_m, \
     .stream_count = 1, \
     .streams = {}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -159,7 +159,7 @@ typedef struct {
 #define se_entity_update_m( ... ) ( se_entity_update_t ) { \
     .component_count = 1, \
     .components = {}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -170,7 +170,7 @@ typedef struct {
 #define se_entity_params_m( ... ) ( se_entity_params_t ) { \
     .debug_name = {}, \
     .update = se_entity_update_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 #endif
@@ -275,7 +275,7 @@ typedef struct {
 #define se_component_properties_params_m(...) ( se_component_properties_params_t ) { \
     .count = 0, \
     .properties = {0}, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

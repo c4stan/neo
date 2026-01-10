@@ -21,16 +21,6 @@
     #include "vulkan/xg_vk_sampler.h"
 #endif
 
-/*
-    TODO
-        create instance
-            init global instance
-        create device
-            create device x
-            init all devices
-        interface displays
-*/
-
 // ---- Private -----
 
 static xg_vk_device_state_t* xg_vk_device_state;
@@ -47,6 +37,12 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_begin_debug_region, "vkCmdBeginDebugUtilsLabelEXT" );
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_end_debug_region, "vkCmdEndDebugUtilsLabelEXT" );
+    //
+    // TODO calling vkSetDebugUtilsObjectNameEXT after a xg module reload crashes with error
+    //      [Vulkan Loader] ERROR: SetDebugUtilsObjectNameEXT: Invalid device handle
+    //      calling it on the instance extension API instead of device extension API changes nothing
+    //      and seemingly this is the only Vulkan call that fails, otherwise xg live reload seems to work (ignoring callbacks issues)
+    //      need to locally build vulkan loader/validation/utility debug builds and step through code to find out more...
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.set_debug_name, "vkSetDebugUtilsObjectNameEXT" );
 #if xg_vk_enable_sync2_m
     xg_vk_device_ext_init_pfn_m ( &device->ext_api.cmd_sync2_pipeline_barrier, "vkCmdPipelineBarrier2KHR" );
@@ -88,14 +84,13 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
     }
 #endif
 
-#undef xg_vk_instance_ext_init_pfn_m    
+#undef xg_vk_instance_ext_init_pfn_m
 }
 
 static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_log_info_m ( "Querying device " std_fmt_size_m " for properties", device->id );
     
     // Properties
-    //vkGetPhysicalDeviceProperties ( device->vk_physical_handle, &device->generic_properties );
     device->raytrace_properties = ( VkPhysicalDeviceRayTracingPipelinePropertiesKHR ) {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
         .pNext = NULL
@@ -279,22 +274,15 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 
     std_log_info_m ( "Mapping device properties to runtime objects" );
 
+    //
     // Map heaps
     //
-    // TODO: for device mapped memory, just look for VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT and store somewhere whether it also has
-    //       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT. deal with the implications at runtime.
     // TODO: rename host_uncached_memory_heap to something better?
-    //xg_vk_device_memory_heap_t device_memory_heap = { .vk_heap_idx = UINT32_MAX, .vk_memory_type_idx = UINT32_MAX, .size = 0, .memory_flags = 0 };
-    //xg_vk_device_memory_heap_t device_mapped_memory_heap = { .vk_heap_idx = UINT32_MAX, .vk_memory_type_idx = UINT32_MAX, .size = 0, .memory_flags = 0 };
-    //xg_vk_device_memory_heap_t host_cached_memory_heap = { .vk_heap_idx = UINT32_MAX, .vk_memory_type_idx = UINT32_MAX, .size = 0, .memory_flags = 0 };
-    //xg_vk_device_memory_heap_t host_uncached_memory_heap = { .vk_heap_idx = UINT32_MAX, .vk_memory_type_idx = UINT32_MAX, .size = 0, .memory_flags = 0 };
     uint32_t device_memory_type = UINT32_MAX;
     uint32_t device_mapped_memory_type = UINT32_MAX;
     uint32_t host_uncached_memory_type = UINT32_MAX;
     uint32_t host_cached_memory_type = UINT32_MAX;
-
-    char used_memory_types[VK_MAX_MEMORY_TYPES];
-    std_mem_zero_m ( &used_memory_types );
+    char used_memory_types[VK_MAX_MEMORY_TYPES] = {0};
 
     // Pass 1. try to look for a good match
     for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
@@ -843,37 +831,38 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     const char* enabled_extensions[xg_vk_query_max_device_extensions_m];
     uint32_t enabled_extensions_count = 0;
 
-    //for ( size_t i = 0; i < supported_extensions_count; ++i ) {
-    //    std_log_info_m ( std_fmt_str_m, supported_extensions[i] );
-    //}
-
+    ////
+    //
+    //  Required Extensions List
+    //
     // TODO take a look at:
     //      VK_KHR_dynamic_rendering - https://www.khronos.org/blog/streamlining-render-passes
     //      VK_EXT_extended_dynamic_state
     //
     const char* required_extensions[] = {
-        "VK_KHR_swapchain",
-        "VK_KHR_synchronization2",
-        "VK_KHR_imageless_framebuffer",
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,                            // VK_KHR_swapchain
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,                    // VK_KHR_synchronization2
+        VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME,                // VK_KHR_imageless_framebuffer
 #if xg_enable_raytracing_m
-        "VK_KHR_acceleration_structure",
-        "VK_KHR_ray_tracing_pipeline",
-        "VK_KHR_deferred_host_operations",
-#if xg_vk_enable_nv_raytracing_ext_m
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,               // VK_KHR_acceleration_structure
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,                 // VK_KHR_ray_tracing_pipeline
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,             // VK_KHR_deferred_host_operations
+    #if xg_vk_enable_nv_raytracing_ext_m
         // https://registry.khronos.org/vulkan/specs/latest/man/html/VK_NV_ray_tracing.html
-        "VK_NV_ray_tracing",
-#else
-        "VK_KHR_ray_query",
-#endif
+        VK_NV_RAY_TRACING_EXTENSION_NAME,                           // VK_NV_ray_tracing
+    #else
+        VK_KHR_RAY_QUERY_EXTENSION_NAME,                            // VK_KHR_ray_query
+    #endif
 #endif
         // debugPrintfEXT - TODO enable in debug only?
         //"VK_KHR_shader_non_semantic_info",
         // vkGetQueueCheckpointDataNV
-        "VK_NV_device_diagnostic_checkpoints",
-        VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,
+        VK_NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME,         // VK_NV_device_diagnostic_checkpoints
+        VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME,       // VK_KHR_pipeline_executable_properties
     };
     size_t required_extensions_count = std_static_array_count_m ( required_extensions );
 
+    // Note: won't auto fail if a required extension is missing
     const bool fail_on_missing_extension = false;
 #if xg_enable_raytracing_m
     bool supports_raytrace = true;
@@ -897,13 +886,13 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
             std_log_warn_m ( "Unable to activate device extension "std_fmt_str_m, required_extensions[i] );
 
             bool raytrace_extension = 
-                std_str_cmp ( required_extensions[i], "VK_KHR_acceleration_structure" ) == 0
-                || std_str_cmp ( required_extensions[i], "VK_KHR_ray_tracing_pipeline" ) == 0
-                || std_str_cmp ( required_extensions[i], "VK_KHR_deferred_host_operations" ) == 0
+                std_str_cmp ( required_extensions[i], VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0
+                || std_str_cmp ( required_extensions[i], VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME ) == 0
+                || std_str_cmp ( required_extensions[i], VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME ) == 0
 #if xg_vk_enable_nv_raytracing_ext_m
-                || std_str_cmp ( required_extensions[i], "VK_NV_ray_tracing" ) == 0
+                || std_str_cmp ( required_extensions[i], VK_NV_RAY_TRACING_EXTENSION_NAME ) == 0
 #else
-                || std_str_cmp ( required_extensions[i], "VK_KHR_ray_query" ) == 0
+                || std_str_cmp ( required_extensions[i], VK_KHR_RAY_QUERY_EXTENSION_NAME ) == 0
 #endif
                 ;
 
@@ -1037,17 +1026,7 @@ bool xg_vk_device_deactivate ( xg_device_h device_handle ) {
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );
 
     xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
-
-    if ( device == NULL ) {
-        std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
-        return false;
-    }
-
     device->flags &= ~ ( xg_vk_device_active_m );
-
-    //vkDestroyCommandPool ( device->logical_id, device->graphics_cmd_pool, NULL );
-    //vkDestroyCommandPool ( device->logical_id, device->compute_cmd_pool, NULL );
-    //vkDestroyCommandPool ( device->logical_id, device->copy_cmd_pool, NULL );
     vkDestroyDevice ( device->vk_handle, xg_vk_cpu_allocator() );
 
     std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
@@ -1127,7 +1106,7 @@ bool xg_vk_device_get_info ( xg_device_info_t* info, xg_device_h device_handle )
     return true;
 }
 
-// TODO query this at init and cache this?
+// TODO query this at init and cache?
 size_t xg_vk_device_get_displays_count ( xg_device_h handle ) {
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );
 

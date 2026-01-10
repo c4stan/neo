@@ -43,7 +43,7 @@ typedef struct {
     .jitter = { 0, 0 }, \
     .reverse_z = false, \
     .infinite_far_z = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 std_static_align_m ( 8 )
@@ -65,7 +65,7 @@ typedef struct {
     .top = 0, \
     .near = 0, \
     .far = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -79,7 +79,7 @@ typedef struct {
 // TODO just take in resolution and compute aspect ration and jitter from that
 #define rv_projection_params_m(...) ( rv_projection_params_t ) { \
     .perspective = rv_perspective_projection_params_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 /*
@@ -116,7 +116,7 @@ typedef struct {
 #define rv_view_transform_m( ... ) ( rv_view_transform_t ) { \
     .position = { 0, 0, 0 }, \
     .orientation = { 0, 0, 0, 1 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -136,7 +136,7 @@ typedef struct {
     .proj_params = rv_projection_params_m(), \
     .view_type = 0, \
     .layer_mask = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

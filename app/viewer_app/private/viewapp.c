@@ -441,8 +441,6 @@ static std_app_state_e viewapp_update ( void ) {
     xg->submit_workload ( workload );
     xg->present_swapchain ( state->render.swapchain, workload );
 
-    xs->update_pipeline_states ( workload );
-
     return std_app_state_tick_m;
 }
 

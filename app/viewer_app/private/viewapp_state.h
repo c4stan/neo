@@ -36,7 +36,7 @@ typedef struct {
 #define viewapp_scene_state_m( ... ) ( viewapp_scene_state_t ) { \
     .active_scene = viewapp_scene_cornell_box_m, \
     .custom_scene_path[0] = '\0' \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 // Render

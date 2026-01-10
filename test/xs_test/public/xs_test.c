@@ -527,8 +527,6 @@ static void xs_test ( void ) {
             .graphics_pipeline = graphics_pipeline,
             .renderpass = renderpass
         } );
-
-        //xs->update_pipeline_states ( workload );
     }
 
     xg->wait_all_workload_complete();

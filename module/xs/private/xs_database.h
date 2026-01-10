@@ -12,13 +12,10 @@ typedef struct {
 
 typedef struct {
     const char* path;
-    const char* live_path; // path to source data shader (not build), used for live reloads
     const char* name;
     uint64_t name_hash;
     xg_pipeline_e type;
     xg_pipeline_state_h pipeline_handle;
-    xg_pipeline_state_h old_pipeline_handle;
-    xg_workload_h old_pipeline_workload;
     std_timestamp_t last_build_timestamp;
     //uint32_t permutation_id;
     //uint32_t reference_count;

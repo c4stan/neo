@@ -30,7 +30,7 @@ typedef struct {
     .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
     .queue = xg_cmd_queue_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -43,7 +43,7 @@ typedef struct {
     .stage = xg_pipeline_stage_bit_none_m, \
     .access = xg_memory_access_bit_none_m, \
     .queue = xg_cmd_queue_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -56,7 +56,7 @@ typedef struct {
     .execution = xf_texture_execution_state_m(), \
     .prev_queue = xg_cmd_queue_invalid_m, \
     .queue_transition = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 //#define xf_resource_execution_state_m( _layout, _stage, _access ) ( xf_texture_execution_state_t ) { \
@@ -102,7 +102,7 @@ typedef struct {
     .params = xf_texture_params_m(), \
     .ref_count = 0, \
     .is_multi = false, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -126,7 +126,7 @@ typedef struct {
     .ref_count = 0, \
     .is_multi = false, \
     .init = xg_buffer_init_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -142,7 +142,7 @@ typedef struct {
     .index = 0, \
     .swapchain = xg_null_handle_m, \
     .ref_count = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -158,7 +158,7 @@ typedef struct {
     .index = 0, \
     .alias = xf_null_handle_m, \
     .ref_count = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -170,7 +170,7 @@ typedef struct {
 #define xf_physical_texture_params_m( ... ) ( xf_physical_texture_params_t ) { \
     .is_external = false, \
     .handle = xg_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -192,7 +192,7 @@ typedef struct {
     .info = { 0 }, \
     .ref_count = 0, \
     .state.mips = { [0 ... 15] = xf_texture_state_m() }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

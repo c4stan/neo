@@ -49,11 +49,9 @@ size_t std_path_to_str ( const WCHAR* path, char* str, size_t cap ) {
     int size = WideCharToMultiByte ( CP_UTF8, 0, path, -1, str, ( int ) cap, NULL, NULL );
 
 #if std_log_assert_enabled_m
-
     if ( size == 0 ) {
         std_log_os_error_m();
     }
-
 #endif
 
     return ( size_t ) size;
@@ -962,8 +960,6 @@ bool std_directory_info ( std_directory_info_t* info, const char* path ) {
 #if defined(std_platform_linux_m)
     #include <sys/sendfile.h>
 #endif
-
-// code is duplicated for API that takes both file and api as param because of path_buffer usage
 
 std_file_h std_file_create ( const char* path, std_file_access_t access, std_path_already_existing_e already_existing ) {
     std_assert_m ( path != NULL );

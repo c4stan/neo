@@ -81,7 +81,7 @@ typedef struct {
 #define xf_resource_access_m( ... ) ( xf_resource_access_t ) { \
     .node = xf_null_handle_m, \
     .resource_idx = -1, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -99,7 +99,7 @@ typedef struct {
 #define xf_graph_resource_dependencies_m( ... ) ( xf_graph_resource_dependencies_t ) { \
     .subresources = NULL, \
     .subresource_count = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef uint64_t xf_graph_physical_texture_h;
@@ -112,7 +112,7 @@ typedef struct {
 #define xf_graph_physical_texture_m( ... ) ( xf_graph_physical_texture_t ) { \
     .handle = xf_null_handle_m, \
     .dependencies = xf_graph_resource_dependencies_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -123,7 +123,7 @@ typedef struct {
 #define xf_graph_resource_lifespan_m( ... ) ( xf_graph_resource_lifespan_t ) { \
     .first = INT32_MAX, \
     .last = { -1, -1, -1 }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -144,7 +144,7 @@ typedef struct {
     .handle = xf_null_handle_m, \
     .lifespan = xf_graph_resource_lifespan_m(), \
     .dependencies = xf_graph_resource_dependencies_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -157,7 +157,7 @@ typedef struct {
     .handle = xf_null_handle_m, \
     .lifespan = xf_graph_resource_lifespan_m(), \
     .dependencies = xf_graph_resource_dependencies_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -191,7 +191,7 @@ typedef struct {
     .events = { [0 ... xg_cmd_queue_count_m-1] = xg_null_handle_m }, \
     .deps_count = 0, \
     .is_depended = { [0 ... xg_cmd_queue_count_m-1] = false }, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 //typedef enum {
@@ -235,7 +235,7 @@ typedef struct {
     .type = xf_node_resource_invalid_m, \
     .stage = xg_pipeline_stage_bit_none_m, \
     .access = xf_resource_access_invalid_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -248,7 +248,7 @@ typedef struct {
     .state = xf_texture_execution_state_m(), \
     .texture = xf_null_handle_m, \
     .view = xg_texture_view_m(), \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -258,7 +258,7 @@ typedef struct {
 
 #define xf_graph_texture_transitions_m( ... ) { \
     .count = 0, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {
@@ -269,7 +269,7 @@ typedef struct {
 #define xf_graph_buffer_transition_m( ... ) ( xf_graph_buffer_transition_t ) { \
     .state = xf_buffer_execution_state_m(), \
     .buffer = xf_null_handle_m, \
-    ##__VA_ARGS__ \
+    __VA_ARGS__ \
 }
 
 typedef struct {

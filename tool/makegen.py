@@ -79,7 +79,7 @@ else:
 # -- Warnings
 CORE_WARNING_FLAGS = (
     '-Wno-switch-enum'                          # Having a _COUNT enum not explicitly handled in a switch throws this
-    ' -Wno-gnu-zero-variadic-macro-arguments'   # Allow 0 args variadic macros and ending ', ##__VA_ARGS__' trick (std_log uses this extensively)
+    ' -Wno-gnu-zero-variadic-macro-arguments'   # Allow 0 args variadic macros and ending ', __VA_ARGS__' trick (std_log uses this extensively)
     ' -Wno-reserved-id-macro'                   # Allow e.g. names starting with __. Although not using it is probably a good idea, the Win32 API does, so.
     #' -Wno-strict-prototypes'                   # Allow declaring foo() without having to explicit the (void).
     #' -Wno-missing-prototypes'                  # Also complains about missing prototypes on 0 params functions not declared as (void)

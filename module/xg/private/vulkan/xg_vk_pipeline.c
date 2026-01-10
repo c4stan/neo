@@ -1224,7 +1224,7 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             std_stack_write_m ( &hash_allocator, &params->state.viewport_state.max_depth );
         }
 
-        force_dynamic_scissor = params->state.scissor_state.width == xi_scissor_width_full_m && params->state.scissor_state.height == xi_scissor_height_full_m;
+        force_dynamic_scissor = params->state.scissor_state.width == xg_scissor_width_full_m && params->state.scissor_state.height == xg_scissor_height_full_m;
         if ( params->state.dynamic_state & xg_graphics_pipeline_dynamic_state_bit_scissor_m || force_dynamic_scissor ) {
             int32_t i32_0 = 0;
             uint32_t u32_0 = 0;
@@ -1239,11 +1239,11 @@ xg_graphics_pipeline_state_h xg_vk_graphics_pipeline_create ( xg_device_h device
             uint32_t width = params->state.scissor_state.width;
             uint32_t height = params->state.scissor_state.height;
 
-            if ( width == xi_scissor_width_full_m ) {
+            if ( width == xg_scissor_width_full_m ) {
                 width = params->state.viewport_state.width;
             }
 
-            if ( height == xi_scissor_height_full_m ) {
+            if ( height == xg_scissor_height_full_m ) {
                 height = params->state.viewport_state.height;
             }
 
