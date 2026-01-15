@@ -29,6 +29,7 @@ typedef struct {
     uint64_t time;
     uint64_t time_records_begin;
     uint64_t time_records_end;
+    uint32_t min_allocation;
 } memview_ui_state_t;
 
 typedef struct {
@@ -132,6 +133,7 @@ static void memview_log_load_data ( void ) {
     state->ui.time_slider_value = 0;
     state->ui.time_records_begin = 0;
     state->ui.time_records_end = 0;
+    state->ui.min_allocation = 128;
 }
 
 static void memview_ui_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -280,6 +282,10 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         std_string_append ( &title, state->log.path );
     }
 
+    bool ignore_scroll = new_input_state->keyboard[wm_keyboard_state_ctrl_left_m];
+    state->ui.window_state.ignore_scroll_input = ignore_scroll;
+    state->ui.window_state.steady_scroll_on_content_resize = !ignore_scroll;
+
     xi->begin_window ( xi_workload, &state->ui.window_state );
 
     bool load = false;
@@ -355,7 +361,8 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
                 .horizontal_margin = 10,
             )
         );
-        std_u64_to_str ( slider_label.text, sizeof ( slider_label.text ), state->ui.time );
+        std_timestamp_to_string ( ( std_timestamp_t ) { state->ui.time }, slider_label.text, sizeof ( slider_label.text ) );
+        //std_u64_to_str ( slider_label.text, sizeof ( slider_label.text ), state->ui.time );
         xi->add_label ( xi_workload, &slider_label );
 
         // filter
@@ -409,7 +416,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         // draw
         xi->newline();
         uint32_t line_width = xi->line_remaining_size() - 150 * 2;
-        uint32_t min_allocation = 32;
+        uint32_t min_allocation = state->ui.min_allocation;
         uint64_t address_step = line_width * min_allocation;
         void* base_address = 0;
         uint64_t record_it = 0;
@@ -418,6 +425,19 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         uint64_t record_offset = 0;
         uint64_t pixel_to_size = address_step / line_width;
         bool tooltip_visible = false;
+
+        if ( new_input_state->keyboard[wm_keyboard_state_ctrl_left_m] ) {
+            if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] || new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
+                if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] ) {
+                    min_allocation = max ( min_allocation / 2, 8 );
+                } else if ( new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
+                    min_allocation *= 2;
+                }
+                address_step = line_width * min_allocation;
+                pixel_to_size = address_step / line_width;
+                state->ui.min_allocation = min_allocation;
+            }
+        } 
 
         if ( filtered_record_count > 0 ) {
             uint64_t align_step = std_pow2_round_up_u64 ( address_step );

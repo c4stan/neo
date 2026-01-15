@@ -694,7 +694,7 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
         if ( lookup ) {
             uint32_t prev_height = ( *lookup ) & 0xffffffff;
             uint32_t prev_prev_height = ( *lookup ) >> 32;
-            if ( prev_height != prev_prev_height && prev_prev_height != 0 ) {
+            if ( state->steady_scroll_on_content_resize && ( prev_height != prev_prev_height && prev_prev_height != 0 ) ) {
                 scroll = scroll * prev_prev_height / prev_height;
             }
         }
@@ -712,7 +712,7 @@ void xi_ui_window_begin ( xi_workload_h workload, xi_window_state_t* state ) {
             uint32_t prev_height = ( *lookup ) & 0xffffffff;
             float tick = ( float ) ( window_height - header_height ) / prev_height;
             tick *= 0.2f;
-            if ( xi_ui_layer_cursor_test ( 0, 0, window_width, layer->height ) ) {
+            if ( !state->ignore_scroll_input && xi_ui_layer_cursor_test ( 0, 0, window_width, layer->height ) ) {
                 if ( xi_ui_state->update.wheel_up ) {
                     scroll -= tick;
                 }

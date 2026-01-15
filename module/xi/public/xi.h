@@ -135,6 +135,8 @@ typedef struct {
     bool resizable;
     bool movable;
     bool scrollable;
+    bool ignore_scroll_input;
+    bool steady_scroll_on_content_resize;
     bool minimizable;
     float scroll; 
     xi_id_t id;
@@ -166,6 +168,7 @@ typedef struct {
     .movable = true, \
     .scrollable = true, \
     .minimizable = true, \
+    .steady_scroll_on_content_resize = true, \
     .scroll = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
