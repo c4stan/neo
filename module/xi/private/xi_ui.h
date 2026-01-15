@@ -162,4 +162,10 @@ bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir );
 
 bool xi_ui_layer_row_hover_test ( uint32_t height );
 
+uint32_t xi_ui_layer_line_remaining_size ( void );
+uint32_t xi_ui_layer_line_offset_get ( void );
+void xi_ui_layer_line_offset_add ( uint32_t offset );
+
 void xi_ui_overlay_texture ( xi_workload_h workload, xi_overlay_texture_state_t* state );
+
+void xi_ui_tooltip ( xi_workload_h workload, xi_label_state_t* state );

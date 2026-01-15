@@ -145,6 +145,10 @@ uint64_t    std_max_u64 ( uint64_t a, uint64_t b );
 float       std_max_f32 ( float a, float b );
 double      std_max_f64 ( double a, double b );
 
+uint32_t    std_lerp_u32 ( uint32_t a, uint32_t b, float t );
+float       std_lerp_inverse_u32 ( uint32_t a, uint32_t b, uint32_t x );
+float       std_lerp_inverse_u64 ( uint64_t a, uint64_t b, uint64_t x );
+
 void        std_u64_to_2_u32 ( uint32_t* high, uint32_t* low, uint64_t u64 );
 uint64_t    std_2_u32_to_u64 ( uint32_t high, uint32_t low );
 

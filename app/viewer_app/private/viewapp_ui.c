@@ -52,7 +52,7 @@ void viewapp_boot_ui ( void ) {
         .height = 500,
         .padding_x = 10,
         .padding_y = 2,
-        .style = xi_default_style_m (
+        .style = xi_window_style_m (
             .font = state->ui.font,
             .color = xi_color_gray_m,
         )
@@ -62,7 +62,7 @@ void viewapp_boot_ui ( void ) {
     state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
     state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
     state->ui.xf_graph_section_state = xi_section_state_m ( .title = "rendergraph" );
-    state->ui.entities_section_state = xi_section_state_m ( .title = "entities", .style = xi_default_style_m() );
+    state->ui.entities_section_state = xi_section_state_m ( .title = "entities", .style = xi_style_m() );
 
     state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
         .device = device,
@@ -767,7 +767,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
             .text = "Add light",
-            .style = xi_default_style_m (
+            .style = xi_style_m (
                 .horizontal_padding = 8,
             ),
         ) ) ) {
@@ -776,7 +776,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
             .text = "Add sphere",
-            .style = xi_default_style_m (
+            .style = xi_style_m (
                 .horizontal_padding = 8,
             ),
         ) ) ) {
@@ -785,7 +785,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         if ( xi->add_button ( xi_workload, &xi_button_state_m (
             .text = "Add plane",
-            .style = xi_default_style_m (
+            .style = xi_style_m (
                 .horizontal_padding = 8,
             ),
         ) ) ) {

@@ -116,16 +116,6 @@ typedef struct {
     __VA_ARGS__ \
 }
 
-#define xi_default_style_m( ... ) ( xi_style_t ) { \
-    .font = xi_null_handle_m, \
-    .font_height = 14, \
-    .color = xi_color_gray_m, \
-    .font_color = xi_color_white_m, \
-    .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
-    .vertical_alignment = xi_vertical_alignment_bottom_m, \
-    __VA_ARGS__ \
-}
-
 // Elements
 
 // TODO XOR instead of + ?
@@ -152,6 +142,16 @@ typedef struct {
     xi_style_t style;
 } xi_window_state_t;
 
+#define xi_window_style_m( ... ) xi_style_m ( \
+    .font = xi_null_handle_m, \
+    .font_height = 14, \
+    .color = xi_color_gray_m, \
+    .font_color = xi_color_white_m, \
+    .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
+    .vertical_alignment = xi_vertical_alignment_bottom_m, \
+    __VA_ARGS__ \
+)
+
 #define xi_window_state_m( ... ) ( xi_window_state_t ) { \
     .title = "", \
     .x = 0, \
@@ -169,11 +169,9 @@ typedef struct {
     .scroll = 0, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
-    .style = xi_default_style_m(), \
+    .style = xi_window_style_m(), \
     __VA_ARGS__ \
 }
-
-#define xi_default_window_state_m xi_window_state_m()
 
 typedef struct {
     bool minimized;
@@ -200,6 +198,7 @@ typedef struct {
     uint32_t width;
     uint32_t height;
     char text[xi_button_text_size];
+    bool resizable;
     bool down;
     bool pressed;
     bool disabled;
@@ -213,9 +212,7 @@ typedef struct {
     .width = 0, \
     .height = 0, \
     .text = "", \
-    .down = false, \
-    .pressed = false, \
-    .disabled = false, \
+    .resizable = true, \
     .id = xi_line_id_m(), \
     .sort_order = 0, \
     .style = xi_style_m(), \
@@ -294,6 +291,7 @@ typedef struct {
 typedef struct {
     char text[xi_label_text_size];
     xi_font_h font;
+    uint32_t width;
     uint32_t height;
     xi_id_t id;
     uint64_t sort_order;
@@ -584,6 +582,8 @@ typedef struct {
 
     void ( *add_texture )   ( xi_workload_h workload, xi_texture_state_t* state );
 
+    void ( *draw_tooltip )  ( xi_workload_h workload, xi_label_state_t* state );
+
     void ( *init_geos )     ( xg_device_h device, xg_workload_h workload );
     void ( *draw_line )     ( xi_workload_h workload, xi_line_state_t* state );
     bool ( *draw_transform )( xi_workload_h workload, xi_transform_state_t* state );    
@@ -591,6 +591,9 @@ typedef struct {
     bool ( *file_pick)      ( std_buffer_t path_buffer, const char* initial_dir );
 
     bool ( *test_layer_row_hover ) ( uint32_t height );
+    uint32_t ( *line_remaining_size ) ( void );
+    uint32_t ( *line_offset ) ( void );
+    void ( *add_line_offset ) ( uint32_t size );
 
     void ( *draw_overlay_texture ) ( xi_workload_h workload, xi_overlay_texture_state_t* state );
 } xi_i;

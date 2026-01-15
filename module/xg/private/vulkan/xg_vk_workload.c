@@ -413,6 +413,7 @@ void xg_vk_workload_enable_debug_capture ( xg_workload_h workload_handle ) {
 xg_resource_bindings_h xg_workload_create_resource_group ( xg_workload_h workload_handle, xg_resource_bindings_layout_h layout_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     uint32_t idx = std_atomic_increment_u32 ( &workload->desc_layouts_count ) - 1;
+    std_assert_m ( idx < xg_vk_workload_max_resource_bindings_m );
     workload->desc_layouts_array[idx] = layout_handle;
     xg_resource_bindings_h bindings_handle = xg_vk_resource_group_handle_tag_as_workload_m ( idx );
     return bindings_handle;
@@ -502,6 +503,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                     xg_resource_bindings_layout_h resource_bindings_layout_handle = workload->desc_layouts_array[group_handle];
                     const xg_vk_resource_bindings_layout_t* resource_bindings_layout = xg_vk_pipeline_resource_bindings_layout_get ( resource_bindings_layout_handle );
                     VkDescriptorSet vk_set = workload->desc_sets_array[group_handle];
+                    std_assert_m ( vk_set != VK_NULL_HANDLE );
 
                     uint32_t buffers_count = args->buffer_count;
                     uint32_t textures_count = args->texture_count;

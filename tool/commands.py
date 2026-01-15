@@ -32,6 +32,8 @@ def get_index():
     return INDEX
 
 def push_path(path):
+    if not os.path.exists(path):
+        os.makedirs(path)    
     PATH_STACK.append(path)
     os.chdir(PATH_STACK[-1])
 

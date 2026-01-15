@@ -20,7 +20,9 @@ bool std_virtual_free ( void* begin, void* end ); // on Win32 this range must ma
     Virtual heap allocator
     TODO rename to global_heap? heap? ???
 */
-#if std_build_debug_m
+#define std_allocator_uses_alloc_scope_m ( std_allocator_track_allocations_m || std_allocator_log_allocations_to_file_m )
+
+#if std_allocator_uses_alloc_scope_m
 typedef struct {
     char module[32];
     char file[32];
@@ -81,8 +83,7 @@ typedef struct {
     std_timestamp_t timestamp;
     void* address;
     uint64_t size;
-    // TODO
-#if std_build_debug_m
+#if std_allocator_uses_alloc_scope_m
     std_alloc_scope_t scope;
 #endif
 } std_allocator_log_record_t;
@@ -118,6 +119,7 @@ void*       std_stack_alloc_align ( std_stack_t* stack, size_t size, size_t alig
 void*       std_stack_write_align ( std_stack_t* stack, const void* data, size_t size, size_t align );
 void        std_stack_clear ( std_stack_t* stack );
 void        std_stack_free ( std_stack_t* stack, size_t size );
+void        std_stack_free_from ( std_stack_t* stack, void* base );
 uint64_t    std_stack_used_size ( const std_stack_t* stack );
 uint64_t    std_stack_used_size_from ( const std_stack_t* stack, void* base );
 uint64_t    std_stack_unused_size ( const std_stack_t* stack );

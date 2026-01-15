@@ -49,6 +49,8 @@ static void xi_api_init ( xi_i* xi ) {
     xi->add_texture = xi_ui_texture;
     xi->add_arrow = xi_ui_arrow;
 
+    xi->draw_tooltip = xi_ui_tooltip;
+
     xi->newline = xi_ui_newline;
 
     xi->init_geos = xi_ui_geo_init;
@@ -60,6 +62,10 @@ static void xi_api_init ( xi_i* xi ) {
     xi->file_pick = xi_ui_file_pick;
 
     xi->test_layer_row_hover = xi_ui_layer_row_hover_test;
+    
+    xi->line_remaining_size = xi_ui_layer_line_remaining_size;
+    xi->line_offset = xi_ui_layer_line_offset_get;
+    xi->add_line_offset = xi_ui_layer_line_offset_add;
 
     xi->draw_overlay_texture = xi_ui_overlay_texture;
 }

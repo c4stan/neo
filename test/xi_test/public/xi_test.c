@@ -189,7 +189,7 @@ static void xi_test ( void ) {
         .y = 20,
         .width = 250,
         .height = 250,
-        .style = xi_default_style_m (
+        .style = xi_window_style_m (
             .font = font,
         ),
     );

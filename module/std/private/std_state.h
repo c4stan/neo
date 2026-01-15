@@ -97,7 +97,7 @@ typedef struct {
 #define std_allocator_tlsf_alignment_bit_m (1 << 2)
 #define std_allocator_tlsf_size_mask_m ( ( ~0ull ) << 3 )
 
-#if std_build_debug_m
+#if std_allocator_track_allocations_m
 typedef struct {
     std_alloc_scope_t scope;
     void* user;
@@ -112,7 +112,7 @@ typedef struct {
     uint64_t available_rows; // one bit per table row (x dimension). 1 if at least one freelist on that row is available, 0 otherwise
     size_t allocated_size;
     size_t total_size;
-#if std_build_debug_m
+#if std_allocator_track_allocations_m
     std_allocator_debug_record_t debug_records_array[std_allocator_max_debug_records_m];
     std_allocator_debug_record_t* debug_records_freelist;
     uint64_t debug_records_bitset[std_bitset_u64_count_m ( std_allocator_max_debug_records_m )];

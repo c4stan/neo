@@ -678,6 +678,12 @@ void std_stack_free ( std_stack_t* stack, size_t size ) {
     stack->top = top >= begin ? top : begin;
 }
 
+void std_stack_free_from ( std_stack_t* stack, void* base ) {
+    std_assert_m ( stack->top >= base );
+    size_t size = stack->top - base;
+    std_stack_free ( stack, size );
+}
+
 uint64_t std_stack_used_size ( const std_stack_t* stack ) {
     void* top = stack->top;
     void* begin = stack->begin;
@@ -994,7 +1000,7 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
     heap->stack = std_stack_create ( std_allocator_tlsf_max_segment_size_m );
     std_allocator_tlsf_heap_grow ( heap, size );
 
-#if std_build_debug_m
+#if std_allocator_track_allocations_m
     heap->debug_records_freelist = std_static_freelist_m ( heap->debug_records_array );
     std_mem_zero_static_array_m ( heap->debug_records_bitset );
 #endif
@@ -1014,13 +1020,13 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
 #endif
 }
 
-#if std_build_debug_m
+#if std_allocator_uses_alloc_scope_m
 void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align, std_alloc_scope_t scope )
 #else
 void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align )
 #endif
 {
-#if std_build_debug_m
+#if std_allocator_track_allocations_m
     size += 8;
 #endif
 
@@ -1124,7 +1130,7 @@ void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint
 
     //std_log_info_m ( "ALLOC " std_fmt_u64_m, segment_size );
 
-#if std_build_debug_m
+#if std_allocator_track_allocations_m
     std_allocator_debug_record_t* debug_record = std_list_pop_m ( &heap->debug_records_freelist );
     if ( debug_record ) {
         debug_record->scope = scope;
@@ -1143,7 +1149,7 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
         return;
     }
 
-#if std_build_debug_m
+#if std_allocator_track_allocations_m
     address -= 8;
     std_auto_m debug_record = ( std_allocator_debug_record_t* ) * (void**) address;
     if ( debug_record ) {
@@ -1275,7 +1281,7 @@ void std_allocator_info ( std_allocator_info_t* info ) {
 
 //==============================================================================
 
-#if std_build_debug_m
+#if std_allocator_uses_alloc_scope_m
 void* std_tlsf_alloc ( uint64_t size, uint64_t align, std_alloc_scope_t scope ) {
     std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
     return std_tlsf_heap_alloc ( heap, size, align, scope );
@@ -1294,7 +1300,7 @@ void std_tlsf_free ( void* address ) {
 
 //==============================================================================
 
-#if std_build_debug_m
+#if std_allocator_uses_alloc_scope_m
 void* std_virtual_heap_alloc ( size_t size, size_t align, std_alloc_scope_t scope ) {
     return std_tlsf_alloc ( size, align, scope );
 }
@@ -1391,8 +1397,8 @@ void std_allocator_attach ( std_allocator_state_t* state ) {
 }
 
 void std_allocator_shutdown ( void ) {
-#if std_build_debug_m
     std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
+#if std_allocator_track_allocations_m
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, heap->debug_records_bitset, idx, std_bitset_u64_count_m ( std_allocator_max_debug_records_m ) ) ) {
         std_allocator_debug_record_t* record = &heap->debug_records_array[idx];

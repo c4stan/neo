@@ -232,6 +232,8 @@ bool xi_ui_layer_row_hover_test ( uint32_t height ) {
 static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, uint32_t height, const xi_style_t* style ) {
     xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
 
+    bool can_fit = true;
+
     if ( xi_ui_state->minimized_window ) {
         return false;
     }
@@ -246,12 +248,12 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
 
     // check for enough horizontal space
     if ( /*width +*/ layer->line_offset + layer->line_offset_rev > layer->width ) {
-        return false;
+        can_fit = false;
     }
 
     // check for enough vertical space
     if ( /*height +*/ layer->line_y > layer->height ) {
-        return false;
+        can_fit = false;
     }
 
     if ( style->horizontal_border_margin != xi_style_border_margin_invalid_m ) {
@@ -282,10 +284,10 @@ static bool xi_ui_layer_add_element ( int32_t* x, int32_t* y, uint32_t width, ui
     }
 
     if ( layer->line_y + height < 0 ) {
-        return false;
+        can_fit = false;
     }
 
-    return true;
+    return can_fit;
 }
 
 static uint32_t xi_ui_focus_stack_push ( uint64_t id, uint32_t sub_id ) {
@@ -581,18 +583,18 @@ xi_style_t xi_ui_inherit_style ( const xi_style_t* style ) {
     }
 
     xi_style_t* parent = &xi_ui_state->layers[xi_ui_state->layer_count - 1].style;
-    xi_style_t result = xi_style_m();
-
-    result.font = style->font != xi_null_handle_m ? style->font : parent->font;
-    result.font_height = style->font_height != 0 ? style->font_height : parent->font_height;
-    result.color = style->color.u32 != xi_color_invalid_m.u32 ? style->color : parent->color;
-    result.font_color = style->font_color.u32 != xi_color_invalid_m.u32 ? style->font_color : parent->font_color;
-    result.horizontal_alignment = style->horizontal_alignment != xi_horizontal_alignment_invalid_m ? style->horizontal_alignment : parent->horizontal_alignment;
-    result.vertical_alignment = style->vertical_alignment != xi_vertical_alignment_invalid_m ? style->vertical_alignment : parent->vertical_alignment;
-    result.horizontal_border_margin = style->horizontal_border_margin != xi_style_border_margin_invalid_m ? style->horizontal_border_margin : parent->horizontal_border_margin;
-    result.horizontal_margin = style->horizontal_margin != xi_style_margin_invalid_m ? style->horizontal_margin : parent->horizontal_margin;
-    result.horizontal_padding = style->horizontal_padding != xi_style_padding_invalid_m ? style->horizontal_padding : parent->horizontal_padding;
-
+    
+    xi_style_t result = xi_style_m (
+        .font = style->font != xi_null_handle_m ? style->font : parent->font,
+        .font_height = style->font_height != 0 ? style->font_height : parent->font_height,
+        .color = style->color.u32 != xi_color_invalid_m.u32 ? style->color : parent->color,
+        .font_color = style->font_color.u32 != xi_color_invalid_m.u32 ? style->font_color : parent->font_color,
+        .horizontal_alignment = style->horizontal_alignment != xi_horizontal_alignment_invalid_m ? style->horizontal_alignment : parent->horizontal_alignment,
+        .vertical_alignment = style->vertical_alignment != xi_vertical_alignment_invalid_m ? style->vertical_alignment : parent->vertical_alignment,
+        .horizontal_border_margin = style->horizontal_border_margin != xi_style_border_margin_invalid_m ? style->horizontal_border_margin : parent->horizontal_border_margin,
+        .horizontal_margin = style->horizontal_margin != xi_style_margin_invalid_m ? style->horizontal_margin : parent->horizontal_margin,
+        .horizontal_padding = style->horizontal_padding != xi_style_padding_invalid_m ? style->horizontal_padding : parent->horizontal_padding,
+    );
     return result;
 }
 
@@ -1011,6 +1013,24 @@ void xi_ui_section_end ( xi_workload_h workload ) {
     xi_ui_state->minimized_section = false;
 }
 
+void xi_ui_tooltip ( xi_workload_h workload, xi_label_state_t* state ) {
+    xi_style_t style = xi_ui_inherit_style ( &state->style );
+
+    xi_font_info_t font_info;
+    xi_font_get_info ( &font_info, style.font );
+
+    int32_t x = xi_ui_state->update.input_state.cursor_x;
+    int32_t y = xi_ui_state->update.input_state.cursor_y;
+    uint32_t string_width = xi_ui_string_width ( state->text, style.font );
+    uint32_t width = std_max_u32 ( state->width, string_width );
+    uint32_t height = std_max_u32 ( state->height, font_info.pixel_height );
+
+    if ( style.color.a != 0 ) {
+        xi_ui_draw_rect ( workload, style.color, x, y, width, height, state->sort_order );
+    }
+    xi_ui_draw_string ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
+}
+
 void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state ) {
     xi_style_t style = xi_ui_inherit_style ( &state->style );
 
@@ -1018,13 +1038,17 @@ void xi_ui_label ( xi_workload_h workload, xi_label_state_t* state ) {
     xi_font_get_info ( &font_info, style.font );
 
     int32_t x, y;
-    uint32_t width = xi_ui_string_width ( state->text, style.font );
+    uint32_t string_width = xi_ui_string_width ( state->text, style.font );
+    uint32_t width = std_max_u32 ( state->width, string_width );
     uint32_t height = std_max_u32 ( state->height, font_info.pixel_height );
 
     if ( !xi_ui_layer_add_element ( &x, &y, width, height, &style ) ) {
         return;
     }
 
+    if ( style.color.a != 0 ) {
+        xi_ui_draw_rect ( workload, style.color, x, y, width, height, state->sort_order );
+    }
     xi_ui_draw_string ( workload, style.font, style.font_color, state->text, x, y, state->sort_order );
 
     if ( xi_ui_cursor_test ( x, y, width, height ) ) {
@@ -1358,7 +1382,10 @@ bool xi_ui_button ( xi_workload_h workload, xi_button_state_t* state ) {
     xi_font_get_info ( &font_info, style.font );
 
     uint32_t text_width = xi_ui_string_width ( state->text, style.font );
-    uint32_t width = std_max_u32 ( text_width, state->width );
+    uint32_t width = state->width;
+    if ( state->resizable ) {
+        width = std_max_u32 ( width, text_width );
+    }
     width += 2 * style.horizontal_padding;
     uint32_t height = std_max_u32 ( font_info.pixel_height, state->height );
 
@@ -1900,6 +1927,21 @@ bool xi_ui_draw_transform ( xi_workload_h workload_handle, xi_transform_state_t*
     xi_workload_cmd_draw_mesh ( workload_handle, &draw );
 
     return down;
+}
+
+void xi_ui_layer_line_offset_add ( uint32_t offset ) {
+    xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+    layer->line_offset += offset;
+}
+
+uint32_t xi_ui_layer_line_offset_get ( void ) {
+    xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+    return layer->line_offset + layer->line_padding_x;
+}
+
+uint32_t xi_ui_layer_line_remaining_size ( void ) {
+    xi_ui_layer_t* layer = &xi_ui_state->layers[xi_ui_state->layer_count - 1];
+    return layer->width - layer->line_offset - layer->line_offset_rev - layer->line_padding_x * 2;
 }
 
 #if defined ( std_platform_win32_m )

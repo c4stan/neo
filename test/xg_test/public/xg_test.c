@@ -1,5 +1,4 @@
 #include <std_main.h>
-#include <std_time.h>
 #include <std_log.h>
 
 #include <xg.h>
@@ -92,10 +91,9 @@ static void xg_test_run ( void ) {
     ) );
 
     xg_i* xg = std_module_load_m ( xg_module_name_m );
-    xg_device_h devices[16];
-    size_t device_count = xg->get_devices ( devices, 16 );
-    std_assert_m ( device_count > 0 );
-    xg_device_h device = devices[0];
+    xg_device_h device = xg_null_handle_m;
+    xg->get_devices ( &device, 1 );
+    std_assert_m ( device != xg_null_handle_m );
     std_verify_m ( xg->activate_device ( device ) );
     xg_device_info_t device_info;
     xg->get_device_info ( &device_info, device );

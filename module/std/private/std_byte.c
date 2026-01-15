@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-#if 1
-
 // http://graphics.stanford.edu/~seander/bithacks.html
 
 // ------------------------------------------------------------------------------------------------------
@@ -371,7 +369,17 @@ uint64_t std_ring_distance_u64 ( uint64_t a, uint64_t b, uint64_t ring_size ) {
     return a <= b ? b - a : ring_size - b + a;
 }
 
-#endif
+uint32_t std_lerp_u32 ( uint32_t a, uint32_t b, float t ) {
+    return a + t * ( b - a );
+}
+
+float std_lerp_inverse_u32 ( uint32_t a, uint32_t b, uint32_t x ) {
+    return ( float ) ( x - a ) / ( float ) ( b - a );
+}
+
+float std_lerp_inverse_u64 ( uint64_t a, uint64_t b, uint64_t x ) {
+    return ( float ) ( x - a ) / ( float ) ( b - a );
+}
 
 // ------------------------------------------------------------------------------------------------------
 // Bitset

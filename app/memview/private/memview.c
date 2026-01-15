@@ -58,6 +58,8 @@ typedef struct {
     std_allocator_log_record_t* records;
     void* min_address;
     void* max_address;
+    std_allocator_log_record_t* filtered_records;
+    uint64_t filtered_record_count;
 } memview_log_state_t;
 
 typedef struct {
@@ -71,13 +73,26 @@ typedef struct {
 
 std_module_implement_state_m ( memview );
 
-static int memview_log_record_cmp ( const void* a, const void* b, const void* user_args ) {
+static int memview_log_record_cmp_timestamp ( const void* a, const void* b, const void* user_args ) {
     std_unused_m ( user_args );
     std_auto_m l1 = ( std_allocator_log_record_t* ) a;
     std_auto_m l2 = ( std_allocator_log_record_t* ) b;
     if ( l1->timestamp.count < l2->timestamp.count ) {
         return -1;
     } else if ( l1->timestamp.count > l2->timestamp.count ) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+static int memview_log_record_cmp_address ( const void* a, const void* b, const void* user_args ) {
+    std_unused_m ( user_args );
+    std_auto_m l1 = ( std_allocator_log_record_t* ) a;
+    std_auto_m l2 = ( std_allocator_log_record_t* ) b;
+    if ( l1->address < l2->address ) {
+        return -1;
+    } else if ( l1->address > l2->address ) {
         return 1;
     } else {
         return 0;
@@ -97,7 +112,7 @@ static void memview_log_load_data ( void ) {
     state->log.records = std_stack_alloc_array_m ( &state->log.allocator, std_allocator_log_record_t, record_count );
 
     std_allocator_log_record_t* data_records = ( std_allocator_log_record_t* ) ( record_count_ptr + 1 );
-    std_sort_insertion_copy ( state->log.records, data_records, sizeof ( std_allocator_log_record_t ), record_count, memview_log_record_cmp, NULL );
+    std_sort_insertion_copy ( state->log.records, data_records, sizeof ( std_allocator_log_record_t ), record_count, memview_log_record_cmp_timestamp, NULL );
 
     void* min_address = ( void* ) -1;
     void* max_address = 0;
@@ -108,6 +123,9 @@ static void memview_log_load_data ( void ) {
     }
     state->log.min_address = min_address;
     state->log.max_address = max_address;
+
+    state->log.filtered_records = NULL;
+    state->log.filtered_record_count = 0;
 
     std_virtual_heap_free ( data.base );
 
@@ -213,6 +231,7 @@ static void memview_boot ( void ) {
             .routine = memview_ui_pass,
             .user_args = &state->render.ui_pass_args,
             .copy_args = false,
+            .key_space_size = 16
         ),
         .resources = xf_node_resource_params_m (
             .render_targets_count = 1,
@@ -225,11 +244,11 @@ static void memview_boot ( void ) {
         .title = "memview",
         .width = state->render.resolution_x,
         .height = state->render.resolution_y,
-        .scrollable = false,
+        .scrollable = true,
         .movable = false,
         .resizable = false,
         .minimizable = false,
-        .style = xi_default_style_m (
+        .style = xi_window_style_m (
             .font = state->ui.font,
         ),
     );
@@ -339,39 +358,147 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         std_u64_to_str ( slider_label.text, sizeof ( slider_label.text ), state->ui.time );
         xi->add_label ( xi_workload, &slider_label );
 
-        // memory view
-        // TODO need some kind of canvas where arbitrarily positioned bars can be drawn
-        xi->newline();
-        //uint64_t time_records_begin = state->ui.time_records_begin;
-        uint64_t time_records_end = state->ui.time_records_end;
-        for ( uint64_t record_it = 0; record_it < time_records_end; ++record_it ) {
-            std_allocator_log_record_t* record = &state->log.records[record_it];
-
-            if ( record->type == std_allocator_log_record_free_m ) {
-                continue;
+        // filter
+        if ( needs_update ) {
+            if ( state->log.filtered_records ) {
+                std_stack_free_from ( &state->log.allocator, state->log.filtered_records );
             }
-            
-            bool freed = false;
-            for ( uint64_t i = record_it + 1; i < time_records_end; ++i ) {
-                std_allocator_log_record_t* r = &state->log.records[i];
-                if ( record->address == r->address ) {
-                    std_assert_m ( r->type == std_allocator_log_record_free_m );
-                    freed = true;
-                    break;
+
+            //uint64_t time_records_begin = state->ui.time_records_begin;
+            uint64_t time_records_end = state->ui.time_records_end;
+            void* filtered_base = state->log.allocator.top;
+            for ( uint64_t record_it = 0; record_it < time_records_end; ++record_it ) {
+                std_allocator_log_record_t* record = &state->log.records[record_it];
+
+                if ( record->type == std_allocator_log_record_free_m ) {
+                    continue;
+                }
+                
+                bool freed = false;
+                for ( uint64_t i = record_it + 1; i < time_records_end; ++i ) {
+                    std_allocator_log_record_t* r = &state->log.records[i];
+                    if ( record->address == r->address ) {
+                        //std_assert_m ( r->type == std_allocator_log_record_free_m );
+                        if ( r->type != std_allocator_log_record_free_m ) {
+                            std_log_error_m ( "Allocations "
+                                std_fmt_ptr_m ":" std_fmt_u64_m " " std_fmt_str_m ":" std_fmt_size_m " and " 
+                                std_fmt_ptr_m ":" std_fmt_u64_m " " std_fmt_str_m ":" std_fmt_size_m " have overlapping addresses",
+                                record->address, record->size, record->scope.file, record->scope.line,
+                                r->address, r->size, r->scope.file, r->scope.line
+                            );
+                        }
+                        freed = true;
+                        break;
+                    }
+                }
+
+                if ( !freed ) {
+                    std_stack_write ( &state->log.allocator, record, sizeof ( *record ) );
                 }
             }
 
-            if ( !freed ) {
-                xi_label_state_t label = xi_label_state_m();
-                std_str_format_m ( label.text, std_fmt_ptr_m ":" std_fmt_u64_m " " std_fmt_str_m ":" std_fmt_size_m, 
-                    record->address, record->size, record->scope.file, record->scope.line );
-                xi->add_label ( xi_workload, &label );
-                xi->newline();
-            }
+            state->log.filtered_record_count = ( state->log.allocator.top - filtered_base ) / sizeof ( std_allocator_log_record_t );
+            std_allocator_log_record_t tmp;
+            std_sort_insertion ( filtered_base, sizeof ( std_allocator_log_record_t ), state->log.filtered_record_count, memview_log_record_cmp_address, NULL, &tmp );
+            state->log.filtered_records = ( std_allocator_log_record_t* ) filtered_base;
         }
 
-        //std_log_info_m ( std_fmt_ptr_m " " std_fmt_ptr_m, state->log.max_address, state->log.min_address );
-        //std_log_info_m ( std_fmt_u64_m, ( uint64_t ) ( state->log.max_address - state->log.min_address ) );
+        std_allocator_log_record_t* filtered_records = state->log.filtered_records;
+        uint64_t filtered_record_count = state->log.filtered_record_count;
+
+        // draw
+        xi->newline();
+        uint32_t line_width = xi->line_remaining_size() - 150 * 2;
+        uint32_t min_allocation = 32;
+        uint64_t address_step = line_width * min_allocation;
+        void* base_address = 0;
+        uint64_t record_it = 0;
+        bool line_first;
+        uint64_t record_remaining_size = 0;
+        uint64_t record_offset = 0;
+        uint64_t pixel_to_size = address_step / line_width;
+        bool tooltip_visible = false;
+
+        if ( filtered_record_count > 0 ) {
+            uint64_t align_step = std_pow2_round_up_u64 ( address_step );
+            base_address = std_align_ptr ( filtered_records[0].address, align_step ) - align_step;
+        }
+
+        while ( record_it < filtered_record_count ) {
+            xi->newline();
+            line_first = true;
+            std_allocator_log_record_t* record = &filtered_records[record_it];
+
+            void* range_max = base_address + address_step;
+            while ( record->address + record_offset >= range_max ) {
+                base_address += address_step;
+                range_max = base_address + address_step;
+            }
+
+            while ( record_it < filtered_record_count && record->address + record_offset < range_max ) {
+                if ( line_first ) {
+                    line_first = false;
+                    xi_label_state_t label = xi_label_state_m ( .width = 150 );
+                    std_str_format_m ( label.text, std_fmt_ptr_m, base_address );
+                    xi->add_label ( xi_workload, &label );
+                }
+                
+                float record_begin_t = std_lerp_inverse_u64 ( ( uint64_t ) base_address, ( uint64_t ) range_max, ( uint64_t ) record->address + record_offset );
+                float line_t = std_lerp_inverse_u32 ( 0, line_width, xi->line_offset() - 150 );
+                float delta_t = record_begin_t - line_t;
+                if ( delta_t > 0 ) {
+                    uint32_t offset = delta_t * line_width;
+                    xi->add_line_offset ( offset );
+                }
+
+                uint32_t line_remaining_width = xi->line_remaining_size() - 150;
+                if ( record_remaining_size == 0 ) {
+                    record_remaining_size = record->size;
+                }
+                uint32_t record_width = record_remaining_size / pixel_to_size;
+                uint32_t width = std_min_u64 ( record_width, line_remaining_width );                
+                xi_id_t id = xi_mix_id_m ( record_it );
+                uint64_t hash = std_hash_64_m ( record_it );
+                xi_label_state_t label = xi_label_state_m ( 
+                    .width = width,
+                    .id = id,
+                    .style = xi_style_m ( .color = xi_color_rgba_u32_m ( hash & 0xff, ( hash >> 8 ) & 0xff, ( hash >> 16 ) & 0xff, 255 ) ),
+                );
+                xi->add_label ( xi_workload, &label );
+                if ( !tooltip_visible && xi->get_hovered_element_id() == id ) {
+                    xi_label_state_t tooltip = xi_label_state_m (
+                        .sort_order = 1,
+                    );
+                    std_str_format_m ( tooltip.text, std_fmt_ptr_m ":" std_fmt_u64_m " " std_fmt_str_m ":" std_fmt_size_m, 
+                        record->address, record->size, record->scope.file, record->scope.line );
+                    xi->draw_tooltip ( xi_workload, &tooltip );
+                    tooltip_visible = true;
+                }
+
+                record_remaining_size -= width * pixel_to_size;
+                if ( record_remaining_size < pixel_to_size ) {
+                    record_remaining_size = 0;
+                }
+                if ( record_remaining_size == 0 ) {
+                    ++record_it;
+                }
+                record = &filtered_records[record_it];
+                if ( record_it < filtered_record_count ) {
+                    if ( record_remaining_size == 0 ) {
+                        record_offset = 0;
+                    } else {
+                        record_offset = record->size - record_remaining_size;
+                        break;
+                    }
+                }
+            }
+
+            if ( !line_first ) {
+                xi_label_state_t label = xi_label_state_m ( .width = 150, .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ) );
+                std_str_format_m ( label.text, std_fmt_ptr_m, range_max );
+                xi->add_label ( xi_workload, &label );
+            }
+        }
     }
 
     xi->newline();
