@@ -573,6 +573,7 @@ void xg_vk_device_load ( xg_vk_device_state_t* state ) {
     xg_vk_device_state = state;
 
     state->devices_array = std_virtual_heap_alloc_array_m ( xg_vk_device_t, xg_vk_max_devices_m );
+    std_mem_zero_array_m ( state->devices_array, xg_vk_max_devices_m );
     state->devices_freelist = std_freelist_m ( state->devices_array, xg_vk_max_devices_m );
     std_mutex_init ( &state->devices_mutex );
 
@@ -797,11 +798,6 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );
 
     xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
-
-    if ( device == NULL ) {
-        std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
-        return false;
-    }
 
     // Fill Layers list
     // *** Device layers are deprecated ***

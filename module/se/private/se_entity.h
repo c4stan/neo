@@ -94,7 +94,7 @@ typedef struct {
 } se_entity_component_metadata_t;
 
 typedef struct {
-    uint64_t used_entities[ std_div_round_up_m ( se_max_entities_m, 64 ) ];    
+    uint64_t used_entities[ std_bitset_u64_count_m ( se_max_entities_m ) ];    
     se_entity_name_t names[se_max_entities_m];
 } se_entity_metadata_t;
 

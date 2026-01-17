@@ -34,7 +34,7 @@ typedef struct {
 #endif
 } xg_vk_allocator_tlsf_segment_t;
 
-#define xg_vk_allocator_tlsf_min_x_level_m 10
+#define xg_vk_allocator_tlsf_min_x_level_m 14
 #define xg_vk_allocator_tlsf_max_x_level_m 36
 #define xg_vk_allocator_tlsf_x_size_m (xg_vk_allocator_tlsf_max_x_level_m - xg_vk_allocator_tlsf_min_x_level_m)
 #define xg_vk_allocator_tlsf_y_size_m 16

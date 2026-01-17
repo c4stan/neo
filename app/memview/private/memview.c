@@ -478,7 +478,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
                 uint32_t record_width = record_remaining_size / pixel_to_size;
                 uint32_t width = std_min_u64 ( record_width, line_remaining_width );                
                 xi_id_t id = xi_mix_id_m ( record_it );
-                uint64_t hash = std_hash_64_m ( record_it );
+                uint64_t hash = std_hash_64_m ( ( uint64_t ) record->address );
                 xi_label_state_t label = xi_label_state_m ( 
                     .width = width,
                     .id = id,

@@ -10,7 +10,6 @@ void* xg_vk_instance_cpu_alloc ( void* user, size_t size, size_t alignment, VkSy
     std_unused_m ( user );
     std_unused_m ( scope );
     return std_virtual_heap_alloc_m ( size, alignment );
-    //return malloc(size);
 }
 
 void* xg_vk_instance_cpu_realloc ( void* user, void* original, size_t size, size_t alignment, VkSystemAllocationScope scope ) {
@@ -20,13 +19,11 @@ void* xg_vk_instance_cpu_realloc ( void* user, void* original, size_t size, size
     std_mem_copy ( new, original, size );
     std_virtual_heap_free ( original );
     return new;
-    //return realloc(original, size);
 }
 
 void xg_vk_instance_cpu_free ( void* user, void* memory ) {
     std_unused_m ( user );
     std_virtual_heap_free ( memory );
-    //free(memory);
 }
 
 // --------------------------
@@ -356,7 +353,5 @@ VkInstance xg_vk_instance ( void ) {
 }
 
 VkAllocationCallbacks* xg_vk_cpu_allocator ( void ) {
-    return NULL;
-    // TODO seems to break renderdoc - find out why
-    //return &xg_vk_instance_state->cpu_allocator; // TODO make it thread safe
+    return &xg_vk_instance_state->cpu_allocator;
 }
