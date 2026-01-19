@@ -36,6 +36,7 @@ void xf_graph_unload ( void ) {
     while ( std_bitset_scan ( &idx, xf_graph_state->graphs_bitset, idx, xf_graph_bitset_u64_count_m ) ) {
         xf_graph_t* graph = &xf_graph_state->graphs_array[idx];
         xg_workload_h workload = xg->create_workload ( graph->params.device );
+        std_log_info_m ( "Destroying render graph " std_fmt_u64_m ": " std_fmt_str_m, idx, graph->params.debug_name );
         xf_graph_destroy ( idx, workload );
         xg->submit_workload ( workload );
         ++idx;

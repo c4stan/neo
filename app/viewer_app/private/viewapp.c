@@ -20,7 +20,7 @@ static void viewapp_boot ( void ) {
     viewapp_boot_render();
     viewapp_boot_ui();
 
-    viewapp_load_render_graph ( state->render.active_render_graph, xg_null_handle_m );
+    viewapp_load_render_graph ( viewapp_render_graph_raster_m, xg_null_handle_m );
     viewapp_load_mouse_pick_graph();
 
     viewapp_load_scene ( state->scene.active_scene );
@@ -407,8 +407,9 @@ static std_app_state_e viewapp_update ( void ) {
         viewapp_reload_graphs();
     }
 
-    if ( state->render.load_render_graph ) {
-        viewapp_load_render_graph ( state->render.active_render_graph, workload );
+    if ( state->render.new_render_graph != viewapp_render_graph_invalid_m ) {
+        viewapp_load_render_graph ( state->render.new_render_graph, workload );
+        state->render.new_render_graph = viewapp_render_graph_invalid_m;
     }
 
     wm_window_info_t new_window_info;
@@ -498,6 +499,11 @@ void viewer_app_unload ( void ) {
         viewapp_destroy_entity_resources ( *entity, workload, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_start_m );
         se->destroy_entity ( *entity );
     }
+
+    viewapp_destroy_render_graph ( workload, resource_cmd_buffer );
+    viewapp_destroy_mouse_pick_graph ( workload, resource_cmd_buffer );
+
+    viewapp_unload_ui ( resource_cmd_buffer );
 
     xg->submit_workload ( workload );
 

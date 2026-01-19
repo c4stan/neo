@@ -83,8 +83,8 @@ typedef struct {
     bool linear_sampler_filter;
     uint32_t idx_count;
     uint64_t sort_order;
-    float traslation[3]; // x y z
-    float rotation[4];    // x y z w
+    float traslation[3];    // x y z
+    float rotation[4];      // x y z w
     float scale;
     float color[4];
 } xi_draw_mesh_t;
@@ -111,7 +111,6 @@ typedef struct {
     xi_draw_tri_t tri_array[xi_workload_max_tris_m];
     uint64_t tri_count;
 
-    xi_workload_vertex_t vertex_buffer_data[xi_workload_max_rects_m * 6 + xi_workload_max_tris_m * 3];
     xg_buffer_h vertex_buffer;
     // TODO index buffer
 
@@ -142,8 +141,6 @@ typedef struct {
     xi_workload_t* workloads_freelist;
     uint64_t workloads_count;
 
-    //xi_workload_submit_context_t* submit_contexts;
-    //std_ring_t submit_ring;
     xi_workload_device_context_t device_contexts[xg_max_active_devices_m];
 
     xs_database_pipeline_h ui_pipeline_rgba8;

@@ -52,6 +52,9 @@ void xi_font_unload ( void ) {
         ++idx;
     }
 
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    xg->destroy_renderpass ( xi_font_state->renderpass );
+
     std_virtual_heap_free ( xi_font_state->fonts_array );
     std_virtual_heap_free ( xi_font_state->fonts_bitset );
 }
@@ -356,7 +359,9 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
 }
 
 void xi_font_destroy ( xi_font_h font_handle ) {
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
     xi_font_t* font = &xi_font_state->fonts_array[font_handle];
+    xg->destroy_texture ( font->atlas_texture );
     std_virtual_heap_free ( font->char_info );
     std_bitset_clear ( xi_font_state->fonts_bitset, font_handle );
 }

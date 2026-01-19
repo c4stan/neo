@@ -62,7 +62,7 @@ void viewapp_boot_ui ( void ) {
     state->ui.xg_alloc_section_state = xi_section_state_m ( .title = "memory" );
     state->ui.scene_section_state = xi_section_state_m ( .title = "scene" );
     state->ui.xf_graph_section_state = xi_section_state_m ( .title = "rendergraph" );
-    state->ui.entities_section_state = xi_section_state_m ( .title = "entities", .style = xi_style_m() );
+    state->ui.entities_section_state = xi_section_state_m ( .title = "entities" );
 
     state->ui.export_texture = xg->create_texture ( &xg_texture_params_m (
         .device = device,
@@ -74,6 +74,14 @@ void viewapp_boot_ui ( void ) {
     ) );
 
     xg->submit_workload ( workload );
+}
+
+void viewapp_unload_ui ( xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+    xi_i* xi = state->modules.xi;
+    xg->cmd_destroy_texture ( resource_cmd_buffer, state->ui.export_texture, xg_resource_cmd_buffer_time_workload_complete_m );
+    xi->destroy_font ( state->ui.font );
 }
 
 static void mouse_pick ( uint32_t x, uint32_t y ) {
@@ -358,8 +366,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         viewapp_render_graph_e selected_graph = graph_select.item_idx;
         if ( state->render.active_render_graph != selected_graph ) {
-            state->render.active_render_graph = selected_graph;
-            state->render.load_render_graph = true;
+            state->render.new_render_graph = selected_graph;
         }
 
         xi->newline();

@@ -28,6 +28,19 @@ void xi_workload_reload ( xi_workload_state_t* state ) {
 
 void xi_workload_unload ( void ) {
     std_virtual_heap_free ( xi_workload_state->workloads_array );
+
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+    if ( xi_workload_state->ui_renderpass_rgba8.xg_handle != xg_null_handle_m ) {
+        xg->destroy_renderpass ( xi_workload_state->ui_renderpass_rgba8.xg_handle );
+    }
+
+    if ( xi_workload_state->ui_renderpass_bgra8.xg_handle != xg_null_handle_m ) {
+        xg->destroy_renderpass ( xi_workload_state->ui_renderpass_bgra8.xg_handle );
+    }
+
+    if ( xi_workload_state->ui_renderpass_a2bgr10.xg_handle != xg_null_handle_m ) {
+        xg->destroy_renderpass ( xi_workload_state->ui_renderpass_a2bgr10.xg_handle );
+    }
 }
 
 void xi_workload_load_shaders ( xs_i* xs, xs_database_h sdb ) {
@@ -254,6 +267,10 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
         }
     }
 
+    // alloc vertex buffer data
+    uint64_t vertex_buffer_size = sizeof ( xi_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 );
+    xi_workload_vertex_t* vertex_buffer_data = std_virtual_heap_alloc_array_m ( xi_workload_vertex_t, vertex_buffer_size );
+
     // draw ui
     xi_scissor_h active_scissor = xi_null_scissor_m;
     {
@@ -268,7 +285,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             // and flips position y axis direction from bottom up to top down
             //
             // top left
-            vertex = &workload->vertex_buffer_data[i * 6 + 0];
+            vertex = &vertex_buffer_data[i * 6 + 0];
             vertex->pos[0] = ( rect->x / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - ( rect->y / viewport_h ) )  * 2 - 1;
             vertex->uv[0] = rect->uv0[0];
@@ -278,7 +295,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[2] = rect->color.b / 255.f;
             vertex->color[3] = rect->color.a / 255.f;
             // top right
-            vertex = &workload->vertex_buffer_data[i * 6 + 1];
+            vertex = &vertex_buffer_data[i * 6 + 1];
             vertex->pos[0] = ( ( rect->x + rect->width ) / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - ( rect->y / viewport_h ) ) * 2 - 1;
             vertex->uv[0] = rect->uv1[0];
@@ -288,7 +305,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[2] = rect->color.b / 255.f;
             vertex->color[3] = rect->color.a / 255.f;
             // bottom right
-            vertex = &workload->vertex_buffer_data[i * 6 + 2];
+            vertex = &vertex_buffer_data[i * 6 + 2];
             vertex->pos[0] = ( ( rect->x + rect->width ) / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - ( ( rect->y + rect->height ) / viewport_h ) ) * 2 - 1;
             vertex->uv[0] = rect->uv1[0];
@@ -298,10 +315,10 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[2] = rect->color.b / 255.f;
             vertex->color[3] = rect->color.a / 255.f;
             // bottom right
-            vertex = &workload->vertex_buffer_data[i * 6 + 3];
-            *vertex = workload->vertex_buffer_data[i * 6 + 2];
+            vertex = &vertex_buffer_data[i * 6 + 3];
+            *vertex = vertex_buffer_data[i * 6 + 2];
             // bottom left
-            vertex = &workload->vertex_buffer_data[i * 6 + 4];
+            vertex = &vertex_buffer_data[i * 6 + 4];
             vertex->pos[0] = ( rect->x / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - ( ( rect->y + rect->height ) / viewport_h ) ) * 2 - 1;
             vertex->uv[0] = rect->uv0[0];
@@ -311,8 +328,8 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[2] = rect->color.b / 255.f;
             vertex->color[3] = rect->color.a / 255.f;
             // top left
-            vertex = &workload->vertex_buffer_data[i * 6 + 5];
-            *vertex = workload->vertex_buffer_data[i * 6 + 0];
+            vertex = &vertex_buffer_data[i * 6 + 5];
+            *vertex = vertex_buffer_data[i * 6 + 0];
         }
 
         uint64_t tri_base = workload->rect_count * 6;
@@ -323,7 +340,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
 
             max_sort_order = std_max ( max_sort_order, tri->sort_order );
 
-            vertex = &workload->vertex_buffer_data[tri_base + i * 3 + 0];
+            vertex = &vertex_buffer_data[tri_base + i * 3 + 0];
             vertex->pos[0] = ( tri->xy0[0] / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - tri->xy0[1] / viewport_h ) * 2 - 1;
             vertex->uv[0] = tri->uv0[0];
@@ -333,7 +350,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[2] = tri->color.b / 255.f;
             vertex->color[3] = tri->color.a / 255.f;
 
-            vertex = &workload->vertex_buffer_data[tri_base + i * 3 + 1];
+            vertex = &vertex_buffer_data[tri_base + i * 3 + 1];
             vertex->pos[0] = ( tri->xy1[0] / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - tri->xy1[1] / viewport_h ) * 2 - 1;
             vertex->uv[0] = tri->uv1[0];
@@ -343,7 +360,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[2] = tri->color.b / 255.f;
             vertex->color[3] = tri->color.a / 255.f;
 
-            vertex = &workload->vertex_buffer_data[tri_base + i * 3 + 2];
+            vertex = &vertex_buffer_data[tri_base + i * 3 + 2];
             vertex->pos[0] = ( tri->xy2[0] / viewport_w ) * 2 - 1;
             vertex->pos[1] = ( 1 - tri->xy2[1] / viewport_h ) * 2 - 1;
             vertex->uv[0] = tri->uv2[0];
@@ -358,7 +375,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
         xg_buffer_params_t vertex_buffer_params = xg_buffer_params_m (
             .memory_type = xg_memory_type_gpu_mapped_m,
             .device = flush_params->device,
-            .size = sizeof ( xi_workload_vertex_t ) * ( workload->rect_count * 6 + workload->tri_count * 3 ),
+            .size = vertex_buffer_size,
             .allowed_usage = xg_buffer_usage_bit_vertex_buffer_m,
             .debug_name = "xi_vertex_buffer",
         );
@@ -369,8 +386,11 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
         // fill vertex buffer
         xg_buffer_info_t vertex_buffer_info;
         xg->get_buffer_info ( &vertex_buffer_info, vertex_buffer_handle );
-        char* vertex_buffer_data = ( char* ) vertex_buffer_info.allocation.mapped_address;
-        std_mem_copy ( vertex_buffer_data, workload->vertex_buffer_data, vertex_buffer_params.size );
+        char* vertex_buffer_mapped_address = ( char* ) vertex_buffer_info.allocation.mapped_address;
+        std_mem_copy ( vertex_buffer_mapped_address, vertex_buffer_data, vertex_buffer_size );
+
+        // free vertex buffer data
+        std_virtual_heap_free ( vertex_buffer_data );
 
         // bind pipeline
         xs_i* xs = std_module_get_m ( xs_module_name_m );

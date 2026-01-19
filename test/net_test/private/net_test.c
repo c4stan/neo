@@ -113,10 +113,12 @@ void test_http_server ( void ) {
         net->read_connected_socket ( buffer, sizeof ( buffer ), client_socket, net_connected_socket_read_flag_none_m );
         //std_log_info_m ( std_fmt_str_m, buffer );
 
-        char path[std_path_size_m];
-        std_string_t path_string = std_static_string_m ( path );
-        std_string_append ( &path_string, "data/net_test//www/index.html" );
-        std_buffer_t file = std_file_read_to_virtual_heap ( path );
+        char path_buffer[std_path_size_m];
+        std_string_t path = std_static_string_m ( path_buffer );
+        std_path_append_dir ( &path, std_source_data_path_m );
+        std_path_append_dir ( &path, "www" );
+        std_path_append_file ( &path, "index.html" );
+        std_buffer_t file = std_file_read_to_virtual_heap ( path.str );
 
         std_stack_t stack = std_static_stack_m ( buffer );
         std_stack_string_append ( &stack, "HTTP/1.1 200 OK\r\n" );

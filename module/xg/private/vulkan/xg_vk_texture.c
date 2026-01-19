@@ -496,12 +496,8 @@ bool xg_texture_alloc ( xg_texture_h texture_handle ) {
     return true;
 }
 
-bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle ) {
+void xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle ) {
     const xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
-
-    if ( texture == NULL ) {
-        return false;
-    }
 
     info->allocation = texture->allocation;
     info->device = texture->params.device;
@@ -520,11 +516,9 @@ bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle 
     info->default_aspect = texture->default_aspect;
     info->os_handle = ( uint64_t ) texture->vk_handle;
     std_str_copy_static_m ( info->debug_name, texture->params.debug_name );
-
-    return true;
 }
 
-bool xg_texture_destroy ( xg_texture_h texture_handle ) {
+void xg_texture_destroy ( xg_texture_h texture_handle ) {
     std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 
@@ -566,8 +560,6 @@ bool xg_texture_destroy ( xg_texture_h texture_handle ) {
     std_bitset_clear ( xg_vk_texture_state->textures_bitset, texture_handle );
     std_list_push ( &xg_vk_texture_state->textures_freelist, texture );
     std_mutex_unlock ( &xg_vk_texture_state->textures_mutex );
-
-    return true;
 }
 
 bool xg_texture_resize ( xg_texture_h texture, size_t width, size_t height ) {

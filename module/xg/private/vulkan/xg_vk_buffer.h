@@ -41,9 +41,9 @@ void xg_vk_buffer_unload ( void );
 xg_buffer_h xg_buffer_create ( const xg_buffer_params_t* params );
 
 xg_buffer_h xg_buffer_reserve ( const xg_buffer_params_t* params );
-bool xg_buffer_alloc ( xg_buffer_h buffer );
+void xg_buffer_alloc ( xg_buffer_h buffer );
 
-bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer );
-bool xg_buffer_destroy ( xg_buffer_h buffer );
+void xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer );
+void xg_buffer_destroy ( xg_buffer_h buffer );
 
 const xg_vk_buffer_t* xg_vk_buffer_get ( xg_buffer_h handle );

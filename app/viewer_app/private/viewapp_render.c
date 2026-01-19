@@ -1202,6 +1202,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .mode = xg_buffer_init_mode_upload_m,
         .upload_data = tess_instance_vertex_data,
     ) );
+    state->render.tessellation_instance_vertex_buffer = tess_instance_vertex_buffer;
 
     xg->submit_workload ( tess_workload );
     xg->wait_all_workload_complete();
@@ -1848,13 +1849,45 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->finalize_graph ( graph );
 }
 
-void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h workload ) {
+static void viewapp_destroy_render_graph ( xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
     xf_i* xf = state->modules.xf;
-    
+    viewapp_render_graph_e active_graph = state->render.active_render_graph;
+
     if ( state->render.render_graph != xf_null_handle_m ) {
         xf->destroy_graph ( state->render.render_graph, workload );
     }
+
+    switch ( active_graph ) {
+    case viewapp_render_graph_raster_m:
+        xg->cmd_destroy_buffer ( resource_cmd_buffer, state->render.tessellation_instance_vertex_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
+        break;
+    default:
+        break;
+    }
+
+    state->render.active_render_graph = viewapp_render_graph_count_m;
+}
+
+static void viewapp_destroy_mouse_pick_graph ( xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+    xf_i* xf = state->modules.xf;
+
+    xf->destroy_graph ( state->render.mouse_pick_graph, workload );
+    xg->cmd_destroy_texture ( resource_cmd_buffer, state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_start_m );
+}
+
+void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h workload ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+    
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg_null_handle_m;
+    if ( workload != xg_null_handle_m ) {
+        resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+    }
+    viewapp_destroy_render_graph ( workload, resource_cmd_buffer );
 
     state->render.active_render_graph = graph;
 
@@ -1875,8 +1908,6 @@ void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h wor
     default:
         std_assert_m ( false );
     }
-
-    state->render.load_render_graph = false;
 
     //if ( viewapp_render_graph_is_raytrace ( graph ) ) {
     //    state->render.raytrace_world_update = true;

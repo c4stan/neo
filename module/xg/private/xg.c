@@ -112,6 +112,8 @@ static void xg_api_init ( xg_i* xg ) {
     xg->create_queue_event = xg_gpu_queue_event_create;
     xg->get_default_texture = xg_texture_get_default;
     xg->get_texture_memory_requirement = xg_texture_memory_requirement;
+    xg->destroy_texture = xg_texture_destroy;
+    xg->destroy_buffer = xg_buffer_destroy;
     // Memory allocator
     xg->alloc_memory = xg_alloc;
     xg->free_memory = xg_free;

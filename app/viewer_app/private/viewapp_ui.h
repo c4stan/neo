@@ -5,3 +5,4 @@
 
 void viewapp_boot_ui ( void );
 void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state, xg_workload_h workload );
+void viewapp_unload_ui ( xg_resource_cmd_buffer_h resource_cmd_buffer );

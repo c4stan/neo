@@ -39,7 +39,7 @@ void xg_vk_buffer_unload ( void ) {
 
 xg_buffer_h xg_buffer_create ( const xg_buffer_params_t* params ) {
     xg_buffer_h buffer_handle = xg_buffer_reserve ( params );
-    std_verify_m ( xg_buffer_alloc ( buffer_handle ) );
+    xg_buffer_alloc ( buffer_handle );
     return buffer_handle;
 }
 
@@ -87,7 +87,7 @@ xg_buffer_h xg_buffer_reserve ( const xg_buffer_params_t* params ) {
     return buffer_handle;
 }
 
-bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
+void xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
     xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[buffer_handle];
 
     std_assert_m ( buffer->state == xg_vk_buffer_state_reserved_m );
@@ -144,16 +144,10 @@ bool xg_buffer_alloc ( xg_buffer_h buffer_handle ) {
 
     buffer->allocation = alloc;
     buffer->state = xg_vk_buffer_state_created_m;
-
-    return true;
 }
 
-bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
+void xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
     const xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[buffer_handle];
-
-    if ( buffer == NULL ) {
-        return false;
-    }
 
     info->allocation = buffer->allocation;
     info->device = buffer->params.device;
@@ -161,11 +155,9 @@ bool xg_buffer_get_info ( xg_buffer_info_t* info, xg_buffer_h buffer_handle ) {
     info->allowed_usage = buffer->params.allowed_usage;
     info->gpu_address = buffer->gpu_address;
     std_str_copy_static_m ( info->debug_name, buffer->params.debug_name );
-
-    return true;
 }
 
-bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
+void xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
     uint64_t idx = buffer_handle;
     std_mutex_lock ( &xg_vk_buffer_state->buffers_mutex );
     xg_vk_buffer_t* buffer = &xg_vk_buffer_state->buffer_array[idx];
@@ -178,8 +170,6 @@ bool xg_buffer_destroy ( xg_buffer_h buffer_handle ) {
 
     std_list_push ( &xg_vk_buffer_state->buffer_freelist, buffer );
     std_mutex_unlock ( &xg_vk_buffer_state->buffers_mutex );
-
-    return true;
 }
 
 const xg_vk_buffer_t* xg_vk_buffer_get ( xg_buffer_h buffer_handle ) {

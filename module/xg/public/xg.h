@@ -2638,6 +2638,9 @@ typedef struct {
     void                    ( *cmd_destroy_buffer )                 ( xg_resource_cmd_buffer_h cmd_buffer, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e time );
     void                    ( *cmd_destroy_texture )                ( xg_resource_cmd_buffer_h cmd_buffer, xg_texture_h texture, xg_resource_cmd_buffer_time_e time );
 
+    void                    ( *destroy_texture )                    ( xg_texture_h texture );
+    void                    ( *destroy_buffer )                     ( xg_buffer_h buffer );
+
     //xg_query_buffer_h       ( *cmd_create_query_buffer )            ( xg_resource_cmd_buffer_h cmd_buffer, const xg_query_buffer_params_t* params );
 
     void                    ( *cmd_set_dynamic_viewport )           ( xg_cmd_buffer_h cmd_buffer, uint64_t key, const xg_viewport_state_t* viewport );
@@ -2665,8 +2668,8 @@ typedef struct {
 
     void                    ( *enable_texture_view )                ( xg_texture_h texture, xg_texture_view_t view );
 
-    bool                    ( *get_buffer_info )                    ( xg_buffer_info_t* info, xg_buffer_h buffer );
-    bool                    ( *get_texture_info )                   ( xg_texture_info_t* info, xg_texture_h texture );
+    void                    ( *get_buffer_info )                    ( xg_buffer_info_t* info, xg_buffer_h buffer );
+    void                    ( *get_texture_info )                   ( xg_texture_info_t* info, xg_texture_h texture );
 
     xg_sampler_h            ( *create_sampler )                     ( const xg_sampler_params_t* params );
     xg_sampler_h            ( *get_default_sampler )                ( xg_device_h device, xg_default_sampler_e sampler );

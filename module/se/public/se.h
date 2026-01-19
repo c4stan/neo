@@ -11,11 +11,6 @@ typedef uint64_t se_entity_h;
 typedef uint64_t se_query_h;
 typedef uint64_t se_entity_group_h;
 
-#if 0
-    typedef uint32_t se_component_e;
-    typedef uint32_t se_component_index_t;
-#endif
-
 typedef uint32_t se_component_e;
 typedef uint64_t se_component_h;
 
@@ -26,7 +21,6 @@ typedef uint64_t se_component_h;
 typedef struct {
     se_component_e id;
     uint32_t stream_count;
-    //se_component_stream_layout_t streams[se_component_max_streams_m];
     uint32_t streams[se_component_max_streams_m]; // stride of each stream
 } se_component_layout_t;
 
@@ -303,56 +297,18 @@ typedef struct {
     void ( *create_entity_family ) ( const se_entity_family_params_t* params );
     void ( *destroy_entity_family ) ( se_component_mask_t mask );
 
-    //se_entity_h ( *create_entity ) ( void );
-    const char* ( *get_entity_name ) ( se_entity_h entity );
-
-    //void ( *init_entities ) ( const se_entity_params_t* params );
-
-    void ( *destroy_entities ) ( const se_entity_h* entities, uint64_t count );
-
     se_entity_h ( *create_entity ) ( const se_entity_params_t* params );
     void ( *destroy_entity ) ( se_entity_h entity );
 
-    // TODO is this a good idea?
-    //se_entity_group_h ( *create_entity_group ) ( void );
-    //void ( *destroy_entity_group ) ( se_entity_group_h group );
-
     void ( *query_entities ) ( se_query_result_t* result, const se_query_params_t* params );
 
+    const char* ( *get_entity_name ) ( se_entity_h entity );
     void* ( *get_entity_component ) ( se_entity_h entity, se_component_e component, uint8_t stream );
 
     void ( *set_entity_name ) ( se_entity_h entity, const char* name );
     void ( *set_component_properties ) ( se_component_e component, const char* name, const se_component_properties_params_t* params );
     size_t ( *get_entity_list ) ( se_entity_h* out_entities, size_t cap );
     void ( *get_entity_properties ) ( se_entity_properties_t* out_props, se_entity_h entity_handle );
-
-#if 0
-    // TODO remove individual calls?
-    se_entity_h create_entity ( const se_entity_params_t* params );
-    bool create_entities ( se_entity_h* entities, const se_entity_params_t* params, size_t count );
-    bool destroy_entity ( se_entity_h entity );
-    bool destroy_entities ( const se_entity_h* entities, size_t count );
-
-    bool register_component ( se_entity_h entity, se_component_e component_type, se_component_index_t index );
-    bool register_components ( const se_entity_h* entities, se_component_e component_type, const se_component_index_t* indices );
-    bool unregister_component ( se_entity_h entity, se_component_e component_type );
-    bool unregister_components ( const se_entity_h* entities, se_component_e component_type );
-
-    // TODO support multi bases/streams? e.g. for component data laid out in SoA style, to be able to extract directly from SoA streams
-    void set_component_data_base ( se_component_e component_type, const void* base );
-    void* get_component_data_base ( se_component_e component_type );
-
-    bool get_component_data ( void* data, size_t data_stride, se_component_e component_type, const se_entity_h* entities, size_t count );
-    bool get_component_data_streams ( void** streams, const size_t* stream_strides, size_t stream_count, se_component_e component_type, const se_entity_h* entities, size_t entity_count );
-    bool get_component_ptrs ( void** pointers, se_component_e component_type, const se_entity_h* entities, size_t count );
-    bool get_component_idxs ( se_component_index_t* indices, se_component_e component_type, const se_entity_h* entities, size_t count );
-
-    // TODO is batching queries any good?
-    se_query_h create_query ( const se_query_params_t* params );
-    se_query_results_h resolve_pending_queries ( void );
-    void dispose_query_results ( se_query_results_h query_results );
-    bool get_query_result ( se_query_result_t* data, se_query_results_h results, se_query_h query );
-#endif
 } se_i;
 
 #include <se.inl>

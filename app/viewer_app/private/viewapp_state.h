@@ -70,7 +70,7 @@ typedef struct {
 
     xf_graph_h render_graph;
     viewapp_render_graph_e active_render_graph;
-    bool load_render_graph;
+    viewapp_render_graph_e new_render_graph;
     xf_graph_h mouse_pick_graph;
     xg_texture_h object_id_readback_texture;
 
@@ -83,6 +83,8 @@ typedef struct {
     bool raytrace_world_update;
 
     xf_texture_h export_dest;
+
+    xg_buffer_h tessellation_instance_vertex_buffer;
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
@@ -103,8 +105,8 @@ typedef struct {
     .sdb = xs_null_handle_m, \
     .supports_raytrace = false, \
     .render_graph = xf_null_handle_m, \
-    .active_render_graph = 0, \
-    .load_render_graph = false, \
+    .active_render_graph = viewapp_render_graph_invalid_m, \
+    .new_render_graph = viewapp_render_graph_invalid_m, \
     .mouse_pick_graph = xf_null_handle_m, \
     .object_id_readback_texture = xg_null_handle_m, \
     .raytrace_world = xg_null_handle_m, \
@@ -113,6 +115,7 @@ typedef struct {
     .allow_graph_aliasing = true, \
     .raytrace_world_update = false, \
     .export_dest = xf_null_handle_m, \
+    .tessellation_instance_vertex_buffer = xg_null_handle_m, \
     __VA_ARGS__ \
 }
 
@@ -312,20 +315,6 @@ typedef struct {
     .radius = 100, \
     .color = { 0, 0, 0 }, \
     .intensity = 0, \
-    __VA_ARGS__ \
-}
-
-#define viewapp_render_component_name_size_m 32
-#define viewapp_render_component_meshes_max_count_m 32
-
-typedef struct {
-    char name[viewapp_render_component_name_size_m];
-    se_entity_h meshes[viewapp_render_component_meshes_max_count_m];
-} viewapp_render_component_t;
-
-#define viewapp_render_component_m( ... ) ( viewapp_render_component_t ) { \
-    .name = {0}, \
-    .meshes = {0}, \
     __VA_ARGS__ \
 }
 

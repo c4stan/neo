@@ -25,6 +25,7 @@ static void xi_load_shaders ( xg_device_h device ) {
 
 static void xi_api_init ( xi_i* xi ) {
     xi->create_font = xi_font_create_ttf;
+    xi->destroy_font = xi_font_destroy;
 
     xi->load_shaders = xi_load_shaders;
 

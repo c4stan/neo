@@ -16,7 +16,6 @@ typedef struct {
 } pass_uniforms_t;
 
 typedef struct {
-    xg_resource_bindings_layout_h pass_layout;
     uint64_t width;
     uint64_t height;
 } shadow_pass_args_t;
@@ -69,6 +68,14 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
         rows = pass_args->height / size;
     }
 
+    // TODO cache
+    xg_resource_bindings_layout_h pass_layout = xg->create_resource_layout ( &xg_resource_bindings_layout_params_m (
+        .device = node_args->device,
+        .resource_count = 1,
+        .resources = { xg_resource_binding_layout_m ( .shader_register = 0, .stages = xg_shading_stage_bit_vertex_m, .type = xg_resource_binding_buffer_uniform_m ) },
+        .debug_name = "shadow_pass"
+    ) );
+
     uint32_t global_view_it = 0;
     for ( uint64_t light_it = 0; light_it < light_count; ++light_it ) {
         viewapp_light_component_t* light_component = se_stream_iterator_next ( &light_iterator );
@@ -95,7 +102,7 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
             xg_buffer_range_t range = xg->write_workload_uniform ( node_args->workload, &pass_uniforms, sizeof ( pass_uniforms ) );
 
             xg_resource_bindings_h pass_bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m ( 
-                .layout = pass_args->pass_layout,
+                .layout = pass_layout,
                 .bindings = xg_pipeline_resource_bindings_m (
                     .buffer_count = 1,
                     .buffers = xg_buffer_resource_binding_m (
@@ -164,11 +171,12 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
             }
         }
     }
+
+    xg->destroy_resource_layout ( pass_layout );
 }
 
 xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     viewapp_state_t* state = viewapp_state_get();
-    xg_i* xg = state->modules.xg;
     xf_i* xf = state->modules.xf;
 
     xf_graph_info_t graph_info;
@@ -177,16 +185,7 @@ xf_node_h add_shadow_pass ( xf_graph_h graph, xf_texture_h target ) {
     xf_texture_info_t texture_info;
     xf->get_texture_info ( &texture_info, target );
 
-    // TODO this remains un-referenced and gets destroyed only by the xg unload cleanup. do better
-    xg_resource_bindings_layout_h pass_layout = xg->create_resource_layout ( &xg_resource_bindings_layout_params_m (
-        .device = graph_info.device,
-        .resource_count = 1,
-        .resources = { xg_resource_binding_layout_m ( .shader_register = 0, .stages = xg_shading_stage_bit_vertex_m, .type = xg_resource_binding_buffer_uniform_m ) },
-        .debug_name = "shadow_pass"
-    ) );
-
     shadow_pass_args_t args = {
-        .pass_layout = pass_layout,
         .width = texture_info.width,
         .height = texture_info.height,
     };

@@ -77,9 +77,9 @@ xg_texture_h xg_texture_create ( const xg_texture_params_t* params );
 xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params );
 bool xg_texture_alloc ( xg_texture_h texture );
 
-bool xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture );
+void xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture );
 
-bool xg_texture_destroy ( xg_texture_h texture );
+void xg_texture_destroy ( xg_texture_h texture );
 
 bool xg_texture_resize ( xg_texture_h texture, size_t width, size_t height );
 

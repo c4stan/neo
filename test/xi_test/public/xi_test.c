@@ -452,6 +452,9 @@ static void xi_test ( void ) {
 
     std_virtual_heap_free ( select_alloc );
 
+    xg->wait_all_workload_complete();
+    xi->destroy_font ( font );
+
     std_module_unload_m ( xf_module_name_m );
     std_module_unload_m ( xi_module_name_m );
     std_module_unload_m ( xs_module_name_m );

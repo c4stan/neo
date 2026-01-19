@@ -2449,7 +2449,7 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
                     std_auto_m args = ( xg_resource_cmd_buffer_create_t* ) header->args;
                     
                     xg_buffer_h buffer_handle = args->buffer;
-                    std_verify_m ( xg_buffer_alloc ( buffer_handle ) );
+                    xg_buffer_alloc ( buffer_handle );
                     switch ( args->init_mode ) {
                     case xg_buffer_init_mode_clear_m:
                         xg_cmd_buffer_clear_buffer ( cmd_buffer, 0, buffer_handle, args->clear );
@@ -2513,7 +2513,7 @@ static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg
                         continue;
                     }
 
-                    std_verify_m ( xg_texture_destroy ( args->texture ) );
+                    xg_texture_destroy ( args->texture );
                 }
                 break;
 
@@ -2524,7 +2524,7 @@ static void xg_vk_workload_destroy_resources ( xg_workload_h workload_handle, xg
                         continue;
                     }
 
-                    std_verify_m ( xg_buffer_destroy ( args->buffer ) );
+                    xg_buffer_destroy ( args->buffer );
                 }
                 break;
 

@@ -318,7 +318,7 @@ xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_texture_info_t info;
-    std_verify_m ( xg->get_texture_info ( &info, xg_texture ) );
+    xg->get_texture_info ( &info, xg_texture );
 
     xf_texture_params_t texture_params = xf_texture_params_m (
         .allow_aliasing = false,
@@ -535,7 +535,7 @@ xf_buffer_h xf_resource_buffer_create_from_external ( xg_buffer_h xg_buffer ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_buffer_info_t info;
-    std_verify_m ( xg->get_buffer_info ( &info, xg_buffer ) );
+    xg->get_buffer_info ( &info, xg_buffer );
 
     xf_buffer_params_t buffer_params = xf_buffer_params_m (
         .allow_aliasing = false,
