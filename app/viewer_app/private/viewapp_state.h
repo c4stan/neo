@@ -31,11 +31,12 @@ typedef struct {
 typedef struct {
     viewapp_scene_e active_scene;
     char custom_scene_path[128];
+    viewapp_envmap_e active_envmap;
+    char envmap_path[128];
 } viewapp_scene_state_t;
 
 #define viewapp_scene_state_m( ... ) ( viewapp_scene_state_t ) { \
     .active_scene = viewapp_scene_cornell_box_m, \
-    .custom_scene_path[0] = '\0' \
     __VA_ARGS__ \
 }
 
@@ -88,22 +89,12 @@ typedef struct {
 } viewapp_render_state_t;
 
 #define viewapp_render_state_m( ... ) ( viewapp_render_state_t ) { \
-    .resolution_x = 0, \
-    .resolution_y = 0, \
-    .frame_id = 0, \
-    .capture_frame = false, \
-    .time_ms = 0, \
-    .delta_time_ms = 0, \
-    .frame_tick = 0, \
     .target_fps = 120, \
     .next_object_id = 1, \
     .window = wm_null_handle_m, \
-    .window_info = {}, \
-    .input_state = {}, \
     .device = xg_null_handle_m, \
     .swapchain = xg_null_handle_m, \
     .sdb = xs_null_handle_m, \
-    .supports_raytrace = false, \
     .render_graph = xf_null_handle_m, \
     .active_render_graph = viewapp_render_graph_invalid_m, \
     .new_render_graph = viewapp_render_graph_invalid_m, \
@@ -111,9 +102,7 @@ typedef struct {
     .object_id_readback_texture = xg_null_handle_m, \
     .raytrace_world = xg_null_handle_m, \
     .workload_bindings_layout = xg_null_handle_m, \
-    .clear_history = false, \
     .allow_graph_aliasing = true, \
-    .raytrace_world_update = false, \
     .export_dest = xf_null_handle_m, \
     .tessellation_instance_vertex_buffer = xg_null_handle_m, \
     __VA_ARGS__ \
@@ -174,6 +163,7 @@ typedef struct {
 #define viewapp_transform_component_id_m 4
 #define viewapp_parent_component_id_m 5
 #define viewapp_tessellation_mesh_component_id_m 6
+#define viewapp_sky_component_id_m 7
 
 typedef struct {
     float base_color[3];
@@ -241,6 +231,17 @@ typedef struct {
 
 #define viewapp_tessellation_mesh_component_m( ... ) ( viewapp_tessellation_mesh_component_t ) { \
     .geo_gpu_data = xg_geo_util_geometry_gpu_data_m(), \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    xg_geo_util_geometry_data_t geo_data;
+    xg_geo_util_geometry_gpu_data_t geo_gpu_data;
+    xg_texture_h sky_texture;
+} viewapp_sky_component_t;
+
+#define viewapp_sky_component_m( ... ) ( viewapp_sky_component_t ) { \
+    .sky_texture = xg_null_handle_m, \
     __VA_ARGS__ \
 }
 

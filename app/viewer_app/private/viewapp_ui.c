@@ -328,7 +328,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             .item_count = std_static_array_count_m ( scene_select_items ),
             .item_idx = state->scene.active_scene,
             .width = 100,
-            .sort_order = 2,
+            .sort_order = 3,
             .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
         );
         if ( xi->add_select ( xi_workload, &scene_select ) ) {
@@ -337,6 +337,29 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
             }
             if ( scene_select.item_idx != 2 || state->scene.custom_scene_path[0] != '\0' ) {
                 viewapp_load_scene ( scene_select.item_idx );
+            }
+        }
+
+        xi->newline();
+
+        xi_label_state_t envmap_label = xi_label_state_m ( .text = "envmap" );
+        xi->add_label ( xi_workload, &envmap_label );
+
+        const char* envmap_select_items[] = { "none", "..." };
+        xi_select_state_t envmap_select = xi_select_state_m (
+            .items = envmap_select_items,
+            .item_count = std_static_array_count_m ( envmap_select_items ),
+            .item_idx = state->scene.active_envmap,
+            .width = 100,
+            .sort_order = 2,
+            .style.horizontal_alignment = xi_horizontal_alignment_right_to_left_m,
+        );
+        if ( xi->add_select ( xi_workload, &envmap_select ) ) {
+            if ( envmap_select.item_idx == viewapp_envmap_external_m ) {
+                xi->file_pick ( std_buffer_static_array_m ( state->scene.envmap_path ), NULL );
+            }
+            if ( envmap_select.item_idx != viewapp_envmap_external_m || state->scene.envmap_path[0] != '\0' ) {
+                viewapp_load_envmap ( workload, envmap_select.item_idx );
             }
         }
     }

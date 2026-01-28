@@ -76,6 +76,9 @@ typedef struct {
     xg_vk_workload_buffer_t* staging_buffers_array[xg_vk_workload_max_staging_buffers_per_workload_m];
     uint32_t staging_buffers_count;
 
+    xg_buffer_h staging_allocs_array[xg_vk_workload_max_staging_allocs_per_workload_m];
+    uint32_t staging_allocs_count;
+
     xg_vk_desc_allocator_t* desc_allocator;
     xg_vk_desc_allocator_t* desc_allocators_array[xg_vk_workload_max_desc_allocators_per_workload_m];
     uint32_t desc_allocators_count;
@@ -91,9 +94,6 @@ typedef struct {
     xg_resource_bindings_layout_h desc_layouts_array[xg_vk_workload_max_resource_bindings_m];
     uint32_t desc_layouts_count;
     VkDescriptorSet desc_sets_array[xg_vk_workload_max_resource_bindings_m];
-
-    //xg_vk_workload_query_pool_t timestamp_query_pools[xg_workload_max_timestamp_query_pools_per_workload_m];
-    //uint32_t timestamp_query_pools_count;
 
     xg_resource_bindings_h global_bindings;
 

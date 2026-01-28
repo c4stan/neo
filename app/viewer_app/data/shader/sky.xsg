@@ -1,0 +1,48 @@
+vertex_shader sky.vert
+fragment_shader sky.frag
+
+include common_graphics.xsi
+
+begin depth_stencil
+    format D32_SFLOAT
+    min_depth_bound 0
+    max_depth_bound 1
+    depth_bound_test off
+    depth_test on
+    depth_write off
+    depth_test_op less_eq
+    stencil_test off
+end
+
+begin rasterizer
+    cull off
+end
+
+begin render_target 0 // xyz: radiosity
+    format B10G11R11_UFLOAT
+end
+
+begin input 0
+    pos R32G32B32_FLOAT
+end
+
+begin input 1
+    nor R32G32B32_FLOAT
+end
+
+begin input 2
+    tan R32G32B32_FLOAT
+end
+
+begin input 3
+    tan R32G32B32_FLOAT
+end
+
+begin input 4
+    nor R32G32_FLOAT
+end
+
+begin bindings
+    texture sampled fragment
+    sampler fragment
+end

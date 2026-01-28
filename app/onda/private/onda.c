@@ -441,9 +441,9 @@ static std_app_state_e onda_update_server ( void ) {
 
 typedef struct {
     bool paused;
-    uint32_t total_size;
-    uint32_t read_size;
-    uint32_t consumed_size;
+    uint32_t total_size;    // total size of the stream
+    uint32_t read_size;     // stream size that was read from network
+    uint32_t consumed_size; // stream size that was consumed after being read
     void* begin;
     // TODO
     onda_client_stream_type_e type;
@@ -550,10 +550,13 @@ static void onda_client_feed_stream ( aud_source_h source, onda_client_stream_st
 
     if ( stream_state->type == onda_client_stream_type_mp3_m ) {
         int16_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
-        // TODO fix this!!!
         while ( stream_state->consumed_size < stream_state->read_size ) {
             void* decode_base = stream_state->begin + stream_state->consumed_size;
             uint32_t decode_size = stream_state->read_size - stream_state->consumed_size;
+            // buffer in at least 16KB as requested by minimp3
+            if ( decode_size < 1024 * 16 && stream_state->read_size != stream_state->total_size ) {
+                break;
+            }
             mp3dec_frame_info_t info;
             int samples = mp3dec_decode_frame ( &stream_state->mp3dec, decode_base, decode_size, pcm, &info );
             stream_state->consumed_size += info.frame_bytes;
@@ -782,7 +785,7 @@ static bool onda_client_play_media ( std_stack_t* stack, const char* path ) {
     std_string_t string = std_stack_alloc_string ( stack, onda_path_size_m + 5 );
     std_string_append ( &string, "play " );
     std_path_append_dir ( &string, onda_state->client.path.str );
-    std_path_append_dir ( &string, path );
+    std_path_append_file ( &string, path );
     uint32_t request_data_size =  string.len + 1;
     request->data_size = request_data_size;
     net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + request_data_size );

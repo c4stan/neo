@@ -11,15 +11,18 @@ static xg_vk_event_state_t* xg_vk_event_state;
 void xg_vk_event_load ( xg_vk_event_state_t* state ) {
     xg_vk_event_state = state;
 
-    state->gpu_events_array = std_virtual_heap_alloc_array_m ( xg_vk_gpu_event_t, xg_vk_max_gpu_events_m );
+    //state->gpu_events_array = std_virtual_heap_alloc_array_m ( xg_vk_gpu_event_t, xg_vk_max_gpu_events_m );
     state->gpu_queue_events_array = std_virtual_heap_alloc_array_m ( xg_vk_gpu_queue_event_t, xg_vk_max_gpu_queue_events_m );
     state->cpu_queue_events_array = std_virtual_heap_alloc_array_m ( xg_vk_cpu_queue_event_t, xg_vk_max_cpu_queue_events_m );
 
-    state->gpu_events_freelist = std_freelist_m ( state->gpu_events_array, xg_vk_max_gpu_events_m );
+    //state->gpu_events_freelist = std_freelist_m ( state->gpu_events_array, xg_vk_max_gpu_events_m );
     state->gpu_queue_events_freelist = std_freelist_m ( state->gpu_queue_events_array, xg_vk_max_gpu_queue_events_m );
     state->cpu_queue_events_freelist = std_freelist_m ( state->cpu_queue_events_array, xg_vk_max_cpu_queue_events_m );
 
-    std_mutex_init ( &state->gpu_events_mutex );
+    state->cpu_queue_events_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xg_vk_max_cpu_queue_events_m ) );
+    std_mem_zero_array_m ( state->cpu_queue_events_bitset, std_bitset_u64_count_m ( xg_vk_max_cpu_queue_events_m ) );
+
+    //std_mutex_init ( &state->gpu_events_mutex );
     std_mutex_init ( &state->gpu_queue_events_mutex );
     std_mutex_init ( &state->cpu_queue_events_mutex );
 
@@ -33,9 +36,17 @@ void xg_vk_event_reload ( xg_vk_event_state_t* state ) {
 }
 
 void xg_vk_event_unload ( void ) {
-    std_virtual_heap_free ( xg_vk_event_state->gpu_events_array );
+    uint64_t idx = 0;
+    while ( std_bitset_scan ( &idx, xg_vk_event_state->cpu_queue_events_bitset, idx, std_bitset_u64_count_m ( xg_vk_max_cpu_queue_events_m ) ) ) {
+        xg_vk_cpu_queue_event_t* event = &xg_vk_event_state->cpu_queue_events_array[idx];
+        std_log_info_m ( "Destroying fence " std_fmt_u64_m ": " std_fmt_str_m, idx, event->params.debug_name );
+        ++idx;
+    }
+
+    //std_virtual_heap_free ( xg_vk_event_state->gpu_events_array );
     std_virtual_heap_free ( xg_vk_event_state->gpu_queue_events_array );
     std_virtual_heap_free ( xg_vk_event_state->cpu_queue_events_array );
+    std_virtual_heap_free ( xg_vk_event_state->cpu_queue_events_bitset );
 }
 
 #if 0
@@ -163,25 +174,25 @@ void xg_gpu_queue_event_log_signal ( xg_queue_event_h event_handle ) {
 
 // --
 
-xg_cpu_queue_event_h xg_cpu_queue_event_create ( xg_device_h device_handle ) {
-    const xg_vk_device_t* device = xg_vk_device_get ( device_handle );
+xg_cpu_queue_event_h xg_cpu_queue_event_create ( const xg_cpu_queue_event_params_t* params ) {
+    const xg_vk_device_t* device = xg_vk_device_get ( params->device );
 
     std_mutex_lock ( &xg_vk_event_state->cpu_queue_events_mutex );
 
     xg_vk_cpu_queue_event_t* event = std_list_pop_m ( &xg_vk_event_state->cpu_queue_events_freelist );
-    std_assert_m ( event )
+    std_assert_m ( event );
 
-    VkFenceCreateInfo fence_create_info;
-    fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fence_create_info.pNext = NULL;
-    fence_create_info.flags = 0;
+    VkFenceCreateInfo fence_create_info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    };
     vkCreateFence ( device->vk_handle, &fence_create_info, xg_vk_cpu_allocator(), &event->vk_fence );
 
-    event->device = device_handle;
+    event->params = *params;
 
     std_mutex_unlock ( &xg_vk_event_state->cpu_queue_events_mutex );
 
     uint64_t idx = ( uint64_t ) ( event - xg_vk_event_state->cpu_queue_events_array );
+    std_bitset_set ( xg_vk_event_state->cpu_queue_events_bitset, idx );
     return ( xg_cpu_queue_event_h ) idx;
 }
 
@@ -189,10 +200,11 @@ void xg_cpu_queue_event_destroy ( xg_cpu_queue_event_h event_handle ) {
     std_mutex_lock ( &xg_vk_event_state->cpu_queue_events_mutex );
 
     xg_vk_cpu_queue_event_t* event = &xg_vk_event_state->cpu_queue_events_array[event_handle];
-    const xg_vk_device_t* device = xg_vk_device_get ( event->device );
+    const xg_vk_device_t* device = xg_vk_device_get ( event->params.device );
 
     vkDestroyFence ( device->vk_handle, event->vk_fence, xg_vk_cpu_allocator() );
 
+    std_bitset_clear ( xg_vk_event_state->cpu_queue_events_bitset, event_handle );
     std_list_push ( &xg_vk_event_state->cpu_queue_events_freelist, event );
 
     std_mutex_unlock ( &xg_vk_event_state->cpu_queue_events_mutex );

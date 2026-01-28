@@ -11,7 +11,14 @@ typedef enum {
     viewapp_scene_external_m,
 } viewapp_scene_e;
 
+typedef enum {
+    viewapp_envmap_none_m,
+    viewapp_envmap_external_m,
+} viewapp_envmap_e;
+
 void viewapp_load_scene ( viewapp_scene_e scene );
+
+void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap );
 
 se_entity_h spawn_plane ( xg_workload_h workload );
 se_entity_h spawn_sphere ( xg_workload_h workload );

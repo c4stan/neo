@@ -6,6 +6,7 @@
 
 #define net_module_name_m net
 std_module_export_m void* net_load ( void* );
+std_module_export_m void net_reload ( void*, void* );
 std_module_export_m void net_unload ( void );
 
 #define net_null_handle_m UINT64_MAX

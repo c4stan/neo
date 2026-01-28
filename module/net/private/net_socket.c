@@ -1,41 +1,15 @@
 #include "net_socket.h"
 
-#include "net_platform.h"
 #include "net_address.h"
 
 #include <std_log.h>
 #include <std_list.h>
-#include <std_mutex.h>
 
-typedef enum {
-    net_socket_state_invalid_m,
-    net_socket_state_unbound_m,
-    net_socket_state_bound_m,
-    net_socket_state_listening_m,
-    net_socket_state_connected_m,
-} net_socket_state_e;
-
-typedef struct {
-    net_socket_params_t params;
-    net_socket_address_t address;
-    //char address_string[net_address_string_size_m];
-#if defined std_platform_win32_m
-    SOCKET os_handle;
-#elif defined std_platform_linux_m
-    int os_handle;
-#endif
-    net_socket_state_e state;
-} net_socket_t;
-
-typedef struct {
-    net_socket_t* sockets_array;
-    net_socket_t* sockets_freelist;
-    std_mutex_t sockets_mutex;
-} net_socket_state_t;
-
-static net_socket_state_t net_socket_state;
+static net_socket_state_t* net_socket_state;
 
 /*
+    https://www.tenouk.com/Winsock/Winsock2story.html
+
     https://docs.microsoft.com/en-us/windows/win32/winsock/sockaddr-2
     https://docs.microsoft.com/en-us/windows/win32/winsock/winsock-ioctls
 */
@@ -76,11 +50,19 @@ static void net_socket_address_ip6_from_winsock ( net_socket_address_t* address,
 
 // --
 
-void net_socket_init ( void ) {
-    static net_socket_t sockets_array[net_socket_max_sockets_m];
-    net_socket_state.sockets_array = sockets_array;
-    net_socket_state.sockets_freelist = std_static_freelist_m ( sockets_array );
-    std_mutex_init ( &net_socket_state.sockets_mutex );
+void net_socket_load ( net_socket_state_t* state ) {
+    state->sockets_array = std_virtual_heap_alloc_array_m ( net_socket_t, net_socket_max_sockets_m );
+    state->sockets_freelist = std_freelist_m ( state->sockets_array, net_socket_max_sockets_m );
+    std_mutex_init ( &state->sockets_mutex );
+    net_socket_state = state;
+}
+
+void net_socket_reload ( net_socket_state_t* state ) {
+    net_socket_state = state;
+}
+
+void net_socket_unload ( void ) {
+    std_virtual_heap_free ( net_socket_state->sockets_array );
 }
 
 net_socket_h net_socket_create ( const net_socket_params_t* params ) {
@@ -123,9 +105,9 @@ net_socket_h net_socket_create ( const net_socket_params_t* params ) {
     char reuse = 1;
     setsockopt ( os_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof ( reuse ) );
 
-    std_mutex_lock ( &net_socket_state.sockets_mutex );
-    net_socket_t* sock = std_list_pop_m ( &net_socket_state.sockets_freelist );
-    std_mutex_unlock ( &net_socket_state.sockets_mutex );
+    std_mutex_lock ( &net_socket_state->sockets_mutex );
+    net_socket_t* sock = std_list_pop_m ( &net_socket_state->sockets_freelist );
+    std_mutex_unlock ( &net_socket_state->sockets_mutex );
 
     sock->params = *params;
     sock->os_handle = os_socket;
@@ -146,15 +128,15 @@ net_socket_h net_socket_create ( const net_socket_params_t* params ) {
 #endif
     }
 
-    return ( net_socket_h ) ( sock - net_socket_state.sockets_array );
+    return ( net_socket_h ) ( sock - net_socket_state->sockets_array );
 }
 
 bool net_socket_destroy ( net_socket_h socket_handle ) {
-    std_mutex_lock ( &net_socket_state.sockets_mutex );
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    std_mutex_lock ( &net_socket_state->sockets_mutex );
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
 
     if ( sock == NULL ) {
-        std_mutex_unlock ( &net_socket_state.sockets_mutex );
+        std_mutex_unlock ( &net_socket_state->sockets_mutex );
         return false;
     }
 
@@ -165,10 +147,10 @@ bool net_socket_destroy ( net_socket_h socket_handle ) {
 #endif
 
     if ( error == 0 ) {
-        std_list_push ( &net_socket_state.sockets_freelist, sock );
+        std_list_push ( &net_socket_state->sockets_freelist, sock );
     }
 
-    std_mutex_unlock ( &net_socket_state.sockets_mutex );
+    std_mutex_unlock ( &net_socket_state->sockets_mutex );
 
     return error == 0;
 }
@@ -176,7 +158,7 @@ bool net_socket_destroy ( net_socket_h socket_handle ) {
 // --
 
 bool net_socket_bind_address ( net_socket_h socket_handle, const net_socket_address_t* address ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_unbound_m );
@@ -219,7 +201,7 @@ bool net_socket_bind_address ( net_socket_h socket_handle, const net_socket_addr
 }
 
 bool net_socket_connect ( net_socket_h socket_handle, const net_socket_address_t* address ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_unbound_m || sock->state == net_socket_state_bound_m );
@@ -261,7 +243,7 @@ bool net_socket_connect ( net_socket_h socket_handle, const net_socket_address_t
 }
 
 bool net_socket_listen_for_connections ( net_socket_h socket_handle ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_bound_m );
@@ -279,7 +261,7 @@ bool net_socket_listen_for_connections ( net_socket_h socket_handle ) {
 }
 
 net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* address, net_socket_h socket_handle ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_listening_m );
@@ -326,9 +308,9 @@ net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* addres
             return net_null_handle_m;
     }
 
-    std_mutex_lock ( &net_socket_state.sockets_mutex );
-    net_socket_t* connection_sock = std_list_pop_m ( &net_socket_state.sockets_freelist );
-    std_mutex_unlock ( &net_socket_state.sockets_mutex );
+    std_mutex_lock ( &net_socket_state->sockets_mutex );
+    net_socket_t* connection_sock = std_list_pop_m ( &net_socket_state->sockets_freelist );
+    std_mutex_unlock ( &net_socket_state->sockets_mutex );
 
     connection_sock->params.family = sock->params.family;
     connection_sock->params.protocol = sock->params.protocol;
@@ -339,14 +321,14 @@ net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* addres
 
     *address = connection_address;
 
-    net_socket_h connection_socket_handle = ( net_socket_h ) ( connection_sock - net_socket_state.sockets_array );
+    net_socket_h connection_socket_handle = ( net_socket_h ) ( connection_sock - net_socket_state->sockets_array );
     return connection_socket_handle;
 }
 
 // --
 
 size_t net_socket_get_available_read_size ( net_socket_h socket_handle ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state >= net_socket_state_bound_m );
@@ -365,7 +347,7 @@ size_t net_socket_get_available_read_size ( net_socket_h socket_handle ) {
 }
 
 size_t net_socket_read_connected ( void* dest, size_t cap, net_socket_h socket_handle, net_connected_socket_read_flags_e flags ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_connected_m );
@@ -408,7 +390,7 @@ size_t net_socket_read_connected ( void* dest, size_t cap, net_socket_h socket_h
 }
 
 size_t net_socket_write_connected ( net_socket_h socket_handle, const void* data, size_t size ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state == net_socket_state_connected_m );
@@ -434,7 +416,7 @@ size_t net_socket_write_connected ( net_socket_h socket_handle, const void* data
 }
 
 size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap, net_socket_h socket_handle ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state >= net_socket_state_bound_m );
@@ -482,7 +464,7 @@ size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap, 
 }
 
 size_t net_socket_write ( net_socket_h socket_handle, const net_socket_address_t* address, const void* data, size_t size ) {
-    net_socket_t* sock = &net_socket_state.sockets_array[ ( uint64_t ) socket_handle];
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
     std_assert_m ( sock != NULL );
 
     std_assert_m ( sock->state >= net_socket_state_bound_m );

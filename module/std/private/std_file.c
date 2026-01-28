@@ -252,7 +252,11 @@ bool std_path_append_dir ( std_string_t* path, const char* append ) {
         return false;
     }
 
-    return std_string_append_char ( path, '/' );
+    if ( !std_path_is_slash ( path->str[path->len-1] ) ) {
+        return std_string_append_char ( path, '/' );
+    }
+
+    return true;
 }
 
 bool std_path_append_file ( std_string_t* path, const char* append ) {
@@ -275,6 +279,12 @@ bool std_path_pop ( std_string_t* path ) {
     i -= char_size;
 
     for ( ;; ) {
+        if ( i == 0 ) {
+            std_string_clear ( path );
+            std_string_append_char ( path, '/' );
+            return true;
+        }
+
         if ( path->str[i] == ':' ) {
             std_string_truncate_at ( path, path->str + i );
             std_string_append_char ( path, '/' );
@@ -287,10 +297,6 @@ bool std_path_pop ( std_string_t* path ) {
         }
 
         char_size = std_utf8_char_size_reverse ( path->str + i, path->str );
-
-        if ( char_size >= i ) {
-            break;
-        }
 
         i -= char_size;
     }
@@ -392,7 +398,10 @@ size_t std_path_name ( char* name, size_t cap, const char* path ) {
 char* std_path_name_ptr ( const std_string_t* path ) {
     char* find = std_str_find_reverse ( path->str, path->len, "/" );
     if ( !find ) {
-        return path->str;
+        find = std_str_find_reverse ( path->str, path->len, "\\" );
+        if ( !find ) {
+            return path->str;
+        }
     }
 
     return ( char* ) ( find + 1 );

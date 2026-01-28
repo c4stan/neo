@@ -1,6 +1,7 @@
 #include "viewapp_render.h"
 
 #include <geometry_pass.h>
+#include <sky_pass.h>
 #include <lighting_pass.h>
 #include <hiz_pass.h>
 #include <ssgi_pass.h>
@@ -1173,6 +1174,9 @@ static void viewapp_boot_raster_graph ( void ) {
         .velocity = velocity_texture,
     };
     add_geometry_node ( graph, &gbuffer, depth_texture );
+
+    // sky
+    add_sky_node ( graph, &gbuffer, depth_texture );
 
     // tessellation
     // TODO remove the setup pass, have a proper susystem that suballocates multiple meshes vertex/index/meta data into buffers, properly render on gbuffer, shadows, ...

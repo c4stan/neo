@@ -376,6 +376,14 @@ static std_app_state_e viewapp_update ( void ) {
         return std_app_state_exit_m;
     }
 
+    if ( !input_state->keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
+        return std_app_state_reload_m;
+    }
+
+    if ( !input_state->keyboard[wm_keyboard_state_f3_m] && new_input_state.keyboard[wm_keyboard_state_f3_m] ) {
+        return std_app_state_reboot_m;
+    }
+
     xg_workload_h workload = xg->create_workload ( state->render.device );
 
     if ( !input_state->keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
@@ -384,14 +392,6 @@ static std_app_state_e viewapp_update ( void ) {
             //state->render.raytrace_world_update = true;
             viewapp_update_raytrace_world();
         }
-    }
-
-    if ( !input_state->keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
-        return std_app_state_reload_m;
-    }
-
-    if ( !input_state->keyboard[wm_keyboard_state_f3_m] && new_input_state.keyboard[wm_keyboard_state_f3_m] ) {
-        return std_app_state_reboot_m;
     }
 
     if ( !input_state->keyboard[wm_keyboard_state_f4_m] && new_input_state.keyboard[wm_keyboard_state_f4_m] ) {

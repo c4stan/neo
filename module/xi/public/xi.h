@@ -151,6 +151,9 @@ typedef struct {
     .font_color = xi_color_white_m, \
     .horizontal_alignment = xi_horizontal_alignment_left_to_right_m, \
     .vertical_alignment = xi_vertical_alignment_bottom_m, \
+    .horizontal_border_margin = 0, \
+    .horizontal_margin = 0, \
+    .horizontal_padding = 0, \
     __VA_ARGS__ \
 )
 

@@ -366,13 +366,13 @@ static xg_compare_op_e xs_parser_compare_op_to_enum ( const char* op ) {
         return xg_compare_op_less_m;
     } else if ( std_str_cmp ( op, "equal" ) == 0 ) {
         return xg_compare_op_equal_m;
-    } else if ( std_str_cmp ( op, "less_or_equal" ) == 0 ) {
+    } else if ( std_str_cmp ( op, "less_eq" ) == 0 ) {
         return xg_compare_op_less_or_equal_m;
     } else if ( std_str_cmp ( op, "greater" ) == 0 ) {
         return xg_compare_op_greater_m;
     } else if ( std_str_cmp ( op, "not_equal" ) == 0 ) {
         return xg_compare_op_not_equal_m;
-    } else if ( std_str_cmp ( op, "greater_or_equal" ) == 0 ) {
+    } else if ( std_str_cmp ( op, "greater_eq" ) == 0 ) {
         return xg_compare_op_greater_or_equal_m;
     } else if ( std_str_cmp ( op, "always" ) == 0 ) {
         return xg_compare_op_always_m;

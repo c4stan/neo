@@ -9,13 +9,13 @@
 #include <std_mutex.h>
 
 // Cmd buffer event
-
+// TODO
+#if 0
 typedef struct {
     xg_device_h device;
     VkEvent vk_event;
 } xg_vk_gpu_event_t;
 
-#if 0
 xg_gpu_event_h xg_gpu_event_create ( xg_device_h device );
 void xg_gpu_event_destroy ( xg_gpu_event_h handle );
 const xg_vk_gpu_event_t* xg_vk_gpu_event_get ( xg_gpu_event_h handle );
@@ -48,12 +48,17 @@ void xg_gpu_queue_event_log_signal ( xg_queue_event_h handle );
 */
 typedef struct {
     xg_device_h device;
+    char debug_name[xg_debug_name_size_m];
+} xg_cpu_queue_event_params_t;
+
+typedef struct {
+    xg_cpu_queue_event_params_t params;
     VkFence vk_fence;
 } xg_vk_cpu_queue_event_t;
 
 typedef uint64_t xg_cpu_queue_event_h;
 
-xg_cpu_queue_event_h xg_cpu_queue_event_create ( xg_device_h device );
+xg_cpu_queue_event_h xg_cpu_queue_event_create ( const xg_cpu_queue_event_params_t* params );
 void xg_cpu_queue_event_destroy ( xg_cpu_queue_event_h handle );
 const xg_vk_cpu_queue_event_t* xg_vk_cpu_queue_event_get ( xg_cpu_queue_event_h handle );
 
@@ -73,9 +78,9 @@ const xg_vk_cpu_queue_event_t* xg_vk_cpu_queue_event_get ( xg_cpu_queue_event_h 
 */
 
 typedef struct {
-    xg_vk_gpu_event_t* gpu_events_array;
-    xg_vk_gpu_event_t* gpu_events_freelist;
-    std_mutex_t gpu_events_mutex;
+    //xg_vk_gpu_event_t* gpu_events_array;
+    //xg_vk_gpu_event_t* gpu_events_freelist;
+    //std_mutex_t gpu_events_mutex;
 
     xg_vk_gpu_queue_event_t* gpu_queue_events_array;
     xg_vk_gpu_queue_event_t* gpu_queue_events_freelist;
@@ -84,6 +89,7 @@ typedef struct {
     xg_vk_cpu_queue_event_t* cpu_queue_events_array;
     xg_vk_cpu_queue_event_t* cpu_queue_events_freelist;
     std_mutex_t cpu_queue_events_mutex;
+    uint64_t* cpu_queue_events_bitset;
 
 #if xg_debug_enable_events_log_m
     uint64_t uid;

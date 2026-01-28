@@ -382,13 +382,19 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     uint64_t workload_idx = ( uint64_t ) ( workload - xg_vk_workload_state->workload_array );
     xg_workload_h workload_handle = workload->gen << xg_workload_handle_idx_bits_m | workload_idx;
 
+    uint64_t workload_id = xg_vk_workload_state->workloads_uid++;
+    xg_cpu_queue_event_params_t fence_params = {
+        .device = device_handle,
+    };
+    std_str_format_m ( fence_params.debug_name, "Workload fence " std_fmt_u64_m, workload_id );
+
     // Keep old gen, increased on destroy
     uint64_t gen = workload->gen;
     *workload = xg_vk_workload_m (
         .gen = gen,
-        .id = xg_vk_workload_state->workloads_uid++,
+        .id = workload_id,
         .device = device_handle,
-        .execution_complete_cpu_event = xg_cpu_queue_event_create ( device_handle ),
+        .execution_complete_cpu_event = xg_cpu_queue_event_create ( &fence_params ),
     );
 
     // These need to happen outside of the init because they modify the workload state...
@@ -720,6 +726,10 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
     }
     for ( uint32_t i = 0; i < workload->staging_buffers_count; ++i ) {
         std_list_push ( &context->staging_buffers_freelist, workload->staging_buffers_array[i] );
+    }
+
+    for ( uint32_t i = 0; i < workload->staging_allocs_count; ++i ) {
+        xg_buffer_destroy ( workload->staging_allocs_array[i] );
     }
 
 #if 0
@@ -2930,9 +2940,34 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, voi
     return range;
 }
 
+xg_buffer_range_t xg_workload_alloc_staging ( xg_workload_h workload_handle, void* data, size_t data_size ) {
+    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
+    xg_buffer_params_t params = xg_buffer_params_m (
+        .memory_type = xg_memory_type_upload_m,
+        .device = workload->device,
+        .size = data_size,
+        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
+    );
+    uint32_t idx = workload->staging_allocs_count++;
+    std_string_t string = std_static_string_m ( params.debug_name );
+    std_string_append_format ( &string, "workload_staging_alloc(" std_fmt_u32_m ")", idx );
+    xg_buffer_h buffer = xg_buffer_create ( &params );
+    workload->staging_allocs_array[idx] = buffer;
+
+    xg_buffer_info_t buffer_info;
+    xg_buffer_get_info ( &buffer_info, buffer );
+    std_mem_copy ( buffer_info.allocation.mapped_address, data, data_size );
+
+    return xg_buffer_range_whole_buffer_m ( buffer );
+}
+
 xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, void* data, size_t data_size ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_vk_workload_buffer_t* staging_buffer = workload->staging_buffer;
+
+    if ( staging_buffer->total_size <= data_size ) {
+        return xg_workload_alloc_staging ( workload_handle, data, data_size );
+    }
 
     uint64_t offset = staging_buffer->used_size;
     if ( offset + data_size > staging_buffer->total_size ) {

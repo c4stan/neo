@@ -160,6 +160,16 @@ void viewapp_boot_scene ( void ) {
             )
         }
     ) );
+
+    se->create_entity_family ( &se_entity_family_params_m (
+        .component_count = 1,
+        .components = {
+            se_component_layout_m (
+                .id = viewapp_sky_component_id_m,
+                .streams = { sizeof ( viewapp_sky_component_t ) }
+            )
+        }
+    ) );
 }
 
 static void viewapp_build_mesh_raytrace_geo ( xg_workload_h workload, se_entity_h entity, viewapp_mesh_component_t* mesh ) {
@@ -330,6 +340,38 @@ static sm_vec_3f_t viewapp_light_view_dir ( uint32_t idx ) {
         std_assert_m ( false );
     }
     return dir;
+}
+
+static void add_sky_entity ( xg_device_h device, xg_workload_h workload ) {
+    viewapp_state_t* state = viewapp_state_get();
+    se_i* se = state->modules.se;
+
+    xg_geo_util_geometry_data_t geo = xg_geo_util_generate_sphere ( 1.f, 10, 10 );
+    xg_geo_util_geometry_gpu_data_t gpu_data = xg_geo_util_upload_geometry_to_gpu ( device, workload, &geo );
+
+    viewapp_sky_component_t sky_component = viewapp_sky_component_m (
+        .geo_data = geo,
+        .geo_gpu_data = gpu_data,
+    );
+
+    se->create_entity ( &se_entity_params_m (
+        .debug_name = "sky",
+        .update = se_entity_update_m (
+            .component_count = 1,
+            .components = {
+                se_component_update_m (
+                    .id = viewapp_sky_component_id_m,
+                    .streams = {
+                        se_stream_update_m ( .data = &sky_component )
+                    }
+                )
+            }
+        ),
+    ) );
+
+    if ( state->scene.active_envmap != viewapp_envmap_none_m ) {
+        viewapp_load_envmap ( workload, state->scene.active_envmap );
+    }
 }
 
 static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
@@ -602,6 +644,8 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
             )
         ) );
     }
+
+    add_sky_entity ( device, workload );
 }
 
 static void viewapp_boot_scene_field ( xg_workload_h workload ) {
@@ -898,6 +942,8 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
             )
         ) );
     }
+ 
+    add_sky_entity ( device, workload );
 }
 
 static void viewapp_create_cameras ( void ) {
@@ -1270,17 +1316,17 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
                         }
                     }
 
-                    std_virtual_heap_free ( material_texture.data );
+                    STBI_FREE ( material_texture.data );
                 }
 
                 if ( color_texture.data ) {
                     mesh_material.color_texture = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &color_texture, color_texture_name.data );
-                    std_virtual_heap_free ( color_texture.data );
+                    STBI_FREE ( color_texture.data );
                 }
 
                 if ( normal_texture.data ) {
                     mesh_material.normal_texture = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &normal_texture, normal_texture_name.data );
-                    std_virtual_heap_free ( normal_texture.data );
+                    STBI_FREE ( normal_texture.data );
                 }
 
                 // These are just scalars added on top of the texture values...
@@ -1387,6 +1433,15 @@ void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h worklo
         }
     }
 
+    viewapp_sky_component_t* sky_component = se->get_entity_component ( entity, viewapp_sky_component_id_m, 0 );
+    if ( sky_component ) {
+        xg_geo_util_free_data ( &sky_component->geo_data );
+        xg_geo_util_free_gpu_data ( &sky_component->geo_gpu_data, workload, time );
+        if ( sky_component->sky_texture != xg_null_handle_m ) {
+            xg->cmd_destroy_texture ( resource_cmd_buffer, sky_component->sky_texture, time );
+        }
+    }
+
     viewapp_tessellation_mesh_component_t* tessellation_mesh_component = se->get_entity_component ( entity, viewapp_tessellation_mesh_component_id_m, 0 );
     if ( tessellation_mesh_component ) {
         xg_geo_util_free_data ( &tessellation_mesh_component->geo_data );
@@ -1421,6 +1476,7 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     } else if ( scene == 1 ) {
         viewapp_boot_scene_field ( workload );
     } else {
+        std_assert_m ( scene == viewapp_scene_external_m );
         viewapp_import_scene ( workload, 0, state->scene.custom_scene_path );
     }
 
@@ -1434,7 +1490,53 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
         viewapp_update_raytrace_world();
         //viewapp_build_raytrace_world();
     }
+}
 
+xg_texture_h viewapp_import_envmap ( xg_workload_h workload, uint64_t key, const char* path ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+
+    int width, height;
+    int channels = 4;
+    void* data = stbi_loadf ( path, &width, &height, NULL, channels );
+    viewapp_texture_t texture = {
+        .data = data,
+        .width = width,
+        .height = height,
+        .channels = channels,
+        .format = xg_format_r32g32b32a32_sfloat_m
+    };
+    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+    xg_texture_h texture_handle = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &texture, "envmap" );
+    STBI_FREE ( data );
+    return texture_handle;
+}
+
+void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap ) {
+    viewapp_state_t* state = viewapp_state_get();
+    se_i* se = state->modules.se;
+
+    se_query_result_t query_result;
+    se->query_entities ( &query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { viewapp_sky_component_id_m } ) );
+    if ( query_result.entity_count == 0 ) {
+        return;
+    }
+    std_assert_m ( query_result.entity_count == 1 );
+    se_stream_iterator_t sky_component_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+    viewapp_sky_component_t* sky_component = se_stream_iterator_next ( &sky_component_iterator );
+
+    if ( envmap == viewapp_envmap_none_m ) {
+        xg_i* xg = state->modules.xg;
+        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+        xg->cmd_destroy_texture ( resource_cmd_buffer, sky_component->sky_texture, xg_resource_cmd_buffer_time_workload_complete_m );
+        sky_component->sky_texture = xg_null_handle_m;
+    } else {
+        std_assert_m ( envmap == viewapp_envmap_external_m );
+        sky_component->sky_texture = viewapp_import_envmap ( workload, 0, state->scene.envmap_path );
+    }
+
+    state->scene.active_envmap = envmap;
 }
 
 se_entity_h spawn_plane ( xg_workload_h workload ) {
@@ -1471,7 +1573,6 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
     viewapp_transform_t transform = viewapp_transform_m (
         .position = { 0, 0, 0 },
     );
-
 
     se_entity_h entity = se->create_entity( &se_entity_params_m (
         .debug_name = "plane",
