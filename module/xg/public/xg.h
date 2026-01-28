@@ -2445,7 +2445,7 @@ typedef enum {
     xg_present_mode_mailbox_m,          // wait for vblank, single slot fifo
     xg_present_mode_fifo_m,             // wait for vblank, queue to prev requests
     xg_present_mode_fifo_relaxed_m,     // wait for vblank, tear if prev vblank was missed
-    xg_present_mode_fifo_latest_m,      // same as fifo, but vblank can pop multiple from fifo (always present latest)
+    //xg_present_mode_fifo_latest_m,      // same as fifo, but vblank can pop multiple from fifo (always present latest)
 } xg_present_mode_e;
 
 typedef struct {

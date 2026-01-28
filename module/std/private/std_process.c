@@ -50,7 +50,7 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
     }
     std_path_normalize ( &std_static_string_m ( process->executable_path ), path_buffer );
 #elif defined(std_platform_linux_m)
-    char path_buffer[std_process_path_max_len_m];
+    char path_buffer[std_process_path_max_len_m] = {0};
     readlink ( "/proc/self/exe", path_buffer, std_process_path_max_len_m );
     std_path_normalize ( &std_static_string_m ( process->executable_path ), path_buffer );
 #endif

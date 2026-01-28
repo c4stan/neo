@@ -739,16 +739,14 @@ class Project:
         global COMPILER
         if COMPILER == COMPILER_CLANG:
             std = 'c99'
+            comp = bindings.get("clang", "clang")
+            ar = bindings.get("llvm-ar", "llvm-ar")
         elif COMPILER == COMPILER_GCC:
             std = 'gnu23'
+            comp = bindings.get("gcc", "gcc")
+            ar = bindings.get("ar", "ar")
         elif COMPILER == COMPILER_CLANG_ANDROID:
             std = 'c99'
-
-        comp = ""
-        ar = ""
-
-        # TODO
-        if COMPILER == COMPILER_CLANG_ANDROID:
             comp = bindings.get("android_clang_path") + "clang.exe"
             ar = bindings.get("android_clang_path") + "llvm-ar.exe"
 
@@ -757,48 +755,48 @@ class Project:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    main_target.cmd += '\t@llvm-ar crus $@ ' + objs_dep
+                    main_target.cmd += '\t@' + comp + ' crus $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@clang -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@clang -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
+                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
             elif platform.system() == 'Linux':
                 # -rdynamic preserves code symbols, allows to print callstack
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
                     # removed u flag from win32 version. https://bugzilla.redhat.com/show_bug.cgi?id=1155273
-                    main_target.cmd += '\t@ar crs $@ ' + objs_dep
+                    main_target.cmd += '\t@' + ar + ' crs $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@clang -rdynamic -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@' + comp + ' -rdynamic -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
                     # -lX11 -lvulkan -lpthread -lm -ldl
-                    main_target.cmd += '\t@clang -rdynamic ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
+                    main_target.cmd += '\t@' + comp + ' -rdynamic ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
         elif COMPILER == COMPILER_GCC:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    main_target.cmd += '\t@ar crus $@ ' + objs_dep
+                    main_target.cmd += '\t@' + ar + ' crus $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@gcc -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@gcc -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-stack,' + stack_size
+                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-stack,' + stack_size
             elif platform.system() == 'Linux':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
                     # removed u flag from win32 version. https://bugzilla.redhat.com/show_bug.cgi?id=1155273
-                    main_target.cmd += '\t@ar crs $@ ' + objs_dep
+                    main_target.cmd += '\t@' + ar + ' crs $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@gcc -shared ' + config_flags + ' -o $@ ' + objs_dep
+                    main_target.cmd += '\t@' + comp + ' -shared ' + config_flags + ' -o $@ ' + objs_dep
                 elif self.output == OUTPUT_EXE:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@gcc ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
+                    main_target.cmd += '\t@' + comp + ' ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
         elif COMPILER == COMPILER_CLANG_ANDROID:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
@@ -871,9 +869,7 @@ class Project:
             platform_flags = '-funsigned-char' # default char to unsigned
 
         compile_flags = concat(['-Wall', platform_flags, config_flags, CORE_WARNING_FLAGS])
-        #compile_flags = '-Wall' + ' ' + platform_flags + ' ' + config_flags + ' ' + CORE_WARNING_FLAGS
         if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-            #compile_flags += ' ' + EXTENDED_WARNING_FLAGS
             compile_flags = concat([compile_flags, EXTENDED_WARNING_FLAGS])
 
         compiler_flags_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/flags')
@@ -893,7 +889,7 @@ class Project:
             if COMPILER == COMPILER_CLANG:
                 if platform.system() == 'Windows':
                     #target.cmd = '\t@clang-cl ' + config_flags + ' -Zi -Fa' + normpath(output_path + '/' + name + '.asm') + ' '
-                    target.cmd = '\t@clang -std=' + std + ' -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@' + comp + ' -std=' + std + ' -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
@@ -912,7 +908,7 @@ class Project:
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
                 elif platform.system() == 'Linux':
-                    target.cmd = '\t@clang ' + config_flags
+                    target.cmd = '\t@' + comp + ' ' + config_flags
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -S'
                         target.cmd += ' -mllvm --x86-asm-syntax=intel'
@@ -934,7 +930,7 @@ class Project:
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
             elif COMPILER == COMPILER_GCC:
                 if platform.system() == 'Windows':
-                    target.cmd = '\t@gcc -std=' + std + ' -gcodeview'# --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@' + comp + ' -std=' + std + ' -gcodeview'# --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                     for path in self.external_paths:
@@ -947,7 +943,7 @@ class Project:
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
                 elif platform.system() == 'Linux':
-                    target.cmd = '\t@gcc -std=' + std + ' ' + config_flags
+                    target.cmd = '\t@' + comp + ' -std=' + std + ' ' + config_flags
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -S'
                         target.cmd += ' -mllvm --x86-asm-syntax=intel'
@@ -991,11 +987,11 @@ class Project:
             if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP):
                 #if platform.system() == 'Linux':
                 if COMPILER == COMPILER_CLANG:
-                    target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                    target.cmd = '\t@' + comp + ' -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
                 elif COMPILER == COMPILER_GCC:
-                    target.cmd = '\t@gcc -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                    target.cmd = '\t@' + comp + ' -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
                 elif COMPILER == COMPILER_CLANG_ANDROID:
-                    target.cmd = '\t@clang -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
+                    target.cmd = '\t@' + comp + ' -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
 
                 for path in self.project_paths:
                     target.cmd += ' -I' + path

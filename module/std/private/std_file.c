@@ -353,8 +353,9 @@ bool std_path_is_drive ( const std_string_t* path ) {
 #elif defined(std_platform_linux_m)
     // compare path device id with parent device id, if differs then path is mount point
     char parent[std_path_size_m];
-    std_str_copy ( parent, std_path_size_m, path->str );
-    size_t parent_len = std_path_pop ( parent );
+    std_string_t parent_string = std_static_string_m ( parent );
+    std_string_append ( &parent_string, path->str );
+    size_t parent_len = std_path_pop ( &parent_string );
 
     if ( parent_len == 0 ) {
         return true;

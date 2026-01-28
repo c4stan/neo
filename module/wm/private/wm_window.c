@@ -131,9 +131,11 @@ void wm_window_unload ( void ) {
         ++idx;
     }
 
+#if defined(std_platform_win32_m)
     if ( !UnregisterClassA ( wm_window_class_name_m, GetModuleHandle ( NULL ) ) ) {
         std_log_os_error_m();
     }
+#endif
 
     std_virtual_heap_free ( wm_window_state->windows_array );
     std_virtual_heap_free ( wm_window_state->windows_bitset );
@@ -1904,9 +1906,9 @@ void wm_window_input_buffer_get ( wm_window_h handle, wm_input_buffer_t* buffer 
 }
 
 wm_window_h wm_window_console_get ( void ) {
-    wm_window_os_h os_handle;
-    os_handle.root = ( uint64_t ) GetModuleHandle ( NULL );
+    wm_window_os_h os_handle = {};
 #if defined std_platform_win32_m
+    os_handle.root = ( uint64_t ) GetModuleHandle ( NULL );
     // https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/obtain-console-window-handle
     char new_title[1024];
     char old_title[1024];

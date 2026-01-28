@@ -151,9 +151,9 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
 
 #if xg_enable_raytracing_m
     std_assert_m ( device->supported_features.shaderInt64 );
-    std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
+    //std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
     std_assert_m ( device->supported_device_address_features.bufferDeviceAddress );
-    std_assert_m ( device->supported_acceleration_structure_features.accelerationStructure );
+    //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructure );
     //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructureHostCommands );
 #endif
 
@@ -951,24 +951,26 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     last_feature = &pipeline_executable_info_feature;
 
 #if xg_enable_raytracing_m
-    // Enable buffer device address
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
-    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_feature = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-        .pNext = last_feature,
-        .bufferDeviceAddress = VK_TRUE,
-    };
-    last_feature = &buffer_device_address_feature;
+    if ( supports_raytrace ) {
+        // Enable buffer device address
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceBufferDeviceAddressFeatures.html
+        VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_feature = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+            .pNext = last_feature,
+            .bufferDeviceAddress = VK_TRUE,
+        };
+        last_feature = &buffer_device_address_feature;
 
-    // Enable acceleration strucutre
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_strucutre_feature = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-        .pNext = last_feature,
-        .accelerationStructure = VK_TRUE,
-        //.accelerationStructureHostCommands = VK_TRUE,
-    };
-    last_feature = &acceleration_strucutre_feature;
+        // Enable acceleration strucutre
+        // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceAccelerationStructureFeaturesKHR.html
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_strucutre_feature = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+            .pNext = last_feature,
+            .accelerationStructure = VK_TRUE,
+            //.accelerationStructureHostCommands = VK_TRUE,
+        };
+        last_feature = &acceleration_strucutre_feature;
+    }
 #endif
 
     // Create Device

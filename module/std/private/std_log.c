@@ -5,6 +5,7 @@
 #include <std_process.h>
 
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "std_state.h"
 

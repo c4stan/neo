@@ -87,44 +87,44 @@ typedef struct {
 
 void    std_log_print              ( std_log_msg_t msg, ... ); // msg, format
 #define std_log_msg_m( level, fmt )  ( std_log_msg_t ) { std_log_scope_m(), (fmt), (level) }
-#define std_log_m( level, fmt, ... ) std_log_print ( std_log_msg_m ( (level), (fmt) ), __VA_ARGS__ )
+#define std_log_m( level, fmt, ... ) std_log_print ( std_log_msg_m ( (level), (fmt) ), ##__VA_ARGS__ )
 #define std_log_once_m( level, fmt, ... ) \
     static bool std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) = false; \
     if ( !std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) ) { \
-        std_log_m ( level, fmt, __VA_ARGS__ ); \
+        std_log_m ( level, fmt, ##__VA_ARGS__ ); \
         std_pp_eval_concat_m ( _std_log_once_flag_, std_line_num_m ) = true; \
     }
 void std_log_flush();
 
 // Callback caller wrappers with static log level check.
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
-    #define std_log_info_m( fmt, ... )      std_log_m ( std_log_level_info_m, fmt, __VA_ARGS__ )
-    #define std_log_info_once_m( fmt, ... ) std_log_once_m ( std_log_level_info_m, fmt, __VA_ARGS__ )
+    #define std_log_info_m( fmt, ... )      std_log_m ( std_log_level_info_m, fmt, ##__VA_ARGS__ )
+    #define std_log_info_once_m( fmt, ... ) std_log_once_m ( std_log_level_info_m, fmt, ##__VA_ARGS__ )
 #else
     #define std_log_info_m(...)
     #define std_log_info_once_m( fmt, ... )
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_warn_m
-    #define std_log_warn_m(fmt, ...)     std_log_m(std_log_level_warn_m, fmt, __VA_ARGS__)
+    #define std_log_warn_m(fmt, ...)     std_log_m(std_log_level_warn_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_warn_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_debug_m
-    #define std_log_debug_m(fmt, ...)     std_log_m(std_log_level_debug_m, fmt, __VA_ARGS__)
+    #define std_log_debug_m(fmt, ...)     std_log_m(std_log_level_debug_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_debug_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_error_m
-    #define std_log_error_m(fmt, ...)     std_log_m(std_log_level_error_m, fmt, __VA_ARGS__)
+    #define std_log_error_m(fmt, ...)     std_log_m(std_log_level_error_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_error_m(...)
 #endif
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_crash_m
-    #define std_log_crash_m(fmt, ...)     std_log_m(std_log_level_crash_m, fmt, __VA_ARGS__)
+    #define std_log_crash_m(fmt, ...)     std_log_m(std_log_level_crash_m, fmt, ##__VA_ARGS__)
 #else
     #define std_log_crash_m(...)
 #endif
@@ -153,13 +153,13 @@ void std_log_flush();
 #endif
 
 // Convenie generic assert macro that takes an optional message and defaults to ERROR on fail
-#define std_assert_msg_m(exp, ...)  std_assert_error_m( (exp), __VA_ARGS__ )
+#define std_assert_msg_m(exp, ...)  std_assert_error_m( (exp), ##__VA_ARGS__ )
 #define std_assert_nomsg_m(exp)     std_assert_error_m( (exp), "FAILED ASSERT: " #exp )
 #define std_assert_overload_m(_1, _2, _NAME, ...) _NAME
 // TODO This breaks when passing a string message and additional args to format!
 #define std_assert_m(...)           std_assert_overload_m(__VA_ARGS__, std_assert_msg_m, std_assert_nomsg_m) (__VA_ARGS__)
 
-#define std_verify_msg_m(exp, ...)  std_verify_error_m( (exp), __VA_ARGS__ )
+#define std_verify_msg_m(exp, ...)  std_verify_error_m( (exp), ##__VA_ARGS__ )
 #define std_verify_nomsg_m(exp)     std_verify_error_m( (exp), "FAILED ASSERT: " #exp )
 #define std_verify_overload_m(_1, _2, _NAME, ...) _NAME
 #define std_verify_m(...)           std_verify_overload_m(__VA_ARGS__, std_verify_msg_m, std_verify_nomsg_m) (__VA_ARGS__)

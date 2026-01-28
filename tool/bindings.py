@@ -2,9 +2,12 @@ import os
 
 BINDINGS = {}
 
-def get(name):
+def get(name, default = None):
     global BINDINGS
-    return BINDINGS[name]
+    if name in BINDINGS:
+        return BINDINGS[name]
+    else:
+        return default
 
 def read(path = 'bindings'):
     global BINDINGS

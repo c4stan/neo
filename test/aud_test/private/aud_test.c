@@ -38,6 +38,7 @@ static void run_aud_test ( void ) {
     // device
     size_t device_count = aud->get_devices_count();
     std_log_info_m ( "Device count: " std_fmt_size_m, device_count );
+    std_assert_m ( device_count > 0 );
 
     aud_device_h devices[aud_device_max_devices_m];
     aud->get_devices ( devices, aud_device_max_devices_m );

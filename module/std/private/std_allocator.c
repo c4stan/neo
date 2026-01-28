@@ -11,6 +11,7 @@
 
 #include <malloc.h>
 #include <stdio.h> // TODO include in std_log only and expose vsprintf from there?
+#include <stdarg.h>
 
 #include "std_state.h"
 
