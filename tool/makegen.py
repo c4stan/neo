@@ -755,7 +755,7 @@ class Project:
             if platform.system() == 'Windows':
                 if self.output == OUTPUT_LIB:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    main_target.cmd += '\t@' + comp + ' crus $@ ' + objs_dep
+                    main_target.cmd += '\t@' + ar + ' crus $@ ' + objs_dep
                 elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
                     main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
                     main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep

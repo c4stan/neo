@@ -30,6 +30,7 @@ typedef struct {
     uint64_t time_records_begin;
     uint64_t time_records_end;
     uint32_t min_allocation;
+    uint64_t allocator_idx;
 } memview_ui_state_t;
 
 typedef struct {
@@ -52,11 +53,17 @@ typedef struct {
 } memview_render_state_t;
 
 typedef struct {
+    char name[32];
+} memview_allocator_t;
+
+typedef struct {
     char path[std_path_size_m];
     bool is_loaded;
     std_stack_t allocator;
-    uint64_t record_count;
+    memview_allocator_t* allocators;
+    uint64_t allocator_count;
     std_allocator_log_record_t* records;
+    uint64_t record_count;
     void* min_address;
     void* max_address;
     std_allocator_log_record_t* filtered_records;
@@ -100,6 +107,19 @@ static int memview_log_record_cmp_address ( const void* a, const void* b, const 
     }
 }
 
+#define memview_max_allocators_m 64
+static void memview_register_log_allocator ( const std_allocator_log_record_t* record ) { 
+    for ( uint64_t i = 0; i < memview_state->log.allocator_count; ++i ) {
+        if ( std_str_cmp ( memview_state->log.allocators[i].name, record->allocator ) == 0 ) {
+            return;
+        }
+    }
+
+    std_assert_m ( memview_state->log.allocator_count < memview_max_allocators_m );
+    memview_allocator_t* allocator = &memview_state->log.allocators[memview_state->log.allocator_count++];
+    std_str_copy_static_m ( allocator->name, record->allocator );
+}
+
 static void memview_log_load_data ( void ) {
     memview_state_t* state = memview_state;
     state->log.is_loaded = true;
@@ -112,6 +132,9 @@ static void memview_log_load_data ( void ) {
     state->log.record_count = record_count;
     state->log.records = std_stack_alloc_array_m ( &state->log.allocator, std_allocator_log_record_t, record_count );
 
+    state->log.allocator_count = 0;
+    state->log.allocators = std_stack_alloc_array_m ( &state->log.allocator, memview_allocator_t, memview_max_allocators_m );
+
     std_allocator_log_record_t* data_records = ( std_allocator_log_record_t* ) ( record_count_ptr + 1 );
     std_sort_insertion_copy ( state->log.records, data_records, sizeof ( std_allocator_log_record_t ), record_count, memview_log_record_cmp_timestamp, NULL );
 
@@ -119,6 +142,7 @@ static void memview_log_load_data ( void ) {
     void* max_address = 0;
     for ( uint64_t i = 0; i < record_count; ++i ) {
         std_allocator_log_record_t* record = &state->log.records[i];
+        memview_register_log_allocator ( record );
         min_address = ( void* ) ( std_min_u64 ( ( uint64_t ) min_address, ( uint64_t ) record->address ) );
         max_address = ( void* ) ( std_max_u64 ( ( uint64_t ) max_address, ( uint64_t ) record->address ) );
     }
@@ -134,6 +158,7 @@ static void memview_log_load_data ( void ) {
     state->ui.time_records_begin = 0;
     state->ui.time_records_end = 0;
     state->ui.min_allocation = 128;
+    state->ui.allocator_idx = 0;
 }
 
 static void memview_ui_pass ( const xf_node_execute_args_t* node_args, void* user_args ) {
@@ -304,9 +329,25 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
     }
 
     if ( state->log.is_loaded ) {
+        // allocator
+        const char* allocator_select_items[64];
+        for ( uint64_t i = 0; i < memview_state->log.allocator_count; ++i ) {
+            allocator_select_items[i] = memview_state->log.allocators[i].name;
+        }
+        xi_select_state_t allocator_select = xi_select_state_m (
+            .items = allocator_select_items,
+            .item_count = memview_state->log.allocator_count,
+            .item_idx = memview_state->ui.allocator_idx,
+            .width = 100,
+            .sort_order = 1,
+        );
+        if ( xi->add_select ( xi_workload, &allocator_select ) ) {
+            memview_state->ui.allocator_idx = allocator_select.item_idx;
+        }
+
         // slider
         xi_slider_state_t time_slider = xi_slider_state_m (
-            .width = new_window_info->width - 300,
+            .width = new_window_info->width - 400,
             .value = state->ui.time_slider_value,
             .delayed = true,
             .style = xi_style_m (
@@ -418,7 +459,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         uint32_t line_width = xi->line_remaining_size() - 150 * 2;
         uint32_t min_allocation = state->ui.min_allocation;
         uint64_t address_step = line_width * min_allocation;
-        void* base_address = 0;
+        uint64_t base_address = 0;
         uint64_t record_it = 0;
         bool line_first;
         uint64_t record_remaining_size = 0;
@@ -441,7 +482,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
 
         if ( filtered_record_count > 0 ) {
             uint64_t align_step = std_pow2_round_up_u64 ( address_step );
-            base_address = std_align_ptr ( filtered_records[0].address, align_step ) - align_step;
+            base_address = std_align_u64 ( filtered_records[0].address, align_step ) - align_step;
         }
 
         while ( record_it < filtered_record_count ) {
@@ -449,7 +490,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
             line_first = true;
             std_allocator_log_record_t* record = &filtered_records[record_it];
 
-            void* range_max = base_address + address_step;
+            uint64_t range_max = base_address + address_step;
             while ( record->address + record_offset >= range_max ) {
                 base_address += address_step;
                 range_max = base_address + address_step;

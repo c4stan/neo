@@ -264,6 +264,26 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
     std_mem_zero_array_m ( heap->debug_records_bitset, xg_vk_allocator_debug_records_bitset_u64_count_m);
 #endif
 
+#if std_allocator_log_allocations_to_file_m
+    std_timestamp_t timestamp = std_program_start_timestamp_local();
+    char log_path_buffer[std_path_size_m];
+    std_string_t log_path = std_static_string_m ( log_path_buffer );
+    std_string_copy ( &log_path, "std_allocator_log" );
+    std_directory_create ( log_path.str );
+    const char* type_str = xg_memory_type_str ( type );
+    char filename[64] = {};
+    std_string_t filename_string = std_static_string_m ( filename );
+    std_string_append ( &filename_string, "xg_tlsf_" );
+    std_string_append ( &filename_string, type_str );
+    std_string_append ( &filename_string, "_heap_log_" );
+    std_path_append_file ( &log_path, filename );
+    std_string_append_format ( &log_path, std_fmt_u64_m, timestamp.count );
+    std_string_append ( &log_path, ".txt" );
+    heap->log_file = std_file_create ( log_path.str, std_file_write_m, std_path_already_existing_overwrite_m );
+    heap->log_count = 0;
+    heap->file_offset = 0;
+#endif
+
     xg_vk_allocator_tlsf_segment_t* segment = xg_vk_allocator_tlsf_acquire_new_segment ( heap );
     segment->offset = 0;
     segment->size = size;
@@ -272,6 +292,10 @@ void xg_vk_allocator_tlsf_heap_init ( xg_vk_allocator_tlsf_heap_t* heap, xg_devi
 }
 
 static void xg_vk_allocator_tlsf_heap_deinit ( xg_vk_allocator_tlsf_heap_t* heap ) {
+#if std_allocator_log_allocations_to_file_m
+    std_file_close ( heap->log_file );
+#endif
+
 #if std_build_debug_m
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, heap->debug_records_bitset, idx, xg_vk_allocator_debug_records_bitset_u64_count_m ) ) {
@@ -385,6 +409,25 @@ xg_alloc_t xg_vk_tlsf_heap_alloc ( xg_vk_allocator_tlsf_heap_t* heap, uint64_t s
     
     std_assert_m ( alloc.offset < heap->gpu_alloc.size );
 
+#if std_allocator_log_allocations_to_file_m
+    std_allocator_log_record_t log_record = {
+        .allocator =  "xg_tlsf",
+        .type = std_allocator_log_record_alloc_m,
+        .timestamp = std_timestamp_now_local(),
+        .address = ( uint64_t ) ( alloc.base + segment_offset ),
+        .size = segment_size,
+        .scope = scope,
+    };
+    uint64_t log_count = heap->log_count + 1;
+    // TODO explicit async write?
+    std_file_seek ( heap->log_file, std_file_start_m, 0 );
+    std_file_write ( heap->log_file, &log_count, sizeof ( log_count ) );
+    std_file_seek ( heap->log_file, std_file_end_m, 0 );
+    std_file_write ( heap->log_file, &log_record, sizeof ( log_record ) );
+    heap->log_count = log_count;
+    heap->file_offset += sizeof ( log_record );
+#endif
+
 #if std_build_debug_m
     xg_vk_allocator_debug_record_t* debug_record = std_list_pop_m ( &heap->debug_records_freelist );
     if ( debug_record ) {
@@ -409,6 +452,10 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
         std_list_push ( &heap->debug_records_freelist, debug_record );
         std_bitset_clear ( heap->debug_records_bitset, debug_record - heap->debug_records_array );
     }
+#endif
+
+#if std_allocator_log_allocations_to_file_m
+    uint64_t offset = segment->offset;
 #endif
 
     // load segment
@@ -482,6 +529,24 @@ void xg_vk_tlsf_heap_free ( xg_vk_allocator_tlsf_heap_t* heap, xg_memory_h handl
             std_assert_m ( segment->left == NULL || segment->left != segment->right );
         }
     }
+
+#if std_allocator_log_allocations_to_file_m
+    std_allocator_log_record_t log_record = {
+        .allocator = "xg_tlsf",
+        .type = std_allocator_log_record_free_m,
+        .timestamp = std_timestamp_now_local(),
+        .address = ( uint64_t ) ( heap->gpu_alloc.base + offset ),
+        .size = handle.size,
+    };
+    uint64_t log_count = heap->log_count + 1;
+    // TODO explicit async write?
+    std_file_seek ( heap->log_file, std_file_start_m, 0 );
+    std_file_write ( heap->log_file, &log_count, sizeof ( log_count ) );
+    std_file_seek ( heap->log_file, std_file_end_m, 0 );
+    std_file_write ( heap->log_file, &log_record, sizeof ( log_record ) );
+    heap->log_count = log_count;
+    heap->file_offset += sizeof ( log_record );
+#endif
 
     // write and add to freelist
     segment->free = true;

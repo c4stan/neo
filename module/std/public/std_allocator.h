@@ -79,9 +79,10 @@ typedef enum {
 } std_allocator_log_record_type_e;
 
 typedef struct {
+    char allocator[32];
     std_allocator_log_record_type_e type;
     std_timestamp_t timestamp;
-    void* address;
+    uint64_t address;
     uint64_t size;
 #if std_allocator_uses_alloc_scope_m
     std_alloc_scope_t scope;

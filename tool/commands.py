@@ -104,7 +104,7 @@ def print_help():
     print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + Color.ENDC + ' to git pull remote changes')
     print('\t' + Color.OKGREEN + 'gitstatus' + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
-    print('\t' + Color.OKGREEN + 'showremote' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the remote version of the file')
+    print('\t' + Color.OKGREEN + 'showremote' + Color.OKBLUE + ' <workspace> <file> <version>' + Color.ENDC + ' to show the remote version of the file')
     print('\t' + Color.OKGREEN + 'showstash' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the latest stash version of the file')
     print('\t' + Color.OKGREEN + 'killeditor' + Color.ENDC + ' to kill the text editor process')
     print('\t' + Color.OKGREEN + 'adblist' + Color.ENDC + ' to list adb devices')
@@ -648,7 +648,7 @@ def git_pull():
 def git_status():
     os.system('git status')
 
-def show_committed_version(workspace, filename):
+def show_committed_version(workspace, filename, version):
     path = get_workspace_path(workspace)
     if platform.system() == 'Windows':
         base = '\\neo\\'
@@ -663,9 +663,9 @@ def show_committed_version(workspace, filename):
         path += '/' + filename
 
     if platform.system() == 'Windows':
-        os.system('git show HEAD:' + path + ' | subl.exe -')
+        os.system('git show HEAD~' + version + ':' + path + ' | subl.exe -')
     elif platform.system() == 'Linux':
-        os.system('git show HEAD:' + path + ' | subl -')
+        os.system('git show HEAD~' + version + ':' + path + ' | subl -')
 
 def show_stash_version(workspace, filename):
     path = get_workspace_path(workspace)
@@ -835,7 +835,10 @@ def execute(string):
         elif cmd == 'debug-setup':
             setup_debug_app(tokens[1], tokens[2:])
         elif cmd == 'showremote':
-            show_committed_version(tokens[1], tokens[2])
+            version = '0'
+            if len(tokens) > 3:
+                version = tokens[3]
+            show_committed_version(tokens[1], tokens[2], version)
         elif cmd == 'showstash':
             show_stash_version(tokens[1], tokens[2])
         elif cmd == 'killeditor':

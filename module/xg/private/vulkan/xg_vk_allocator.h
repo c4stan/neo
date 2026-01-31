@@ -10,6 +10,7 @@
 #include "xg_vk.h"
 
 #include <std_mutex.h>
+#include <std_file.h>
 
 #if std_build_debug_m
 typedef struct {
@@ -60,6 +61,11 @@ typedef struct {
     xg_vk_allocator_debug_record_t* debug_records_array;
     xg_vk_allocator_debug_record_t* debug_records_freelist;
     uint64_t* debug_records_bitset;
+#endif
+#if std_allocator_log_allocations_to_file_m
+    std_file_h log_file;
+    uint64_t log_count;
+    uint64_t file_offset;
 #endif
 } xg_vk_allocator_tlsf_heap_t;
 

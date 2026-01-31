@@ -1007,7 +1007,7 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
 #endif
 
 #if std_allocator_log_allocations_to_file_m
-    std_timestamp_t timestamp = std_timestamp_now_local();
+    std_timestamp_t timestamp = std_program_start_timestamp_local();
     char log_path_buffer[std_path_size_m];
     std_string_t log_path = std_static_string_m ( log_path_buffer );
     std_string_copy ( &log_path, "std_allocator_log" );
@@ -1108,9 +1108,10 @@ void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint
 
 #if std_allocator_log_allocations_to_file_m
     std_allocator_log_record_t log_record = {
+        .allocator =  "std_tlsf",
         .type = std_allocator_log_record_alloc_m,
         .timestamp = std_timestamp_now_local(),
-        .address = segment,
+        .address = ( uint64_t ) segment,
         .size = segment_size,
         .scope = scope,
     };
@@ -1246,9 +1247,10 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
 
 #if std_allocator_log_allocations_to_file_m
     std_allocator_log_record_t log_record = {
+        .allocator = "std_tlsf",
         .type = std_allocator_log_record_free_m,
         .timestamp = std_timestamp_now_local(),
-        .address = segment,
+        .address = ( uint64_t ) segment,
         .size = segment_size,
     };
     uint64_t log_count = heap->log_count + 1;
