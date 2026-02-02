@@ -22,6 +22,8 @@ static void net_api_init ( net_i* net ) {
     net->listen_for_connections = net_socket_listen_for_connections;
     net->accept_pending_connection = net_socket_accept_pending_connection;
 
+    net->set_socket_is_blocking = net_socket_set_is_blocking;
+
     net->get_socket_available_read_size = net_socket_get_available_read_size;
     net->read_connected_socket = net_socket_read_connected;
     net->write_connected_socket = net_socket_write_connected;
@@ -58,4 +60,6 @@ void net_reload ( void* std_runtime, void* api ) {
 void net_unload ( void ) {
     net_socket_unload();
     net_platform_shutdown();
+
+    net_state_free();
 }

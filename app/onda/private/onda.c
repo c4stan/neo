@@ -6,6 +6,7 @@
 #include <std_allocator.h>
 #include <std_file.h>
 #include <std_string.h>
+#include <std_list.h>
 
 #include <net.h>
 #include <aud.h>
@@ -22,10 +23,16 @@
 #define onda_path_size_m ( onda_rootpath_size_m + onda_subpath_size_m )
 
 typedef struct {
-    net_socket_h client_socket;
-    net_socket_address_t client_address;
+    net_socket_h socket;
+    net_socket_address_t address;
+} onda_server_connection_t;
+
+typedef struct {
     std_string_t root_path;
     char root_path_buffer[onda_path_size_m];
+    onda_server_connection_t* connections_array;
+    onda_server_connection_t* connections_freelist;
+    uint64_t* connections_bitset;
 } onda_server_state_t;
 
 typedef struct {
@@ -76,33 +83,41 @@ static void onda_print_help ( void ) {
     std_log_info_m ( buffer );
 }
 
+#define onda_server_max_connections_m 128
+
 static bool onda_boot_server ( uint16_t port, const char* path ) {
     net_i* net = onda_state->net;
     onda_state->is_server = true;
-    onda_state->server.client_socket = net_null_handle_m;
 
-    net_socket_address_t address = net_socket_address_m (
-        .port = port,
-    );
-    net->ip_string_to_bytes ( &address.ip, "127.0.0.1", net_address_family_ip4_m );
-
-    onda_state->socket = net->create_socket ( &net_socket_params_m () );
-    bool success = net->bind_socket ( onda_state->socket, &address );
-    if ( !success ) {
-        std_log_error_m ( "Failed to bind socket address" );
-        return false;
-    }
+    onda_state->server.connections_array = std_virtual_heap_alloc_array_m ( onda_server_connection_t, onda_server_max_connections_m );
+    onda_state->server.connections_freelist = std_freelist_m ( onda_state->server.connections_array, onda_server_max_connections_m );
+    onda_state->server.connections_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( onda_server_max_connections_m ) );
+    std_mem_zero_array_m ( onda_state->server.connections_bitset, std_bitset_u64_count_m ( onda_server_max_connections_m ) );
 
     onda_state->server.root_path = std_static_string_m ( onda_state->server.root_path_buffer );
     std_path_normalize ( &onda_state->server.root_path, path );
     std_path_info_t path_info;
-    success = std_path_info ( &path_info, onda_state->server.root_path.str );
+    bool success = std_path_info ( &path_info, onda_state->server.root_path.str );
     if ( !success ) {
         std_log_error_m ( "Invalid path" );
         return false;
     }
     if ( path_info.flags != std_path_is_directory_m ) {
         std_log_error_m ( "Path must be an existing directory" );
+        return false;
+    }
+
+    net_socket_address_t address = net_socket_address_m (
+        .port = port,
+    );
+    net->ip_string_to_bytes ( &address.ip, "127.0.0.1", net_address_family_ip4_m );
+
+    onda_state->socket = net->create_socket ( &net_socket_params_m (
+        .is_blocking = false,
+    ) );
+    success = net->bind_socket ( onda_state->socket, &address );
+    if ( !success ) {
+        std_log_error_m ( "Failed to bind socket address" );
         return false;
     }
 
@@ -115,7 +130,30 @@ static bool onda_boot_server ( uint16_t port, const char* path ) {
     return true;
 }
 
+static void onda_server_add_connection ( net_socket_h socket, net_socket_address_t address ) {
+    onda_server_connection_t* connection = std_list_pop ( &onda_state->server.connections_freelist );
+    std_assert_m ( connection );
+    connection->socket = socket;
+    connection->address = address;
+    uint64_t idx = connection - onda_state->server.connections_array;
+    std_bitset_set ( onda_state->server.connections_bitset, idx );
 
+    net_i* net = onda_state->net;
+    char client_ip[32];
+    net->ip_bytes_to_string ( client_ip, &address.ip, net_address_family_ip4_m );
+    std_log_info_m ( "Serving new client " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, address.port );
+}
+
+static void onda_server_remove_connection ( onda_server_connection_t* connection ) {
+    net_i* net = onda_state->net;
+    char client_ip[32];
+    net->ip_bytes_to_string ( client_ip, &connection->address.ip, net_address_family_ip4_m );
+    std_log_info_m ( "Closing client connection " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, connection->address.port );
+
+    std_list_push ( &onda_state->server.connections_freelist, connection );
+    uint64_t idx = connection - onda_state->server.connections_array;
+    std_bitset_clear ( onda_state->server.connections_bitset, idx );
+}
 
 static bool onda_boot_client ( const char* server_ip, uint16_t server_port ) {
     net_i* net = onda_state->net;
@@ -262,7 +300,7 @@ typedef struct {
     char data[];
 } onda_list_header_t;
 
-static void onda_server_send_list ( std_stack_t* stack, const list_result_t* list ) {
+static void onda_server_send_list ( net_socket_h client_socket, std_stack_t* stack, const list_result_t* list ) {
     net_i* net = onda_state->net;
 
     std_auto_m header = std_stack_alloc_m ( stack, onda_list_header_t );
@@ -283,7 +321,7 @@ static void onda_server_send_list ( std_stack_t* stack, const list_result_t* lis
     size_t msg_size = std_stack_used_size_from ( stack, header );
     header->total_size = msg_size;
 
-    net->write_connected_socket ( onda_state->server.client_socket, header, msg_size );
+    net->write_connected_socket ( client_socket, header, msg_size );
 }
 
 typedef enum {
@@ -303,7 +341,7 @@ typedef struct {
     char data[];
 } onda_media_header_t;
 
-static void onda_server_stream_media ( std_stack_t* stack, const char* path ) {
+static void onda_server_stream_media ( net_socket_h client_socket, std_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
     std_file_h file = std_file_open ( path, std_file_read_m );
     
@@ -376,7 +414,7 @@ static void onda_server_stream_media ( std_stack_t* stack, const char* path ) {
         uint32_t chunk_size = onda_stream_chunk_size_m;
         uint32_t remaining_size = total_size - stream_size;
         uint32_t write_size = remaining_size < chunk_size ? remaining_size : chunk_size;
-        net->write_connected_socket ( onda_state->server.client_socket, begin + stream_size, write_size );
+        net->write_connected_socket ( client_socket, begin + stream_size, write_size );
         stream_size += write_size;
     }
 }
@@ -389,51 +427,60 @@ typedef struct {
 static std_app_state_e onda_update_server ( void ) {
     net_i* net = onda_state->net;
 
-    if ( onda_state->server.client_socket == net_null_handle_m ) {
-        std_log_info_m ( "Waiting for client..." );
-        net_socket_h client_socket = net->accept_pending_connection ( &onda_state->server.client_address, onda_state->socket );
-
-        onda_state->server.client_socket = client_socket;
-
-        char client_ip[32];
-        net->ip_bytes_to_string ( client_ip, &onda_state->server.client_address.ip, net_address_family_ip4_m );
-        std_log_info_m ( "Serving client " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, onda_state->server.client_address.port );
+    net_socket_address_t new_client_address;
+    net_socket_h new_client_socket = net->accept_pending_connection ( &new_client_address, onda_state->socket );
+    if ( new_client_socket != net_null_handle_m ) {
+        net->set_socket_is_blocking ( new_client_socket, true );
+        onda_server_add_connection ( new_client_socket, new_client_address );
     }
 
-    net_socket_h client_socket = onda_state->server.client_socket;
-    std_stack_t* stack = &onda_state->stack;
-    std_stack_clear ( stack );
-    std_auto_m request = std_stack_alloc_m ( stack, onda_client_request_t );
-    size_t read_result = net->read_connected_socket ( request, sizeof ( onda_client_request_t ), client_socket, net_connected_socket_read_flag_read_all_m );
-    if ( read_result == 0 ) {
-        net->destroy_socket ( onda_state->server.client_socket );
-        onda_state->server.client_socket = net_null_handle_m;
-        std_log_info_m ( "Client socket closed" );
-        return std_app_state_tick_m;
+    uint32_t served_clients_count = 0;
+    uint64_t connection_idx = 0;
+    while ( std_bitset_scan ( &connection_idx, onda_state->server.connections_bitset, connection_idx, std_bitset_u64_count_m ( onda_server_max_connections_m ) ) ) {
+        onda_server_connection_t* connection = &onda_state->server.connections_array[connection_idx++];
+        net_socket_h client_socket = connection->socket;
+        
+        if ( net->get_socket_available_read_size ( client_socket ) == 0 ) {
+            continue;
+        }
+
+        ++served_clients_count;
+
+        std_stack_t* stack = &onda_state->stack;
+        std_stack_clear ( stack );
+        std_auto_m request = std_stack_alloc_m ( stack, onda_client_request_t );
+        size_t read_result = net->read_connected_socket ( request, sizeof ( onda_client_request_t ), client_socket, net_connected_socket_read_flag_read_all_m );
+        if ( read_result == 0 ) {
+            onda_server_remove_connection ( connection );
+            net->destroy_socket ( client_socket );
+            continue;
+        }
+
+        char* client_msg = std_stack_alloc ( stack, request->data_size );
+        net->read_connected_socket ( client_msg, request->data_size, client_socket, net_connected_socket_read_flag_read_all_m );
+        std_log_info_m ( "Received request '" std_fmt_str_m "'", client_msg );
+
+        if ( std_str_starts_with ( client_msg, "list" ) ) {
+            char* path = client_msg + 5;
+            list_result_t list = onda_build_list ( stack, path );
+            onda_server_send_list ( client_socket, stack, &list );
+        } else if ( std_str_starts_with ( client_msg, "play" ) ) {
+            char* client_path = client_msg + 5;
+            std_string_t media_path = std_stack_alloc_string ( stack, onda_path_size_m );
+            std_path_append_dir ( &media_path, onda_state->server.root_path.str );
+            std_path_append_file ( &media_path, client_path );
+            onda_server_stream_media ( client_socket, stack, media_path.str );
+        } else if ( std_str_starts_with ( client_msg, "exit" ) ) {
+            onda_server_remove_connection ( connection );
+            net->destroy_socket ( client_socket );
+        } else {
+            onda_server_remove_connection ( connection );
+            net->destroy_socket ( client_socket );
+        }
     }
 
-    char* client_msg = std_stack_alloc ( stack, request->data_size );
-    net->read_connected_socket ( client_msg, request->data_size, client_socket, net_connected_socket_read_flag_read_all_m );
-    std_log_info_m ( "Received request '" std_fmt_str_m "'", client_msg );
-
-    if ( std_str_starts_with ( client_msg, "list" ) ) {
-        char* path = client_msg + 5;
-        list_result_t list = onda_build_list ( stack, path );
-        onda_server_send_list ( stack, &list );
-    } else if ( std_str_starts_with ( client_msg, "play" ) ) {
-        char* client_path = client_msg + 5;
-        std_string_t media_path = std_stack_alloc_string ( stack, onda_path_size_m );
-        std_path_append_dir ( &media_path, onda_state->server.root_path.str );
-        std_path_append_file ( &media_path, client_path );
-        onda_server_stream_media ( stack, media_path.str );
-    } else if ( std_str_starts_with ( client_msg, "exit" ) ) {
-        net->destroy_socket ( onda_state->server.client_socket );
-        onda_state->server.client_socket = net_null_handle_m;
-        std_log_info_m ( "Client socket closed" );
-    } else {
-        net->destroy_socket ( onda_state->server.client_socket );
-        onda_state->server.client_socket = net_null_handle_m;
-        std_log_warn_m ( "Bad request, client dropped" );
+    if ( served_clients_count == 0 ) {
+        std_thread_this_sleep ( 0 );
     }
 
     return std_app_state_tick_m;

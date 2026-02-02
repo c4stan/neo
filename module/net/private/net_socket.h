@@ -49,3 +49,5 @@ size_t net_socket_read_connected ( void* dest, size_t cap, net_socket_h socket, 
 size_t net_socket_write_connected ( net_socket_h socket, const void* data, size_t size );
 size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap,  net_socket_h socket );
 size_t net_socket_write ( net_socket_h socket, const net_socket_address_t* address, const void* data, size_t size );
+
+void net_socket_set_is_blocking ( net_socket_h socket_handle, bool is_blocking );

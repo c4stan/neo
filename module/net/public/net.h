@@ -90,6 +90,7 @@ typedef struct {
     bool            ( *listen_for_connections )             ( net_socket_h socket );
     net_socket_h    ( *accept_pending_connection )          ( net_socket_address_t* address, net_socket_h socket );
 
+    void            ( *set_socket_is_blocking )             ( net_socket_h socket, bool is_blocking );
     size_t          ( *get_socket_available_read_size )     ( net_socket_h socket );
     size_t          ( *read_connected_socket )              ( void* dest, size_t cap, net_socket_h socket, net_connected_socket_read_flags_e flags );
     size_t          ( *write_connected_socket )             ( net_socket_h socket, const void* data, size_t size );

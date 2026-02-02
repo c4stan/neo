@@ -65,6 +65,26 @@ void net_socket_unload ( void ) {
     std_virtual_heap_free ( net_socket_state->sockets_array );
 }
 
+void net_socket_set_is_blocking ( net_socket_h socket_handle, bool is_blocking ) {
+    net_socket_t* sock = &net_socket_state->sockets_array[ ( uint64_t ) socket_handle];
+
+#if defined std_platform_win32_m
+    u_long mode = is_blocking ? 0 : 1;
+    int error = ioctlsocket ( sock->os_handle, ( long ) FIONBIO, &mode );
+    std_assert_m ( !error );
+#elif defined std_platform_linux_m
+    int flags = fcntl ( sock->os_handle, F_GETFL, 0 );
+    std_assert_m ( flags != -1 );
+    if ( is_blocking ) {
+        flags = std_bit_clear_32_m ( flags, O_NONBLOCK );
+    } else {
+        flags |= O_NONBLOCK;
+    }
+    int error = fcntl ( sock->os_handle, F_SETFL, flags );
+    std_assert_m ( error == 0 );
+#endif
+}
+
 net_socket_h net_socket_create ( const net_socket_params_t* params ) {
     int af = -1;
     int type = -1;
@@ -115,20 +135,10 @@ net_socket_h net_socket_create ( const net_socket_params_t* params ) {
     std_mem_zero_m ( &sock->address );
     //std_mem_zero_m ( &sock->address_string );
 
-    if ( !params->is_blocking ) {
-#if defined std_platform_win32_m
-        u_long mode = 1;
-        int error = ioctlsocket ( os_socket, ( long ) FIONBIO, &mode );
-        std_assert_m ( !error );
-#elif defined std_platform_linux_m
-        int flags = fcntl ( os_socket, F_GETFL, 0 );
-        std_assert_m ( flags != -1 );
-        int error = fcntl ( os_socket, F_SETFL, flags | O_NONBLOCK );
-        std_assert_m ( error == 0 );
-#endif
-    }
+    net_socket_h handle = sock - net_socket_state->sockets_array;
+    net_socket_set_is_blocking ( handle, params->is_blocking );
 
-    return ( net_socket_h ) ( sock - net_socket_state->sockets_array );
+    return handle;
 }
 
 bool net_socket_destroy ( net_socket_h socket_handle ) {
@@ -273,8 +283,13 @@ net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* addres
     SOCKET connection_socket = accept ( sock->os_handle, ( SOCKADDR* ) &sockaddr, &sockaddr_size );
 
     if ( connection_socket == INVALID_SOCKET ) {
-        std_log_os_error_m();
-        return false;
+        int error = WSAGetLastError();
+        if ( error == WSAEWOULDBLOCK ) {
+            return net_null_handle_m;
+        } else {
+            std_log_os_error_m();
+            return net_null_handle_m;
+        }
     }
 #elif defined std_platform_linux_m
     struct sockaddr_storage sockaddr;
@@ -282,8 +297,9 @@ net_socket_h net_socket_accept_pending_connection ( net_socket_address_t* addres
     int connection_socket = accept ( sock->os_handle, ( struct sockaddr* ) &sockaddr, &sockaddr_size );
 
     if ( connection_socket == -1 ) {
+        // TODO WSAEWOULDBLOCK
         std_log_os_error_m();
-        return false;
+        return net_null_handle_m;
     }
 #endif
 

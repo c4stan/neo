@@ -39,9 +39,10 @@ void std_init ( int argc, char** argv ) {
 #endif
 
     std_log_init ( &state->log_state );
+    std_time_init ( &state->time_state );
+    std_time_attach ( &state->time_state ); // provide program_start_timestamp to other inits
     std_allocator_init ( &state->allocator_state );
     std_platform_init ( &state->platform_state );
-    std_time_init ( &state->time_state );
     std_process_init ( &state->process_state, argv, ( size_t ) argc );
     std_thread_init ( &state->thread_state );
     std_module_init ( &state->module_state );
