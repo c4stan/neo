@@ -512,7 +512,7 @@ void* std_stack_write ( std_stack_t* stack, const void* data, size_t size ) {
     return alloc;
 }
 
-static void* std_stack_alloc_zero ( std_stack_t* stack, size_t size ) {
+void* std_stack_alloc_zero ( std_stack_t* stack, size_t size ) {
     void* top = std_stack_alloc ( stack, size );
 
     if ( top ) {

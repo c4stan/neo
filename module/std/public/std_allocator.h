@@ -113,6 +113,7 @@ std_stack_t std_stack ( void* base, size_t mapped_size, size_t virtual_size );
 std_stack_t std_stack_create ( size_t virtual_size );
 void        std_stack_destroy ( std_stack_t* stack );
 void*       std_stack_alloc ( std_stack_t* stack, size_t size );
+void*       std_stack_alloc_zero ( std_stack_t* stack, size_t size );
 void*       std_stack_write ( std_stack_t* stack, const void* data, size_t size );
 void*       std_stack_align ( std_stack_t* stack, size_t align );
 void*       std_stack_align_zero ( std_stack_t* stack, size_t align );

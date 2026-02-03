@@ -25,6 +25,7 @@
 typedef struct {
     net_socket_h socket;
     net_socket_address_t address;
+    char ip[32];
 } onda_server_connection_t;
 
 typedef struct {
@@ -131,28 +132,37 @@ static bool onda_boot_server ( uint16_t port, const char* path ) {
 }
 
 static void onda_server_add_connection ( net_socket_h socket, net_socket_address_t address ) {
+    net_i* net = onda_state->net;
     onda_server_connection_t* connection = std_list_pop ( &onda_state->server.connections_freelist );
     std_assert_m ( connection );
     connection->socket = socket;
     connection->address = address;
+    net->ip_bytes_to_string ( connection->ip, &address.ip, net_address_family_ip4_m );
     uint64_t idx = connection - onda_state->server.connections_array;
     std_bitset_set ( onda_state->server.connections_bitset, idx );
-
-    net_i* net = onda_state->net;
-    char client_ip[32];
-    net->ip_bytes_to_string ( client_ip, &address.ip, net_address_family_ip4_m );
-    std_log_info_m ( "Serving new client " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, address.port );
+    std_log_info_m ( "Serving new client " std_fmt_str_m ":" std_fmt_u16_m, connection->ip, address.port );
 }
 
 static void onda_server_remove_connection ( onda_server_connection_t* connection ) {
-    net_i* net = onda_state->net;
-    char client_ip[32];
-    net->ip_bytes_to_string ( client_ip, &connection->address.ip, net_address_family_ip4_m );
-    std_log_info_m ( "Closing client connection " std_fmt_str_m ":" std_fmt_u16_m"...", client_ip, connection->address.port );
-
     std_list_push ( &onda_state->server.connections_freelist, connection );
     uint64_t idx = connection - onda_state->server.connections_array;
     std_bitset_clear ( onda_state->server.connections_bitset, idx );
+}
+
+// left alt + up/down : volume
+// left alt + left/right : skip
+// left alt + left ctrl + up : pause/resume
+// left alt + left ctrl + down : stop
+static void onda_client_print_help ( void ) {
+    std_log_m ( std_log_level_custom_m, "list - List current path ids and filenames\n" );
+    std_log_m ( std_log_level_custom_m, "open <id> - Open folder and update path\n" );
+    std_log_m ( std_log_level_custom_m, "back - Close current folder and update path\n" );
+    std_log_m ( std_log_level_custom_m, "exit - Exit application\n" );
+    std_log_m ( std_log_level_custom_m, "play <id> - Play a media file or entire folder contents.\n" );
+    std_log_m ( std_log_level_custom_m, std_fmt_tab_m "Volume: " std_fmt_tab_m "left alt + up/down\n" );
+    std_log_m ( std_log_level_custom_m, std_fmt_tab_m "Skip: " std_fmt_tab_m std_fmt_tab_m "left alt + left/right\n" );
+    std_log_m ( std_log_level_custom_m, std_fmt_tab_m "Pause/Resume: " std_fmt_tab_m "left alt + left ctrl + up\n" );
+    std_log_m ( std_log_level_custom_m, std_fmt_tab_m "Stop: " std_fmt_tab_m std_fmt_tab_m "left alt + left ctrl + down\n" );
 }
 
 static bool onda_boot_client ( const char* server_ip, uint16_t server_port ) {
@@ -215,6 +225,8 @@ static bool onda_boot_client ( const char* server_ip, uint16_t server_port ) {
     onda_state->client.volume = 0.2f;
 
     onda_state->client.list_stack = std_stack_create ( 1024ull * 1024 * 1024 );
+
+    onda_client_print_help();
 
     return true;
 }
@@ -300,7 +312,7 @@ typedef struct {
     char data[];
 } onda_list_header_t;
 
-static void onda_server_send_list ( net_socket_h client_socket, std_stack_t* stack, const list_result_t* list ) {
+static bool onda_server_send_list ( net_socket_h client_socket, std_stack_t* stack, const list_result_t* list ) {
     net_i* net = onda_state->net;
 
     std_auto_m header = std_stack_alloc_m ( stack, onda_list_header_t );
@@ -321,7 +333,8 @@ static void onda_server_send_list ( net_socket_h client_socket, std_stack_t* sta
     size_t msg_size = std_stack_used_size_from ( stack, header );
     header->total_size = msg_size;
 
-    net->write_connected_socket ( client_socket, header, msg_size );
+    size_t write_size = net->write_connected_socket ( client_socket, header, msg_size );
+    return write_size > 0;
 }
 
 typedef enum {
@@ -341,7 +354,7 @@ typedef struct {
     char data[];
 } onda_media_header_t;
 
-static void onda_server_stream_media ( net_socket_h client_socket, std_stack_t* stack, const char* path ) {
+static bool onda_server_stream_media ( net_socket_h client_socket, std_stack_t* stack, const char* path ) {
     net_i* net = onda_state->net;
     std_file_h file = std_file_open ( path, std_file_read_m );
     
@@ -414,15 +427,29 @@ static void onda_server_stream_media ( net_socket_h client_socket, std_stack_t* 
         uint32_t chunk_size = onda_stream_chunk_size_m;
         uint32_t remaining_size = total_size - stream_size;
         uint32_t write_size = remaining_size < chunk_size ? remaining_size : chunk_size;
-        net->write_connected_socket ( client_socket, begin + stream_size, write_size );
+        write_size = net->write_connected_socket ( client_socket, begin + stream_size, write_size );
+        if ( write_size == 0 ) {
+            std_log_warn_m ( "Streaming error " std_fmt_str_m, path );
+            return false;
+        }
         stream_size += write_size;
     }
+
+    std_log_info_m ( "Finished streaming " std_fmt_str_m, path );
+    return true;
 }
 
 typedef struct {
     uint32_t data_size;
     char data[];
 } onda_client_request_t;
+
+static void onda_server_drop_connection ( onda_server_connection_t* connection ) {
+    net_i* net = onda_state->net;
+    std_log_info_m ( "Dropping client " std_fmt_str_m ":" std_fmt_u16_m, connection->ip, connection->address.port );
+    net->destroy_socket ( connection->socket );
+    onda_server_remove_connection ( connection );
+}
 
 static std_app_state_e onda_update_server ( void ) {
     net_i* net = onda_state->net;
@@ -451,31 +478,33 @@ static std_app_state_e onda_update_server ( void ) {
         std_auto_m request = std_stack_alloc_m ( stack, onda_client_request_t );
         size_t read_result = net->read_connected_socket ( request, sizeof ( onda_client_request_t ), client_socket, net_connected_socket_read_flag_read_all_m );
         if ( read_result == 0 ) {
-            onda_server_remove_connection ( connection );
-            net->destroy_socket ( client_socket );
+            onda_server_drop_connection ( connection );
             continue;
         }
 
-        char* client_msg = std_stack_alloc ( stack, request->data_size );
+        char* client_msg = std_stack_alloc_zero ( stack, request->data_size );
         net->read_connected_socket ( client_msg, request->data_size, client_socket, net_connected_socket_read_flag_read_all_m );
-        std_log_info_m ( "Received request '" std_fmt_str_m "'", client_msg );
+        std_log_info_m ( "Received request from client " std_fmt_str_m ":" std_fmt_u16_m ": '" std_fmt_str_m "'", connection->ip, connection->address.port, client_msg );
 
         if ( std_str_starts_with ( client_msg, "list" ) ) {
             char* path = client_msg + 5;
             list_result_t list = onda_build_list ( stack, path );
-            onda_server_send_list ( client_socket, stack, &list );
+            if ( !onda_server_send_list ( client_socket, stack, &list ) ) {
+                onda_server_drop_connection ( connection );
+            }
         } else if ( std_str_starts_with ( client_msg, "play" ) ) {
             char* client_path = client_msg + 5;
             std_string_t media_path = std_stack_alloc_string ( stack, onda_path_size_m );
             std_path_append_dir ( &media_path, onda_state->server.root_path.str );
             std_path_append_file ( &media_path, client_path );
-            onda_server_stream_media ( client_socket, stack, media_path.str );
+            if ( !onda_server_stream_media ( client_socket, stack, media_path.str ) ) {
+                onda_server_drop_connection ( connection );
+            }
         } else if ( std_str_starts_with ( client_msg, "exit" ) ) {
-            onda_server_remove_connection ( connection );
-            net->destroy_socket ( client_socket );
+            onda_server_drop_connection ( connection );
         } else {
-            onda_server_remove_connection ( connection );
-            net->destroy_socket ( client_socket );
+            std_log_warn_m ( "Bad input from client " std_fmt_str_m ":" std_fmt_u16_m ": '" std_fmt_str_m "'", connection->ip, connection->address.port, client_msg );
+            onda_server_drop_connection ( connection );
         }
     }
 
@@ -868,13 +897,18 @@ static std_app_state_e onda_update_client ( void ) {
     std_process_info_t process_info;
     std_process_info ( &process_info, std_process_this() );
     
-    char msg_buffer[32];
-    char* msg = msg_buffer;
-    size_t msg_size = 0;
-    std_process_io_read ( msg, &msg_size, sizeof ( msg_buffer ) - 1, process_info.io.stdin_handle );
-    msg[msg_size++] = '\0';
+    char cmd_buffer[32] = {};
+    char* cmd = cmd_buffer;
+    size_t cmd_size = 0;
+    std_process_io_read ( cmd, &cmd_size, sizeof ( cmd_buffer ) - 1, process_info.io.stdin_handle );
+    while ( cmd[cmd_size-1] == '\r' || cmd[cmd_size-1] == '\n' ) {
+        cmd[--cmd_size] = '\0';
+    }
+    if ( cmd[cmd_size-1] != '\0' ) {
+        cmd[cmd_size++] = '\0';
+    }
 
-    if ( std_str_cmp ( msg, "reload" ) == 0 ) {
+    if ( std_str_cmp ( cmd, "reload" ) == 0 ) {
         return std_app_state_reload_m;
     }
 
@@ -883,14 +917,14 @@ static std_app_state_e onda_update_client ( void ) {
 
     std_stack_t* list_stack = &onda_state->client.list_stack;
 
-    if ( std_str_cmp ( msg, "list" ) == 0 ) {
+    if ( std_str_cmp ( cmd, "list" ) == 0 ) {
         onda_client_request_list ( stack, "" );
         std_stack_clear ( list_stack );
         list_result_t list = onda_client_read_list ( list_stack );
         onda_state->client.list = list;
         onda_client_print_list ( stack, &list );
-    } else if ( std_str_starts_with ( msg, "open" ) ) {
-        uint32_t id = std_str_to_u32 ( msg + 5 );
+    } else if ( std_str_starts_with ( cmd, "open" ) ) {
+        uint32_t id = std_str_to_u32 ( cmd + 5 );
         list_result_t* client_list = &onda_state->client.list;
         std_assert_m ( id < client_list->subdir_count + client_list->file_count );
         if ( id < client_list->subdir_count ) {
@@ -903,23 +937,23 @@ static std_app_state_e onda_update_client ( void ) {
         list_result_t list = onda_client_read_list ( list_stack );
         onda_state->client.list = list;
         onda_client_print_list ( stack, &list );
-    } else if ( std_str_cmp ( msg, "back" ) == 0 ) {
+    } else if ( std_str_cmp ( cmd, "back" ) == 0 ) {
         std_path_pop ( &onda_state->client.path );
         onda_client_request_list ( stack, "" );
         std_stack_clear ( list_stack );
         list_result_t list = onda_client_read_list ( list_stack );
         onda_state->client.list = list;
         onda_client_print_list ( stack, &list );
-    } else if ( std_str_cmp ( msg, "exit" ) == 0 ) {
+    } else if ( std_str_cmp ( cmd, "exit" ) == 0 ) {
         onda_client_request_t* request = std_stack_alloc_m ( stack, onda_client_request_t );
-        request->data_size = msg_size;
-        std_stack_string_copy ( stack, msg );
-        net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + msg_size );
+        request->data_size = cmd_size;
+        std_stack_string_copy ( stack, cmd );
+        net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + cmd_size );
         net->destroy_socket ( onda_state->socket );
         return std_app_state_exit_m;
-    } else if ( std_str_starts_with ( msg, "play" ) ) {
+    } else if ( std_str_starts_with ( cmd, "play" ) ) {
         list_result_t* client_list = &onda_state->client.list;
-        uint32_t id = std_str_to_u32 ( msg + 5 );
+        uint32_t id = std_str_to_u32 ( cmd + 5 );
         std_assert_m ( id < client_list->subdir_count + client_list->file_count );
         std_log_m ( std_log_level_custom_m, "\n\n" ); // make room for 2 empty lines for the player
         if ( id < client_list->subdir_count ) {
@@ -936,8 +970,17 @@ static std_app_state_e onda_update_client ( void ) {
             char* file = client_list->files[id - client_list->subdir_count];
             onda_client_play_media ( stack, file );
         }
+    } else if ( std_str_cmp ( cmd, "help" ) == 0 ) {
+        onda_client_print_help();
     } else {
-        std_log_error_m ( "Bad input" );
+        std_log_warn_m ( "Bad input: \"" std_fmt_str_m "\"", cmd );
+        onda_client_request_t* request = std_stack_alloc_m ( stack, onda_client_request_t );
+        cmd = "exit";
+        cmd_size = sizeof ( "exit" );
+        request->data_size = cmd_size;
+        std_stack_string_copy ( stack, cmd );
+        net->write_connected_socket ( onda_state->socket, request, sizeof ( onda_client_request_t ) + cmd_size );
+        net->destroy_socket ( onda_state->socket );
         return std_app_state_exit_m;
     }
 

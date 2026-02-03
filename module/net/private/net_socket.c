@@ -411,24 +411,34 @@ size_t net_socket_write_connected ( net_socket_h socket_handle, const void* data
 
     std_assert_m ( sock->state == net_socket_state_connected_m );
 
-    int write_size = send ( sock->os_handle, data, ( int ) size, 0 );
+    int result = send ( sock->os_handle, data, ( int ) size, 0 );
 
     // TODO better error handling
 #if defined std_platform_win32_m
-    if ( write_size == SOCKET_ERROR ) {
-        std_log_os_error_m();
-        return 0;
+    if ( result == SOCKET_ERROR ) {
+        int error = WSAGetLastError();
+        if ( error == WSAECONNRESET ) {
+            return 0;
+        } else {
+            std_log_os_error_m();
+            return 0;
+        }
     }
 #elif defined std_platform_linux_m
-    if ( write_size == -1 ) {
-        std_log_os_error_m();
-        return 0;
+    if ( result == -1 ) {
+        int error = errno;
+        if ( error == ECONNRESET ) {
+            return 0;
+        } else {
+            std_log_os_error_m();
+            return 0;
+        }
     }
 #endif
 
+    size_t write_size = ( size_t ) result;
     std_assert_m ( write_size == size );
-
-    return ( size_t ) write_size;
+    return write_size;
 }
 
 size_t net_socket_read ( net_socket_address_t* address, void* dest, size_t cap, net_socket_h socket_handle ) {

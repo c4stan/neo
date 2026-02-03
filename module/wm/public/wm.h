@@ -322,7 +322,7 @@ typedef struct {
 #endif
 
     void ( *get_window_input_buffer ) ( wm_window_h window, wm_input_buffer_t* buffer );
-    wm_window_h ( *get_console_window ) ( void );
+    wm_window_h ( *get_console_window ) ( void ); // WARNING: internally sleeps for ~100ms, prefer calling once and caching the result
 
     size_t ( *get_displays_count ) ( void );
     size_t ( *get_displays ) ( wm_display_h* displays, size_t cap );

@@ -1917,7 +1917,7 @@ wm_window_h wm_window_console_get ( void ) {
    // Format a "unique" NewWindowTitle.
    wsprintf ( new_title,"%d/%d", GetTickCount(), GetCurrentProcessId() );
    SetConsoleTitle ( new_title );
-   Sleep(40);
+   Sleep ( 100 ); // had to increase this
    os_handle.window = ( uint64_t ) FindWindow ( NULL, new_title );
    SetConsoleTitle ( old_title );
 #elif defined std_platform_linux_m
