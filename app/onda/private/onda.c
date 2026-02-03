@@ -16,7 +16,7 @@
 #include "minimp3_ex.h"
 #include "foxen-flac.h"
 
-#define onda_subpath_size_m 128
+#define onda_subpath_size_m 512
 #define onda_stream_chunk_size_m (1024ull * 64 * 1)
 
 #define onda_rootpath_size_m 128
@@ -111,7 +111,7 @@ static bool onda_boot_server ( uint16_t port, const char* path ) {
     net_socket_address_t address = net_socket_address_m (
         .port = port,
     );
-    net->ip_string_to_bytes ( &address.ip, "127.0.0.1", net_address_family_ip4_m );
+    net->ip_string_to_bytes ( &address.ip, "0.0.0.0", net_address_family_ip4_m );
 
     onda_state->socket = net->create_socket ( &net_socket_params_m (
         .is_blocking = false,

@@ -30,4 +30,4 @@ std_module_entrypoint_name_max_len_m    64
 
 # std_allocator
 std_allocator_track_allocations_m           1
-std_allocator_log_allocations_to_file_m     1
+std_allocator_log_allocations_to_file_m     0
