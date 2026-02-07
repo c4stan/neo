@@ -23,11 +23,21 @@ static void xf_load_shaders ( xg_device_h device ) {
 
 static void xf_api_init ( xf_i* xf ) {
     xf->load_shaders = xf_load_shaders;
+    
+    xf->create_texture = xf_graph_create_texture;
+    xf->create_texture_from_external = xf_graph_create_texture_from_external;
+    
+    xf->create_multi_texture = xf_graph_create_multi_texture;
+    xf->create_multi_texture_from_swapchain = xf_graph_create_multi_texture_from_swapchain;
+    
+    xf->create_buffer = xf_graph_create_buffer;
+    xf->create_buffer_from_external = xf_graph_buffer_create_from_external;
+    
+    xf->create_multi_buffer = xf_graph_create_multi_buffer;
 
-    xf->create_texture = xf_resource_texture_create;
-    xf->create_buffer = xf_resource_buffer_create;
     xf->create_graph = xf_graph_create;
     xf->create_node = xf_graph_node_create;
+
     xf->finalize_graph = xf_graph_finalize;
     //xf->build_graph = xf_graph_build;
     xf->execute_graph = xf_graph_execute;
@@ -35,22 +45,13 @@ static void xf_api_init ( xf_i* xf ) {
     xf->destroy_graph = xf_graph_destroy;
     //xf.declare_swapchain = xf_resource_swapchain_declare;
     //xf.bind_texture = xf_resource_texture_bind;
-    xf->destroy_unreferenced_resources = xf_resource_destroy_unreferenced;
 
     xf->enable_node = xf_graph_node_enable;
     xf->disable_node = xf_graph_node_disable;
     xf->node_set_enabled = xf_graph_node_set_enabled;
 
-    xf->create_multi_texture = xf_resource_multi_texture_create;
-    xf->create_multi_buffer = xf_resource_multi_buffer_create;
-    xf->advance_multi_texture = xf_resource_multi_texture_advance;
-    xf->advance_multi_buffer = xf_resource_multi_buffer_advance;
-    xf->create_multi_texture_from_swapchain = xf_resource_multi_texture_create_from_swapchain;
-
     xf->destroy_texture = xf_resource_texture_destroy;
 
-    xf->create_texture_from_external = xf_resource_texture_create_from_external;
-    xf->create_buffer_from_external = xf_resource_buffer_create_from_external;
     xf->get_multi_texture = xf_resource_multi_texture_get_texture;
     xf->get_multi_buffer = xf_resource_multi_buffer_get_buffer;
 
@@ -62,7 +63,6 @@ static void xf_api_init ( xf_i* xf ) {
 
     xf->debug_print_graph = xf_graph_debug_print;
 
-    xf->list_textures = xf_resource_texture_list;
     xf->set_graph_texture_export = xf_graph_set_texture_export;
 
     xf->get_node_by_name = xf_graph_get_node_by_name;

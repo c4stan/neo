@@ -97,3 +97,31 @@ xf_node_h add_sky_node ( xf_graph_h graph, const gbuffer_textures_t* gbuffer, xf
     ) );
     return node;
 }
+
+#if 0
+xf_node_h add_sky_convolution_node ( xf_graph_h graph ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xs_i* xs = state->modules.xs;
+    xf_i* xf = state->modules.xf;
+
+    sky_pass_args_t args = {
+        .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "equirectangular_convolution" ) ),
+    };
+
+    xf_node_h node = xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "sky_convolution",
+        .type = xf_node_type_custom_pass_m,
+        .pass.custom = xf_node_custom_pass_params_m (
+            .routine = sky_convolution_pass_routine,
+            .user_args = std_buffer_struct_m ( &args ),
+        ),
+        .resources = xf_node_resource_params_m (
+            .sampled_textures_count = 1,
+            .sampled_textures = {
+                xf_compute_texture_dependency_m ( .texture = gbuffer->radiosity ),
+            },
+        ),
+    ) );
+    return node;
+}
+#endif

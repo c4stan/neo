@@ -88,14 +88,14 @@ static void xf_test ( void ) {
     xf_i* xf = std_module_load_m ( xf_module_name_m );
     xf->load_shaders ( device );
 
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain(swapchain);
-
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( 
         .device = device,
         .debug_name = "test_graph_1" 
     ) );
 
-    xf_texture_h color_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
+
+    xf_texture_h color_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = 600,
             .height = 400,
@@ -106,7 +106,7 @@ static void xf_test ( void ) {
         .auto_advance = false,
     ) );
 
-    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h depth_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = 600,
             .height = 400,
@@ -242,6 +242,10 @@ static void xf_test ( void ) {
         xg->submit_workload ( workload );
         xg->present_swapchain ( swapchain, workload );
     }
+
+    xg_workload_h workload = xg->create_workload ( device );
+    xf->destroy_graph ( graph, workload );
+    xg->submit_workload ( workload );
 
     std_module_unload_m ( xf_module_name_m );
     std_module_unload_m ( xs_module_name_m );

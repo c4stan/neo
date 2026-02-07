@@ -147,8 +147,8 @@ static void run_se_test_2 ( void ) {
     xs_database_pipeline_h pipeline_state = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "triangle") );
     std_assert_m ( pipeline_state != xg_null_handle_m );
 
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
-    xf_graph_h graph = xf->create_graph( &xf_graph_params_m ( .device = device, .debug_name = "se_test" ) );
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "se_test" ) );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
     
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "clear",

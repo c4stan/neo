@@ -652,13 +652,26 @@ typedef enum {
 typedef struct {
     void ( *load_shaders ) ( xg_device_h device );
 
-    xf_texture_h ( *create_texture ) ( const xf_texture_params_t* params );
-    xf_buffer_h ( *create_buffer ) ( const xf_buffer_params_t* params );
-    xf_texture_h ( *create_multi_texture ) ( const xf_multi_texture_params_t* params );
-    xf_buffer_h ( *create_multi_buffer ) ( const xf_multi_buffer_params_t* params );
-    void ( *destroy_unreferenced_resources ) ( xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time );
+    //xf_texture_h ( *create_texture ) ( const xf_texture_params_t* params );
+    //xf_buffer_h ( *create_buffer ) ( const xf_buffer_params_t* params );
+    //xf_texture_h ( *create_multi_texture ) ( const xf_multi_texture_params_t* params );
+    //xf_buffer_h ( *create_multi_buffer ) ( const xf_multi_buffer_params_t* params );
+
+    xf_texture_h ( *create_texture ) ( xf_graph_h graph, const xf_texture_params_t* params );
+    xf_texture_h ( *create_texture_from_external ) ( xf_graph_h graph, xg_texture_h xg_handle );
+
+    xf_texture_h ( *create_multi_texture ) ( xf_graph_h graph, const xf_multi_texture_params_t* params );
+    //xf_texture_h ( *create_external_multi_texture ) ( xf_graph_h graph, const xf_multi_texture_params_t* params );
+    xf_texture_h ( *create_multi_texture_from_swapchain ) ( xf_graph_h graph, xg_swapchain_h swapchain );
+
+    xf_buffer_h ( *create_buffer ) ( xf_graph_h graph, const xf_buffer_params_t* params );
+    xf_buffer_h ( *create_buffer_from_external ) ( xf_graph_h graph, xg_buffer_h xg_handle );
+
+    xf_buffer_h ( *create_multi_buffer ) ( xf_graph_h graph, const xf_multi_buffer_params_t* params );
+    //xf_buffer_h ( *create_external_multi_buffer ) ( xf_graph_h graph, const xf_multi_buffer_params_t* params );
 
     void ( *destroy_texture ) ( xf_texture_h texture );
+    void ( *destroy_buffer ) ( xf_buffer_h buffer );
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
     xf_node_h ( *create_node ) ( xf_graph_h graph, const xf_node_params_t* params );
@@ -679,9 +692,6 @@ typedef struct {
     xf_texture_h ( *get_multi_texture ) ( xf_texture_h multi_texture, int32_t offset );
     xf_buffer_h ( *get_multi_buffer ) ( xf_buffer_h multi_buffer, int32_t offset );
 
-    xf_texture_h ( *create_multi_texture_from_swapchain ) ( xg_swapchain_h swapchain );
-    xf_texture_h ( *create_texture_from_external ) ( xg_texture_h texture );
-    xf_buffer_h ( *create_buffer_from_external ) ( xg_buffer_h buffer );
     void ( *refresh_external_texture ) ( xf_texture_h texture );
 
     void ( *get_texture_info ) ( xf_texture_info_t* info, xf_texture_h texture );

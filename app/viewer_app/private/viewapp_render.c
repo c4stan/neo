@@ -264,14 +264,14 @@ void viewapp_load_mouse_pick_graph ( void ) {
     ) );
     state->render.mouse_pick_graph = graph;
 
-    xf_texture_h object_id_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h object_id_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8_uint_m,
         .debug_name = "mouse_pick_object_id"
     ) );
 
-    xf_texture_h depth_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h depth_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_d32_sfloat_m,
@@ -310,7 +310,7 @@ void viewapp_load_mouse_pick_graph ( void ) {
     ) );
     state->render.object_id_readback_texture = readback_texture;
 
-    xf_texture_h copy_dest = xf->create_texture_from_external ( readback_texture );
+    xf_texture_h copy_dest = xf->create_texture_from_external ( graph, readback_texture );
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "mouse_pick_object_id_copy",
@@ -356,35 +356,35 @@ static void viewapp_boot_restir_di_graph ( void ) {
     state->render.render_graph = graph;
 
     // gbuffer laydown
-    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h color_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "color_texture",
     ) );
 
-    xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h normal_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "normal_texture",
     ) );
 
-    xf_texture_h material_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h material_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "material_texture"
     ) );
 
-    xf_texture_h radiosity_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h radiosity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "radiosity_texture"
     ) );
 
-    xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h object_id_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -395,14 +395,14 @@ static void viewapp_boot_restir_di_graph ( void ) {
         ),
     ) );
 
-    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h velocity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r16g16_unorm_m,
         .debug_name = "velocity_texture",
     ) );
 
-    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h depth_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -452,26 +452,26 @@ static void viewapp_boot_restir_di_graph ( void ) {
     add_geometry_node ( graph, &gbuffer, depth_texture );
 
     // restir di
-    xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
+    xf_texture_h lighting_texture = xf->create_texture ( graph, &xf_texture_params_m ( 
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
         .debug_name = "lighting_texture"
     ));
 
-    xf_buffer_h instance_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h instance_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = raytrace_instance_data_size(),
         .debug_name = "instance_buffer",
     ) );
 
-    xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = raytrace_light_data_size(),
         .debug_name = "light_buffer",
     ) );
     
     add_raytrace_setup_pass ( graph, instance_buffer, light_buffer );
 
-    xf_texture_h reservoir_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
+    xf_texture_h reservoir_buffer = xf->create_multi_buffer ( graph, &xf_multi_buffer_params_m (
         .buffer = xf_buffer_params_m (
             .size = 32 * resolution_x * resolution_y, // TODO
             .debug_name = "reservoir_buffer",
@@ -636,7 +636,7 @@ static void viewapp_boot_restir_di_graph ( void ) {
     ) );
 
     // taa
-    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -680,7 +680,7 @@ static void viewapp_boot_restir_di_graph ( void ) {
     ) );
 
     // tonemap
-    xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h tonemap_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
@@ -712,11 +712,11 @@ static void viewapp_boot_restir_di_graph ( void ) {
     ) );
 
     // ui
-    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
+    state->render.export_dest = xf->create_texture_from_external ( graph, state->ui.export_texture );
     add_ui_pass ( graph, tonemap_texture, state->render.export_dest );
 
     // present
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
@@ -759,35 +759,35 @@ static void viewapp_boot_raytrace_graph ( void ) {
     state->render.render_graph = graph;
 
     // gbuffer laydown
-    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h color_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "color_texture",
     ) );
 
-    xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h normal_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "normal_texture",
     ) );
 
-    xf_texture_h material_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h material_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "material_texture"
     ) );
 
-    xf_texture_h radiosity_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h radiosity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "radiosity_texture"
     ) );
 
-    xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h object_id_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -798,14 +798,14 @@ static void viewapp_boot_raytrace_graph ( void ) {
         ),
     ) );
 
-    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h velocity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r16g16_unorm_m,
         .debug_name = "velocity_texture",
     ) );
 
-    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h depth_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -855,26 +855,26 @@ static void viewapp_boot_raytrace_graph ( void ) {
     add_geometry_node ( graph, &gbuffer, depth_texture );
 
     // raytrace
-    xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m ( 
+    xf_texture_h lighting_texture = xf->create_texture ( graph, &xf_texture_params_m ( 
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
         .debug_name = "lighting_texture"
     ));
 
-    xf_buffer_h instance_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h instance_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = raytrace_instance_data_size(),
         .debug_name = "instance_buffer",
     ) );
 
-    xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = raytrace_light_data_size(),
         .debug_name = "light_buffer",
     ) );
     
     add_raytrace_setup_pass ( graph, instance_buffer, light_buffer );
 
-    xf_texture_h reservoir_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
+    xf_texture_h reservoir_buffer = xf->create_multi_buffer ( graph, &xf_multi_buffer_params_m (
         .buffer = xf_buffer_params_m (
             .size = 32 * resolution_x * resolution_y, // TODO
             .debug_name = "reservoir_buffer",
@@ -926,7 +926,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     // taa
-    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -970,7 +970,7 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     // tonemap
-    xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h tonemap_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
@@ -1002,11 +1002,11 @@ static void viewapp_boot_raytrace_graph ( void ) {
     ) );
 
     // ui
-    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
+    state->render.export_dest = xf->create_texture_from_external ( graph, state->ui.export_texture );
     add_ui_pass ( graph, tonemap_texture, state->render.export_dest );
 
     // present
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,
@@ -1053,7 +1053,7 @@ static void viewapp_boot_raster_graph ( void ) {
     state->render.render_graph = graph;
 
     uint32_t shadow_size = 1024 * 8;
-    xf_texture_h shadow_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h shadow_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = shadow_size,
         .height = shadow_size,
         .format = xg_format_d32_sfloat_m,
@@ -1079,35 +1079,35 @@ static void viewapp_boot_raster_graph ( void ) {
     add_shadow_pass ( graph, shadow_texture );
 
     // gbuffer laydown
-    xf_texture_h color_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h color_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "color_texture",
     ) );
 
-    xf_texture_h normal_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h normal_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "normal_texture",
     ) );
 
-    xf_texture_h material_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h material_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "material_texture"
     ) );
 
-    xf_texture_h radiosity_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h radiosity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "radiosity_texture"
     ) );
 
-    xf_texture_h object_id_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h object_id_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -1119,14 +1119,14 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
 
-    xf_texture_h velocity_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h velocity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r16g16_unorm_m,
         .debug_name = "velocity_texture",
     ) );
 
-    xf_texture_h depth_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h depth_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -1176,16 +1176,17 @@ static void viewapp_boot_raster_graph ( void ) {
     add_geometry_node ( graph, &gbuffer, depth_texture );
 
     // sky
+    //add_sky_convolution_node ( graph );
     add_sky_node ( graph, &gbuffer, depth_texture );
 
     // tessellation
     // TODO remove the setup pass, have a proper susystem that suballocates multiple meshes vertex/index/meta data into buffers, properly render on gbuffer, shadows, ...
     xg_workload_h tess_workload = xg->create_workload ( device );
-    xf_buffer_h tess_vertex_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h tess_vertex_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = 1024 * 1024 * 16,
         .debug_name = "tessellation_vbuffer"
     ) );
-    xf_buffer_h tess_index_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h tess_index_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = 1024 * 1024 * 32,
         .debug_name = "tessellation_ibuffer"
     ) );
@@ -1212,7 +1213,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xg->wait_all_workload_complete();
     
     uint64_t tess_subdivision_buffer_size = sizeof ( uint32_t ) * 1024 * 1024 * 32;
-    xf_buffer_h tess_subdivision_buffer = xf->create_multi_buffer ( &xf_multi_buffer_params_m (
+    xf_buffer_h tess_subdivision_buffer = xf->create_multi_buffer ( graph, &xf_multi_buffer_params_m (
         .buffer = xf_buffer_params_m (
             .size = tess_subdivision_buffer_size,
             .debug_name = "tessellation_subdivision_buffer",
@@ -1224,7 +1225,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
     xf_buffer_h tess_prev_subdivision_buffer = xf->get_multi_buffer ( tess_subdivision_buffer, -1 );
 
-    xf_buffer_h tess_culled_subdivision_buffer = xf->create_buffer ( &xf_buffer_params_m ( 
+    xf_buffer_h tess_culled_subdivision_buffer = xf->create_buffer ( graph, &xf_buffer_params_m ( 
         .size = tess_subdivision_buffer_size,
         .debug_name = "tessellation_culled_buffer",
         .init = &xg_buffer_init_m (
@@ -1233,7 +1234,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    xf_buffer_h tess_update_indirect_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h tess_update_indirect_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = sizeof ( xg_compute_indirect_gpu_args_t ) + 4,
         .debug_name = "tessellation_indirect_update",
     ) );
@@ -1262,7 +1263,7 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
     ) );
 
-    xf_buffer_h tess_draw_indirect_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h tess_draw_indirect_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = sizeof ( xg_draw_indirect_gpu_args_t ),
         .debug_name = "tessellation_indirect_draw"
     ) );
@@ -1292,7 +1293,7 @@ static void viewapp_boot_raster_graph ( void ) {
     add_tessellation_draw_pass ( graph, tess_vertex_buffer, tess_index_buffer, tess_culled_subdivision_buffer, tess_draw_indirect_buffer, tess_instance_vertex_buffer, &gbuffer, depth_texture, sdb );
 
     // lighting
-    xf_texture_h lighting_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h lighting_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -1306,14 +1307,14 @@ static void viewapp_boot_raster_graph ( void ) {
     // filled by light_cluster_build
     uint32_t light_grid_size[3] = { 16, 8, 24 };
     uint32_t light_cluster_count = light_grid_size[0] * light_grid_size[1] * light_grid_size[2];
-    xf_buffer_h light_cluster_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_cluster_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = sizeof ( float ) * 4 * 2 * light_cluster_count,
         .debug_name = "light_clusters"
     ) );
 
     // light buffer contains the lights and their data (light_t)
     // filled by the light update pass
-    xf_buffer_h light_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = light_data_size(),
         .debug_name = "light_data",
     ) );
@@ -1321,11 +1322,11 @@ static void viewapp_boot_raster_graph ( void ) {
     // light list buffer contains lists of relevant lights (u32 indices to light data), one per cluster but stored out of order
     // light grid buffer contains for each cluster an <offset,count> pair (light_grid_t) that identifies the cluster's list of lights inside the light list buffer
     // both are filled by light_cull
-    xf_buffer_h light_list_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_list_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = sizeof ( uint32_t ) * light_cluster_count * viewapp_max_lights_m,
         .debug_name = "light_list",
     ) );
-    xf_buffer_h light_grid_buffer = xf->create_buffer ( &xf_buffer_params_m (
+    xf_buffer_h light_grid_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = sizeof ( uint32_t ) * 2 * light_cluster_count,
         .debug_name = "light_grid"
     ) );
@@ -1389,7 +1390,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
-        //.queue = xg_cmd_queue_compute_m,
+        .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ),
             .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
@@ -1428,7 +1429,7 @@ static void viewapp_boot_raster_graph ( void ) {
     uint32_t hiz_mip_count = 8;
     std_assert_m ( resolution_x % ( 1 << ( hiz_mip_count - 1 ) ) == 0 );
     std_assert_m ( resolution_y % ( 1 << ( hiz_mip_count - 1 ) ) == 0 );
-    xf_texture_h hiz_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h hiz_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_r32_sfloat_m,
@@ -1447,7 +1448,7 @@ static void viewapp_boot_raster_graph ( void ) {
     uint32_t lighting_mip_count = 8;
     std_assert_m ( resolution_x % ( 1 << ( lighting_mip_count - 1 ) ) == 0 );
     std_assert_m ( resolution_y % ( 1 << ( lighting_mip_count - 1 ) ) == 0 );
-    xf_texture_h downsampled_lighting_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h downsampled_lighting_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x / 2,
         .height = resolution_y / 2,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -1508,7 +1509,7 @@ static void viewapp_boot_raster_graph ( void ) {
     //    ),
     //) );
     uint32_t ssgi_scale = 2;
-    xf_texture_h ssgi_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h ssgi_raymarch_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x / ssgi_scale,
         .height = resolution_y / ssgi_scale,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -1537,7 +1538,7 @@ static void viewapp_boot_raster_graph ( void ) {
 #endif
 
     // ssgi temporal accumulation
-    xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h ssgi_accumulation_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x / ssgi_scale,
             .height = resolution_y / ssgi_scale,
@@ -1648,13 +1649,13 @@ static void viewapp_boot_raster_graph ( void ) {
 
     // ssr
     uint32_t ssr_scale = 1;
-    xf_texture_h ssr_raymarch_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h ssr_raymarch_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x / ssr_scale,
         .height = resolution_y / ssr_scale,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
         .debug_name = "ssr_raymarch_texture",
     ) );
-    xf_texture_h ssr_intersection_distance = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h ssr_intersection_distance = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x / ssr_scale,
         .height = resolution_y / ssr_scale,
         .format = xg_format_r16_sfloat_m,
@@ -1682,7 +1683,7 @@ static void viewapp_boot_raster_graph ( void ) {
 #endif
 
     // ssr ta
-    xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x / ssr_scale,
             .height = resolution_y / ssr_scale,
@@ -1696,7 +1697,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssr_ta",
-        //.queue = xg_cmd_queue_compute_m,
+        .queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ),
             .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssr_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssr_scale, 8 ), 1 },
@@ -1726,7 +1727,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // combine
-    xf_texture_h combine_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h combine_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_b10g11r11_ufloat_pack32_m,
@@ -1756,7 +1757,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // taa
-    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( &xf_multi_texture_params_m (
+    xf_texture_h taa_accumulation_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
             .width = resolution_x,
             .height = resolution_y,
@@ -1800,7 +1801,7 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // tonemap
-    xf_texture_h tonemap_texture = xf->create_texture ( &xf_texture_params_m (
+    xf_texture_h tonemap_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
         .height = resolution_y,
         .format = xg_format_a2b10g10r10_unorm_pack32_m,
@@ -1832,11 +1833,11 @@ static void viewapp_boot_raster_graph ( void ) {
     ) );
 
     // ui
-    state->render.export_dest = xf->create_texture_from_external ( state->ui.export_texture );
+    state->render.export_dest = xf->create_texture_from_external ( graph, state->ui.export_texture );
     add_ui_pass ( graph, tonemap_texture, state->render.export_dest );
 
     // present
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
         .type = xf_node_type_copy_pass_m,

@@ -502,6 +502,7 @@ void viewer_app_unload ( void ) {
 
     viewapp_destroy_render_graph ( workload, resource_cmd_buffer );
     viewapp_destroy_mouse_pick_graph ( workload, resource_cmd_buffer );
+    xg->destroy_swapchain ( state->render.swapchain );
 
     viewapp_unload_ui ( resource_cmd_buffer );
 

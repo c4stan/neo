@@ -1,0 +1,9 @@
+compute_shader equirectangular_convolution.comp
+
+include common.xsi
+
+begin bindings
+    texture sampled
+    texture storage
+    sampler
+end

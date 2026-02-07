@@ -56,11 +56,26 @@ struct shadow_ray_payload_t {
 //                                         M A T H
 // ======================================================================================= //
 
+// theta: [0, pi] angle on y plane from y axis
+// phi: [0, 2pi] angle on xz plane around y axis from x axis 
 vec3 vec3_from_spherical ( float theta, float phi ) {
     float x = sin ( theta ) * cos ( phi );
     float y = cos ( theta );
     float z = sin ( theta ) * sin ( phi );
     return vec3 ( x, y, z );
+}
+
+vec2 spherical_from_uv ( vec2 uv ) {
+    float theta = uv.y * PI;
+    float phi = uv.x * 2.f * PI;
+    return vec2 ( theta, phi );
+}
+
+vec2 equirectangular_uv_from_dir ( vec3 dir ) {
+    float x = atan ( dir.z, dir.x ) * 0.5f; // move result range from -pi to pi to -pi/2 to pi/2
+    float y = -asin ( dir.y );              // pi/2 to -pi/2
+    vec2 uv = vec2 ( x, y ) / PI + 0.5f;    // normalize all into 0,1 range
+    return uv;
 }
 
 vec3 tangent_from_normal ( vec3 normal ) {

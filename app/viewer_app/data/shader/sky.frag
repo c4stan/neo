@@ -13,11 +13,6 @@ layout ( location = 0 ) out vec4 out_color;
 
 void main() {
     vec3 dir = normalize ( in_dir );
-
-    vec2 sample_uv;
-    sample_uv.x = atan ( dir.z, dir.x ) * 0.5f;
-    sample_uv.y = -asin ( dir.y );
-    sample_uv = sample_uv / PI + 0.5f;
-
+    vec2 sample_uv = equirectangular_uv_from_dir ( dir );
     out_color = texture ( sampler2D ( color_texture, sampler_linear ), sample_uv );
 }

@@ -323,6 +323,11 @@ typedef struct {
 typedef struct {
     xf_graph_params_t params;
 
+    xf_texture_h owned_textures_array[xf_graph_max_textures_m];
+    xf_buffer_h owned_buffers_array[xf_graph_max_buffers_m];
+    uint32_t owned_textures_count;
+    uint32_t owned_buffers_count;
+
     xf_node_t nodes_array[xf_graph_max_nodes_m];
     xf_node_t* nodes_freelist;
     uint32_t nodes_execution_order[xf_graph_max_nodes_m]; // indexes nodes, sorted by execution order
@@ -359,8 +364,6 @@ typedef struct {
     std_hash_map_t buffers_map;
 
     xf_graph_memory_heap_t heap; // TODO one per mem type?
-    uint32_t owned_textures_array[32]; // indexes textures_array - TODO size
-    uint32_t owned_textures_count;
 
     xf_graph_segment_t segments_array[xf_graph_max_nodes_m];
     uint32_t segments_count;
@@ -393,6 +396,14 @@ void xf_graph_reload ( xf_graph_state_t* state );
 void xf_graph_unload ( void );
 
 void xf_graph_load_shaders ( xs_i* xs, xs_database_h sdb );
+
+xf_texture_h xf_graph_create_texture ( xf_graph_h graph_handle, const xf_texture_params_t* params );
+xf_texture_h xf_graph_create_texture_from_external ( xf_graph_h graph_handle, xg_texture_h xg_handle );
+xf_texture_h xf_graph_create_multi_texture ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params );
+xf_texture_h xf_graph_create_multi_texture_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain );
+xf_buffer_h xf_graph_create_buffer ( xf_graph_h graph_handle, const xf_buffer_params_t* params );
+xf_buffer_h xf_graph_buffer_create_from_external ( xf_graph_h graph_handle, xg_buffer_h xg_handle );
+xf_buffer_h xf_graph_create_multi_buffer ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params );
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );

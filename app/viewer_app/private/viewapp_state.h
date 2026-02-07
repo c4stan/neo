@@ -238,10 +238,12 @@ typedef struct {
     xg_geo_util_geometry_data_t geo_data;
     xg_geo_util_geometry_gpu_data_t geo_gpu_data;
     xg_texture_h sky_texture;
+    xg_texture_h irradiance_texture;
 } viewapp_sky_component_t;
 
 #define viewapp_sky_component_m( ... ) ( viewapp_sky_component_t ) { \
     .sky_texture = xg_null_handle_m, \
+    .irradiance_texture = xg_null_handle_m, \
     __VA_ARGS__ \
 }
 

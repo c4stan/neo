@@ -149,7 +149,7 @@ static void xi_test ( void ) {
     xf_i* xf = std_module_load_m ( xf_module_name_m );
     xf_graph_h graph = xf->create_graph ( &xf_graph_params_m ( .device = device, .debug_name = "xi_graph" ) );
 
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "clear",
