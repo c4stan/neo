@@ -325,8 +325,12 @@ typedef struct {
 
     xf_texture_h owned_textures_array[xf_graph_max_textures_m];
     xf_buffer_h owned_buffers_array[xf_graph_max_buffers_m];
+    xf_physical_texture_h owned_physical_textures_array[xf_graph_max_textures_m];
+    xf_physical_texture_h owned_physical_buffers_array[xf_graph_max_textures_m];
     uint32_t owned_textures_count;
     uint32_t owned_buffers_count;
+    uint32_t owned_physical_textures_count;
+    uint32_t owned_physical_buffers_count;
 
     xf_node_t nodes_array[xf_graph_max_nodes_m];
     xf_node_t* nodes_freelist;

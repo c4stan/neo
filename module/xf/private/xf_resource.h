@@ -152,7 +152,6 @@ typedef struct {
 typedef struct {
     bool is_external;
     xg_texture_h handle;
-    uint32_t ref_count;
     xg_texture_info_t info;
     union {
         xf_texture_state_t shared;
@@ -184,7 +183,6 @@ typedef struct {
 typedef struct {
     bool is_external;
     xg_buffer_h handle;
-    uint32_t ref_count;
     xg_buffer_info_t info;
     xf_buffer_state_t state;
 } xf_physical_buffer_t;
@@ -275,8 +273,6 @@ void xf_resource_multi_texture_swapchain_resize ( xf_texture_h swapchain );
 
 xf_physical_texture_h xf_resource_physical_texture_create ( const xf_physical_texture_params_t* params );
 void xf_resource_physical_texture_destroy ( xf_physical_texture_h texture );
-void xf_resource_physical_texture_add_ref ( xf_physical_texture_h texture );
-void xf_resource_physical_texture_remove_ref ( xf_physical_texture_h texture );
 xf_physical_texture_t* xf_resource_physical_texture_get ( xf_physical_texture_h texture );
 void xf_resource_physical_texture_map_to_new ( xf_physical_texture_h texture, xg_texture_h xg_handle, const xg_texture_info_t* info );
 void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physical_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
@@ -304,10 +300,6 @@ xf_buffer_h xf_resource_multi_buffer_get_default ( xf_buffer_h multi_buffer );
 
 xf_physical_buffer_h xf_resource_physical_buffer_create ( const xf_physical_buffer_params_t* params );
 void xf_resource_physical_buffer_destroy ( xf_physical_buffer_h buffer );
-void xf_resource_physical_buffer_add_ref ( xf_physical_buffer_h buffer );
-void xf_resource_physical_buffer_remove_ref ( xf_physical_buffer_h buffer );
 xf_physical_buffer_t* xf_resource_physical_buffer_get ( xf_physical_buffer_h buffer );
 void xf_resource_physical_buffer_map_to_new ( xf_physical_buffer_h buffer, xg_buffer_h xg_handle, const xg_buffer_info_t* info );
 void xf_resource_physical_buffer_state_barrier ( std_stack_t* stack, xf_physical_buffer_h buffer, const xf_buffer_execution_state_t* new_state );
-
-void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time );

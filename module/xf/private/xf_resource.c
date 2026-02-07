@@ -142,7 +142,12 @@ void xf_resource_texture_destroy ( xf_texture_h texture_handle ) {
         std_bitset_clear ( xf_resource_state->multi_textures_bitset, multi_idx );
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
-        xf_resource_physical_texture_remove_ref ( texture->physical_texture_handle );
+        if ( texture->physical_texture_handle != xf_null_handle_m ) {
+            xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( texture->physical_texture_handle );
+            if ( physical_texture->is_external ) {
+                xf_resource_physical_texture_destroy ( texture->physical_texture_handle );
+            }
+        }
         std_list_push ( &xf_resource_state->textures_freelist, texture );
         std_bitset_clear ( xf_resource_state->textures_bitset, texture_handle );
     }
@@ -231,95 +236,6 @@ void xf_resource_texture_update_info ( xf_texture_h texture_handle, const xg_tex
     //texture->allowed_usage = info->allowed_usage;
 }
 
-static void xf_resource_physical_texture_set_execution_state ( xf_physical_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
-    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
-
-    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        //if ( texture->state.shared.execution.queue == xg_cmd_queue_invalid_m ) {
-        //    // First acquire
-        //    std_assert_m ( !state->release );
-        //} else if ( texture->state.shared.execution.queue != state->queue ) {
-        //    // Release or Acquire
-        //    std_assert_m ( texture->state.shared.execution.release != state->release );
-        //    std_assert_m ( state->queue != xg_cmd_queue_invalid_m );
-        //} else if ( texture->state.shared.execution.release ) {
-        //    // Regular transition
-        //    std_assert_m ( state->queue != xg_cmd_queue_invalid_m );
-        //}
-        xf_texture_state_t* state = &texture->state.shared;
-        if ( state->execution.queue == xg_cmd_queue_invalid_m ) {
-            state->prev_queue = new_state->queue;
-            state->queue_transition = false;
-        } else if ( state->queue_transition ) {
-            std_assert_m ( new_state->queue == state->execution.queue );
-            state->queue_transition = false;
-            state->prev_queue = new_state->queue;
-        } else if ( state->execution.queue != new_state->queue ) {
-            state->queue_transition = true;
-            state->prev_queue = state->execution.queue;
-        }
-        texture->state.shared.execution = *new_state;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count;
-
-        if ( view.u64 == xg_texture_view_m().u64 ) {
-            mip_count = texture->info.mip_levels - view.mip_base;
-        } else {
-            mip_count = view.mip_count;
-        }
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].execution = *new_state;
-        }
-    } else {
-        std_not_implemented_m();
-    }
-}
-
-static void xf_resource_physical_texture_set_execution_layout ( xf_physical_texture_h texture_handle, xg_texture_view_t view, xg_texture_layout_e layout ) {
-    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
-
-    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->state.shared.execution.layout = layout;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count;
-
-        if ( view.u64 == xg_texture_view_m().u64 ) {
-            mip_count = texture->info.mip_levels - view.mip_base;
-        } else {
-            mip_count = view.mip_count;
-        }
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].execution.layout = layout;
-        }
-    } else {
-        std_not_implemented_m();
-    }
-}
-
-static void xf_resource_physical_texture_add_execution_stage ( xf_physical_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
-    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
-
-    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        texture->state.shared.execution.stage |= stage;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count;
-
-        if ( view.u64 == xg_texture_view_m().u64 ) {
-            mip_count = texture->info.mip_levels - view.mip_base;
-        } else {
-            mip_count = view.mip_count;
-        }
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].execution.stage |= stage;
-        }
-    } else {
-        std_not_implemented_m();
-    }
-}
-
 void xf_resource_texture_update_external ( xf_texture_h texture_handle ) {
     if ( xf_resource_handle_is_multi_m ( texture_handle ) ) {
         uint32_t multi_idx = xf_resource_handle_multi_idx_m ( texture_handle );
@@ -365,108 +281,20 @@ xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture 
     return texture_handle;
 }
 
-// TODO try using VkEvents instead of barriers?
-static void xf_resource_texture_barrier ( std_stack_t* stack, xf_physical_texture_h physical_texture_handle, xg_texture_view_t view, const xf_texture_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
-    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
-
-    /*
-        if same layout as previous and both are reads, no barrier needed, just accumulate the stage in the resource state
-        if different layout as previous and both are reads, do layout update only barrier, and accumulate stage
-        if prev or current access is write, do barrier with layout change and proper access and stage dependency, and replace resource state current values (no access and proper shader stage)
-    */
-    if ( !xg_memory_access_is_write ( prev_state->execution.access ) && !xg_memory_access_is_write ( new_state->access ) && prev_state->execution.queue == new_state->queue && !prev_state->queue_transition ) {
-        // read after a previous read
-        // just accumulate the stage and do layout transition if necessary
-        if ( prev_state->execution.layout != new_state->layout ) {
-            std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
-            *barrier = xg_texture_memory_barrier_m (
-                .texture = physical_texture->handle,
-                .mip_base = view.mip_base,
-                .mip_count = view.mip_count,
-                .array_base = view.array_base,
-                .array_count = view.array_count,
-                .layout.old = prev_state->execution.layout,
-                .layout.new = new_state->layout,
-                .memory.flushes = xg_memory_access_bit_none_m,
-                .memory.invalidations = new_state->access,
-                .execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m,
-                .execution.blocked = new_state->stage,
-                .queue.old = prev_state->execution.queue,
-                .queue.new = new_state->queue,
-            );
-
-            xf_resource_physical_texture_set_execution_layout ( physical_texture_handle, view, new_state->layout );
-        }
-
-        xf_resource_physical_texture_add_execution_stage ( physical_texture_handle, view, new_state->stage );
-    } else {
-        xg_cmd_queue_e prev_queue = prev_state->execution.queue;
-        if ( prev_state->queue_transition ) {
-            prev_queue = prev_state->prev_queue;
-        }
-
-        // wait on previous access and update the resource state
-        std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
-        *barrier = xg_texture_memory_barrier_m (
-            .texture = physical_texture->handle,
-            .mip_base = view.mip_base,
-            .mip_count = view.mip_count,
-            .array_base = view.array_base,
-            .array_count = view.array_count,
-            .layout.old = prev_state->execution.layout,
-            .layout.new = new_state->layout,
-            .memory.flushes = prev_state->execution.access,
-            .memory.invalidations = new_state->access,
-            .execution.blocker = prev_state->execution.stage,
-            .execution.blocked = new_state->stage,
-            .queue.old = prev_queue,
-            .queue.new = new_state->queue,
-        );
-
-        xf_resource_physical_texture_set_execution_state ( physical_texture_handle, view, new_state );
-    }
-}
-
 void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
     xf_resource_physical_texture_state_barrier ( stack, physical_texture_handle, view, new_state );
 }
 
-void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physical_texture_h physical_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
-    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
-
-    if ( physical_texture->info.view_access == xg_texture_view_access_default_only_m ) {
-        xf_texture_state_t* old_state = &physical_texture->state.shared;
-        xf_resource_texture_barrier ( stack, physical_texture_handle, view, old_state, new_state );
-    } else if ( physical_texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? physical_texture->info.mip_levels : view.mip_count;
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            xf_texture_state_t* old_state = &physical_texture->state.mips[view.mip_base + i];
-            xg_texture_view_t mip_view = view;
-            mip_view.mip_base = view.mip_base + i;
-            mip_view.mip_count = 1;
-            xf_resource_texture_barrier ( stack, physical_texture_handle, mip_view, old_state, new_state );
-        }
-    } else {
-        std_not_implemented_m();
-    }
-}
-
 void xf_resource_texture_bind ( xf_texture_h texture_handle, xf_physical_texture_h physical_texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
     texture->physical_texture_handle = physical_texture_handle;
-    xf_resource_physical_texture_add_ref ( physical_texture_handle );
 }
 
 void xf_resource_texture_unbind ( xf_texture_h texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    xf_physical_texture_h physical_texture_handle = texture->physical_texture_handle;
-    if ( physical_texture_handle != xf_null_handle_m ) {
-        xf_resource_physical_texture_remove_ref ( physical_texture_handle );
-        texture->physical_texture_handle = xf_null_handle_m;
-    }
+    texture->physical_texture_handle = xf_null_handle_m;
 }
 
 bool xf_resource_texture_is_depth ( xf_texture_h texture_handle ) {
@@ -505,7 +333,12 @@ void xf_resource_buffer_destroy ( xf_buffer_h buffer_handle ) {
         std_bitset_clear ( xf_resource_state->multi_buffers_bitset, multi_idx );
     } else {
         xf_buffer_t* buffer = &xf_resource_state->buffers_array[buffer_handle];
-        xf_resource_physical_buffer_remove_ref ( buffer->physical_buffer_handle );
+        if ( buffer->physical_buffer_handle != xf_null_handle_m ) {
+            xf_physical_buffer_t* physical_buffer = xf_resource_physical_buffer_get ( buffer->physical_buffer_handle );
+            if ( physical_buffer->is_external ) {
+                xf_resource_physical_buffer_destroy ( buffer->physical_buffer_handle );
+            }
+        }
         std_list_push ( &xf_resource_state->buffers_freelist, buffer );
         std_bitset_clear ( xf_resource_state->buffers_bitset, buffer_handle );
     }
@@ -632,69 +465,20 @@ void xf_resource_buffer_add_usage ( xf_buffer_h buffer_handle, xg_buffer_usage_b
     }
 }
 
-static void xf_resource_physical_buffer_set_execution_state ( xf_physical_buffer_h physical_buffer_handle, const xf_buffer_execution_state_t* state ) {
-    xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
-    buffer->state.execution = *state;
-}
-
-static void xf_resource_physical_buffer_add_execution_stage ( xf_physical_buffer_h physical_buffer_handle, xg_pipeline_stage_bit_e stage ) {
-    xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
-    buffer->state.execution.stage |= stage;
-}
-
-static void xf_resource_buffer_barrier ( std_stack_t* stack, xf_physical_buffer_h physical_buffer_handle, const xf_buffer_state_t* prev_state, const xf_buffer_execution_state_t* new_state ) {
-    const xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
-
-    /*
-        if same layout as previous and both are reads, no barrier needed, just accumulate the stage in the resource state
-        if different layout as previous and both are reads, do layout update only barrier, and accumulate stage
-        if prev or current access is write, do barrier with layout change and proper access and stage dependency, and replace resource state current values (no access and proper shader stage)
-    */
-    if ( !xg_memory_access_is_write ( prev_state->execution.access ) && !xg_memory_access_is_write ( new_state->access ) ) {
-        // read after a previous read
-        // just accumulate the stage
-        xf_resource_physical_buffer_add_execution_stage ( physical_buffer_handle, new_state->stage );
-    } else {
-        // wait on previous access and update the resource state
-        std_auto_m barrier = std_stack_alloc_m ( stack, xg_buffer_memory_barrier_t );
-        *barrier = xg_buffer_memory_barrier_m (
-            .buffer = buffer->handle,
-            .memory.flushes = prev_state->execution.access,
-            .memory.invalidations = new_state->access,
-            .execution.blocker = prev_state->execution.stage,
-            .execution.blocked = new_state->stage,
-            .size = buffer->info.size,
-        );
-
-        xf_resource_physical_buffer_set_execution_state ( physical_buffer_handle, new_state );
-    }
-}
-
 void xf_resource_buffer_state_barrier ( std_stack_t* stack, xf_buffer_h buffer_handle, const xf_buffer_execution_state_t* new_state ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
     xf_physical_buffer_h physical_buffer_handle = buffer->physical_buffer_handle;
     xf_resource_physical_buffer_state_barrier ( stack, physical_buffer_handle, new_state );
 }
 
-void xf_resource_physical_buffer_state_barrier ( std_stack_t* stack, xf_physical_buffer_h physical_buffer_handle, const xf_buffer_execution_state_t* new_state ) {
-    xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
-    xf_buffer_state_t* old_state = &buffer->state;
-    xf_resource_buffer_barrier ( stack, physical_buffer_handle, old_state, new_state );
-}
-
 void xf_resource_buffer_bind ( xf_buffer_h buffer_handle, xf_physical_buffer_h physical_buffer_handle ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
     buffer->physical_buffer_handle = physical_buffer_handle;
-    xf_resource_physical_buffer_add_ref ( physical_buffer_handle );
 }
 
 void xf_resource_buffer_unbind ( xf_buffer_h buffer_handle ) {
     xf_buffer_t* buffer = xf_resource_buffer_get ( buffer_handle );
-    xf_physical_buffer_h physical_buffer_handle = buffer->physical_buffer_handle;
-    if ( physical_buffer_handle != xf_null_handle_m ) {
-        xf_resource_physical_buffer_remove_ref ( physical_buffer_handle );
-        buffer->physical_buffer_handle = xf_null_handle_m;
-    }
+    buffer->physical_buffer_handle = xf_null_handle_m;
 }
 
 xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer_handle ) {
@@ -922,6 +706,157 @@ xf_buffer_h xf_resource_multi_buffer_get_default ( xf_buffer_h multi_buffer_hand
 //                               D E V I C E   T E X T U R E
 // ======================================================================================= //
 
+static void xf_resource_physical_texture_set_execution_layout ( xf_physical_texture_h texture_handle, xg_texture_view_t view, xg_texture_layout_e layout ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
+
+    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
+        texture->state.shared.execution.layout = layout;
+    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
+        uint32_t mip_count;
+
+        if ( view.u64 == xg_texture_view_m().u64 ) {
+            mip_count = texture->info.mip_levels - view.mip_base;
+        } else {
+            mip_count = view.mip_count;
+        }
+
+        for ( uint32_t i = 0; i < mip_count; ++i ) {
+            texture->state.mips[view.mip_base + i].execution.layout = layout;
+        }
+    } else {
+        std_not_implemented_m();
+    }
+}
+
+static void xf_resource_physical_texture_add_execution_stage ( xf_physical_texture_h texture_handle, xg_texture_view_t view, xg_pipeline_stage_bit_e stage ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
+
+    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
+        texture->state.shared.execution.stage |= stage;
+    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
+        uint32_t mip_count;
+
+        if ( view.u64 == xg_texture_view_m().u64 ) {
+            mip_count = texture->info.mip_levels - view.mip_base;
+        } else {
+            mip_count = view.mip_count;
+        }
+
+        for ( uint32_t i = 0; i < mip_count; ++i ) {
+            texture->state.mips[view.mip_base + i].execution.stage |= stage;
+        }
+    } else {
+        std_not_implemented_m();
+    }
+}
+
+static void xf_resource_physical_texture_set_execution_state ( xf_physical_texture_h texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
+    xf_physical_texture_t* texture = xf_resource_physical_texture_get ( texture_handle );
+
+    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
+        //if ( texture->state.shared.execution.queue == xg_cmd_queue_invalid_m ) {
+        //    // First acquire
+        //    std_assert_m ( !state->release );
+        //} else if ( texture->state.shared.execution.queue != state->queue ) {
+        //    // Release or Acquire
+        //    std_assert_m ( texture->state.shared.execution.release != state->release );
+        //    std_assert_m ( state->queue != xg_cmd_queue_invalid_m );
+        //} else if ( texture->state.shared.execution.release ) {
+        //    // Regular transition
+        //    std_assert_m ( state->queue != xg_cmd_queue_invalid_m );
+        //}
+        xf_texture_state_t* state = &texture->state.shared;
+        if ( state->execution.queue == xg_cmd_queue_invalid_m ) {
+            state->prev_queue = new_state->queue;
+            state->queue_transition = false;
+        } else if ( state->queue_transition ) {
+            std_assert_m ( new_state->queue == state->execution.queue );
+            state->queue_transition = false;
+            state->prev_queue = new_state->queue;
+        } else if ( state->execution.queue != new_state->queue ) {
+            state->queue_transition = true;
+            state->prev_queue = state->execution.queue;
+        }
+        texture->state.shared.execution = *new_state;
+    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
+        uint32_t mip_count;
+
+        if ( view.u64 == xg_texture_view_m().u64 ) {
+            mip_count = texture->info.mip_levels - view.mip_base;
+        } else {
+            mip_count = view.mip_count;
+        }
+
+        for ( uint32_t i = 0; i < mip_count; ++i ) {
+            texture->state.mips[view.mip_base + i].execution = *new_state;
+        }
+    } else {
+        std_not_implemented_m();
+    }
+}
+
+// TODO try using VkEvents instead of barriers?
+static void xf_resource_physical_texture_barrier ( std_stack_t* stack, xf_physical_texture_h physical_texture_handle, xg_texture_view_t view, const xf_texture_state_t* prev_state, const xf_texture_execution_state_t* new_state ) {
+    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
+
+    /*
+        if same layout as previous and both are reads, no barrier needed, just accumulate the stage in the resource state
+        if different layout as previous and both are reads, do layout update only barrier, and accumulate stage
+        if prev or current access is write, do barrier with layout change and proper access and stage dependency, and replace resource state current values (no access and proper shader stage)
+    */
+    if ( !xg_memory_access_is_write ( prev_state->execution.access ) && !xg_memory_access_is_write ( new_state->access ) && prev_state->execution.queue == new_state->queue && !prev_state->queue_transition ) {
+        // read after a previous read
+        // just accumulate the stage and do layout transition if necessary
+        if ( prev_state->execution.layout != new_state->layout ) {
+            std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
+            *barrier = xg_texture_memory_barrier_m (
+                .texture = physical_texture->handle,
+                .mip_base = view.mip_base,
+                .mip_count = view.mip_count,
+                .array_base = view.array_base,
+                .array_count = view.array_count,
+                .layout.old = prev_state->execution.layout,
+                .layout.new = new_state->layout,
+                .memory.flushes = xg_memory_access_bit_none_m,
+                .memory.invalidations = new_state->access,
+                .execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m,
+                .execution.blocked = new_state->stage,
+                .queue.old = prev_state->execution.queue,
+                .queue.new = new_state->queue,
+            );
+
+            xf_resource_physical_texture_set_execution_layout ( physical_texture_handle, view, new_state->layout );
+        }
+
+        xf_resource_physical_texture_add_execution_stage ( physical_texture_handle, view, new_state->stage );
+    } else {
+        xg_cmd_queue_e prev_queue = prev_state->execution.queue;
+        if ( prev_state->queue_transition ) {
+            prev_queue = prev_state->prev_queue;
+        }
+
+        // wait on previous access and update the resource state
+        std_auto_m barrier = std_stack_alloc_m ( stack, xg_texture_memory_barrier_t );
+        *barrier = xg_texture_memory_barrier_m (
+            .texture = physical_texture->handle,
+            .mip_base = view.mip_base,
+            .mip_count = view.mip_count,
+            .array_base = view.array_base,
+            .array_count = view.array_count,
+            .layout.old = prev_state->execution.layout,
+            .layout.new = new_state->layout,
+            .memory.flushes = prev_state->execution.access,
+            .memory.invalidations = new_state->access,
+            .execution.blocker = prev_state->execution.stage,
+            .execution.blocked = new_state->stage,
+            .queue.old = prev_queue,
+            .queue.new = new_state->queue,
+        );
+
+        xf_resource_physical_texture_set_execution_state ( physical_texture_handle, view, new_state );
+    }
+}
+
 xf_physical_texture_h xf_resource_physical_texture_create ( const xf_physical_texture_params_t* params ) {
     xf_physical_texture_t* texture = std_list_pop_m ( &xf_resource_state->physical_textures_freelist );
     *texture = xf_physical_texture_m (
@@ -940,26 +875,6 @@ void xf_resource_physical_texture_destroy ( xf_physical_texture_h handle ) {
     std_bitset_clear ( xf_resource_state->physical_textures_bitset, handle );
 }
 
-void xf_resource_physical_texture_add_ref ( xf_physical_texture_h handle ) {
-    xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
-    texture->ref_count += 1;
-}
-
-void xf_resource_physical_texture_remove_ref ( xf_physical_texture_h handle ) {
-    if ( handle == xf_null_handle_m ) {
-        return;
-    }
-
-    xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
-    uint32_t ref_count = texture->ref_count;
-    if ( ref_count > 1 ) {
-        texture->ref_count = ref_count - 1;
-    } else {
-        texture->ref_count = 0;
-        //xf_resource_physical_texture_destroy ( handle );
-    }
-}
-
 xf_physical_texture_t* xf_resource_physical_texture_get ( xf_physical_texture_h handle ) {
     xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
     return texture;
@@ -972,9 +887,68 @@ void xf_resource_physical_texture_map_to_new ( xf_physical_texture_h physical_te
     texture->state.shared = xf_texture_state_m(); // TODO take as param, don't assume shared
 }
 
+void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physical_texture_h physical_texture_handle, xg_texture_view_t view, const xf_texture_execution_state_t* new_state ) {
+    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
+
+    if ( physical_texture->info.view_access == xg_texture_view_access_default_only_m ) {
+        xf_texture_state_t* old_state = &physical_texture->state.shared;
+        xf_resource_physical_texture_barrier ( stack, physical_texture_handle, view, old_state, new_state );
+    } else if ( physical_texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
+        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? physical_texture->info.mip_levels : view.mip_count;
+
+        for ( uint32_t i = 0; i < mip_count; ++i ) {
+            xf_texture_state_t* old_state = &physical_texture->state.mips[view.mip_base + i];
+            xg_texture_view_t mip_view = view;
+            mip_view.mip_base = view.mip_base + i;
+            mip_view.mip_count = 1;
+            xf_resource_physical_texture_barrier ( stack, physical_texture_handle, mip_view, old_state, new_state );
+        }
+    } else {
+        std_not_implemented_m();
+    }
+}
+
 // ======================================================================================= //
 //                                D E V I C E   B U F F E R
 // ======================================================================================= //
+
+static void xf_resource_physical_buffer_set_execution_state ( xf_physical_buffer_h physical_buffer_handle, const xf_buffer_execution_state_t* state ) {
+    xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
+    buffer->state.execution = *state;
+}
+
+static void xf_resource_physical_buffer_add_execution_stage ( xf_physical_buffer_h physical_buffer_handle, xg_pipeline_stage_bit_e stage ) {
+    xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
+    buffer->state.execution.stage |= stage;
+}
+
+static void xf_resource_physical_buffer_barrier ( std_stack_t* stack, xf_physical_buffer_h physical_buffer_handle, const xf_buffer_state_t* prev_state, const xf_buffer_execution_state_t* new_state ) {
+    const xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
+
+    /*
+        if same layout as previous and both are reads, no barrier needed, just accumulate the stage in the resource state
+        if different layout as previous and both are reads, do layout update only barrier, and accumulate stage
+        if prev or current access is write, do barrier with layout change and proper access and stage dependency, and replace resource state current values (no access and proper shader stage)
+    */
+    if ( !xg_memory_access_is_write ( prev_state->execution.access ) && !xg_memory_access_is_write ( new_state->access ) ) {
+        // read after a previous read
+        // just accumulate the stage
+        xf_resource_physical_buffer_add_execution_stage ( physical_buffer_handle, new_state->stage );
+    } else {
+        // wait on previous access and update the resource state
+        std_auto_m barrier = std_stack_alloc_m ( stack, xg_buffer_memory_barrier_t );
+        *barrier = xg_buffer_memory_barrier_m (
+            .buffer = buffer->handle,
+            .memory.flushes = prev_state->execution.access,
+            .memory.invalidations = new_state->access,
+            .execution.blocker = prev_state->execution.stage,
+            .execution.blocked = new_state->stage,
+            .size = buffer->info.size,
+        );
+
+        xf_resource_physical_buffer_set_execution_state ( physical_buffer_handle, new_state );
+    }
+}
 
 xf_physical_buffer_h xf_resource_physical_buffer_create ( const xf_physical_buffer_params_t* params ) {
     xf_physical_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->physical_buffers_freelist );
@@ -994,25 +968,6 @@ void xf_resource_physical_buffer_destroy ( xf_physical_buffer_h handle ) {
     std_bitset_clear ( xf_resource_state->physical_buffers_bitset, handle );
 }
 
-void xf_resource_physical_buffer_add_ref ( xf_physical_buffer_h handle ) {
-    xf_physical_buffer_t* buffer = &xf_resource_state->physical_buffers_array[handle];
-    buffer->ref_count += 1;
-}
-
-void xf_resource_physical_buffer_remove_ref ( xf_physical_buffer_h handle ) {
-    if ( handle == xf_null_handle_m ) {
-        return;
-    }
-
-    xf_physical_buffer_t* buffer = &xf_resource_state->physical_buffers_array[handle];
-    uint32_t ref_count = buffer->ref_count;
-    if ( ref_count > 1 ) {
-        buffer->ref_count = ref_count - 1;
-    } else {
-        buffer->ref_count = 0;
-    }
-}
-
 xf_physical_buffer_t* xf_resource_physical_buffer_get ( xf_physical_buffer_h handle ) {
     xf_physical_buffer_t* buffer = &xf_resource_state->physical_buffers_array[handle];
     return buffer;
@@ -1025,85 +980,8 @@ void xf_resource_physical_buffer_map_to_new ( xf_physical_buffer_h physical_buff
     buffer->state = xf_buffer_state_m();
 }
 
-// ======================================================================================= //
-
-void xf_resource_destroy_unreferenced ( xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time ) {
-    uint64_t idx;
-
-    idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->physical_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_physical_textures_m ) ) ) {
-        xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[idx];
-        if ( texture->ref_count == 0 ) {
-            if ( texture->handle != xg_null_handle_m && !texture->is_external ) {
-                xg->cmd_destroy_texture ( resource_cmd_buffer, texture->handle, time );
-            }
-            xf_resource_physical_texture_destroy ( idx );
-        }
-        ++idx;
-    }
-
-    idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->physical_buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_physical_buffers_m ) ) ) {
-        xf_physical_buffer_t* buffer = &xf_resource_state->physical_buffers_array[idx];
-        if ( buffer->ref_count == 0 ) {
-            if ( buffer->handle != xg_null_handle_m && !buffer->is_external ) {
-                xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->handle, time );
-            }
-            xf_resource_physical_buffer_destroy ( idx );
-        }
-        ++idx;
-    }
-
-#if 0
-    idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_textures_m ) ) ) {
-        xf_texture_t* texture = &xf_resource_state->textures_array[idx];
-        if ( texture->ref_count == 0 ) {
-            xf_resource_texture_destroy ( idx );
-        }
-        ++idx;
-    }
-#endif
-
-#if 0
-    idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_buffers_m ) ) ) {
-        xf_buffer_t* buffer = &xf_resource_state->buffers_array[idx];
-        if ( buffer->is_destroyed ) {
-            if ( buffer->xg_handle != xg_null_handle_m && !buffer->is_external ) {
-                xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, time );
-            }
-            xf_resource_buffer_destroy ( idx );
-        }
-        ++idx;
-    }
-#endif
-
-#if 0
-    idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->multi_textures_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_textures_m ) ) ) {
-        xf_multi_texture_t* multi_texture = &xf_resource_state->multi_textures_array[idx];
-        if ( multi_texture->ref_count == 0 ) {
-            xf_resource_texture_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
-        }
-        ++idx;
-    }
-#endif
-
-#if 0
-    idx = 0;
-    while ( std_bitset_scan ( &idx, xf_resource_state->multi_buffers_bitset, idx, std_bitset_u64_count_m ( xf_resource_max_multi_buffers_m ) ) ) {
-        xf_multi_buffer_t* multi_buffer = &xf_resource_state->multi_buffers_array[idx];
-        if ( multi_buffer->ref_count == 0 ) {
-            for ( uint32_t i = 0; i < multi_buffer->params.multi_buffer_count; ++i ) {
-                xf_buffer_t* buffer = &xf_resource_state->buffers_array[multi_buffer->buffers[i]];
-                if ( buffer->xg_handle != xg_null_handle_m ) {
-                    xg->cmd_destroy_buffer ( resource_cmd_buffer, buffer->xg_handle, time );
-                }
-            }
-            xf_resource_buffer_destroy ( xf_resource_handle_tag_as_multi_m ( idx ) );
-        }
-        ++idx;
-    }
-#endif
+void xf_resource_physical_buffer_state_barrier ( std_stack_t* stack, xf_physical_buffer_h physical_buffer_handle, const xf_buffer_execution_state_t* new_state ) {
+    xf_physical_buffer_t* buffer = xf_resource_physical_buffer_get ( physical_buffer_handle );
+    xf_buffer_state_t* old_state = &buffer->state;
+    xf_resource_physical_buffer_barrier ( stack, physical_buffer_handle, old_state, new_state );
 }
