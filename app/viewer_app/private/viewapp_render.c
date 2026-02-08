@@ -327,8 +327,6 @@ void viewapp_load_mouse_pick_graph ( void ) {
             }
         )
     ) );
-
-    xf->finalize_graph ( graph );
 }
 
 static void viewapp_bind_restir_di_graph_routines ( void ) {
@@ -729,8 +727,6 @@ static void viewapp_boot_restir_di_graph ( void ) {
             .presentable_texture = swapchain_multi_texture,
         )
     ) );
-
-    xf->finalize_graph ( graph );
 #endif
 }
 
@@ -1850,8 +1846,6 @@ static void viewapp_boot_raster_graph ( void ) {
             .presentable_texture = swapchain_multi_texture,
         ),
     ) );
-
-    xf->finalize_graph ( graph );
 }
 
 static void viewapp_destroy_render_graph ( xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer ) {

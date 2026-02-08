@@ -1924,13 +1924,16 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         align = std_align_u64 ( align, committed_textures_array[i].req.align );
     }
 
-    xg_alloc_t heap_alloc = xg_alloc_memory_m ( xg, &xg_alloc_params_m (
-        .device = graph->params.device,
-        .size = heap.size,
-        .align = align, 
-        .type = xg_memory_type_gpu_only_m, // TODO
-        .debug_name = "xf_heap"
-    ) );
+    xg_alloc_t heap_alloc = xg_null_alloc_m;
+    if ( heap.textures_count > 0 ) {
+        heap_alloc = xg_alloc_memory_m ( xg, &xg_alloc_params_m (
+            .device = graph->params.device,
+            .size = heap.size,
+            .align = align, 
+            .type = xg_memory_type_gpu_only_m, // TODO
+            .debug_name = "xf_heap"
+        ) );
+    }
 
     for ( uint32_t i = 0; i < heap.textures_count; ++i ) {
         xf_graph_heap_texture_t* heap_texture = &heap.textures_array[i];
@@ -2068,7 +2071,7 @@ static uint64_t xf_graph_clear_owned_textures ( xf_graph_h graph_handle, xg_i* x
     return key;
 }
 
-static void xf_graph_destroy_owned_resources ( xf_graph_h graph_handle, xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time ) {
+static void xf_graph_destroy_owned_resources ( xf_graph_h graph_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
     for ( uint32_t i = 0; i < graph->owned_textures_count; ++i ) {
@@ -2080,7 +2083,11 @@ static void xf_graph_destroy_owned_resources ( xf_graph_h graph_handle, xg_i* xg
         xf_buffer_h buffer_handle = graph->owned_buffers_array[i];
         xf_resource_buffer_destroy ( buffer_handle );
     }
+}
 
+static void xf_graph_destroy_owned_physical_resources ( xf_graph_h graph_handle, xg_i* xg, xg_resource_cmd_buffer_h resource_cmd_buffer, xg_resource_cmd_buffer_time_e time ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    
     for ( uint32_t i = 0; i < graph->owned_physical_textures_count; ++i ) {
         xf_physical_texture_h texture_handle = graph->owned_physical_textures_array[i];
         xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( texture_handle );
@@ -2460,6 +2467,7 @@ void xf_graph_clear ( xf_graph_h graph_handle, xg_workload_h workload ) {
             xf_resource_texture_unbind ( graph->textures_array[i].handle );
         }
     }
+    xf_graph_destroy_owned_physical_resources ( graph_handle, xg, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 
     if ( !xg_memory_handle_is_null_m ( graph->heap.memory_handle ) ) {
         xg->free_memory ( graph->heap.memory_handle );
@@ -2473,8 +2481,6 @@ void xf_graph_clear ( xf_graph_h graph_handle, xg_workload_h workload ) {
     graph->physical_textures_count = 0;
     graph->multi_textures_count = 0;
     graph->multi_buffers_count = 0;
-    graph->owned_textures_count = 0;
-    graph->owned_buffers_count = 0;
     graph->owned_physical_textures_count = 0;
     graph->owned_physical_buffers_count = 0;
     graph->segments_count = 0;
@@ -2567,17 +2573,10 @@ static void xf_graph_clear_physical_resources ( xf_graph_h graph_handle ) {
     std_stack_clear ( &graph->physical_resource_dependencies_allocator );
 }
 
-void xf_graph_finalize ( xf_graph_h graph_handle ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    std_assert_m ( !graph->is_finalized );
-    xf_graph_compile ( graph_handle );
-    graph->is_finalized = true;
-}
-
 static uint64_t xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, uint64_t key ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
-    // Clear if needed, then make sure the graph is finalized/compiled/built
+    // Clear if needed, then make sure the graph is compiled/built
     if ( graph->needs_clear ) {
         xf_graph_clear ( graph_handle, workload );
         graph->needs_clear = false;
@@ -2586,10 +2585,6 @@ static uint64_t xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg
 
     if ( !graph->is_compiled ) {
         xf_graph_compile ( graph_handle );
-    }
-
-    if ( !graph->is_finalized ) {
-        graph->is_finalized = true;
     }
 
     if ( !graph->is_built ) {
@@ -3010,7 +3005,8 @@ void xf_graph_destroy ( xf_graph_h graph_handle, xg_workload_h xg_workload ) {
         }
     }
 
-    xf_graph_destroy_owned_resources ( graph_handle, xg, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
+    xf_graph_destroy_owned_resources ( graph_handle );
+    xf_graph_destroy_owned_physical_resources ( graph_handle, xg, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
 
     if ( !xg_memory_handle_is_null_m ( graph->heap.memory_handle ) ) {
         xg->free_memory ( graph->heap.memory_handle );

@@ -38,7 +38,7 @@ static void xf_api_init ( xf_i* xf ) {
     xf->create_graph = xf_graph_create;
     xf->create_node = xf_graph_node_create;
 
-    xf->finalize_graph = xf_graph_finalize;
+    xf->compile_graph = xf_graph_compile;
     //xf->build_graph = xf_graph_build;
     xf->execute_graph = xf_graph_execute;
     xf->advance_graph_multi_textures = xf_graph_advance_multi_textures;

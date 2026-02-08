@@ -1156,6 +1156,18 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
         xg_vk_cmd_allocator_t* cmd_allocator = &cmd_allocators[queue];
         VkCommandBuffer vk_cmd_buffer = cmd_allocator->vk_cmd_buffers[cmd_allocator->cmd_buffers_count++];
         cmd_buffers_array[cmd_buffers_count++] = vk_cmd_buffer;
+        {
+            char debug_name[xg_debug_name_size_m];
+            std_string_t debug_name_string = std_static_string_m ( debug_name );
+            std_string_append_format ( &debug_name_string, std_fmt_u64_m "/" std_fmt_u32_m, workload->id, chunk_it );
+            VkDebugUtilsObjectNameInfoEXT debug_name_info;
+            debug_name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+            debug_name_info.pNext = NULL;
+            debug_name_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
+            debug_name_info.objectHandle = ( uint64_t ) vk_cmd_buffer;
+            debug_name_info.pObjectName = debug_name;
+            xg_vk_device_ext_api ( device_handle )->set_debug_name ( device->vk_handle, &debug_name_info );
+        }
         VkCommandBufferBeginInfo begin_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = NULL,

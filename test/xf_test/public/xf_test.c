@@ -178,7 +178,7 @@ static void xf_test ( void ) {
     xf_triangle_pass_args_t triangle_pass_args = {
         .pipeline_state = pipeline_state,
     };
-    xf->create_node ( graph, &xf_node_params_m (
+    xf_node_h triangle_node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "triangle",
         .debug_color = xg_debug_region_color_green_m,
         .type = xf_node_type_custom_pass_m,
@@ -193,6 +193,7 @@ static void xf_test ( void ) {
             .depth_stencil_target = depth_texture,
         ),
     ) );
+    bool triangle_node_enabled = true;
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "present",
@@ -229,6 +230,11 @@ static void xf_test ( void ) {
 
         if ( !input_state.keyboard[wm_keyboard_state_f1_m] && new_input_state.keyboard[wm_keyboard_state_f1_m] ) {
             xs->update_databases ( workload );
+        }
+
+        if ( !input_state.keyboard[wm_keyboard_state_f2_m] && new_input_state.keyboard[wm_keyboard_state_f2_m] ) {
+            triangle_node_enabled = !triangle_node_enabled;
+            xf->node_set_enabled ( graph, triangle_node, triangle_node_enabled );
         }
 
         wm_window_info_t new_window_info;

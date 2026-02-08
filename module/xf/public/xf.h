@@ -675,7 +675,7 @@ typedef struct {
 
     xf_graph_h ( *create_graph ) ( const xf_graph_params_t* params );
     xf_node_h ( *create_node ) ( xf_graph_h graph, const xf_node_params_t* params );
-    void ( *finalize_graph ) ( xf_graph_h graph );
+    void ( *compile_graph ) ( xf_graph_h graph );
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
