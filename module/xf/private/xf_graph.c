@@ -76,7 +76,7 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     ++graph->nodes_count;
     std_mem_zero_m ( node );
     node->params = *params;
-    node->enabled = true;
+    node->enabled = params->enabled;
     node->renderpass = xg_null_handle_m;
     node->renderpass_params.render_textures_layout = xg_render_textures_layout_m();
     node->renderpass_params.render_textures_usage = xg_render_textures_usage_m();
@@ -116,6 +116,50 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     node->declaration_order = node_handle;
 
     return node_handle;
+}
+
+void xf_graph_node_update ( xf_graph_h graph_handle, xf_node_h node_handle, const xf_node_params_t* params ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    xf_node_t* node = &graph->nodes_array[node_handle];
+
+    // TODO free node resources
+    std_mem_zero_m ( node );
+    node->params = *params;
+    node->enabled = params->enabled;
+    node->renderpass = xg_null_handle_m;
+    node->renderpass_params.render_textures_layout = xg_render_textures_layout_m();
+    node->renderpass_params.render_textures_usage = xg_render_textures_usage_m();
+
+    bool copy_args = false;
+    std_buffer_t user_args = std_buffer_m();
+
+    if ( node->params.type == xf_node_type_custom_pass_m ) {
+        xf_node_custom_pass_params_t* params = &node->params.pass.custom;
+        copy_args = params->copy_args;
+        user_args = params->user_args;
+    } else if ( node->params.type == xf_node_type_compute_pass_m ) {
+        xf_node_compute_pass_params_t* params = &node->params.pass.compute;
+        copy_args = params->copy_uniform_data;
+        user_args = params->uniform_data;
+    } else if ( node->params.type == xf_node_type_raytrace_pass_m ) {
+        xf_node_raytrace_pass_params_t* params = &node->params.pass.raytrace;
+        copy_args = params->copy_uniform_data;
+        user_args = params->uniform_data;
+    } else if ( node->params.type == xf_node_type_compute_indirect_pass_m ) {
+        xf_node_compute_indirect_pass_params_t* params = &node->params.pass.compute_indirect;
+        copy_args = params->copy_uniform_data;
+        user_args = params->uniform_data;
+    }
+
+    if ( copy_args && user_args.base ) {
+        void* alloc = std_stack_alloc_align ( &graph->node_user_arg_allocator, user_args.size, 16 );
+        std_mem_copy ( alloc, user_args.base, user_args.size );
+        node->user_alloc = alloc;
+    } else {
+        node->user_alloc = NULL;
+    }
+
+    graph->needs_clear = true;
 }
 
 void xf_graph_node_destroy ( xf_graph_h graph_handle, xf_node_h node_handle ) {
@@ -1958,6 +2002,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         }
     }
 
+    // Allocate permanent textures
     for ( uint32_t i = 0; i < permanent_textures_count; ++i ) {
         xf_graph_texture_t* graph_texture = permanent_textures_array[i];
         xf_texture_h texture_handle = graph_texture->handle;
@@ -1968,7 +2013,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
         if ( texture->physical_texture_handle == xg_null_handle_m ) {
             create_new = true;
         } else {
-        xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( texture->physical_texture_handle );
+            xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( texture->physical_texture_handle );
             if ( texture->required_usage &~ physical_texture->info.allowed_usage ) {
                 // TODO free current device texture
                 std_log_error_m ( "Texture " std_fmt_str_m " required and allowed usage mismatch. Fix your usage declaration or implement this code path", physical_texture->info.debug_name );
@@ -2464,7 +2509,19 @@ void xf_graph_clear ( xf_graph_h graph_handle, xg_workload_h workload ) {
         xf_texture_h texture_handle = graph->textures_array[i].handle;
         xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( texture_handle );
         if ( physical_texture && !physical_texture->is_external ) {
-            xf_resource_texture_unbind ( graph->textures_array[i].handle );
+            xf_resource_texture_unbind ( texture_handle );
+        }
+    }
+    for ( uint32_t i = 0; i < graph->multi_textures_count; ++i ) {
+        xf_graph_texture_t* graph_texture = &graph->textures_array[graph->multi_textures_array[i]];
+        xf_multi_texture_t* multi_texture = xf_resource_multi_texture_get ( graph_texture->handle );
+
+        for ( uint32_t j = 0; j < multi_texture->params.multi_texture_count; ++j ) {
+            xf_texture_h texture_handle = multi_texture->textures[j];
+            xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( texture_handle );
+            if ( physical_texture && !physical_texture->is_external ) {
+                xf_resource_texture_unbind ( texture_handle );
+            }
         }
     }
     xf_graph_destroy_owned_physical_resources ( graph_handle, xg, resource_cmd_buffer, xg_resource_cmd_buffer_time_workload_complete_m );
@@ -3719,6 +3776,13 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             .idx = node_it * 2 + 1,
             .stage = xg_pipeline_stage_bit_bottom_of_pipe_m,
         ) );
+
+        // TODO properly support this
+        //      a node writes to a non-external texture once -> the following clear/rebuild causes the texture to be immediately destroyed and made unusable
+        if ( node->enabled && node->params.execute_once ) {
+            node->enabled = false;
+            graph->needs_clear = true;
+        }
     }
 
     // Advance multi resources, skip those created without auto_advance
@@ -3800,9 +3864,7 @@ void xf_graph_debug_print ( xf_graph_h graph_handle ) {
 void xf_graph_node_set_enabled ( xf_graph_h graph_handle, xf_node_h node_handle, bool enabled ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xf_node_t* node = &graph->nodes_array[node_handle];
-    if ( node->params.passthrough.enable ) {
-        node->enabled = enabled;
-    }
+    node->enabled = enabled;
     graph->needs_clear = true;
 }
 
@@ -3816,10 +3878,14 @@ void xf_graph_node_enable ( xf_graph_h graph_handle, xf_node_h node_handle ) {
 void xf_graph_node_disable ( xf_graph_h graph_handle, xf_node_h node_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xf_node_t* node = &graph->nodes_array[node_handle];
-    if ( node->params.passthrough.enable ) {
-        node->enabled = false;
-    }
+    node->enabled = false;
     graph->needs_clear = true;
+}
+
+void* xf_graph_node_get_uniform_data ( xf_graph_h graph_handle, xf_node_h node_handle ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    xf_node_t* node = &graph->nodes_array[node_handle];
+    return node->user_alloc; // TODO
 }
 
 void xf_graph_set_texture_export ( xf_graph_h graph_handle, xf_node_h node, xf_texture_h texture, xf_texture_h dest, xf_export_channel_e channel_remap[4] ) {

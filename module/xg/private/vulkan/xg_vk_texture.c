@@ -519,6 +519,11 @@ void xg_texture_get_info ( xg_texture_info_t* info, xg_texture_h texture_handle 
 }
 
 void xg_texture_destroy ( xg_texture_h texture_handle ) {
+    if ( texture_handle == xg_null_handle_m ) {
+        std_log_warn_m ( "Trying to destroy null texture handle" );
+        return;
+    }
+
     std_mutex_lock ( &xg_vk_texture_state->textures_mutex );
     xg_vk_texture_t* texture = &xg_vk_texture_state->textures_array[texture_handle];
 

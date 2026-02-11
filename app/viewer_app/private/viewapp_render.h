@@ -3,6 +3,8 @@
 #include <xg.h>
 #include <xs.h>
 
+#include "viewapp_scene.h"
+
 void viewapp_boot_render ( void );
 
 typedef enum {
@@ -26,3 +28,5 @@ void viewapp_reload_graphs ( void );
 
 bool viewapp_render_graph_is_raytrace ( viewapp_render_graph_e graph );
 xs_database_pipeline_h viewapp_get_render_graph_raytrace_pipeline ( viewapp_render_graph_e graph );
+
+void viewapp_render_update_sky_irradiance_sh ( viewapp_sky_component_t* sky_component );

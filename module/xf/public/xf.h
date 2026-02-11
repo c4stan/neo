@@ -458,6 +458,8 @@ typedef enum {
 typedef struct {
     char debug_name[xf_debug_name_size_m];
     uint32_t debug_color;
+    bool enabled;
+    bool execute_once; // TODO
     xf_node_type_e type;
     xg_cmd_queue_e queue;
     xf_node_pass_params_t pass;
@@ -472,6 +474,7 @@ typedef struct {
 #define xf_node_params_m( ... ) ( xf_node_params_t ) { \
     .debug_name = { 0 }, \
     .debug_color = xg_debug_region_color_none_m, \
+    .enabled = true, \
     .resources = xf_node_resource_params_m(), \
     .passthrough = xf_node_passthrough_params_m(), \
     .type = xf_node_type_custom_pass_m, \
@@ -670,6 +673,9 @@ typedef struct {
     xf_buffer_h ( *create_multi_buffer ) ( xf_graph_h graph, const xf_multi_buffer_params_t* params );
     //xf_buffer_h ( *create_external_multi_buffer ) ( xf_graph_h graph, const xf_multi_buffer_params_t* params );
 
+    void ( *bind_texture_to_external ) ( xf_texture_h texture, xg_texture_h xg_texture );
+    void ( *bind_texture_to_new ) ( xf_texture_h texture, const xf_texture_params_t* params );
+
     void ( *destroy_texture ) ( xf_texture_h texture );
     void ( *destroy_buffer ) ( xf_buffer_h buffer );
 
@@ -679,6 +685,9 @@ typedef struct {
     uint64_t ( *execute_graph ) ( xf_graph_h graph, xg_workload_h workload, uint64_t base_key );
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
+
+    void ( *update_node ) ( xf_graph_h graph, xf_node_h node, const xf_node_params_t* params );
+    void* ( *get_node_uniform_data ) ( xf_graph_h graph, xf_node_h node );
 
     void ( *disable_node ) ( xf_graph_h graph, xf_node_h node );
     void ( *enable_node ) ( xf_graph_h graph, xf_node_h node );

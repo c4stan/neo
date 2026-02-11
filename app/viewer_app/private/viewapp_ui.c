@@ -342,7 +342,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
 
         xi->newline();
 
-        xi_label_state_t envmap_label = xi_label_state_m ( .text = "envmap" );
+        xi_label_state_t envmap_label = xi_label_state_m ( .text = "sky_radiance" );
         xi->add_label ( xi_workload, &envmap_label );
 
         const char* envmap_select_items[] = { "none", "..." };

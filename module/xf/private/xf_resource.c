@@ -302,18 +302,35 @@ bool xf_resource_texture_is_depth ( xf_texture_h texture_handle ) {
     return xg_format_has_depth ( texture->params.format );
 }
 
-xf_texture_execution_state_t xf_resource_texture_get_state ( xf_texture_h texture_handle, xg_texture_view_t view ) {
-    xf_physical_texture_t* texture = xf_resource_texture_get_physical_texture ( texture_handle );
-    std_assert_m ( texture );
-    if ( texture->info.view_access == xg_texture_view_access_default_only_m ) { 
-        return texture->state.shared.execution;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        std_assert_m ( view.mip_count == 1 );
-        return texture->state.mips[view.mip_base].execution;
-    } else {
-        std_not_implemented_m();
-        return xf_texture_execution_state_m();
-    }
+void xf_resource_texture_bind_to_external ( xf_texture_h texture_handle, xg_texture_h xg_texture ) {
+    xg_i* xg = std_module_get_m ( xg_module_name_m );
+
+    xg_texture_info_t info;
+    xg->get_texture_info ( &info, xg_texture );
+
+    xf_texture_params_t texture_params = xf_texture_params_m (
+        .allow_aliasing = false,
+    );
+    std_str_copy_static_m ( texture_params.debug_name, info.debug_name );
+
+    xf_physical_texture_params_t physical_texture_params = xf_physical_texture_params_m (
+        .is_external = true,
+        .handle = xg_texture,
+        .info = info,
+    );
+    xf_physical_texture_h physical_texture_handle = xf_resource_physical_texture_create ( &physical_texture_params );
+
+    // TODO remove, keep info in physical texture only
+    xf_resource_texture_update_info ( texture_handle, &info );
+    xf_resource_texture_bind ( texture_handle, physical_texture_handle );
+}
+
+void xf_resource_texture_bind_to_new ( xf_texture_h texture_handle, const xf_texture_params_t* params ) {
+    // TODO dirty graph
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    *texture = xf_texture_m (
+        .params = *params
+    );
 }
 
 // ======================================================================================= //

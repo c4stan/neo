@@ -467,6 +467,7 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
 
+#define xg_vk_workload_resource_bindings_update_debug_m 0
 #define xg_vk_workload_max_descriptor_writes_per_batch_m ( xg_vk_workload_resource_bindings_update_batch_size_m * xg_pipeline_resource_max_bindings_m )
 
     VkWriteDescriptorSet writes_array[xg_vk_workload_max_descriptor_writes_per_batch_m];
@@ -666,24 +667,35 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
                         write->descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 #endif
                     }
+
+#if xg_vk_workload_resource_bindings_update_debug_m
+                    vkUpdateDescriptorSets ( device->vk_handle, writes_count, writes_array, 0, NULL );
+                    writes_count = 0;
+                    buffer_info_count = 0;
+                    image_info_count = 0;
+#endif
                     break;
                 }
 
             }
 
             // TODO
+#if !xg_vk_workload_resource_bindings_update_debug_m
             if ( writes_count >= xg_vk_workload_resource_bindings_update_batch_size_m ) {
                 vkUpdateDescriptorSets ( device->vk_handle, writes_count, writes_array, 0, NULL );
                 writes_count = 0;
                 buffer_info_count = 0;
                 image_info_count = 0;
             }
+#endif
         }
     }
 
+#if !xg_vk_workload_resource_bindings_update_debug_m
     if ( writes_count > 0 ) {
         vkUpdateDescriptorSets ( device->vk_handle, writes_count, writes_array, 0, NULL );
     }
+#endif
 }
 
 void xg_workload_destroy ( xg_workload_h workload_handle ) {

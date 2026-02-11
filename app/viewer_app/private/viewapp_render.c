@@ -1030,6 +1030,15 @@ static void viewapp_bind_raster_graph_routines ( void ) {
     bind_ui_routine ( graph );
 }
 
+typedef struct {
+    uint32_t grid_size[3];
+    float z_scale;
+    float z_bias;
+    uint32_t shadow_size;
+    uint32_t _pad0[2];
+    float sky_irradiance_sh[9][4];
+} viewapp_raster_lighting_uniform_data_t;
+
 static void viewapp_boot_raster_graph ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_device_h device = state->render.device;    
@@ -1171,8 +1180,6 @@ static void viewapp_boot_raster_graph ( void ) {
     };
     add_geometry_node ( graph, &gbuffer, depth_texture );
 
-    // sky
-    //add_sky_convolution_node ( graph );
     add_sky_node ( graph, &gbuffer, depth_texture );
 
     // tessellation
@@ -1369,12 +1376,7 @@ static void viewapp_boot_raster_graph ( void ) {
         )
     ) );
 
-    struct {
-        uint32_t grid_size[3];
-        float z_scale;
-        float z_bias;
-        uint32_t shadow_size;
-    } lighting_uniforms = {
+    viewapp_raster_lighting_uniform_data_t lighting_uniforms = {
         .grid_size[0] = light_grid_size[0],
         .grid_size[1] = light_grid_size[1],
         .grid_size[2] = light_grid_size[2],
@@ -1386,7 +1388,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
-        .queue = xg_cmd_queue_compute_m,
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "lighting" ) ),
             .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
@@ -1693,7 +1695,7 @@ static void viewapp_boot_raster_graph ( void ) {
     xf->create_node ( graph, &xf_node_params_m (
         .type = xf_node_type_compute_pass_m,
         .debug_name = "ssr_ta",
-        .queue = xg_cmd_queue_compute_m,
+        //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ),
             .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssr_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssr_scale, 8 ), 1 },
@@ -1964,4 +1966,18 @@ xs_database_pipeline_h viewapp_get_render_graph_raytrace_pipeline ( viewapp_rend
     }
 
     return false;
+}
+
+void viewapp_render_update_sky_irradiance_sh ( viewapp_sky_component_t* sky_component ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xf_i* xf = state->modules.xf;
+    xf_graph_h graph = state->render.render_graph;
+
+    xf_node_h lighting_node = xf->get_node_by_name ( graph, "lighting" );
+    std_auto_m lighting_uniforms = ( viewapp_raster_lighting_uniform_data_t* ) ( xf->get_node_uniform_data ( graph, lighting_node ) );
+    for ( uint32_t i = 0; i < 9; ++i ) {
+        lighting_uniforms->sky_irradiance_sh[i][0] = sky_component->irradiance_sh[i * 3 + 0];
+        lighting_uniforms->sky_irradiance_sh[i][1] = sky_component->irradiance_sh[i * 3 + 1];
+        lighting_uniforms->sky_irradiance_sh[i][2] = sky_component->irradiance_sh[i * 3 + 2];
+    }
 }

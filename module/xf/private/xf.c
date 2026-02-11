@@ -38,6 +38,12 @@ static void xf_api_init ( xf_i* xf ) {
     xf->create_graph = xf_graph_create;
     xf->create_node = xf_graph_node_create;
 
+    xf->update_node = xf_graph_node_update;
+    xf->get_node_uniform_data = xf_graph_node_get_uniform_data;
+
+    xf->bind_texture_to_external = xf_resource_texture_bind_to_external;
+    xf->bind_texture_to_new = xf_resource_texture_bind_to_new;
+
     xf->compile_graph = xf_graph_compile;
     //xf->build_graph = xf_graph_build;
     xf->execute_graph = xf_graph_execute;

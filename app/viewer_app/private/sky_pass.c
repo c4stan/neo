@@ -28,7 +28,7 @@ static void sky_pass_routine ( const xf_node_execute_args_t* node_args, void* us
     std_assert_m ( query_result.entity_count == 1 );
     se_stream_iterator_t sky_component_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
     viewapp_sky_component_t* sky_component = se_stream_iterator_next ( &sky_component_iterator );
-    if ( sky_component->sky_texture == xg_null_handle_m ) {
+    if ( sky_component->radiance_texture == xg_null_handle_m ) {
         return;
     }
 
@@ -41,7 +41,7 @@ static void sky_pass_routine ( const xf_node_execute_args_t* node_args, void* us
                 xg_texture_resource_binding_m (
                     .shader_register = 0,
                     .layout = xg_texture_layout_shader_read_m,
-                    .texture = sky_component->sky_texture,
+                    .texture = sky_component->radiance_texture,
                 ),
             },
             .sampler_count = 1,

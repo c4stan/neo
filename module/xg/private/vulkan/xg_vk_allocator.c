@@ -616,7 +616,7 @@ void xg_vk_allocator_activate_device ( xg_device_h device_handle ) {
         case xg_memory_type_gpu_only_m:
             size = size * 0.8;
             if ( shared_gpu_upload_heap ) size = size * 0.5;
-            size = std_min_u64 ( size, 1024 * 1024 * 1024 * 2ull );
+            size = std_min_u64 ( size, 1024 * 1024 * 1024 * 3ull );
             break;
         case xg_memory_type_upload_m:
             size = size * 0.8;

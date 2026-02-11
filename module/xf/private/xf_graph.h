@@ -130,14 +130,8 @@ typedef struct {
     xf_texture_h handle;
     xf_graph_physical_texture_h physical_texture_handle;
     xf_graph_resource_lifespan_t lifespan;
-    //union {
-    //    xf_graph_resource_dependencies_t shared;
-    //    xf_graph_resource_dependencies_t mips[16]; // TODO make storage external?
-    //    // TODO external hash table to support dynamic view access
-    //} deps;
     uint64_t subresources_bitset;
     xf_graph_resource_dependencies_t dependencies;
-    // cached from underlying texture
 } xf_graph_texture_t;
 
 #define xf_graph_texture_m( ... ) ( xf_graph_texture_t ) { \
@@ -410,6 +404,7 @@ xf_buffer_h xf_graph_create_multi_buffer ( xf_graph_h graph_handle, const xf_mul
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
+void xf_graph_node_update ( xf_graph_h graph_handle, xf_node_h node_handle, const xf_node_params_t* params );
 void xf_graph_invalidate ( xf_graph_h graph, xg_workload_h workload );
 void xf_graph_compile ( xf_graph_h graph );
 uint64_t xf_graph_build ( xf_graph_h graph, xg_workload_h workload, uint64_t key );
@@ -425,6 +420,7 @@ void xf_graph_debug_print ( xf_graph_h graph );
 void xf_graph_node_set_enabled ( xf_graph_h graph, xf_node_h node, bool enabled );
 void xf_graph_node_enable ( xf_graph_h graph, xf_node_h node );
 void xf_graph_node_disable ( xf_graph_h graph, xf_node_h node );
+void* xf_graph_node_get_uniform_data ( xf_graph_h graph, xf_node_h node );
 
 const uint64_t* xf_graph_get_timings ( xf_graph_h graph );
 

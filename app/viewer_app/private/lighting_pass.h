@@ -2,6 +2,15 @@
 
 #include <xf.h>
 
+typedef struct {
+    uint32_t grid_size[3];
+    float z_scale;
+    float z_bias;
+    uint32_t shadow_size;
+    uint32_t _pad0[2];
+    float sh_coeffs[9][4];
+} lighting_uniforms_t;
+
 uint32_t light_data_size ( void );
 
 //xf_node_h add_lighting_pass ( xf_graph_h graph, xf_texture_h target, xf_texture_h color, xf_texture_h normal, xf_texture_h material, xf_texture_h depth, xf_texture_h shadows );

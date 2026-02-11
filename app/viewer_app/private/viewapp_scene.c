@@ -1180,11 +1180,10 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
     flags |= aiProcess_PreTransformVertices;
     flags |= aiProcess_CalcTangentSpace;
 
-    std_tick_t start_tick = std_tick_now();
-
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
 
+    std_tick_t start_tick = std_tick_now();
     std_log_info_m ( "Importing input scene " std_fmt_str_m, input_path );
     const struct aiScene* scene = aiImportFile ( input_path, flags );
 
@@ -1437,8 +1436,8 @@ void viewapp_destroy_entity_resources ( se_entity_h entity, xg_workload_h worklo
     if ( sky_component ) {
         xg_geo_util_free_data ( &sky_component->geo_data );
         xg_geo_util_free_gpu_data ( &sky_component->geo_gpu_data, workload, time );
-        if ( sky_component->sky_texture != xg_null_handle_m ) {
-            xg->cmd_destroy_texture ( resource_cmd_buffer, sky_component->sky_texture, time );
+        if ( sky_component->radiance_texture != xg_null_handle_m ) {
+            xg->cmd_destroy_texture ( resource_cmd_buffer, sky_component->radiance_texture, time );
         }
     }
 
@@ -1478,6 +1477,7 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     } else {
         std_assert_m ( scene == viewapp_scene_external_m );
         viewapp_import_scene ( workload, 0, state->scene.custom_scene_path );
+        add_sky_entity ( state->render.device, workload );
     }
 
     state->scene.active_scene = scene;
@@ -1492,9 +1492,131 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     }
 }
 
-xg_texture_h viewapp_import_envmap ( xg_workload_h workload, uint64_t key, const char* path ) {
+// https://www.ppsloan.org/publications/shdering.pdf
+static float sh_sloan_window ( float l, float w ) {
+    if ( l == 0 ) {
+        return 1.0f;
+    }
+
+    float x = 3.1415f * l / w;
+    return sinf ( x ) / x;
+}
+
+static void compute_sh_basis ( float* out_basis, const float* dir ) {
+    float x = dir[0];
+    float y = dir[1];
+    float z = dir[2];
+
+    out_basis[0] = 0.282095f;
+
+    out_basis[1] = 0.488603f * y;
+    out_basis[2] = 0.488603f * z;
+    out_basis[3] = 0.488603f * x;
+
+    out_basis[4] = 1.092548f * x * y;
+    out_basis[5] = 1.092548f * y * z;
+    out_basis[6] = 0.315392f * ( 3.0f * z * z - 1.0f );
+    out_basis[7] = 1.092548f * x * z;
+    out_basis[8] = 0.546274f * ( x * x - y * y );
+}
+
+static void viewapp_envmap_to_sh_irradiance ( float* sh_out, const viewapp_texture_t* texture ) {
+    std_mem_zero_array_m ( sh_out, 3*9 );
+
+    // compute radiance sh
+    float delta_phi = 2.f * 3.1415f / ( float ) texture->width;
+    float delta_theta = 3.1415f / ( float ) texture->height;
+
+    for ( uint32_t y = 0; y < texture->height; ++y ) {
+        float theta = ( ( float ) y + 0.5f ) / ( float ) texture->height * 3.1415f;
+        float sin_theta = sinf ( theta );
+        float cos_theta = cosf ( theta );
+
+        for ( uint32_t x = 0; x < texture->width; ++x ) {
+            float phi = ( ( float ) x + 0.5f ) / ( float ) texture->width * 2.f * 3.1415f;
+            float sin_phi = sinf ( phi );
+            float cos_phi = cosf ( phi );
+
+            sm_vec_3f_t dir = sm_vec_3f_set ( sin_theta * cos_phi, cos_theta, sin_theta * sin_phi );
+            float delta_omega = delta_phi * delta_theta * sin_theta;
+
+            uint32_t idx = ( y * texture->width + x ) * 4;
+            sm_vec_3f_t radiance = sm_vec_3f ( ( ( float* ) texture->data ) + idx );
+
+            float sh_basis[9];
+            compute_sh_basis ( sh_basis, dir.e );
+
+            for ( uint32_t i = 0; i < 9; ++i ) {
+                sm_vec_3f_t contrib = sm_vec_3f_mul ( radiance, sh_basis[i] * delta_omega );
+                sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+                sh = sm_vec_3f_add ( sh, contrib );
+                sm_vec_3f_store ( &sh_out[i * 3], sh );
+            }
+        }
+    }
+
+    // convolve radiance to irradiance
+    {
+        float h0 = 3.1415f;
+        float h1 = 2.f * 3.1415f / 3.f;
+        float h2 = 3.1415f / 4.f;
+
+        uint32_t i = 0;
+        sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+        sh = sm_vec_3f_mul ( sh, h0 );
+        sm_vec_3f_store ( &sh_out[i * 3], sh );
+        ++i;
+
+        for ( ; i < 4; ++i ) {
+            sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+            sh = sm_vec_3f_mul ( sh, h1 );
+            sm_vec_3f_store ( &sh_out[i * 3], sh );
+        }
+
+        for ( ; i < 9; ++i ) {
+            sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+            sh = sm_vec_3f_mul ( sh, h2 );
+            sm_vec_3f_store ( &sh_out[i * 3], sh );
+        }
+    }
+
+    // Sloan windowing
+    {
+        float w0 = sh_sloan_window ( 0.0, 3.0 );
+        float w1 = sh_sloan_window ( 1.0, 3.0 );
+        float w2 = sh_sloan_window ( 2.0, 3.0 );
+
+        uint32_t i = 0;
+        sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+        sh = sm_vec_3f_mul ( sh, w0 );
+        sm_vec_3f_store ( &sh_out[i * 3], sh );
+        ++i;
+
+        for ( ; i < 4; ++i ) {
+            sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+            sh = sm_vec_3f_mul ( sh, w1 );
+            sm_vec_3f_store ( &sh_out[i * 3], sh );
+        }
+
+        for ( ; i < 9; ++i ) {
+            sm_vec_3f_t sh = sm_vec_3f ( &sh_out[i * 3] );
+            sh = sm_vec_3f_mul ( sh, w2 );
+            sm_vec_3f_store ( &sh_out[i * 3], sh );
+        }
+    }
+}
+
+typedef struct {
+    xg_texture_h radiance_texture;
+    float irradiance_sh[9*3];
+} viewapp_envmap_import_result_t;
+
+viewapp_envmap_import_result_t viewapp_import_envmap ( xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, uint64_t key, const char* path ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
+
+    std_tick_t start_tick = std_tick_now();
+    std_log_info_m ( "Importing input envmap " std_fmt_str_m, path );
 
     int width, height;
     int channels = 4;
@@ -1507,10 +1629,17 @@ xg_texture_h viewapp_import_envmap ( xg_workload_h workload, uint64_t key, const
         .format = xg_format_r32g32b32a32_sfloat_m
     };
     xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
-    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-    xg_texture_h texture_handle = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &texture, "envmap" );
+    xg_texture_h texture_handle = viewapp_upload_texture_to_gpu ( cmd_buffer, key, resource_cmd_buffer, &texture, "sky_radiance" );
+    viewapp_envmap_import_result_t result;
+    result.radiance_texture = texture_handle;
+    viewapp_envmap_to_sh_irradiance ( result.irradiance_sh, &texture );
     STBI_FREE ( data );
-    return texture_handle;
+
+    std_tick_t end_tick = std_tick_now();
+    float time_ms = std_tick_to_milli_f32 ( end_tick - start_tick );
+    std_log_info_m ( "Envmap imported in " std_fmt_f32_dec_m(3) "s", time_ms / 1000.f );
+
+    return result;
 }
 
 void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap ) {
@@ -1526,14 +1655,22 @@ void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap ) {
     se_stream_iterator_t sky_component_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
     viewapp_sky_component_t* sky_component = se_stream_iterator_next ( &sky_component_iterator );
 
+    xg_i* xg = state->modules.xg;
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+    if ( sky_component->radiance_texture != xg_null_handle_m ) {
+        xg->cmd_destroy_texture ( resource_cmd_buffer, sky_component->radiance_texture, xg_resource_cmd_buffer_time_workload_complete_m );
+        sky_component->radiance_texture = xg_null_handle_m;
+    }
+
     if ( envmap == viewapp_envmap_none_m ) {
-        xg_i* xg = state->modules.xg;
-        xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
-        xg->cmd_destroy_texture ( resource_cmd_buffer, sky_component->sky_texture, xg_resource_cmd_buffer_time_workload_complete_m );
-        sky_component->sky_texture = xg_null_handle_m;
+        std_mem_zero_static_array_m ( sky_component->irradiance_sh );
+        viewapp_render_update_sky_irradiance_sh ( sky_component );
     } else {
         std_assert_m ( envmap == viewapp_envmap_external_m );
-        sky_component->sky_texture = viewapp_import_envmap ( workload, 0, state->scene.envmap_path );
+        viewapp_envmap_import_result_t result = viewapp_import_envmap ( workload, resource_cmd_buffer, 0, state->scene.envmap_path );
+        sky_component->radiance_texture = result.radiance_texture;
+        std_mem_copy_static_array_m ( sky_component->irradiance_sh, result.irradiance_sh );
+        viewapp_render_update_sky_irradiance_sh ( sky_component );
     }
 
     state->scene.active_envmap = envmap;
