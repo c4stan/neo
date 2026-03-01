@@ -73,6 +73,8 @@ static void xf_api_init ( xf_i* xf ) {
 
     xf->get_node_by_name = xf_graph_get_node_by_name;
     xf->bind_custom_node_routine = xf_graph_bind_custom_node_routine;
+
+    xf->get_texture_by_name = xf_graph_get_texture_by_name;
 }
 
 void* xf_load ( void* std_runtime ) {

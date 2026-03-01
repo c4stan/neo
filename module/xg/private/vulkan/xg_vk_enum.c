@@ -720,6 +720,16 @@ VkImageTiling xg_texture_tiling_to_vk ( xg_texture_tiling_e tiling ) {
     }
 }
 
+VkImageCreateFlagBits xg_texture_create_flag_to_vk ( xg_texture_create_flag_bit_e flags ) {
+    VkImageCreateFlags result = 0;
+
+    if ( flags & xg_texture_create_flag_bit_cubemap_e ) {
+        result |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+    }
+
+    return result;
+}
+
 xg_pipeline_stage_bit_e xg_pipeline_stage_from_vk ( VkPipelineStageFlags flags ) {
     return flags;
 }

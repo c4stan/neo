@@ -1,0 +1,38 @@
+vertex_shader cubemap_sky_gen.vert
+fragment_shader cubemap_sky_gen.frag
+
+include common_graphics.xsi
+
+begin rasterizer
+    cull off
+end
+
+begin render_target 0
+    format B10G11R11_UFLOAT
+end
+
+begin input 0
+    pos R32G32B32_FLOAT
+end
+
+begin input 1
+    nor R32G32B32_FLOAT
+end
+
+begin input 2
+    tan R32G32B32_FLOAT
+end
+
+begin input 3
+    tan R32G32B32_FLOAT
+end
+
+begin input 4
+    nor R32G32_FLOAT
+end
+
+begin bindings
+    buffer uniform vertex
+    texture sampled fragment
+    sampler fragment
+end

@@ -70,8 +70,12 @@ typedef struct {
     xf_graph_h render_graph;
     viewapp_render_graph_e active_render_graph;
     viewapp_render_graph_e new_render_graph;
+    
     xf_graph_h mouse_pick_graph;
     xg_texture_h object_id_readback_texture;
+    
+    xf_graph_h cubemap_gen_graph;
+    xf_texture_h cubemap_gen_texture;
 
     xg_raytrace_world_h raytrace_world;
     xs_database_pipeline_h raytrace_pipeline;
@@ -82,6 +86,8 @@ typedef struct {
     bool raytrace_world_update;
 
     xf_texture_h export_dest;
+    xf_texture_h sky_radiance_texture;
+    xg_texture_h sky_cubemap;
 
     xg_buffer_h tessellation_instance_vertex_buffer;
 } viewapp_render_state_t;
@@ -103,6 +109,7 @@ typedef struct {
     .allow_graph_aliasing = true, \
     .export_dest = xf_null_handle_m, \
     .tessellation_instance_vertex_buffer = xg_null_handle_m, \
+    .sky_radiance_texture = xf_null_handle_m, \
     __VA_ARGS__ \
 }
 

@@ -4,7 +4,7 @@
 
 #include "common.glsl"
 
-layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_direct;
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_lighting;
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_ssr;
 layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_ssgi;
 //layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_ssgi_2;
@@ -19,13 +19,13 @@ layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
 void main ( void ) {
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
 
-    vec3 direct = texture ( sampler2D ( tex_direct, sampler_point ), screen_uv ).xyz;
+    vec3 lighting = texture ( sampler2D ( tex_lighting, sampler_point ), screen_uv ).xyz;
     vec3 ssr = texture ( sampler2D ( tex_ssr, sampler_point ), screen_uv ).xyz;
     vec3 ssgi = texture ( sampler2D ( tex_ssgi, sampler_point ), screen_uv ).xyz;
     //vec3 ssgi_2 = texture ( sampler2D ( tex_ssgi_2, sampler_point ), screen_uv ).xyz;
     vec3 radiosity = texture ( sampler2D ( tex_radiosity, sampler_point ), screen_uv ).xyz;
 
-    vec3 combine = direct + ssr + ssgi + radiosity;// + ssgi_2;
+    vec3 combine = lighting + ssr + ssgi + radiosity;// + ssgi_2;
 
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( combine, 1 ) );
 }

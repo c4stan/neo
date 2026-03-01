@@ -161,7 +161,7 @@ static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
     return false;
 }
 
-void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state, xg_workload_h workload ) {
+uint64_t viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state, xg_workload_h workload, uint64_t key ) {
     viewapp_state_t* state = viewapp_state_get();
     wm_i* wm = state->modules.wm;
     xg_i* xg = state->modules.xg;
@@ -359,7 +359,7 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
                 xi->file_pick ( std_buffer_static_array_m ( state->scene.envmap_path ), NULL );
             }
             if ( envmap_select.item_idx != viewapp_envmap_external_m || state->scene.envmap_path[0] != '\0' ) {
-                viewapp_load_envmap ( workload, envmap_select.item_idx );
+                key = viewapp_load_envmap ( workload, key, envmap_select.item_idx );
             }
         }
     }
@@ -878,4 +878,6 @@ void viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_in
     }
 
     xi->end_update();
+
+    return key;
 }

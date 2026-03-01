@@ -5,6 +5,7 @@
 #include <std_queue.h>
 #include <std_hash.h>
 #include <std_compiler.h>
+#include <std_sort.h>
 
 // PRIVATE
 typedef struct {
@@ -27,6 +28,7 @@ static xg_cmd_buffer_state_t* xg_cmd_buffer_state;
 static void xg_cmd_buffer_alloc_memory ( xg_cmd_buffer_t* cmd_buffer ) {
     cmd_buffer->cmd_headers_allocator = std_stack_create ( xg_cmd_buffer_cmd_buffer_size_m );
     cmd_buffer->cmd_args_allocator = std_stack_create ( xg_cmd_buffer_cmd_buffer_size_m );
+    std_assert_m ( std_align_test_ptr ( cmd_buffer->cmd_headers_allocator.begin, sizeof ( xg_cmd_header_t ) ) );
 }
 
 static void xg_cmd_buffer_free_memory ( xg_cmd_buffer_t* cmd_buffer ) {
@@ -84,6 +86,19 @@ xg_cmd_buffer_h xg_cmd_buffer_create ( xg_workload_h workload ) {
     std_mutex_unlock ( &xg_cmd_buffer_state->cmd_buffers_mutex );
 
     return handle;
+}
+
+int cmp_cmd ( const void* a, const void* b, const void* _ ) {
+    xg_cmd_header_t* h1 = ( xg_cmd_header_t* ) a;
+    xg_cmd_header_t* h2 = ( xg_cmd_header_t* ) b;
+
+    if ( h1->key < h2->key ) {
+        return -1;
+    } else if ( h1->key > h2->key ) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 // TODO try moving to std_sort?
@@ -175,7 +190,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 1
     // buffer1 -> buffer2
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer1;
     output = buffer2;
 
@@ -198,7 +213,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 2
     // bufer2 -> buffer1
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer2;
     output = buffer1;
 
@@ -221,7 +236,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 3
     // buffer1 -> buffer2
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer1;
     output = buffer2;
 
@@ -244,7 +259,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 4
     // buffer2 -> buffer1
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer2;
     output = buffer1;
 
@@ -267,7 +282,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 5
     // buffer1 -> buffer2
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer1;
     output = buffer2;
 
@@ -290,7 +305,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 6
     // buffer2 -> buffer1
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer2;
     output = buffer1;
 
@@ -313,7 +328,7 @@ void xg_cmd_buffer_sort ( xg_cmd_header_t* cmd_headers, xg_cmd_header_t* cmd_hea
     // byte 7
     // buffer1 -> output
     //
-    std_mem_zero_m ( count_table );
+    std_mem_zero_static_array_m ( count_table );
     input = buffer1;
     output = buffer2;
 
@@ -371,6 +386,7 @@ static void* xg_cmd_buffer_record_cmd ( xg_cmd_buffer_t* cmd_buffer, xg_cmd_type
 
     if ( args_size ) {
         cmd_args = std_stack_alloc ( &cmd_buffer->cmd_args_allocator, args_size );
+        std_assert_m ( cmd_args );
     }
 
     cmd_header->args = ( uint64_t ) cmd_args;

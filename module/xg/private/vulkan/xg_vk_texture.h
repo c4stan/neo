@@ -14,6 +14,7 @@ typedef struct {
     uint32_t array_count;
     VkImageAspectFlags aspect;
     VkImage image;
+    VkImageViewType type;
     char debug_name[xg_debug_name_size_m];
 } xg_vk_texture_view_params_t;
 
@@ -40,11 +41,10 @@ typedef struct {
         struct {
             xg_vk_texture_view_t* array;
         } mips;
-        // TODO use std_map_t? and store <xg_vk_texture_view_t, xg_texture_view_t> in payload
         struct {
-            // TODO not implemented yet
-            std_hash_map_t* map; // xg_texture_view_t -> xg_vk_texture_view_t
-        } table;
+            xg_vk_texture_view_t* array;
+            std_hash_set_t set; // xg_texture_view_t
+        } sparse;
     } external_views;
 
     xg_vk_texture_state_e   state;

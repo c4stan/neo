@@ -775,8 +775,9 @@ typedef union {
         uint64_t mip_count      :  8;
         uint64_t array_base     : 16;
         uint64_t array_count    : 16;
-        uint64_t format         : 13; // xg_format_e - can shave off another 3-5 bits if needed
+        uint64_t format         : 12; // xg_format_e - can shave off another 2-4 bits if needed
         uint64_t aspect         :  3; // xg_texture_aspect_e
+        uint64_t cube           :  1;
     };
 } xg_texture_view_t;
 
@@ -944,7 +945,7 @@ typedef enum {
     xg_resource_binding_raytrace_world_m,               // VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR / VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV
     xg_resource_binding_count_m,
     xg_resource_binding_invalid_m
-    // TODO? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
+    // TODO VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
 } xg_resource_binding_e;
 
 typedef enum {
@@ -1504,20 +1505,35 @@ typedef struct {
 
 // -- Commands --
 
-// Because Vulkan requires all attachments supported usages to be declared at framebuffer creation time.
-typedef struct {
-    xg_texture_usage_bit_e render_targets[xg_pipeline_output_max_color_targets_m];
-    xg_texture_usage_bit_e depth_stencil;
-} xg_render_textures_usage_t;
+typedef enum {
+    xg_texture_create_flag_bit_none_e = 0,
+    xg_texture_create_flag_bit_cubemap_e,
+} xg_texture_create_flag_bit_e;
 
-#define xg_render_textures_usage_m( ... ) ( xg_render_textures_usage_t ) { \
+// Because Vulkan requires all attachments info to be declared at framebuffer creation time.
+typedef struct {
+    xg_texture_create_flag_bit_e flags;
+    xg_texture_usage_bit_e usage;
+} xg_render_texture_desc_t;
+
+#define xg_render_texture_desc_m( ... ) ( xg_render_texture_desc_t ) { \
+    __VA_ARGS__ \
+}
+
+typedef struct {
+    xg_render_texture_desc_t render_targets[xg_pipeline_output_max_color_targets_m];
+    xg_render_texture_desc_t depth_stencil;
+} xg_render_textures_desc_t;
+
+#define xg_render_textures_desc_m( ... ) ( xg_render_textures_desc_t ) { \
     __VA_ARGS__ \
 }
 
 typedef struct {
     xg_device_h device;
+    // TODO merge layout into desc
     xg_render_textures_layout_t render_textures_layout;
-    xg_render_textures_usage_t render_textures_usage;
+    xg_render_textures_desc_t render_textures_desc;
     uint32_t resolution_x;
     uint32_t resolution_y;
     char debug_name[xg_debug_name_size_m];
@@ -1526,7 +1542,7 @@ typedef struct {
 #define xg_renderpass_params_m( ... ) ( xg_renderpass_params_t ) { \
     .device = xg_null_handle_m, \
     .render_textures_layout = xg_render_textures_layout_m(), \
-    .render_textures_usage = xg_render_textures_usage_m(), \
+    .render_textures_desc = xg_render_textures_desc_m(), \
     .resolution_x = -1, \
     .resolution_y = -1, \
     .debug_name = "", \
@@ -1995,6 +2011,7 @@ typedef struct {
     xg_texture_tiling_e tiling;
     xg_texture_view_access_e view_access;
     xg_memory_address_t creation_address; // TODO make a separate param struct for create-at-address?
+    xg_texture_create_flag_bit_e flags;
     char debug_name[xg_debug_name_size_m];
 } xg_texture_params_t;
 
@@ -2078,6 +2095,7 @@ typedef enum {
     //xg_texture_flag_bit_depth_stencil_texture_m = 1 << 2,
     xg_texture_flag_bit_depth_texture_m = 1 << 2,
     xg_texture_flag_bit_stencil_texture_m = 1 << 3,
+    xg_texture_flag_bit_cubemap_m = 1 << 4,
 } xg_texture_flag_bit_e;
 
 typedef struct {
@@ -2208,11 +2226,13 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+// Expected source memory layout: [array0 [mip0] [mip1] ... ] [array1 [mip0] [mip1] ... ] ...
 typedef struct {
     xg_buffer_h source;
     uint64_t source_offset;
     xg_texture_h destination;
     uint32_t mip_base;
+    uint32_t mip_count;
     uint32_t array_base;
     uint32_t array_count;
     //xg_texture_aspect_e aspect;
@@ -2221,10 +2241,8 @@ typedef struct {
 
 #define xg_buffer_to_texture_copy_params_m( ... ) ( xg_buffer_to_texture_copy_params_t ) { \
     .source = xg_null_handle_m, \
-    .source_offset = 0, \
     .destination = xg_null_handle_m, \
-    .mip_base = 0, \
-    .array_base = 0, \
+    .mip_count = 1, \
     .array_count = 1, \
     __VA_ARGS__ \
 }
@@ -2253,6 +2271,7 @@ typedef enum {
     xg_default_texture_r8g8b8a8_unorm_black_m,
     xg_default_texture_r8g8b8a8_unorm_white_m,
     xg_default_texture_r8g8b8a8_unorm_tbn_up_m,
+    //xg_default_texture_b10g11r11_ufloat_cube_black_m,
     xg_default_texture_count_m,
 } xg_default_texture_e;
 

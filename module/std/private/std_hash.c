@@ -770,6 +770,39 @@ bool std_hash_set_insert ( std_hash_set_t* set, uint64_t hash ) {
     return false;
 }
 
+bool std_hash_set_try_insert ( uint64_t* out_idx, std_hash_set_t* set, uint64_t hash ) {
+    // Load
+    size_t      mask = set->mask;
+    uint64_t*   hashes = set->hashes;
+
+    // Compute idx
+    size_t      idx = hash & mask;
+
+    // Redirect the hash value used to indicate empty to some other value slot
+    if ( hash == UINT64_MAX ) {
+        ++hash;
+    }
+
+    // Try insert until success (linear probing)
+    for ( size_t i = 0; i < mask + 1; ++i ) {
+        if ( hashes[idx] == UINT64_MAX ) {
+            hashes[idx] = hash;
+            ++set->count;
+            *out_idx = idx;
+            return true;
+        } else if ( hashes[idx] == hash ) {
+            *out_idx = idx;
+            return false;
+        }
+
+        idx = ( idx + 1 ) & mask;
+    }
+
+    std_log_error_m ( "hash set is full!" );
+    *out_idx = std_hash_set_miss_m;
+    return false;
+}
+
 bool std_hash_set_remove ( std_hash_set_t* set, uint64_t hash ) {
     // Load
     size_t      mask = set->mask;
@@ -829,7 +862,7 @@ remove: {
     return true;
 }
 
-bool std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash ) {
+uint64_t std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash ) {
     // Load
     size_t          mask = set->mask;
     const uint64_t* hashes = set->hashes;
@@ -842,19 +875,19 @@ bool std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash ) {
     for ( size_t i = 0; i < mask + 1; ++i ) {
         if ( set_hash == UINT64_MAX ) {
             // Empty
-            return NULL;
+            return std_hash_set_miss_m;
         }
 
         if ( hash == set_hash ) {
             // Success
-            return true;
+            return i;
         }
 
         idx = ( idx + 1 ) & mask;
         set_hash = hashes[idx];
     }
 
-    return false;
+    return std_hash_set_miss_m;
 }
 
 void std_hash_set_clear ( std_hash_set_t* set ) {
@@ -862,4 +895,13 @@ void std_hash_set_clear ( std_hash_set_t* set ) {
     for ( size_t i = 0; i < set->mask + 1; ++i ) {
         set->hashes[i] = UINT64_MAX;
     }
+}
+
+std_hash_set_t std_hash_set_create ( uint64_t capacity ) {
+    uint64_t* hashes = std_virtual_heap_alloc_array_m ( uint64_t, capacity );
+    return std_hash_set ( hashes, capacity );
+}
+
+void std_hash_set_destroy ( std_hash_set_t* set ) {
+    std_virtual_heap_free ( set->hashes );
 }

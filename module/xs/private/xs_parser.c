@@ -945,7 +945,7 @@ static uint32_t xs_parser_parse_shader ( xs_parser_parsing_context_t* context, x
         std_assert_m ( len > 0 );
 
         uint64_t hash = std_hash_block_64_m ( token, len );
-        if ( std_hash_set_lookup ( &context->shader_references->set, hash ) ) {
+        if ( std_hash_set_lookup ( &context->shader_references->set, hash ) != std_hash_set_miss_m ) {
             // TODO optional?
             return idx;
         } else {
@@ -1636,7 +1636,7 @@ static bool xs_parser_parse_if ( xs_parser_parsing_context_t* context ) {
         size_t len = xs_parser_read_word ( context, token, xs_shader_parser_max_token_size_m );
         std_assert_m ( len );
         uint64_t hash = xs_hash_string_m ( token, len );
-        return std_hash_set_lookup ( &context->defines, hash );
+        return std_hash_set_lookup ( &context->defines, hash ) != std_hash_set_miss_m;
     }
 
     return false;

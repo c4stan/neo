@@ -162,6 +162,7 @@ typedef struct {
     xg_vk_cmd_allocator_t cmd_allocators[xg_cmd_queue_count_m];
     VkCommandBuffer* translated_chunks_array;
     uint32_t translated_chunks_capacity;
+    std_stack_t stack; // temp allocator
 } xg_vk_workload_translate_context_t;
 
 typedef struct {

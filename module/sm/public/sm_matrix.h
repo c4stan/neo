@@ -1,83 +1,6 @@
 #pragma once
 
-#include <sm_vector.h>
-
-// ======================================================================================= //
-//                                       M A T R I X
-// ======================================================================================= //
-
-// NxM matrix: N rows, M columns
-// Row major storage, e.g. for a 4x4 matrix:
-// r0 = m[0][] = e00 e01 e02 e03
-// r1 = m[1][] = e04 e05 e06 e07
-// r2 = m[2][] = e08 e09 e10 e11
-// r3 = m[3][] = e12 e13 e14 e15
-// m[i][j] -> i = row, j = column
-
-// Vectors can be considered as Nx1 column matrices
-// Matrix vector product follows the M*v convention
-// A 4x4 affine transform matrix has the following layout
-//      |     R   | T |
-// r0 = | Xx Yx Zx Tx |
-// r1 = | Xy Yy Zy Ty |
-// r2 = | Xz Yz Zz Tz |
-// r3 = | 0  0  0  1  |
-
-/* template begin
-
-def <TYPE, PREFIX, ROWS, COLS>
-typedef union {
-    $TYPE e[$ROWS * $COLS];
-    $TYPE m[$ROWS][$COLS];
-    struct {
-        $FOR 0 $ROWS
-        $TYPE r$i[$COLS];
-        $END_FOR
-    };
-    struct {
-        $FOR 0 $ROWS
-        sm_vec_$COLS$PREFIX_t v$i;
-        $END_FOR
-    };
-} sm_mat_$ROWSx$COLS$PREFIX_t;
-
-make <float, f, 3, 3>
-
-make <float, f, 4, 4>
-*/
-// template generation begin
-typedef union {
-    float e[3 * 3];
-    float m[3][3];
-    struct {
-        float r0[3];
-        float r1[3];
-        float r2[3];
-    };
-    struct {
-        sm_vec_3f_t v0;
-        sm_vec_3f_t v1;
-        sm_vec_3f_t v2;
-    };
-} sm_mat_3x3f_t;
-
-typedef union {
-    float e[4 * 4];
-    float m[4][4];
-    struct {
-        float r0[4];
-        float r1[4];
-        float r2[4];
-        float r3[4];
-    };
-    struct {
-        sm_vec_4f_t v0;
-        sm_vec_4f_t v1;
-        sm_vec_4f_t v2;
-        sm_vec_4f_t v3;
-    };
-} sm_mat_4x4f_t;
-// template generation end
+#include <sm_types.h>
 
 // ======================================================================================= //
 //                                  C O N S T R U C T O R
@@ -130,3 +53,29 @@ sm_mat_3x3f_t sm_matrix_3x3f_transpose ( sm_mat_3x3f_t mat );
 sm_mat_4x4f_t sm_matrix_4x4f_transpose ( sm_mat_4x4f_t mat );
 // template generation end
 
+// ======================================================================================= //
+//                                   P R O J E C T I O N
+// ======================================================================================= //
+sm_mat_4x4f_t sm_matrix_view ( sm_vec_3f_t position, sm_quat_t orientation );
+
+typedef struct {
+    float aspect_ratio;
+    float near_z;
+    float far_z;
+    // TODO use fov_x instead?
+    float fov_y; // in radians
+    bool reverse_z;
+    bool infinite_far_z;
+} sm_perspective_projection_params_t;
+
+#define sm_perspective_projection_params_m( ... ) ( sm_perspective_projection_params_t ) { \
+    .aspect_ratio = ( 16.f / 9.f ), \
+    .near_z = 0.1f, \
+    .far_z = 1000.f, \
+    .fov_y = 90 * sm_deg_to_rad_m, \
+    .reverse_z = false, \
+    .infinite_far_z = false, \
+    __VA_ARGS__ \
+}
+
+sm_mat_4x4f_t sm_matrix_perspective_proj ( const sm_perspective_projection_params_t* params );

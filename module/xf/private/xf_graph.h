@@ -75,7 +75,6 @@ typedef uint64_t xf_node_buffer_h;
 typedef struct {
     xf_node_h node;
     uint32_t resource_idx; // indexes node resources_array
-    // TODO specify subresource too here?
 } xf_resource_access_t;
 
 #define xf_resource_access_m( ... ) ( xf_resource_access_t ) { \
@@ -115,6 +114,7 @@ typedef struct {
     __VA_ARGS__ \
 }
 
+// Resource aliasing and multi queue scheduling logic inspired by Resource Management with Frame Graph in Messiah - Gpu Zen 3 - p.111
 typedef struct {
     int32_t first; // indexes graph nodes_execution_order
     int32_t last[xg_cmd_queue_count_m];
@@ -130,7 +130,6 @@ typedef struct {
     xf_texture_h handle;
     xf_graph_physical_texture_h physical_texture_handle;
     xf_graph_resource_lifespan_t lifespan;
-    uint64_t subresources_bitset;
     xf_graph_resource_dependencies_t dependencies;
 } xf_graph_texture_t;
 
@@ -187,21 +186,6 @@ typedef struct {
     .is_depended = { [0 ... xg_cmd_queue_count_m-1] = false }, \
     __VA_ARGS__ \
 }
-
-//typedef enum {
-//    xf_resource_access_sampled_m,
-//    xf_resource_access_uniform_m,
-//    xf_resource_access_storage_read_m,
-//    xf_resource_access_copy_read_m,
-//    xf_resource_access_render_target_m,
-//    xf_resource_access_depth_target_m,
-//    xf_resource_access_storage_write_m,
-//    xf_resource_access_copy_write_m,
-//    xf_resource_access_invalid_m,
-//} xf_resource_access_e;
-//
-//#define xf_resource_access_is_read( a ) ( a <= xf_resource_access_copy_read_m )
-//#define xf_resource_access_is_write( a ) ( a > xf_resource_access_copy_read_m && a <= xf_resource_access_copy_write_m )
 
 typedef enum {
     xf_node_resource_texture_m,
@@ -274,15 +258,13 @@ typedef struct {
 
 typedef struct {
     xf_node_params_t params;
-    xf_node_h edges[xf_node_max_node_edges_m]; // outgoing dependency edges
-    uint32_t edge_count;
     void* user_alloc;
     bool enabled;
     //tk_workload_h cpu_workload;
     xg_renderpass_h renderpass;
     struct {
         xg_render_textures_layout_t render_textures_layout;
-        xg_render_textures_usage_t render_textures_usage;
+        xg_render_textures_desc_t render_textures_desc;
         uint32_t resolution_x;
         uint32_t resolution_y;
     } renderpass_params;
@@ -428,3 +410,5 @@ void xf_graph_set_texture_export ( xf_graph_h graph, xf_node_h node, xf_texture_
 
 xf_node_h xf_graph_get_node_by_name ( xf_graph_h graph, const char* name );
 void xf_graph_bind_custom_node_routine ( xf_graph_h graph, xf_node_h node, xf_node_execute_f* routine );
+
+xf_texture_h xf_graph_get_texture_by_name ( xf_graph_h graph, const char* name );

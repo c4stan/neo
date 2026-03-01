@@ -63,10 +63,16 @@ typedef struct {
     size_t mask;
 } std_hash_set_t;
 
+#define std_hash_set_miss_m UINT64_MAX
+#define std_hash_set_null_hash_m UINT64_MAX
+
 std_hash_set_t      std_hash_set ( uint64_t* hashes, size_t capacity );
-bool                std_hash_set_insert ( std_hash_set_t* set, uint64_t hash ); // Returns false if hash is already present
+bool                std_hash_set_insert ( std_hash_set_t* set, uint64_t hash ); // Retuns false if already present, always writes out idx
+bool                std_hash_set_try_insert ( uint64_t* out_idx, std_hash_set_t* set, uint64_t hash ); // Retuns false if already present, always writes out idx
 bool                std_hash_set_remove ( std_hash_set_t* set, uint64_t hash );
-bool                std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash );
+uint64_t            std_hash_set_lookup ( std_hash_set_t* set, uint64_t hash ); // Returns the hash index, or std_hash_set_miss_m if missing
 void                std_hash_set_clear ( std_hash_set_t* set );
+std_hash_set_t      std_hash_set_create ( uint64_t capacity );
+void                std_hash_set_destroy ( std_hash_set_t* set );
 
 #define std_static_hash_set_m( array ) std_hash_set ( array, std_static_array_count_m ( array ) )

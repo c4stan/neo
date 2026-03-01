@@ -271,6 +271,7 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
         xg_vk_cmd_allocator_init ( copy_cmd_allocator, device_handle, xg_cmd_queue_copy_m );
         workload_context->translate.translated_chunks_array = std_virtual_heap_alloc_array_m ( VkCommandBuffer, 1024 );
         workload_context->translate.translated_chunks_capacity = 1024;
+        workload_context->translate.stack = std_stack_create ( 1024 * 1024 );
 
         workload_context->submit.events_count = 0;
     }
@@ -435,6 +436,7 @@ void xg_vk_workload_allocate_resource_groups ( xg_workload_h workload_handle ) {
     }
 
     VkDescriptorSetLayout vk_layouts[xg_vk_workload_max_resource_bindings_m];
+    std_assert_m ( desc_layouts_count < xg_vk_workload_max_resource_bindings_m );
     for ( uint32_t i = 0; i < desc_layouts_count; ++i ) {
         xg_resource_bindings_layout_h layout_handle = workload->desc_layouts_array[i];
         const xg_vk_resource_bindings_layout_t* layout = xg_vk_pipeline_resource_bindings_layout_get ( layout_handle );
@@ -878,6 +880,7 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
     for ( cmd_it = 0; cmd_it < cmd_count; ++cmd_it ) {
         const xg_cmd_header_t* header = &cmd_headers[cmd_it];
         xg_cmd_type_e cmd_type = header->type;
+        std_assert_m ( header->key != UINT64_MAX );
 
         switch ( cmd_type ) {
         case xg_cmd_graphics_renderpass_begin_m:
@@ -968,6 +971,9 @@ static xg_vk_workload_cmd_chunk_result_t xg_vk_workload_chunk_cmd_headers ( xg_v
             break;
         }        
     }
+
+    std_assert_m ( cmd_chunks_count < 1024 );
+    std_assert_m ( queue_chunks_count < 1024 );
 
     std_assert_m ( !in_renderpass );
     if ( cmd_chunk.begin != -1 ) {
@@ -1193,6 +1199,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
             const xg_cmd_header_t* header = &cmd_headers_array[cmd_it];
             //device->ext_api.cmd_set_checkpoint ( vk_cmd_buffer, (void*) header->key );
             xg_cmd_type_e cmd_type = header->type;
+            std_stack_clear ( &context->stack );
 
             switch ( cmd_type ) {
             case xg_cmd_graphics_renderpass_begin_m: {
@@ -1783,6 +1790,55 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                     dst_aspect = VK_IMAGE_ASPECT_COLOR_BIT;
                 }
 
+                uint32_t mip_base = args->mip_base;
+                uint32_t array_base = args->array_base;
+                uint32_t array_count = args->array_count;
+                uint32_t mip_count = args->mip_count;
+                if ( array_count == xg_texture_whole_array_m ) {
+                    array_count = dest->params.array_layers - array_base;
+                }
+                if ( mip_count == xg_texture_all_mips_m ) {
+                    mip_count = dest->params.mip_levels - mip_base;
+                }
+                uint32_t copy_count = array_count * mip_count;
+                VkBufferImageCopy* copy_array = std_stack_alloc_array_m ( &context->stack, VkBufferImageCopy, copy_count );
+                uint64_t offset = args->source_offset;
+                size_t bpp = xg_format_size ( dest->params.format );
+                size_t width = dest->params.width;
+                size_t height = dest->params.height;
+                size_t depth = dest->params.depth;
+
+                for ( uint32_t array_it = 0; array_it < array_count; ++array_it ) {
+                    for ( uint32_t mip_it = 0; mip_it < mip_count; ++mip_it ) {
+                        uint32_t copy_idx = array_it * mip_count + mip_it;
+                        
+                        uint32_t mip_id = mip_base + mip_it;
+                        uint32_t array_id = array_base + array_it;
+                        size_t mip_width = std_max ( 1, width << mip_id );
+                        size_t mip_height = std_max ( 1, height << mip_id );
+                        size_t mip_depth = std_max ( 1, depth << mip_id );
+
+                        copy_array[copy_idx] = ( VkBufferImageCopy ) {
+                            .bufferOffset = offset,
+                            .bufferRowLength = 0,
+                            .bufferImageHeight = 0,
+                            .imageSubresource.aspectMask = dst_aspect,
+                            .imageSubresource.mipLevel = mip_id,
+                            .imageSubresource.baseArrayLayer = array_id,
+                            .imageSubresource.layerCount = 1, // TODO batch if mip == 1 and array_count > 1 ?
+                            .imageOffset.x = 0,
+                            .imageOffset.y = 0,
+                            .imageOffset.z = 0,
+                            .imageExtent.width = mip_width,
+                            .imageExtent.height = mip_height,
+                            .imageExtent.depth = mip_depth,
+                        };
+
+                        offset += mip_width * mip_height * mip_depth * bpp;
+                    }
+                }
+
+#if 0
                 VkBufferImageCopy copy = {
                     .bufferOffset = args->source_offset,
                     .bufferRowLength = 0,
@@ -1798,8 +1854,9 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                     .imageExtent.height = dest->params.height,
                     .imageExtent.depth = dest->params.depth,
                 };
+#endif
 
-                vkCmdCopyBufferToImage ( vk_cmd_buffer, source->vk_handle, dest->vk_handle, dest_layout, 1, &copy );
+                vkCmdCopyBufferToImage ( vk_cmd_buffer, source->vk_handle, dest->vk_handle, dest_layout, copy_count, copy_array );
             }
             break;
             case xg_cmd_copy_texture_to_buffer_m: {
@@ -1907,8 +1964,12 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 // TODO make it obligatory?
                 std_static_assert_m ( xg_vk_enable_sync2_m );
 
+                // TODO remove limits
                 VkImageMemoryBarrier2KHR vk_texture_barriers[xg_vk_workload_max_texture_barriers_per_cmd_m];
-                VkBufferMemoryBarrier2KHR vk_buffer_barriers[xg_vk_workload_max_texture_barriers_per_cmd_m];
+                VkBufferMemoryBarrier2KHR vk_buffer_barriers[xg_vk_workload_max_buffer_barriers_per_cmd_m];
+
+                std_assert_m ( args->texture_memory_barriers < xg_vk_workload_max_texture_barriers_per_cmd_m );
+                std_assert_m ( args->buffer_memory_barriers < xg_vk_workload_max_buffer_barriers_per_cmd_m );
 
                 if ( args->memory_barriers > 0 ) {
                     std_not_implemented_m();

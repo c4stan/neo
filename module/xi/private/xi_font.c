@@ -224,8 +224,10 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
                 .render_targets_count = 1,
                 .render_targets = { xg_render_target_layout_m ( .format = xg_format_r8g8b8a8_unorm_m ) }
             ),
-            .render_textures_usage = xg_render_textures_usage_m (
-                .render_targets = { xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m },
+            .render_textures_desc = xg_render_textures_desc_m (
+                .render_targets = { 
+                    xg_render_texture_desc_m ( .usage = xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_sampled_m ), 
+                },
             ),
         ) );
     }

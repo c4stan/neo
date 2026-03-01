@@ -106,6 +106,7 @@ static void* xg_resource_cmd_buffer_record_cmd ( xg_resource_cmd_buffer_t* cmd_b
 
     xg_resource_cmd_header_t* cmd_header = std_stack_alloc_m ( &cmd_buffer->cmd_headers_allocator, xg_resource_cmd_header_t );
     void* cmd_args = std_stack_alloc ( &cmd_buffer->cmd_args_allocator, args_size );
+    std_assert_m ( cmd_args );
 
     cmd_header->type = ( uint16_t ) type;
     cmd_header->args = ( uint64_t ) cmd_args;

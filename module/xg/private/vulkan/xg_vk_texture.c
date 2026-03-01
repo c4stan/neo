@@ -166,7 +166,7 @@ xg_memory_requirement_t xg_texture_memory_requirement ( const xg_texture_params_
     VkImageCreateInfo vk_image_info;
     vk_image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     vk_image_info.pNext = NULL;
-    vk_image_info.flags = 0;
+    vk_image_info.flags = xg_texture_create_flag_to_vk ( params->flags );
     vk_image_info.imageType = xg_image_type_to_vk ( params->dimension );
     vk_image_info.format = xg_format_to_vk ( params->format );
     vk_image_info.extent.width = ( uint32_t ) params->width;
@@ -261,6 +261,18 @@ static xg_vk_texture_view_params_t xg_texture_view_params ( xg_texture_h texture
         params.aspect = xg_texture_aspect_to_vk ( view_desc.aspect );
     }
 
+    if ( texture->params.dimension == xg_texture_dimension_1d_m ) {
+        params.type = VK_IMAGE_VIEW_TYPE_1D;
+    } else if ( texture->params.dimension == xg_texture_dimension_2d_m ) {
+        params.type = VK_IMAGE_VIEW_TYPE_2D;
+    } else if ( texture->params.dimension == xg_texture_dimension_3d_m ) {
+        params.type = VK_IMAGE_VIEW_TYPE_3D;
+    }
+
+    if ( view_desc.cube ) {
+        params.type = VK_IMAGE_VIEW_TYPE_CUBE;
+    }
+
     params.desc = view_desc;
     params.image = texture->vk_handle;
 
@@ -280,7 +292,7 @@ static VkImageView xg_texture_view_create_vk ( xg_device_h device_handle, const 
         .pNext = NULL,
         .flags = 0,
         .image = params->image,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .viewType = params->type,
         .format = xg_format_to_vk ( params->format ),
         .components.r = VK_COMPONENT_SWIZZLE_IDENTITY,
         .components.g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -314,17 +326,24 @@ static void xg_texture_create_texture_views ( xg_texture_h texture_handle ) {
     bool needs_view = params->allowed_usage & ( xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m | xg_texture_usage_bit_depth_stencil_m );
 
     if ( needs_view ) {
-        texture->default_view.params = xg_texture_view_params ( texture_handle, xg_texture_view_m() );
+        xg_texture_view_t default_view = xg_texture_view_m ( 
+            .cube = texture->params.flags & xg_texture_create_flag_bit_cubemap_e ? 1 : 0 
+        );
+        texture->default_view.params = xg_texture_view_params ( texture_handle, default_view );
         texture->default_view.vk_handle = xg_texture_view_create_vk ( texture->params.device, &texture->default_view.params );
 
         if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
             for ( uint32_t i = 0; i < texture->params.mip_levels; ++i ) {
-                xg_texture_view_t view = xg_texture_view_m ( .mip_base = i, .mip_count = 1 );
+                xg_texture_view_t view = xg_texture_view_m ( 
+                    .mip_base = i, 
+                    .mip_count = 1, 
+                    .cube = texture->params.flags & xg_texture_create_flag_bit_cubemap_e ? 1 : 0 
+                );
                 texture->external_views.mips.array[i].params = xg_texture_view_params ( texture_handle, view );
                 texture->external_views.mips.array[i].vk_handle = xg_texture_view_create_vk ( texture->params.device, &texture->external_views.mips.array[i].params );
             }
         } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
-            std_not_implemented_m();
+            // do nothing, sparse views are created when requested
         }
     } else {
         texture->default_view.vk_handle = VK_NULL_HANDLE;
@@ -349,9 +368,11 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     if ( xg_format_has_stencil ( params->format ) ) {
         flags |= xg_texture_flag_bit_stencil_texture_m;
     }
-
+    if ( params->flags & xg_texture_create_flag_bit_cubemap_e ) {
+        flags |= xg_texture_flag_bit_cubemap_m;
+    }
     if ( params->allowed_usage & xg_texture_usage_bit_render_target_m ) {
-        flags = xg_texture_flag_bit_render_target_texture_m;
+        flags |= xg_texture_flag_bit_render_target_texture_m;
     }
 
     texture->vk_handle = VK_NULL_HANDLE;
@@ -389,7 +410,9 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
         texture->external_views.mips.array = std_virtual_heap_alloc_array_m ( xg_vk_texture_view_t, mip_levels );
         std_mem_zero ( texture->external_views.mips.array, sizeof ( xg_vk_texture_view_t ) * mip_levels );
     } else if ( params->view_access == xg_texture_view_access_dynamic_m ) {
-        std_not_implemented_m();
+        uint64_t capacity = 128; // TODO
+        texture->external_views.sparse.array = std_virtual_heap_alloc_array_m ( xg_vk_texture_view_t, capacity );
+        texture->external_views.sparse.set = std_hash_set_create ( capacity );
     }
 
     // Create Vulkan image
@@ -399,7 +422,7 @@ xg_texture_h xg_texture_reserve ( const xg_texture_params_t* params ) {
     VkImageCreateInfo vk_image_info;
     vk_image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     vk_image_info.pNext = NULL;
-    vk_image_info.flags = 0;
+    vk_image_info.flags = xg_texture_create_flag_to_vk ( params->flags );
     vk_image_info.imageType = xg_image_type_to_vk ( params->dimension );
     vk_image_info.format = xg_format_to_vk ( params->format );
     vk_image_info.extent.width = ( uint32_t ) params->width;
@@ -554,12 +577,21 @@ void xg_texture_destroy ( xg_texture_h texture_handle ) {
         }
 
         if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
-            std_not_implemented_m();
+            std_hash_set_t* set = &texture->external_views.sparse.set;
+            for ( uint32_t i = 0; i < set->mask + 1; ++i ) {
+                if ( set->hashes[i] != std_hash_set_null_hash_m ) {
+                    xg_vk_texture_view_t* view = &texture->external_views.sparse.array[i];
+                    vkDestroyImageView ( device->vk_handle, view->vk_handle, NULL );
+                }
+            }
         }
     }
 
     if ( texture->params.view_access == xg_texture_view_access_separate_mips_m ) {
         std_virtual_heap_free ( texture->external_views.mips.array );
+    } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
+        std_virtual_heap_free ( texture->external_views.sparse.array );
+        std_hash_set_destroy ( &texture->external_views.sparse.set );
     }
 
     std_bitset_clear ( xg_vk_texture_state->textures_bitset, texture_handle );
@@ -651,8 +683,18 @@ const xg_vk_texture_view_t* xg_vk_texture_get_view ( xg_texture_h texture_handle
             std_assert_m ( view.u64 == ( xg_texture_view_m() ).u64 );
 
             return &texture->external_views.mips.array[mip_idx];
+        } else if ( texture->params.view_access == xg_texture_view_access_dynamic_m ) {
+            uint64_t hash = std_hash_64_m ( view.u64 );
+            uint64_t idx;
+            if ( std_hash_set_try_insert ( &idx, &texture->external_views.sparse.set, hash ) ) {
+                xg_vk_texture_view_params_t params = xg_texture_view_params ( texture_handle, view );
+                xg_vk_texture_view_t* sparse_view = &texture->external_views.sparse.array[idx];
+                sparse_view->vk_handle = xg_texture_view_create_vk ( texture->params.device, &params );
+                sparse_view->params = params;
+            }
+            return &texture->external_views.sparse.array[idx];
         } else {
-            std_not_implemented_m();
+            std_assert_m ( false );
             return NULL;
         }
     }

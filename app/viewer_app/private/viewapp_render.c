@@ -329,6 +329,90 @@ void viewapp_load_mouse_pick_graph ( void ) {
     ) );
 }
 
+void viewapp_load_cubemap_gen_graph ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xg_device_h device = state->render.device;
+    uint32_t resolution_x = 512;
+    uint32_t resolution_y = 512;
+
+    xf_i* xf = state->modules.xf;
+    xs_i* xs = state->modules.xs;
+    xg_i* xg = state->modules.xg;
+    xf_graph_h graph = xf->create_graph ( &xf_graph_params_m (
+        .device = device,
+        .debug_name = "cubemap_gen_graph",
+    ) );
+    state->render.cubemap_gen_graph = graph;
+
+    xf_texture_h cubemap_texture = xf->create_texture ( graph, &xf_texture_params_m (
+        .debug_name = "cubemap_texture",
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .flags = xg_texture_create_flag_bit_cubemap_e,
+    ) );
+    state->render.cubemap_gen_texture = cubemap_texture;
+
+    add_sky_cubemap_gen_node ( graph, cubemap_texture, 0 );
+    add_sky_cubemap_gen_node ( graph, cubemap_texture, 1 );
+    add_sky_cubemap_gen_node ( graph, cubemap_texture, 2 );
+    add_sky_cubemap_gen_node ( graph, cubemap_texture, 3 );
+    add_sky_cubemap_gen_node ( graph, cubemap_texture, 4 );
+    add_sky_cubemap_gen_node ( graph, cubemap_texture, 5 );
+
+    uint32_t mip_levels = 10; // TODO
+    for ( uint32_t face_it = 0; face_it < 6; ++face_it ) {        
+        for ( uint32_t mip_it = 1; mip_it < mip_levels; ++mip_it ) {
+            struct {
+                uint32_t face;
+                uint32_t sample_count;
+                float roughness;
+                uint32_t _pad0;
+            } uniform_data = {
+                .face = face_it,
+                .sample_count = 1024,
+                .roughness = ( float ) mip_it / mip_levels,
+            };
+            xf_node_params_t params = xf_node_params_m (
+                .type = xf_node_type_compute_pass_m,
+                .pass.compute = xf_node_compute_pass_params_m (
+                    .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "cubemap_prefilter" ) ),
+                    .samplers_count = 1,
+                    .samplers = {
+                        xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ),
+                    },
+                    .workgroup_count = { std_div_round_up_u32 ( resolution_x >> mip_it, 8 ), std_div_round_up_u32 ( resolution_y >> mip_it, 8 ), 1 },
+                    .uniform_data = std_buffer_struct_m ( &uniform_data ),
+                ),
+                .resources = xf_node_resource_params_m (
+                    .sampled_textures_count = 1,
+                    .sampled_textures = { 
+                        xf_compute_texture_dependency_m ( .texture = cubemap_texture, .view = xg_texture_view_m (
+                            .mip_base = 0,
+                            .mip_count = 1,
+                            .array_base = 0,
+                            .array_count = 6,
+                            .cube = 1,
+                        ) ),
+                    },
+                    .storage_texture_writes_count = 1,
+                    .storage_texture_writes = { 
+                        xf_compute_texture_dependency_m ( .texture = cubemap_texture, .view = xg_texture_view_m ( 
+                            .mip_base = mip_it, 
+                            .mip_count = 1,
+                            .array_base = face_it,
+                            .array_count = 1,
+                        ) ),
+                    },
+                ),
+            );
+            std_string_t string = std_static_string_m ( params.debug_name );
+            std_string_append_format ( &string, "cube_prefilter_" std_fmt_u32_m "_" std_fmt_u32_m, face_it, mip_it );
+            xf->create_node ( graph, &params );
+        }
+    }
+}
+
 static void viewapp_bind_restir_di_graph_routines ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_graph_h graph = state->render.render_graph;
@@ -1385,6 +1469,9 @@ static void viewapp_boot_raster_graph ( void ) {
         .shadow_size = shadow_size,
     };
 
+    xf_texture_h sky_radiance_texture = xf->create_texture_from_external ( graph, xg->get_default_texture ( device, xg_default_texture_r8g8b8a8_unorm_black_m ) );
+    state->render.sky_radiance_texture = sky_radiance_texture;
+
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
@@ -1411,6 +1498,7 @@ static void viewapp_boot_raster_graph ( void ) {
                 //xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
+                //xf_compute_texture_dependency_m ( .texture = state->render.cubemap_gen_texture ),
             },
             .storage_texture_writes_count = 1,
             .storage_texture_writes = {
@@ -1880,6 +1968,14 @@ static void viewapp_destroy_mouse_pick_graph ( xg_workload_h workload, xg_resour
     xg->cmd_destroy_texture ( resource_cmd_buffer, state->render.object_id_readback_texture, xg_resource_cmd_buffer_time_workload_start_m );
 }
 
+static void viewapp_destroy_cubemap_gen_graph ( xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
+    viewapp_state_t* state = viewapp_state_get();
+    //xg_i* xg = state->modules.xg;
+    xf_i* xf = state->modules.xf;
+
+    xf->destroy_graph ( state->render.cubemap_gen_graph, workload );
+}
+
 void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h workload ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
@@ -1968,8 +2064,9 @@ xs_database_pipeline_h viewapp_get_render_graph_raytrace_pipeline ( viewapp_rend
     return false;
 }
 
-void viewapp_render_update_sky_irradiance_sh ( viewapp_sky_component_t* sky_component ) {
+uint64_t viewapp_render_update_sky ( viewapp_sky_component_t* sky_component, xg_workload_h workload, uint64_t key ) {
     viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
     xf_i* xf = state->modules.xf;
     xf_graph_h graph = state->render.render_graph;
 
@@ -1980,4 +2077,30 @@ void viewapp_render_update_sky_irradiance_sh ( viewapp_sky_component_t* sky_comp
         lighting_uniforms->sky_irradiance_sh[i][1] = sky_component->irradiance_sh[i * 3 + 1];
         lighting_uniforms->sky_irradiance_sh[i][2] = sky_component->irradiance_sh[i * 3 + 2];
     }
+
+    xf->bind_texture_to_external ( state->render.sky_radiance_texture, sky_component->radiance_texture );
+
+    xg_texture_h sky_cubemap = xg->create_texture ( &xg_texture_params_m (
+        .memory_type = xg_memory_type_gpu_only_m,
+        .device = state->render.device,
+        .width = 512,
+        .height = 512,
+        .mip_levels = 10,
+        .array_layers = 6,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m,
+        .flags = xg_texture_create_flag_bit_cubemap_e,
+        .view_access = xg_texture_view_access_dynamic_m,
+        .debug_name = "sky_cubemap",
+    ) );
+
+    if ( sky_component->radiance_texture != xg_null_handle_m ) {
+        //xf_texture_h cubemap_texture = xf->get_texture_by_name ( cubemap_gen_graph, "cubemap_texture" );
+        xf_texture_h cubemap_texture = state->render.cubemap_gen_texture;
+        xf->bind_texture_to_external ( cubemap_texture, sky_cubemap );
+
+        key = xf->execute_graph ( state->render.cubemap_gen_graph, workload, key );
+    }
+
+    return key;
 }

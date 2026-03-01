@@ -1,20 +1,6 @@
 #pragma once
 
-#include <sm_matrix.h>
-
-typedef union {
-    float e[4];
-    struct {
-        float x;
-        float y;
-        float z;
-        float w;
-    };
-    struct {
-        sm_vec_3f_t vec;
-        float scalar;
-    };
-} sm_quat_t;
+#include <sm_types.h>
 
 sm_quat_t sm_quat ( const float f[4] );
 sm_quat_t sm_quat_identity ( void );

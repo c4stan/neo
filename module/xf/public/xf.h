@@ -495,6 +495,7 @@ typedef struct {
     xg_texture_dimension_e dimension;
     xg_format_e format;
     xg_sample_count_e samples_per_pixel;
+    xg_texture_create_flag_bit_e flags;
     bool allow_aliasing;
     char debug_name[xf_debug_name_size_m];
     bool clear_on_create;
@@ -695,6 +696,8 @@ typedef struct {
 
     xf_node_h ( *get_node_by_name ) ( xf_graph_h graph, const char* name );
     void ( *bind_custom_node_routine ) ( xf_graph_h graph, xf_node_h node, xf_node_execute_f* routine );
+
+    xf_texture_h ( *get_texture_by_name ) ( xf_graph_h graph, const char* name );
 
     void ( *advance_multi_texture ) ( xf_texture_h multi_texture );
     void ( *advance_multi_buffer ) ( xf_buffer_h multi_buffer );

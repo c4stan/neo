@@ -456,7 +456,7 @@ void xf_resource_texture_add_usage ( xf_texture_h texture_handle, xg_texture_usa
 
         for ( uint32_t i = 0; i < multi_texture->params.multi_texture_count; ++i ) {
             xf_texture_t* texture = &xf_resource_state->textures_array[multi_texture->textures[i]];
-        texture->required_usage |= usage;
+            texture->required_usage |= usage;
         }
     } else {
         xf_texture_t* texture = &xf_resource_state->textures_array[texture_handle];
@@ -728,20 +728,19 @@ static void xf_resource_physical_texture_set_execution_layout ( xf_physical_text
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
         texture->state.shared.execution.layout = layout;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count;
-
-        if ( view.u64 == xg_texture_view_m().u64 ) {
-            mip_count = texture->info.mip_levels - view.mip_base;
-        } else {
-            mip_count = view.mip_count;
-        }
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].execution.layout = layout;
-        }
     } else {
-        std_not_implemented_m();
+        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? texture->info.mip_levels - view.mip_base : view.mip_count;
+        uint32_t array_count = view.array_count == xg_texture_whole_array_m ? texture->info.array_layers - view.array_base : view.array_count;
+
+        for ( uint32_t array_it = 0; array_it < array_count; ++array_it ) {
+            for ( uint32_t mip_it = 0; mip_it < mip_count; ++mip_it ) {
+                uint32_t mip_id = view.mip_base + mip_it;
+                uint32_t array_id = view.array_base + array_it;
+                uint32_t subres_idx = array_id * texture->info.mip_levels + mip_id;
+
+                texture->state.subresources[subres_idx].execution.layout = layout;
+            }
+        }
     }
 }
 
@@ -750,20 +749,19 @@ static void xf_resource_physical_texture_add_execution_stage ( xf_physical_textu
 
     if ( texture->info.view_access == xg_texture_view_access_default_only_m ) {
         texture->state.shared.execution.stage |= stage;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count;
-
-        if ( view.u64 == xg_texture_view_m().u64 ) {
-            mip_count = texture->info.mip_levels - view.mip_base;
-        } else {
-            mip_count = view.mip_count;
-        }
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].execution.stage |= stage;
-        }
     } else {
-        std_not_implemented_m();
+        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? texture->info.mip_levels - view.mip_base : view.mip_count;
+        uint32_t array_count = view.array_count == xg_texture_whole_array_m ? texture->info.array_layers - view.array_base : view.array_count;
+
+        for ( uint32_t array_it = 0; array_it < array_count; ++array_it ) {
+            for ( uint32_t mip_it = 0; mip_it < mip_count; ++mip_it ) {
+                uint32_t mip_id = view.mip_base + mip_it;
+                uint32_t array_id = view.array_base + array_it;
+                uint32_t subres_idx = array_id * texture->info.mip_levels + mip_id;
+
+                texture->state.subresources[subres_idx].execution.stage |= stage;
+            }
+        }
     }
 }
 
@@ -795,20 +793,19 @@ static void xf_resource_physical_texture_set_execution_state ( xf_physical_textu
             state->prev_queue = state->execution.queue;
         }
         texture->state.shared.execution = *new_state;
-    } else if ( texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count;
-
-        if ( view.u64 == xg_texture_view_m().u64 ) {
-            mip_count = texture->info.mip_levels - view.mip_base;
-        } else {
-            mip_count = view.mip_count;
-        }
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            texture->state.mips[view.mip_base + i].execution = *new_state;
-        }
     } else {
-        std_not_implemented_m();
+        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? texture->info.mip_levels - view.mip_base : view.mip_count;
+        uint32_t array_count = view.array_count == xg_texture_whole_array_m ? texture->info.array_layers - view.array_base : view.array_count;
+
+        for ( uint32_t array_it = 0; array_it < array_count; ++array_it ) {
+            for ( uint32_t mip_it = 0; mip_it < mip_count; ++mip_it ) {
+                uint32_t mip_id = view.mip_base + mip_it;
+                uint32_t array_id = view.array_base + array_it;
+                uint32_t subres_idx = array_id * texture->info.mip_levels + mip_id;
+
+                texture->state.subresources[subres_idx].execution = *new_state;
+            }
+        }
     }
 }
 
@@ -881,6 +878,15 @@ xf_physical_texture_h xf_resource_physical_texture_create ( const xf_physical_te
         .handle = params->handle,
         .info = params->info,
     );
+    
+    if ( texture->info.view_access != xg_texture_view_access_default_only_m ) {
+        uint32_t capacity = params->info.mip_levels * params->info.array_layers;
+        texture->state.subresources = std_virtual_heap_alloc_array_m ( xf_texture_state_t, capacity );
+        for ( uint32_t i = 0; i < capacity; ++i ) {
+            texture->state.subresources[i] = xf_texture_state_m();
+        }
+    }
+
     xf_physical_texture_h handle = texture - xf_resource_state->physical_textures_array;
     std_bitset_set ( xf_resource_state->physical_textures_bitset, handle );
     return handle;
@@ -888,6 +894,9 @@ xf_physical_texture_h xf_resource_physical_texture_create ( const xf_physical_te
 
 void xf_resource_physical_texture_destroy ( xf_physical_texture_h handle ) {
     xf_physical_texture_t* texture = &xf_resource_state->physical_textures_array[handle];
+    if ( texture->info.view_access != xg_texture_view_access_default_only_m ) {
+        std_virtual_heap_free ( texture->state.subresources );
+    }
     std_list_push ( &xf_resource_state->physical_textures_freelist, texture );
     std_bitset_clear ( xf_resource_state->physical_textures_bitset, handle );
 }
@@ -910,18 +919,25 @@ void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physica
     if ( physical_texture->info.view_access == xg_texture_view_access_default_only_m ) {
         xf_texture_state_t* old_state = &physical_texture->state.shared;
         xf_resource_physical_texture_barrier ( stack, physical_texture_handle, view, old_state, new_state );
-    } else if ( physical_texture->info.view_access == xg_texture_view_access_separate_mips_m ) {
-        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? physical_texture->info.mip_levels : view.mip_count;
-
-        for ( uint32_t i = 0; i < mip_count; ++i ) {
-            xf_texture_state_t* old_state = &physical_texture->state.mips[view.mip_base + i];
-            xg_texture_view_t mip_view = view;
-            mip_view.mip_base = view.mip_base + i;
-            mip_view.mip_count = 1;
-            xf_resource_physical_texture_barrier ( stack, physical_texture_handle, mip_view, old_state, new_state );
-        }
     } else {
-        std_not_implemented_m();
+        uint32_t mip_count = view.mip_count == xg_texture_all_mips_m ? physical_texture->info.mip_levels - view.mip_base : view.mip_count;
+        uint32_t array_count = view.array_count == xg_texture_whole_array_m ? physical_texture->info.array_layers - view.array_base : view.array_count;
+
+        for ( uint32_t array_it = 0; array_it < array_count; ++array_it ) {
+            for ( uint32_t mip_it = 0; mip_it < mip_count; ++mip_it ) {
+                uint32_t mip_id = view.mip_base + mip_it;
+                uint32_t array_id = view.array_base + array_it;
+                uint32_t subres_idx = array_id * physical_texture->info.mip_levels + mip_id;
+
+                xf_texture_state_t* old_state = &physical_texture->state.subresources[subres_idx];
+                xg_texture_view_t subres_view = view;
+                subres_view.mip_base = mip_id;
+                subres_view.mip_count = 1;
+                subres_view.array_base = array_id;
+                subres_view.array_count = 1;
+                xf_resource_physical_texture_barrier ( stack, physical_texture_handle, subres_view, old_state, new_state );
+            }
+        }
     }
 }
 

@@ -90,6 +90,7 @@ typedef struct {
     xg_geo_util_geometry_gpu_data_t geo_gpu_data;
     xg_texture_h radiance_texture;
     float irradiance_sh[3*9];
+    xg_texture_h cubemap_texture;
 } viewapp_sky_component_t;
 
 #define viewapp_sky_component_m( ... ) ( viewapp_sky_component_t ) { \
@@ -187,7 +188,7 @@ typedef enum {
 
 void viewapp_load_scene ( viewapp_scene_e scene );
 
-void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap );
+uint64_t viewapp_load_envmap ( xg_workload_h workload, uint64_t key, viewapp_envmap_e envmap );
 
 se_entity_h spawn_plane ( xg_workload_h workload );
 se_entity_h spawn_sphere ( xg_workload_h workload );

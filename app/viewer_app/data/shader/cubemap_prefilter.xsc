@@ -1,0 +1,10 @@
+compute_shader cubemap_prefilter.comp
+
+include common.xsi
+
+begin bindings
+    buffer uniform
+    texture sampled
+    texture storage
+    sampler
+end

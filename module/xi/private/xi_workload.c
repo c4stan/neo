@@ -7,6 +7,7 @@
 #include <std_list.h>
 
 #include <sm_matrix.h>
+#include <sm_vector.h>
 
 static xi_workload_state_t* xi_workload_state;
 
@@ -174,8 +175,10 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
                 .render_targets_count = 1,
                 .render_targets = { xg_render_target_layout_m ( .format = flush_params->render_target_format ) }
             ),
-            .render_textures_usage = xg_render_textures_usage_m (
-                .render_targets = { render_target_info.allowed_usage }
+            .render_textures_desc = xg_render_textures_desc_m (
+                .render_targets = { 
+                    xg_render_texture_desc_m ( .usage = render_target_info.allowed_usage ) 
+                }
             ),
         ) );
         renderpass->resolution_x = viewport_w;

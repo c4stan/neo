@@ -1,87 +1,7 @@
 #pragma once
 // TODO rename to sm_vec
 
-// ======================================================================================= //
-//                                       V E C T O R
-// ======================================================================================= //
-/* template begin
-
-def <TYPE, PREFIX, SIZE>
-typedef union {
-    float e[$SIZE];
-    struct {
-        $TYPE x;
-$IF $SIZE > 1
-        $TYPE y;
-$END_IF
-$IF $SIZE > 2
-        $TYPE z;
-$END_IF
-$IF $SIZE > 3
-        $TYPE w;
-$END_IF
-    };
-} sm_vec_$SIZE$PREFIX_t;
-
-#define sm_vec_$SIZE$PREFIX_log_m( v ) std_log_info_m ( \
-    std_fmt_f32_m \
-    $FOR 1 $SIZE
-    " " std_fmt_f32_m \
-    $END_FOR
-    , \
-    v.e[0] \
-    $FOR 1 $SIZE
-    , v.e[$i] \
-    $END_FOR
-)
-
-make <float, f, 3>
-
-make <float, f, 4>
-
-*/
-// template generation begin
-typedef union {
-    float e[3];
-    struct {
-        float x;
-        float y;
-        float z;
-    };
-} sm_vec_3f_t;
-
-#define sm_vec_3f_log_m( v ) std_log_info_m ( \
-    std_fmt_f32_m \
-    " " std_fmt_f32_m \
-    " " std_fmt_f32_m \
-    , \
-    v.e[0] \
-    , v.e[1] \
-    , v.e[2] \
-)
-
-typedef union {
-    float e[4];
-    struct {
-        float x;
-        float y;
-        float z;
-        float w;
-    };
-} sm_vec_4f_t;
-
-#define sm_vec_4f_log_m( v ) std_log_info_m ( \
-    std_fmt_f32_m \
-    " " std_fmt_f32_m \
-    " " std_fmt_f32_m \
-    " " std_fmt_f32_m \
-    , \
-    v.e[0] \
-    , v.e[1] \
-    , v.e[2] \
-    , v.e[3] \
-)
-// template generation end
+#include <sm_types.h>
 
 // ======================================================================================= //
 //                                 C O N S T R U C T O R S
@@ -101,7 +21,6 @@ sm_vec_4f_t sm_vec_4f ( const float f[4] );
 // template generation end
 
 /* template begin
-
 def <TYPE, PREFIX, SIZE>
 $IF $SIZE == 1
 sm_vec_$SIZE$PREFIX_t sm_vec_$SIZE$PREFIX_set ( float x );

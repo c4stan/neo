@@ -1,5 +1,7 @@
 #include <sm_quat.h>
 
+#include <sm_vector.h>
+
 #include <math.h>
 
 sm_quat_t sm_quat ( const float f[4] ) {

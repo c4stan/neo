@@ -342,7 +342,7 @@ static sm_vec_3f_t viewapp_light_view_dir ( uint32_t idx ) {
     return dir;
 }
 
-static void add_sky_entity ( xg_device_h device, xg_workload_h workload ) {
+static void add_sky_entity ( xg_device_h device, xg_workload_h workload, uint64_t key ) {
     viewapp_state_t* state = viewapp_state_get();
     se_i* se = state->modules.se;
 
@@ -370,7 +370,7 @@ static void add_sky_entity ( xg_device_h device, xg_workload_h workload ) {
     ) );
 
     if ( state->scene.active_envmap != viewapp_envmap_none_m ) {
-        viewapp_load_envmap ( workload, state->scene.active_envmap );
+        viewapp_load_envmap ( workload, key, state->scene.active_envmap );
     }
 }
 
@@ -645,7 +645,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
         ) );
     }
 
-    add_sky_entity ( device, workload );
+    add_sky_entity ( device, workload, 0 );
 }
 
 static void viewapp_boot_scene_field ( xg_workload_h workload ) {
@@ -943,7 +943,7 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
         ) );
     }
  
-    add_sky_entity ( device, workload );
+    add_sky_entity ( device, workload, 0 );
 }
 
 static void viewapp_create_cameras ( void ) {
@@ -1477,7 +1477,7 @@ void viewapp_load_scene ( viewapp_scene_e scene ) {
     } else {
         std_assert_m ( scene == viewapp_scene_external_m );
         viewapp_import_scene ( workload, 0, state->scene.custom_scene_path );
-        add_sky_entity ( state->render.device, workload );
+        add_sky_entity ( state->render.device, workload, 0 );
     }
 
     state->scene.active_scene = scene;
@@ -1502,6 +1502,7 @@ static float sh_sloan_window ( float l, float w ) {
     return sinf ( x ) / x;
 }
 
+// https://cseweb.ucsd.edu/~ravir/papers/envmap/envmap.pdf
 static void compute_sh_basis ( float* out_basis, const float* dir ) {
     float x = dir[0];
     float y = dir[1];
@@ -1515,7 +1516,7 @@ static void compute_sh_basis ( float* out_basis, const float* dir ) {
 
     out_basis[4] = 1.092548f * x * y;
     out_basis[5] = 1.092548f * y * z;
-    out_basis[6] = 0.315392f * ( 3.0f * z * z - 1.0f );
+    out_basis[6] = 0.315392f * ( 3.f * z * z - 1.f );
     out_basis[7] = 1.092548f * x * z;
     out_basis[8] = 0.546274f * ( x * x - y * y );
 }
@@ -1642,14 +1643,14 @@ viewapp_envmap_import_result_t viewapp_import_envmap ( xg_workload_h workload, x
     return result;
 }
 
-void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap ) {
+uint64_t viewapp_load_envmap ( xg_workload_h workload, uint64_t key, viewapp_envmap_e envmap ) {
     viewapp_state_t* state = viewapp_state_get();
     se_i* se = state->modules.se;
 
     se_query_result_t query_result;
     se->query_entities ( &query_result, &se_query_params_m ( .include_component_count = 1, .include_components = { viewapp_sky_component_id_m } ) );
     if ( query_result.entity_count == 0 ) {
-        return;
+        return key;
     }
     std_assert_m ( query_result.entity_count == 1 );
     se_stream_iterator_t sky_component_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
@@ -1664,16 +1665,17 @@ void viewapp_load_envmap ( xg_workload_h workload, viewapp_envmap_e envmap ) {
 
     if ( envmap == viewapp_envmap_none_m ) {
         std_mem_zero_static_array_m ( sky_component->irradiance_sh );
-        viewapp_render_update_sky_irradiance_sh ( sky_component );
+        key = viewapp_render_update_sky ( sky_component, workload, key );
     } else {
         std_assert_m ( envmap == viewapp_envmap_external_m );
-        viewapp_envmap_import_result_t result = viewapp_import_envmap ( workload, resource_cmd_buffer, 0, state->scene.envmap_path );
+        viewapp_envmap_import_result_t result = viewapp_import_envmap ( workload, resource_cmd_buffer, key, state->scene.envmap_path );
         sky_component->radiance_texture = result.radiance_texture;
         std_mem_copy_static_array_m ( sky_component->irradiance_sh, result.irradiance_sh );
-        viewapp_render_update_sky_irradiance_sh ( sky_component );
+        key = viewapp_render_update_sky ( sky_component, workload, key );
     }
 
     state->scene.active_envmap = envmap;
+    return key;
 }
 
 se_entity_h spawn_plane ( xg_workload_h workload ) {

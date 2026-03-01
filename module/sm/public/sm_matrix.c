@@ -1,5 +1,8 @@
 #include <sm_matrix.h>
 
+#include <sm_vector.h>
+#include <sm_quat.h>
+
 #include <std_byte.h>
 
 #include <math.h>
@@ -158,3 +161,117 @@ sm_mat_4x4f_t sm_matrix_4x4f_transpose ( sm_mat_4x4f_t mat ) {
     return result;
 }
 // template generation end
+
+sm_mat_4x4f_t sm_matrix_view ( sm_vec_3f_t position, sm_quat_t orientation ) {
+    /*
+        https://www.3dgep.com/understanding-the-view-matrix/
+        view = orientation^-1 * translation^-1
+            orientation^-1: just transpose the orthonormalized camera basis matrix (orientation)
+            translation^-1: just fill the translation column with the negated camera position
+        the below is the above, but in one single step. (also need to recompute basis vectors)
+    */
+
+    sm_mat_4x4f_t result = { 0 };
+
+    sm_vec_3f_t oriented_dir = sm_quat_to_vec ( orientation );
+    sm_vec_3f_t right = sm_vec_3f_norm ( sm_vec_3f_cross ( oriented_dir, sm_vec_3f_set ( 0, 1, 0 ) ) );
+    sm_vec_3f_t oriented_up = sm_vec_3f_cross ( right, oriented_dir );
+
+    // z axis
+    //result.v2
+    sm_vec_3f_t z_axis = sm_vec_3f_norm ( oriented_dir );
+    if ( z_axis.e[0] == 0 && ( z_axis.e[1] == -1 || z_axis.e[1] == 1 ) && z_axis.e[2] == 0 ) {
+        oriented_up.e[0] = 0;
+        oriented_up.e[1] = 0;
+        oriented_up.e[2] = 1;
+    }
+    // x axis
+    //result.v0
+    sm_vec_3f_t x_axis = sm_vec_3f_cross ( oriented_up, z_axis );
+    x_axis = sm_vec_3f_norm ( x_axis );
+    // y axis
+    //result.v1
+    sm_vec_3f_t y_axis = sm_vec_3f_cross ( z_axis, x_axis );
+
+    result.v0 = sm_vec_3f_to_4f ( x_axis, -sm_vec_3f_dot ( x_axis, position ) );
+    result.v1 = sm_vec_3f_to_4f ( y_axis, -sm_vec_3f_dot ( y_axis, position ) );
+    result.v2 = sm_vec_3f_to_4f ( z_axis, -sm_vec_3f_dot ( z_axis, position ) );
+    result.r3[3] = 1;
+
+    return result;
+}
+
+sm_mat_4x4f_t sm_matrix_perspective_proj ( const sm_perspective_projection_params_t* params ) {
+    /*
+        http://www.songho.ca/opengl/gl_projectionmatrix.html
+        https://matthewwellings.com/blog/the-new-vulkan-coordinate-system/
+        Premise:
+            Eye space is left handed. (Camera towards positive Z axis)
+    -- X, Y --
+        eye -> near plane (xe,ye -> xp,yp)
+            <x,y,z>e somewhere inside the frustum
+            xp in [-w/2, w/2], yp in  [-h/2, h/2]
+            [from similar triangles formula: xp/xe == znear/ze]
+            xp = znear * xe / ze
+            yp = znear * ye / ze
+            *division by ze happens automatically in hw later*
+        near plane -> NDC (xp, yp -> xn, yn)
+            xp in [-w/2, w/2], yp in  [-h/2, h/2]
+            xn in [-1, 1], yn in [-1, 1]
+            [simple remapping]
+            xn = xp / w * 2
+            yn = yp / h * 2
+        putting it together, eye -> NDC
+            xn = 2 * znear / w * xe = znear / (w/2) * xe
+            yn = 2 * znear / h * ye = znear / (h/2) * ye
+    -- Z --
+        eye -> NDC (ze -> zn)
+            ze in [znear, zfar]
+            zn in [0, 1]
+            zn = (A*ze + B) / ze ( = A + B / ze )
+            [the target remapping rewritten as system]
+            | (A*znear + B) / znear = 0
+            | (A*zfar + B) / zfar = 1
+            [solving for A, B]
+            B = -A*znear -> (A*zfar - A*znear) / zfar = 1 -> A = zfar / (zfar - znear)
+            B = -(zfar * znear) / (zfar - znear)
+        for reversed Z:
+            | (A*znear + B) / znear = 1
+            | (A*zfar + B) / zfar = 0
+            [solving for A, B]
+            B = -A*zfar -> (A*znear - A*zfar) / znear = 1 -> A = znear / (znear - zfar)
+            B = -(zfar * znear) / (znear - zfar)
+    */
+
+    sm_mat_4x4f_t result = { 0 };
+
+    float near_z = params->near_z;
+    float far_z = params->far_z;
+    float half_h = near_z * tanf ( params->fov_y / 2.f );
+    float half_w = params->aspect_ratio * half_h;
+
+    result.r0[0] = near_z / half_w;
+    result.r1[1] = near_z / half_h;
+
+    if ( params->reverse_z ) {
+        if ( params->infinite_far_z ) {
+            result.r2[2] = 1e-6;
+            result.r2[3] = near_z * ( 1 - 1e-6 );
+        } else {
+            result.r2[2] = near_z / ( near_z - far_z );
+            result.r2[3] = - ( far_z * near_z ) / ( near_z - far_z );        
+        }
+    } else {
+        if ( params->infinite_far_z ) {
+            result.r2[2] = 1 - 1e-6;
+            result.r2[3] = -near_z * ( 1 - 1e-6 );
+        } else {
+            result.r2[2] = far_z / ( far_z - near_z );
+            result.r2[3] = - ( far_z * near_z ) / ( far_z - near_z );
+        }
+    }
+
+    result.r3[2] = 1;
+
+    return result;
+}

@@ -35,6 +35,7 @@ layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D
 //layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_radiosity;
 layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
 layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_shadows;
+//layout ( binding = 9, set = xs_shader_binding_set_dispatch_m ) uniform textureCube tex_radiance_cube;
 
 layout ( binding = 9, set = xs_shader_binding_set_dispatch_m, r11f_g11f_b10f ) uniform writeonly image2D img_color;
 
@@ -55,7 +56,7 @@ void compute_sh_basis ( vec3 dir, out float basis[9] ) {
 
     basis[4] = 1.092548f * x * y;
     basis[5] = 1.092548f * y * z;
-    basis[6] = 0.315392f * ( 3.0f * z * z - 1.0f );
+    basis[6] = 0.315392f * ( 3.f * z * z - 1.f );
     basis[7] = 1.092548f * x * z;
     basis[8] = 0.546274f * ( x * x - y * y );
 }
@@ -74,6 +75,13 @@ vec3 compute_sky_irradiance ( vec3 n ) {
 
     return result;
 }
+
+#if 0
+vec3 compute_sky_radiance ( vec3 dir, float roughness ) {
+    vec3 radiance = textureLod ( samplerCube ( tex_radiance_cube, sampler_linear ), dir, int ( roughness * 10 ) ).xyz;
+    return radiance;
+}
+#endif
 
 float shadow_gather ( vec2 uv, float z ) {
 #if 1
@@ -122,6 +130,25 @@ vec3 brdf_diffuse ( vec3 l, vec3 n, vec3 v, vec3 base_color, float metalness ) {
     vec3 fd = kd * base_color / PI;
 
     return fd;
+}
+
+vec3 brdf_specular ( vec3 l, vec3 n, vec3 v, vec3 base_color, float roughness, float metalness ) {
+    vec3 h = normalize ( v + l );
+    float nv = abs ( dot ( n, v ) ) + 1e-5;
+    float nl = clamp ( dot ( n, l ), 0, 1 );
+    float nh = clamp ( dot ( n, h ), 0, 1 );
+    float lh = clamp ( dot ( l, h ), 0, 1 );
+
+    roughness = clamp ( roughness, 0.045, 1 );
+    vec3 f0 = mix ( vec3 ( 0.04 ), base_color, metalness );
+    
+    // spec
+    float d = ggx_ndf ( nh, roughness );
+    vec3 f = ggx_f ( lh, f0 );
+    float g = ggx_v ( nv, nl, roughness );
+    vec3 fr = d * g * f;
+
+    return fr;
 }
 
 vec3 brdf ( vec3 l, vec3 n, vec3 v, vec3 base_color, float roughness, float metalness ) {
@@ -298,6 +325,16 @@ void main ( void ) {
     if ( !proj_depth_is_out ( depth ) ) {
         irradiance += sky_irradiance * sky_irradiance_surface;
     }
+
+#if 0
+    // sky_radiance
+    vec3 sky_radiance = compute_sky_radiance ( world_normal, 0 );
+    vec3 view_ray_dir = reflect ( normalize ( view_geo_pos ), view_normal );
+    vec3 sky_radiance_surface = brdf_specular ( view_ray_dir, view_normal, normalize ( -view_geo_pos ), base_color, roughness, metalness );
+    if ( !proj_depth_is_out ( depth ) ) {
+        irradiance += sky_radiance * sky_radiance_surface;
+    }
+#endif
 
     float ambient_emissive = 0;
     if ( all ( equal ( sky_irradiance, vec3 ( 0 ) ) ) && light_buffer.light_count == 0 ) {
