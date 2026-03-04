@@ -129,10 +129,9 @@ xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cm
         cmd_args->init_mode = init->mode;
         // TODO just memcpy?
         if ( init->mode == xg_texture_init_mode_upload_m ) {
-            // TODO proper sizing accounting for array size etc
-            //      just store the offset in the cmd?
-            size_t size = params->width * params->height * xg_format_size ( params->format );
-            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload_data, size );
+            size_t bpp = xg_format_size ( params->format );
+            size_t size = params->array_layers * params->mip_levels * params->width * params->height * bpp;
+            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload.data, size, bpp );
         } else if ( init->mode == xg_texture_init_mode_clear_m ) {
             cmd_args->clear = init->clear;
         } else if ( init->mode == xg_texture_init_mode_clear_depth_stencil_m ) {
@@ -170,7 +169,7 @@ xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_
         cmd_args->init_mode = init->mode;
         if ( init->mode == xg_buffer_init_mode_upload_m ) {
             size_t size = params->size;
-            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload_data, size );
+            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload_data, size, 1 );
         } else if ( init->mode == xg_buffer_init_mode_clear_m ) {
             cmd_args->clear = init->clear;
         }

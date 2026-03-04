@@ -1,10 +1,8 @@
-compute_shader cubemap_prefilter.comp
+compute_shader ibl_split_sum_brdf_lut.comp
 
 include common.xsi
 
 begin bindings
     buffer uniform
-    texture sampled
     texture storage
-    sampler
 end

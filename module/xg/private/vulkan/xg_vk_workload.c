@@ -1546,6 +1546,7 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                 }
 
                 vkCmdDispatch ( vk_cmd_buffer, args->workgroup_count_x, args->workgroup_count_y, args->workgroup_count_z );
+                std_noop_m;
             }
             break;
             case xg_cmd_compute_indirect_m: {
@@ -1814,9 +1815,9 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
                         
                         uint32_t mip_id = mip_base + mip_it;
                         uint32_t array_id = array_base + array_it;
-                        size_t mip_width = std_max ( 1, width << mip_id );
-                        size_t mip_height = std_max ( 1, height << mip_id );
-                        size_t mip_depth = std_max ( 1, depth << mip_id );
+                        size_t mip_width = std_max ( 1, width >> mip_id );
+                        size_t mip_height = std_max ( 1, height >> mip_id );
+                        size_t mip_depth = std_max ( 1, depth >> mip_id );
 
                         copy_array[copy_idx] = ( VkBufferImageCopy ) {
                             .bufferOffset = offset,
@@ -2489,6 +2490,7 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
 
                     xg_texture_h texture_handle = args->texture;
                     std_verify_m ( xg_texture_alloc ( texture_handle ) );
+                    const xg_vk_texture_t* texture = xg_vk_texture_get ( texture_handle );
                     if ( args->init ) {
                         switch ( args->init_mode ) {
                         case xg_texture_init_mode_clear_m:
@@ -2515,6 +2517,8 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
                             xg_cmd_buffer_copy_buffer_to_texture ( cmd_buffer, 0, &xg_buffer_to_texture_copy_params_m (
                                 .source = args->staging.handle,
                                 .source_offset = args->staging.offset,
+                                .mip_count = texture->params.mip_levels,
+                                .array_count = texture->params.array_layers,
                                 .destination = texture_handle,
                             ) );
                             break;
@@ -3046,7 +3050,7 @@ xg_buffer_range_t xg_workload_alloc_staging ( xg_workload_h workload_handle, voi
     return xg_buffer_range_whole_buffer_m ( buffer );
 }
 
-xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, void* data, size_t data_size ) {
+xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, void* data, size_t data_size, size_t alignment ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_vk_workload_buffer_t* staging_buffer = workload->staging_buffer;
 
@@ -3055,6 +3059,7 @@ xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, voi
     }
 
     uint64_t offset = staging_buffer->used_size;
+    offset = std_align_u64 ( offset, alignment );
     if ( offset + data_size > staging_buffer->total_size ) {
         staging_buffer = xg_vk_staging_buffer_pop ( workload->device, workload_handle );
         workload->staging_buffer = staging_buffer;

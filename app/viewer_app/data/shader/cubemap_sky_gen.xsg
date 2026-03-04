@@ -8,7 +8,7 @@ begin rasterizer
 end
 
 begin render_target 0
-    format B10G11R11_UFLOAT
+    format R16G16B16A16_FLOAT
 end
 
 begin input 0

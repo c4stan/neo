@@ -258,6 +258,7 @@ void xf_resource_texture_unbind ( xf_texture_h texture );
 bool xf_resource_texture_is_depth ( xf_texture_h texture );
 void xf_resource_texture_bind_to_external ( xf_texture_h texture, xg_texture_h xg_texture );
 void xf_resource_texture_bind_to_new ( xf_texture_h texture, const xf_texture_params_t* params );
+void xf_resource_texture_bind_to_alias ( xf_texture_h texture, xf_texture_h other );
 
 xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params );
 xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain );

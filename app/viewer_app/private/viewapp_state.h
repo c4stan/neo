@@ -74,6 +74,7 @@ typedef struct {
     xf_graph_h mouse_pick_graph;
     xg_texture_h object_id_readback_texture;
     
+    xg_texture_h split_sum_brdf_lut_texture;
     xf_graph_h cubemap_gen_graph;
     xf_texture_h cubemap_gen_texture;
 
@@ -87,6 +88,7 @@ typedef struct {
 
     xf_texture_h export_dest;
     xf_texture_h sky_radiance_texture;
+    xf_texture_h sky_radiance_cubemap;
     xg_texture_h sky_cubemap;
 
     xg_buffer_h tessellation_instance_vertex_buffer;

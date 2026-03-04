@@ -72,6 +72,8 @@
 
     #define std_div_round_up_m( dividend, divisor )                 ( ( (dividend) + (divisor) - 1 ) / (divisor) )
 
+    #define std_half_m                                          _Float16
+
 #elif defined(std_compiler_gcc_m)
     
     #define std_warnings_save_state_m()                         _Pragma ( "GCC diagnostic push" )
@@ -129,8 +131,11 @@
     #endif
 
     #define std_div_round_up_m( dividend, divisor )                     ( ( (dividend) + (divisor) - 1 ) / (divisor) )
+    
+    #define std_half_m                                          _Float16
+
 #else
 
-    #error Unknown compiler
+    #error Unsupported compiler
 
 #endif

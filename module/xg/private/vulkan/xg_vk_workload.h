@@ -227,7 +227,7 @@ xg_resource_cmd_buffer_h xg_workload_add_resource_cmd_buffer ( xg_workload_h wor
 void xg_workload_remove_resource_cmd_buffer ( xg_workload_h workload, xg_resource_cmd_buffer_h cmd_buffer );
 
 xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload, void* data, size_t size );
-xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload, void* data, size_t size );
+xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload, void* data, size_t size, size_t align );
 xg_resource_bindings_h xg_workload_create_resource_group ( xg_workload_h workload, xg_resource_bindings_layout_h layout_handle );
 void xg_workload_set_global_resource_group ( xg_workload_h workload, xg_resource_bindings_h group );
 

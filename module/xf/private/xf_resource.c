@@ -333,6 +333,13 @@ void xf_resource_texture_bind_to_new ( xf_texture_h texture_handle, const xf_tex
     );
 }
 
+void xf_resource_texture_bind_to_alias ( xf_texture_h texture_handle, xf_texture_h other_handle ) {
+    // TODO dirty graph
+    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    xf_texture_t* other = xf_resource_texture_get ( other_handle );
+    *texture = *other;
+}
+
 // ======================================================================================= //
 //                                       B U F F E R
 // ======================================================================================= //

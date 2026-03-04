@@ -1100,7 +1100,7 @@ static xg_texture_h viewapp_upload_texture_to_gpu ( xg_cmd_buffer_h cmd_buffer, 
 
     xg_texture_h texture_handle = xg->cmd_create_texture ( resource_cmd_buffer, &params, &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
-        .upload_data = texture->data,
+        .upload.data = texture->data,
         .final_layout = mip_levels > 1 ? xg_texture_layout_copy_dest_m : xg_texture_layout_shader_read_m,
     ) );
 

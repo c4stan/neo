@@ -676,6 +676,7 @@ typedef struct {
 
     void ( *bind_texture_to_external ) ( xf_texture_h texture, xg_texture_h xg_texture );
     void ( *bind_texture_to_new ) ( xf_texture_h texture, const xf_texture_params_t* params );
+    void ( *bind_texture_to_alias ) ( xf_texture_h texture, xf_texture_h other );
 
     void ( *destroy_texture ) ( xf_texture_h texture );
     void ( *destroy_buffer ) ( xf_buffer_h buffer );

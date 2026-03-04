@@ -16,6 +16,86 @@
 
 #include <std_file.h>
 
+void viewapp_gen_brdf_lut ( xg_workload_h workload ) {
+    viewapp_state_t* state = viewapp_state_get();
+    xg_i* xg = state->modules.xg;
+    xs_i* xs = state->modules.xs;
+
+    xg_texture_h lut_texture = xg->create_texture ( &xg_texture_params_m (
+        .device = state->render.device,
+        .width = 512,
+        .height = 512,
+        .format = xg_format_r16g16_sfloat_m,
+        .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m,
+        .debug_name = "brdf_lut",
+    ) );
+
+    xg_cmd_buffer_h cmd_buffer = xg->create_cmd_buffer ( workload );
+    xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+
+    xg_texture_memory_barrier_t pre_barrier = xg_texture_memory_barrier_m (
+        .texture = lut_texture,
+        .execution = xg_execution_dependency_m (
+            .blocker = xg_pipeline_stage_bit_top_of_pipe_m,
+            .blocked = xg_pipeline_stage_bit_compute_shader_m,
+        ),
+        .memory = xg_memory_dependency_m (
+            .flushes = xg_memory_access_bit_none_m,
+            .invalidations = xg_memory_access_bit_shader_write_m,
+        ),
+        .layout = xg_layout_dependency_m (
+            .old = xg_texture_layout_undefined_m,
+            .new = xg_texture_layout_shader_write_m,
+        ),
+    );
+
+    xg->cmd_barrier_set ( cmd_buffer, 0, &xg_barrier_set_m (
+        .texture_memory_barriers_count = 1,
+        .texture_memory_barriers = &pre_barrier
+    ) );
+
+    xs_database_pipeline_h db_pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ibl_split_sum_brdf_lut" ) );
+    xg_compute_pipeline_state_h pipeline = xs->get_pipeline_state ( db_pipeline );
+
+    xg_resource_bindings_layout_h bindings_layouts[xg_shader_binding_set_count_m];
+    xg->get_pipeline_resource_layouts ( bindings_layouts, pipeline );
+
+    struct {
+        uint32_t sample_count;
+    } uniform_data = {
+        .sample_count = 1024,
+    };
+
+    xg->cmd_compute ( cmd_buffer, 0, &xg_cmd_compute_params_m (
+        .pipeline = pipeline,
+        .bindings[xg_shader_binding_set_dispatch_m] = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
+            .layout = bindings_layouts[xg_shader_binding_set_dispatch_m],
+            .bindings = xg_pipeline_resource_bindings_m (
+                .buffer_count = 1,
+                .buffers = {
+                    xg_buffer_resource_binding_m (
+                        .shader_register = 0,
+                        .range = xg->write_workload_uniform ( workload, &uniform_data, sizeof ( uniform_data ) ),
+                    ),
+                },
+                .texture_count = 1,
+                .textures = {
+                    xg_texture_resource_binding_m (
+                        .texture = lut_texture,
+                        .layout = xg_texture_layout_shader_write_m,
+                        .shader_register = 1,
+                    )
+                }
+            ),
+        ) ),
+        .workgroup_count_x = std_div_round_up_u32 ( 512, 8 ),
+        .workgroup_count_y = std_div_round_up_u32 ( 512, 8 ),
+        .workgroup_count_z = 1,
+    ) );
+
+    state->render.split_sum_brdf_lut_texture = lut_texture;
+}
+
 void viewapp_boot_render ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     uint32_t resolution_x = 1920;
@@ -93,6 +173,11 @@ void viewapp_boot_render ( void ) {
     xf->load_shaders ( device );
 
     viewapp_boot_workload_resources_layout();
+
+    xg_workload_h workload = xg->create_workload ( device );
+    viewapp_update_workload_uniforms ( workload );
+    viewapp_gen_brdf_lut ( workload );
+    xg->submit_workload ( workload );
 }
 
 void viewapp_boot_workload_resources_layout ( void ) {
@@ -348,7 +433,7 @@ void viewapp_load_cubemap_gen_graph ( void ) {
         .debug_name = "cubemap_texture",
         .width = resolution_x,
         .height = resolution_y,
-        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .format = xg_format_r16g16b16a16_sfloat_m,
         .flags = xg_texture_create_flag_bit_cubemap_e,
     ) );
     state->render.cubemap_gen_texture = cubemap_texture;
@@ -376,7 +461,7 @@ void viewapp_load_cubemap_gen_graph ( void ) {
             xf_node_params_t params = xf_node_params_m (
                 .type = xf_node_type_compute_pass_m,
                 .pass.compute = xf_node_compute_pass_params_m (
-                    .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "cubemap_prefilter" ) ),
+                    .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ibl_split_sum_prefilter" ) ),
                     .samplers_count = 1,
                     .samplers = {
                         xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ),
@@ -1472,6 +1557,11 @@ static void viewapp_boot_raster_graph ( void ) {
     xf_texture_h sky_radiance_texture = xf->create_texture_from_external ( graph, xg->get_default_texture ( device, xg_default_texture_r8g8b8a8_unorm_black_m ) );
     state->render.sky_radiance_texture = sky_radiance_texture;
 
+    xf_texture_h sky_radiance_cubemap = xf->create_texture_from_external ( graph, xg->get_default_texture ( device, xg_default_texture_r16g16b16a16_float_cube_black_m ) );
+    state->render.sky_radiance_cubemap = sky_radiance_cubemap;
+
+    xf_texture_h lut_texture = xf->create_texture_from_external ( graph, state->render.split_sum_brdf_lut_texture );
+
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "lighting",
         .type = xf_node_type_compute_pass_m,
@@ -1490,7 +1580,7 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_buffer_dependency_m ( .buffer = light_list_buffer ), 
                 xf_compute_buffer_dependency_m ( .buffer = light_grid_buffer ) 
             },
-            .sampled_textures_count = 5,
+            .sampled_textures_count = 7,
             .sampled_textures = {
                 xf_compute_texture_dependency_m ( .texture = color_texture ),
                 xf_compute_texture_dependency_m ( .texture = normal_texture ),
@@ -1498,7 +1588,10 @@ static void viewapp_boot_raster_graph ( void ) {
                 //xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
-                //xf_compute_texture_dependency_m ( .texture = state->render.cubemap_gen_texture ),
+                xf_compute_texture_dependency_m ( 
+                    .texture = sky_radiance_cubemap,
+                    .view = xg_texture_view_m ( .cube = 1 ) ),
+                xf_compute_texture_dependency_m ( .texture = lut_texture ),
             },
             .storage_texture_writes_count = 1,
             .storage_texture_writes = {
@@ -2087,7 +2180,7 @@ uint64_t viewapp_render_update_sky ( viewapp_sky_component_t* sky_component, xg_
         .height = 512,
         .mip_levels = 10,
         .array_layers = 6,
-        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .format = xg_format_r16g16b16a16_sfloat_m,
         .allowed_usage = xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m | xg_texture_usage_bit_render_target_m,
         .flags = xg_texture_create_flag_bit_cubemap_e,
         .view_access = xg_texture_view_access_dynamic_m,
@@ -2096,10 +2189,13 @@ uint64_t viewapp_render_update_sky ( viewapp_sky_component_t* sky_component, xg_
 
     if ( sky_component->radiance_texture != xg_null_handle_m ) {
         //xf_texture_h cubemap_texture = xf->get_texture_by_name ( cubemap_gen_graph, "cubemap_texture" );
-        xf_texture_h cubemap_texture = state->render.cubemap_gen_texture;
-        xf->bind_texture_to_external ( cubemap_texture, sky_cubemap );
+        xf->bind_texture_to_external ( state->render.cubemap_gen_texture, sky_cubemap );
 
         key = xf->execute_graph ( state->render.cubemap_gen_graph, workload, key );
+
+        xf->bind_texture_to_alias ( state->render.sky_radiance_cubemap, state->render.cubemap_gen_texture );
+    } else {
+        xf->bind_texture_to_external ( state->render.sky_radiance_cubemap, xg->get_default_texture ( state->render.device, xg_default_texture_r16g16b16a16_float_cube_black_m ) );
     }
 
     return key;

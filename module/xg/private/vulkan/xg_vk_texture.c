@@ -91,7 +91,7 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
         .debug_name = "default_r8g8b8a8_unorm_black",
     ), &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
-        .upload_data = black,
+        .upload.data = black,
     ) );
 
     char white[4] = { 0xff, 0xff, 0xff, 0xff };
@@ -103,7 +103,7 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
         .debug_name = "default_r8g8b8a8_unorm_white",
     ), &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
-        .upload_data = white,
+        .upload.data = white,
     ) );
 
     char blue[4] = { 0x7f, 0x7f, 0xff, 0xff };
@@ -115,7 +115,32 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
         .debug_name = "default_r8g8b8a8_unorm_blue",
     ), &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,
-        .upload_data = blue,
+        .upload.data = blue,
+    ) );
+
+    std_half_m black_cube[4*6] = { 
+        0, 0, 0, 1,
+        0, 0, 0, 1,
+        0, 0, 0, 1,
+        0, 0, 0, 1,
+        0, 0, 0, 1,
+        0, 0, 0, 1,
+    };
+    context->default_textures[xg_default_texture_r16g16b16a16_float_cube_black_m] = xg_resource_cmd_buffer_texture_create ( resource_cmd_buffer, &xg_texture_params_m (
+        .device = device_handle,
+        .memory_type = xg_memory_type_gpu_only_m,
+        .format = xg_format_r16g16b16a16_sfloat_m,
+        .array_layers = 6,
+        .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m,
+        .debug_name = "default_r16g16b16a16_float_cube_black",
+        .flags = xg_texture_create_flag_bit_cubemap_e,
+    ), &xg_texture_init_m (
+        .mode = xg_texture_init_mode_upload_m,
+        .upload = xg_texture_upload_data_m (
+            .data = black_cube,
+            .mip_count = 1,
+            .array_count = 6,
+        )
     ) );
 
     xg_texture_memory_barrier_t barriers[xg_default_texture_count_m];

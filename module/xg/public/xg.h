@@ -775,9 +775,10 @@ typedef union {
         uint64_t mip_count      :  8;
         uint64_t array_base     : 16;
         uint64_t array_count    : 16;
-        uint64_t format         : 12; // xg_format_e - can shave off another 2-4 bits if needed
+        uint64_t format         :  8; // xg_format_e
         uint64_t aspect         :  3; // xg_texture_aspect_e
         uint64_t cube           :  1;
+        uint64_t _unused        :  4;
     };
 } xg_texture_view_t;
 
@@ -1978,19 +1979,31 @@ typedef enum {
 } xg_texture_init_mode_e;
 
 typedef struct {
+    void* data;
+    uint32_t mip_count;
+    uint32_t array_count;
+} xg_texture_upload_data_t;
+
+#define xg_texture_upload_data_m( ... ) ( xg_texture_upload_data_t ) { \
+    .mip_count = 1, \
+    .array_count = 1, \
+    __VA_ARGS__ \
+}
+
+typedef struct {
     xg_texture_init_mode_e mode;
     union {
         xg_color_clear_t clear;
         xg_depth_stencil_clear_t depth_stencil_clear;
-        void* upload_data;
+        xg_texture_upload_data_t upload;
     };
     xg_texture_layout_e final_layout;
 } xg_texture_init_t;
 
 #define xg_texture_init_m( ... ) ( xg_texture_init_t ) { \
     .mode = xg_texture_init_mode_uninitialized_m, \
-    .upload_data = NULL, \
     .final_layout = xg_texture_layout_undefined_m, \
+    .upload = xg_texture_upload_data_m(), \
     __VA_ARGS__ \
 }
 
@@ -2006,7 +2019,7 @@ typedef struct {
     xg_format_e format;
     // TODO rename to allowed_gpu_usage?
     xg_texture_usage_bit_e allowed_usage;
-    xg_texture_layout_e initial_layout; // TODO remove this, only accepted inital layout by vulkan is undefined
+    xg_texture_layout_e initial_layout; // TODO remove this
     xg_sample_count_e samples_per_pixel;
     xg_texture_tiling_e tiling;
     xg_texture_view_access_e view_access;
@@ -2271,7 +2284,7 @@ typedef enum {
     xg_default_texture_r8g8b8a8_unorm_black_m,
     xg_default_texture_r8g8b8a8_unorm_white_m,
     xg_default_texture_r8g8b8a8_unorm_tbn_up_m,
-    //xg_default_texture_b10g11r11_ufloat_cube_black_m,
+    xg_default_texture_r16g16b16a16_float_cube_black_m,
     xg_default_texture_count_m,
 } xg_default_texture_e;
 
@@ -2720,7 +2733,7 @@ typedef struct {
 
     // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
     xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size ); // TODO take in a std_buffer_t ?
-    xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, void* data, size_t size );
+    xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, void* data, size_t size, size_t align );
 
     void                    ( *wait_all_workload_complete )         ( void );
     void                    ( *wait_for_device_workloads )          ( xg_device_h device );

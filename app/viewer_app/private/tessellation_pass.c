@@ -90,7 +90,7 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
     }
 
     {
-        xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &enabled, sizeof ( enabled ) );
+        xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &enabled, sizeof ( enabled ), 1 );
         xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
             .destination = indirect_buffer, 
             .source = range.handle,
@@ -102,7 +102,7 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
 
     {
         uint32_t culled_sub_buffer_write = 0;
-        xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &culled_sub_buffer_write, sizeof ( culled_sub_buffer_write ) );
+        xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, &culled_sub_buffer_write, sizeof ( culled_sub_buffer_write ), 1 );
         xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
             .destination = culled_sub_buffer, 
             .source = range.handle,
@@ -122,7 +122,7 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
             tess_update_indirect_data[1] = 1;
             tess_update_indirect_data[2] = 1;
             tess_update_indirect_data[3] = 1; // enabled flag
-            xg_buffer_range_t indirect_range = xg->write_workload_staging ( node_args->workload, tess_update_indirect_data, sizeof ( tess_update_indirect_data ) );
+            xg_buffer_range_t indirect_range = xg->write_workload_staging ( node_args->workload, tess_update_indirect_data, sizeof ( tess_update_indirect_data ), 1 );
             xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
                 .destination = indirect_buffer, 
                 .source = indirect_range.handle,
@@ -139,7 +139,7 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
                 tess_subdivision_data[4 + i * 2 + 1] = i; // prim_id
             }
 
-            xg_buffer_range_t subdiv_range = xg->write_workload_staging ( node_args->workload, tess_subdivision_data, sizeof ( uint32_t ) * tess_subdivision_data_len );
+            xg_buffer_range_t subdiv_range = xg->write_workload_staging ( node_args->workload, tess_subdivision_data, sizeof ( uint32_t ) * tess_subdivision_data_len, 1 );
             xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
                 .destination = prev_sub_buffer, 
                 .source = subdiv_range.handle,

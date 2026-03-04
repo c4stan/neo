@@ -97,7 +97,7 @@ static void light_update_pass ( const xf_node_execute_args_t* node_args, void* u
     light_data->light_count = light_view_count;
     std_assert_m ( light_view_count <= viewapp_max_lights_m );
 
-    xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, light_data, light_data_size );
+    xg_buffer_range_t range = xg->write_workload_staging ( node_args->workload, light_data, light_data_size, 1 );
     std_virtual_heap_free ( light_data );
 
     xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 

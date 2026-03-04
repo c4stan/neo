@@ -1,5 +1,7 @@
 #include "xg_enum.h"
 
+#include <std_log.h>
+
 /*
 case xg_format_undefined_m:
 case xg_format_r4g4_unorm_pack8_m:
@@ -202,6 +204,8 @@ size_t xg_format_size ( xg_format_e format ) {
         case xg_format_r8_uint_m:
         case xg_format_r8_sint_m:
         case xg_format_r8_srgb_m:
+
+        case xg_format_s8_uint_m:
             return 1;
 
         case xg_format_r4g4b4a4_unorm_pack16_m:
@@ -227,6 +231,8 @@ size_t xg_format_size ( xg_format_e format ) {
         case xg_format_r16_uint_m:
         case xg_format_r16_sint_m:
         case xg_format_r16_sfloat_m:
+
+        case xg_format_d16_unorm_m:
             return 2;
 
         case xg_format_r8g8b8_unorm_m:
@@ -243,6 +249,8 @@ size_t xg_format_size ( xg_format_e format ) {
         case xg_format_b8g8r8_uint_m:
         case xg_format_b8g8r8_sint_m:
         case xg_format_b8g8r8_srgb_m:
+
+        case xg_format_d16_unorm_s8_uint_m:
             return 3;
 
         case xg_format_r8g8b8a8_unorm_m:
@@ -291,7 +299,17 @@ size_t xg_format_size ( xg_format_e format ) {
         case xg_format_r32_uint_m:
         case xg_format_r32_sint_m:
         case xg_format_r32_sfloat_m:
+
+        case xg_format_b10g11r11_ufloat_pack32_m:
+        case xg_format_e5b9g9r9_ufloat_pack32_m:
+        case xg_format_x8_d24_unorm_pack32_m:
+
+        case xg_format_d32_sfloat_m:
+        case xg_format_d24_unorm_s8_uint_m:
             return 4;
+
+        case xg_format_d32_sfloat_s8_uint_m:
+            return 5;
 
         case xg_format_r16g16b16_unorm_m:
         case xg_format_r16g16b16_snorm_m:
@@ -344,15 +362,6 @@ size_t xg_format_size ( xg_format_e format ) {
             return 32;
 
         // TODO
-        case xg_format_b10g11r11_ufloat_pack32_m:
-        case xg_format_e5b9g9r9_ufloat_pack32_m:
-        case xg_format_d16_unorm_m:
-        case xg_format_x8_d24_unorm_pack32_m:
-        case xg_format_d32_sfloat_m:
-        case xg_format_s8_uint_m:
-        case xg_format_d16_unorm_s8_uint_m:
-        case xg_format_d24_unorm_s8_uint_m:
-        case xg_format_d32_sfloat_s8_uint_m:
         case xg_format_bc1_rgb_unorm_block_m:
         case xg_format_bc1_rgb_srgb_block_m:
         case xg_format_bc1_rgba_unorm_block_m:
@@ -408,6 +417,7 @@ size_t xg_format_size ( xg_format_e format ) {
         case xg_format_astc_12_mx12_UNORM_BLOCK:
         case xg_format_astc_12_mx12_SRGB_BLOCK:
         default:
+            std_not_implemented_m();
             return 0;
     }
 }

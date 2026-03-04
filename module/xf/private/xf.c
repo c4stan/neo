@@ -43,6 +43,7 @@ static void xf_api_init ( xf_i* xf ) {
 
     xf->bind_texture_to_external = xf_resource_texture_bind_to_external;
     xf->bind_texture_to_new = xf_resource_texture_bind_to_new;
+    xf->bind_texture_to_alias = xf_resource_texture_bind_to_alias;
 
     xf->compile_graph = xf_graph_compile;
     //xf->build_graph = xf_graph_build;
