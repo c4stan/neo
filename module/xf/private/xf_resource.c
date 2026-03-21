@@ -325,14 +325,6 @@ void xf_resource_texture_bind_to_external ( xf_texture_h texture_handle, xg_text
     xf_resource_texture_bind ( texture_handle, physical_texture_handle );
 }
 
-void xf_resource_texture_bind_to_new ( xf_texture_h texture_handle, const xf_texture_params_t* params ) {
-    // TODO dirty graph
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    *texture = xf_texture_m (
-        .params = *params
-    );
-}
-
 void xf_resource_texture_bind_to_alias ( xf_texture_h texture_handle, xf_texture_h other_handle ) {
     // TODO dirty graph
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
@@ -372,7 +364,7 @@ xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params ) {
     xf_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->buffers_freelist );
     *buffer = xf_buffer_m ( .params = *params );
     if ( params->init && params->init->mode != xg_buffer_init_mode_uninitialized_m ) {
-        buffer->required_usage |= xg_texture_usage_bit_copy_dest_m;
+        buffer->required_usage |= xg_buffer_usage_bit_copy_dest_m;
         buffer->init = *params->init;
     }
     xf_buffer_h handle = ( xf_buffer_h ) ( buffer - xf_resource_state->buffers_array );

@@ -54,9 +54,31 @@ sm_mat_4x4f_t sm_matrix_4x4f_transpose ( sm_mat_4x4f_t mat );
 // template generation end
 
 // ======================================================================================= //
-//                                   P R O J E C T I O N
+//                              V I E W   P R O J E C T I O N
 // ======================================================================================= //
 sm_mat_4x4f_t sm_matrix_view ( sm_vec_3f_t position, sm_quat_t orientation );
+sm_mat_4x4f_t sm_matrix_view_lookat ( sm_vec_3f_t position, sm_vec_3f_t dir );
+
+typedef struct {
+    float left;
+    float right;
+    float bottom;
+    float top;
+    float near_z;
+    float far_z;
+} sm_orthographic_projection_params_t;
+
+#define sm_orthographic_projection_params_m( ... ) ( sm_orthographic_projection_params_t ) { \
+    .left = 0, \
+    .right = 0, \
+    .bottom = 0, \
+    .top = 0, \
+    .near_z = 0, \
+    .far_z = 0, \
+    __VA_ARGS__ \
+}
+
+sm_mat_4x4f_t sm_matrix_orthographic_proj ( const sm_orthographic_projection_params_t* params );
 
 typedef struct {
     float aspect_ratio;

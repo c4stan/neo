@@ -2,7 +2,6 @@
 
 #include "std_state.h"
 
-// Will contain state address on app memory and null (zero) on dll memory.
 static std_runtime_state_t* std_runtime_state;
 
 static void std_init_log ( void ) {

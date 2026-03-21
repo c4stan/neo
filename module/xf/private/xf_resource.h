@@ -89,7 +89,6 @@ typedef struct {
     .physical_texture_handle = xf_null_handle_m, \
     .required_usage = xg_texture_usage_bit_none_m, \
     .params = xf_texture_params_m(), \
-    .is_multi = false, \
     __VA_ARGS__ \
 }
 
@@ -257,8 +256,7 @@ void xf_resource_texture_bind ( xf_texture_h texture, xf_physical_texture_h phys
 void xf_resource_texture_unbind ( xf_texture_h texture );
 bool xf_resource_texture_is_depth ( xf_texture_h texture );
 void xf_resource_texture_bind_to_external ( xf_texture_h texture, xg_texture_h xg_texture );
-void xf_resource_texture_bind_to_new ( xf_texture_h texture, const xf_texture_params_t* params );
-void xf_resource_texture_bind_to_alias ( xf_texture_h texture, xf_texture_h other );
+void xf_resource_texture_bind_to_alias ( xf_texture_h texture_handle, xf_texture_h other_handle );
 
 xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params );
 xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain );

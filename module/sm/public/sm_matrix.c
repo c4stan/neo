@@ -76,26 +76,24 @@ sm_mat_4x4f_t sm_matrix_4x4f_axis_rotation ( sm_vec_3f_t axis, float radians ) {
 }
 
 sm_mat_4x4f_t sm_matrix_4x4f_dir_rotation ( sm_vec_3f_t dir, sm_vec_3f_t up ) {
-    sm_vec_3f_t x_axis = sm_vec_3f_cross ( up, dir );
-    x_axis = sm_vec_3f_norm ( x_axis );
-
-    sm_vec_3f_t y_axis = sm_vec_3f_cross ( dir, x_axis );
-    y_axis = sm_vec_3f_norm ( y_axis );
+    sm_vec_3f_t z_axis = sm_vec_3f_norm ( dir );
+    sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
+    sm_vec_3f_t y_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( z_axis, x_axis ) );
 
     sm_mat_4x4f_t result;
     result.v0.x = x_axis.x;
     result.v0.y = y_axis.x;
-    result.v0.z = dir.x;
+    result.v0.z = z_axis.x;
     result.v0.w = 0;
 
     result.v1.x = x_axis.y;
     result.v1.y = y_axis.y;
-    result.v1.z = dir.y;
+    result.v1.z = z_axis.y;
     result.v1.w = 0;
 
     result.v2.x = x_axis.z;
     result.v2.y = y_axis.z;
-    result.v2.z = dir.z;
+    result.v2.z = z_axis.z;
     result.v2.w = 0;
 
     result.v3.x = 0;
@@ -166,36 +164,56 @@ sm_mat_4x4f_t sm_matrix_view ( sm_vec_3f_t position, sm_quat_t orientation ) {
     /*
         https://www.3dgep.com/understanding-the-view-matrix/
         view = orientation^-1 * translation^-1
-            orientation^-1: just transpose the orthonormalized camera basis matrix (orientation)
-            translation^-1: just fill the translation column with the negated camera position
-        the below is the above, but in one single step. (also need to recompute basis vectors)
     */
 
+    sm_quat_t inverse_orientation = sm_quat_inverse ( orientation );
+    sm_mat_4x4f_t result = sm_quat_to_4x4f ( inverse_orientation );
+
+    result.v0.w = -sm_vec_3f_dot ( sm_vec_4f_to_3f ( result.v0 ), position );
+    result.v1.w = -sm_vec_3f_dot ( sm_vec_4f_to_3f ( result.v1 ), position );
+    result.v2.w = -sm_vec_3f_dot ( sm_vec_4f_to_3f ( result.v2 ), position );
+    result.v3.w = 1;
+
+    return result;
+}
+
+sm_mat_4x4f_t sm_matrix_view_lookat ( sm_vec_3f_t position, sm_vec_3f_t dir ) {
+    // Build orthonormal basis for lookat, then build view matrix as usual
     sm_mat_4x4f_t result = { 0 };
 
-    sm_vec_3f_t oriented_dir = sm_quat_to_vec ( orientation );
-    sm_vec_3f_t right = sm_vec_3f_norm ( sm_vec_3f_cross ( oriented_dir, sm_vec_3f_set ( 0, 1, 0 ) ) );
-    sm_vec_3f_t oriented_up = sm_vec_3f_cross ( right, oriented_dir );
+    sm_vec_3f_t dir = sm_vec_3f_norm ( dir );
+    sm_vec_3f_t right = sm_vec_3f_norm ( sm_vec_3f_cross ( dir, sm_vec_3f_set ( 0, 1, 0 ) ) );
+    sm_vec_3f_t up = sm_vec_3f_cross ( right, dir );
 
-    // z axis
-    //result.v2
-    sm_vec_3f_t z_axis = sm_vec_3f_norm ( oriented_dir );
+    sm_vec_3f_t z_axis = dir;
     if ( z_axis.e[0] == 0 && ( z_axis.e[1] == -1 || z_axis.e[1] == 1 ) && z_axis.e[2] == 0 ) {
-        oriented_up.e[0] = 0;
-        oriented_up.e[1] = 0;
-        oriented_up.e[2] = 1;
+        up.e[0] = 0;
+        up.e[1] = 0;
+        up.e[2] = 1;
     }
-    // x axis
-    //result.v0
-    sm_vec_3f_t x_axis = sm_vec_3f_cross ( oriented_up, z_axis );
-    x_axis = sm_vec_3f_norm ( x_axis );
-    // y axis
-    //result.v1
-    sm_vec_3f_t y_axis = sm_vec_3f_cross ( z_axis, x_axis );
+    sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
+    sm_vec_3f_t y_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( z_axis, x_axis ) );
 
     result.v0 = sm_vec_3f_to_4f ( x_axis, -sm_vec_3f_dot ( x_axis, position ) );
     result.v1 = sm_vec_3f_to_4f ( y_axis, -sm_vec_3f_dot ( y_axis, position ) );
     result.v2 = sm_vec_3f_to_4f ( z_axis, -sm_vec_3f_dot ( z_axis, position ) );
+    result.v3.w = 1;
+
+    return result;
+}
+
+sm_mat_4x4f_t sm_matrix_orthographic_proj ( const sm_orthographic_projection_params_t* params ) {
+    sm_mat_4x4f_t result = { 0 };
+
+    result.r0[0] = 2.0f / ( params->right - params->left );
+    result.r0[3] = - ( params->right + params->left ) / ( params->right - params->left );
+
+    result.r1[1] = 2.0f / ( params->top - params->bottom );
+    result.r1[3] = - ( params->top + params->bottom ) / ( params->top - params->bottom );
+
+    result.r2[2] = -2.0f / ( params->far_z - params->near_z );
+    result.r2[3] = - ( params->far_z + params->near_z ) / ( params->far_z - params->near_z );
+
     result.r3[3] = 1;
 
     return result;

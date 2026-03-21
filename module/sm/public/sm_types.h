@@ -181,5 +181,6 @@ typedef union {
         sm_vec_3f_t vec;
         float scalar;
     };
+    sm_vec_4f_t vec4;
 } sm_quat_t;
 

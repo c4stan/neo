@@ -132,7 +132,7 @@ void xg_vk_texture_activate_device ( xg_device_h device_handle, xg_workload_h wo
         .format = xg_format_r16g16b16a16_sfloat_m,
         .array_layers = 6,
         .allowed_usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_copy_source_m | xg_texture_usage_bit_sampled_m | xg_texture_usage_bit_storage_m,
-        .debug_name = "default_r16g16b16a16_float_cube_black",
+        .debug_name = "default_r16g16b16a16_cube_black",
         .flags = xg_texture_create_flag_bit_cubemap_e,
     ), &xg_texture_init_m (
         .mode = xg_texture_init_mode_upload_m,

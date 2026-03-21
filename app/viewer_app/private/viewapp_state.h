@@ -63,9 +63,9 @@ typedef struct {
 
     xg_device_h device;
     xg_swapchain_h swapchain;
+    xg_resource_bindings_layout_h workload_bindings_layout;
 
     xs_database_h sdb;
-    bool supports_raytrace;
 
     xf_graph_h render_graph;
     viewapp_render_graph_e active_render_graph;
@@ -73,24 +73,23 @@ typedef struct {
     
     xf_graph_h mouse_pick_graph;
     xg_texture_h object_id_readback_texture;
-    
-    xg_texture_h split_sum_brdf_lut_texture;
-    xf_graph_h cubemap_gen_graph;
-    xf_texture_h cubemap_gen_texture;
 
+    uint32_t ibl_cubemap_resolution_x;    
+    uint32_t ibl_cubemap_resolution_y;
+    xf_graph_h ibl_cubemap_gen_graph;
+    xg_texture_h ibl_cubemap_texture;
+    xg_texture_h ibl_lut_texture;
+    xf_texture_h ibl_cubemap_gen_texture;
+
+    bool supports_raytrace;
+    bool raytrace_world_update;
     xg_raytrace_world_h raytrace_world;
     xs_database_pipeline_h raytrace_pipeline;
-    xg_resource_bindings_layout_h workload_bindings_layout;
 
     bool clear_history;
-    bool allow_graph_aliasing;
-    bool raytrace_world_update;
-
     xf_texture_h export_dest;
     xf_texture_h sky_radiance_texture;
     xf_texture_h sky_radiance_cubemap;
-    xg_texture_h sky_cubemap;
-
     xg_buffer_h tessellation_instance_vertex_buffer;
 } viewapp_render_state_t;
 
@@ -108,10 +107,10 @@ typedef struct {
     .object_id_readback_texture = xg_null_handle_m, \
     .raytrace_world = xg_null_handle_m, \
     .workload_bindings_layout = xg_null_handle_m, \
-    .allow_graph_aliasing = true, \
     .export_dest = xf_null_handle_m, \
     .tessellation_instance_vertex_buffer = xg_null_handle_m, \
     .sky_radiance_texture = xf_null_handle_m, \
+    .ibl_cubemap_texture = xg_null_handle_m, \
     __VA_ARGS__ \
 }
 

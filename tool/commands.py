@@ -626,12 +626,16 @@ def create_local_workspace(root, name):
     pop_path()
 
 def git_push(tokens):
+    local = False
+    if len(tokens) > 0 and tokens[0] == '-l':
+        local = True
+        tokens.pop(0)
+
     comment = ''
     for token in tokens:
         if comment:
             comment += ' '
         comment += token
-
     if not comment:
         comment = 'sync'
 
@@ -639,8 +643,10 @@ def git_push(tokens):
     os.system('git add .')
     print(Color.OKBLUE + 'git commit -m "' + comment + '"'  + Color.ENDC)
     os.system('git commit -m "' + comment + '"')
-    print(Color.OKBLUE + 'git push'  + Color.ENDC)
-    os.system('git push')
+
+    if not local:
+        print(Color.OKBLUE + 'git push'  + Color.ENDC)
+        os.system('git push')
 
 def git_pull():
     os.system('git pull')

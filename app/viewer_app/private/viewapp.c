@@ -22,7 +22,7 @@ static void viewapp_boot ( void ) {
 
     viewapp_load_render_graph ( viewapp_render_graph_raster_m, xg_null_handle_m );
     viewapp_load_mouse_pick_graph();
-    viewapp_load_cubemap_gen_graph();
+    viewapp_load_ibl_cubemap_gen_graph();
 
     viewapp_load_scene ( state->scene.active_scene );
 }
@@ -59,42 +59,46 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
 
         if ( camera_component->type == viewapp_camera_type_arcball_m ) {
             // drag
-            if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
-                float drag_scale = -1.f / 400;
-                sm_vec_3f_t v = sm_vec_3f ( xform.position );
+            if ( xi->get_active_element_id() == 0 ) {
+                if ( new_input_state->mouse[wm_mouse_state_left_m] ) {
+                    float drag_scale = -1.f / 400;
+                    sm_vec_3f_t v = sm_vec_3f ( xform.position );
 
-                int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
-                int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
+                    int64_t delta_x = ( int64_t ) new_input_state->cursor_x - ( int64_t ) input_state->cursor_x;
+                    int64_t delta_y = ( int64_t ) new_input_state->cursor_y - ( int64_t ) input_state->cursor_y;
 
-                if ( delta_x != 0 ) {
-                    sm_vec_3f_t up = { 0, 1, 0 };
-                    sm_quat_t q = sm_quat_axis_rotation ( up, -delta_x * drag_scale );
-                    v = sm_quat_transform_f3 ( q, v );
-                }
+                    if ( delta_x != 0 ) {
+                        sm_vec_3f_t up = { 0, 1, 0 };
+                        sm_quat_t q = sm_quat_axis_rotation ( up, -delta_x * drag_scale );
+                        v = sm_quat_transform_f3 ( q, v );
+                    }
 
-                if ( delta_y != 0 ) {
-                    sm_vec_3f_t up = { 0, 1, 0 };
-                    sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
-                    axis = sm_vec_3f_norm ( axis );
-                    sm_quat_t q = sm_quat_axis_rotation ( axis, delta_y * drag_scale );
-                    v = sm_quat_transform_f3 ( q, v );
-                }
+                    if ( delta_y != 0 ) {
+                        sm_vec_3f_t up = { 0, 1, 0 };
+                        sm_vec_3f_t axis = sm_vec_3f_cross ( up, v );
+                        axis = sm_vec_3f_norm ( axis );
+                        sm_quat_t q = sm_quat_axis_rotation ( axis, delta_y * drag_scale );
+                        v = sm_quat_transform_f3 ( q, v );
+                    }
 
-                if ( delta_x != 0 || delta_y != 0 ) {
-                    xform.position[0] = v.x;
-                    xform.position[1] = v.y;
-                    xform.position[2] = v.z;
+                    if ( delta_x != 0 || delta_y != 0 ) {
+                        xform.position[0] = v.x;
+                        xform.position[1] = v.y;
+                        xform.position[2] = v.z;
 
-                    sm_vec_3f_t dir = sm_vec_3f ( xform.position );
-                    dir = sm_vec_3f_neg ( dir );
-                    dir = sm_vec_3f_norm ( dir );
-                    sm_quat_t q = sm_quat_from_vec ( dir );
-                    xform.orientation[0] = q.e[0];
-                    xform.orientation[1] = q.e[1];
-                    xform.orientation[2] = q.e[2];
-                    xform.orientation[3] = q.e[3];
+                        sm_vec_3f_t dir = sm_vec_3f ( xform.position );
+                        dir = sm_vec_3f_neg ( dir );
+                        dir = sm_vec_3f_norm ( dir );
+                        sm_vec_3f_t up = { 0, 1, 0 };
+                        sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+                        sm_quat_t orientation = sm_quat_from_4x4f ( rot );
+                        xform.orientation[0] = orientation.e[0];
+                        xform.orientation[1] = orientation.e[1];
+                        xform.orientation[2] = orientation.e[2];
+                        xform.orientation[3] = orientation.e[3];
 
-                    dirty_xform = true;
+                        dirty_xform = true;
+                    }
                 }
             }
 
@@ -181,7 +185,8 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                     dir = sm_quat_transform_f3 ( q, dir );
                 }
 
-                sm_quat_t orientation = sm_quat_from_vec ( dir );
+                sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+                sm_quat_t orientation = sm_quat_from_4x4f ( rot );
 
                 xform.orientation[0] = orientation.e[0];
                 xform.orientation[1] = orientation.e[1];
@@ -502,16 +507,10 @@ void viewer_app_unload ( void ) {
         se->destroy_entity ( *entity );
     }
 
-    viewapp_destroy_render_graph ( workload, resource_cmd_buffer );
-    viewapp_destroy_mouse_pick_graph ( workload, resource_cmd_buffer );
-    viewapp_destroy_cubemap_gen_graph ( workload, resource_cmd_buffer );
-    xg->destroy_swapchain ( state->render.swapchain );
-
     viewapp_unload_ui ( resource_cmd_buffer );
+    viewapp_unload_render ( workload, resource_cmd_buffer );
 
     xg->submit_workload ( workload );
-
-    xg->destroy_resource_layout ( state->render.workload_bindings_layout );
 
     std_module_unload_m ( xi_module_name_m );
     std_module_unload_m ( rv_module_name_m );

@@ -1665,13 +1665,13 @@ uint64_t viewapp_load_envmap ( xg_workload_h workload, uint64_t key, viewapp_env
 
     if ( envmap == viewapp_envmap_none_m ) {
         std_mem_zero_static_array_m ( sky_component->irradiance_sh );
-        key = viewapp_render_update_sky ( sky_component, workload, key );
+        key = viewapp_render_update_sky ( sky_component, workload, resource_cmd_buffer, key );
     } else {
         std_assert_m ( envmap == viewapp_envmap_external_m );
         viewapp_envmap_import_result_t result = viewapp_import_envmap ( workload, resource_cmd_buffer, key, state->scene.envmap_path );
         sky_component->radiance_texture = result.radiance_texture;
         std_mem_copy_static_array_m ( sky_component->irradiance_sh, result.irradiance_sh );
-        key = viewapp_render_update_sky ( sky_component, workload, key );
+        key = viewapp_render_update_sky ( sky_component, workload, resource_cmd_buffer, key );
     }
 
     state->scene.active_envmap = envmap;

@@ -176,7 +176,7 @@ void xf_graph_node_destroy ( xf_graph_h graph_handle, xf_node_h node_handle ) {
     }
 }
 
-xf_texture_h xf_graph_create_texture ( xf_graph_h graph_handle, const xf_texture_params_t* params ) {
+xf_texture_h xf_graph_texture_create ( xf_graph_h graph_handle, const xf_texture_params_t* params ) {
     if ( graph_handle == xf_null_handle_m ) {
         return xf_resource_texture_create ( params );
     } else {
@@ -187,7 +187,7 @@ xf_texture_h xf_graph_create_texture ( xf_graph_h graph_handle, const xf_texture
     }
 }
 
-xf_texture_h xf_graph_create_texture_from_external ( xf_graph_h graph_handle, xg_texture_h xg_handle ) {
+xf_texture_h xf_graph_texture_create_from_external ( xf_graph_h graph_handle, xg_texture_h xg_handle ) {
     if ( graph_handle == xf_null_handle_m ) {
         return xf_resource_texture_create_from_external ( xg_handle );
     } else {
@@ -198,7 +198,7 @@ xf_texture_h xf_graph_create_texture_from_external ( xf_graph_h graph_handle, xg
     }
 }
 
-xf_texture_h xf_graph_create_multi_texture ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params ) {
+xf_texture_h xf_graph_multi_texture_create ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params ) {
     if ( graph_handle == xf_null_handle_m ) {
         return xf_resource_multi_texture_create ( params );
     } else {
@@ -209,7 +209,7 @@ xf_texture_h xf_graph_create_multi_texture ( xf_graph_h graph_handle, const xf_m
     }
 }
 
-xf_texture_h xf_graph_create_multi_texture_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain ) {
+xf_texture_h xf_graph_multi_texture_create_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain ) {
     if ( graph_handle == xf_null_handle_m ) {
         return xf_resource_multi_texture_create_from_swapchain ( swapchain );
     } else {
@@ -220,7 +220,7 @@ xf_texture_h xf_graph_create_multi_texture_from_swapchain ( xf_graph_h graph_han
     }
 }
 
-xf_texture_h xf_graph_create_buffer ( xf_graph_h graph_handle, const xf_buffer_params_t* params ) {
+xf_texture_h xf_graph_buffer_create ( xf_graph_h graph_handle, const xf_buffer_params_t* params ) {
     if ( graph_handle == xf_null_handle_m ) {
         return xf_resource_buffer_create ( params );
     } else {
@@ -242,7 +242,7 @@ xf_buffer_h xf_graph_buffer_create_from_external ( xf_graph_h graph_handle, xg_b
     }
 }
 
-xf_texture_h xf_graph_create_multi_buffer ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params ) {
+xf_texture_h xf_graph_multi_buffer_create ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params ) {
     if ( graph_handle == xf_null_handle_m ) {
         return xf_resource_multi_buffer_create ( params );
     } else {

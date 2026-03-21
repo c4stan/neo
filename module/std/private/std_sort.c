@@ -33,8 +33,6 @@ void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, si
     std_mem_copy ( dest, base, stride );
 
     for ( size_t i = 1; i < count; ++i ) {
-        // Go back starting from the pivot and move the elements forward by one as long as they evaluate more than the pivot
-        // This could overwrite the pivot, which is fine, because we have it stored in tmp
         size_t j = i;
 
         while ( j > 0 && compare ( dest + ( j - 1 ) * stride, base + i * stride, compare_arg ) > 0 ) {
@@ -42,8 +40,6 @@ void std_sort_insertion_copy ( void* _dest, const void* _base, size_t stride, si
             --j;
         }
 
-        // Store the pivot where the last element that got moved forward was before being moved
-        // This could store the pivot into itself if no elements were moved forward
         std_mem_copy ( dest + j * stride, base + i * stride, stride );
     }
 }

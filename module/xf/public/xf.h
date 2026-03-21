@@ -496,7 +496,7 @@ typedef struct {
     xg_format_e format;
     xg_sample_count_e samples_per_pixel;
     xg_texture_create_flag_bit_e flags;
-    bool allow_aliasing;
+    bool allow_aliasing; // TODO rename
     char debug_name[xf_debug_name_size_m];
     bool clear_on_create;
     union {
@@ -675,7 +675,6 @@ typedef struct {
     //xf_buffer_h ( *create_external_multi_buffer ) ( xf_graph_h graph, const xf_multi_buffer_params_t* params );
 
     void ( *bind_texture_to_external ) ( xf_texture_h texture, xg_texture_h xg_texture );
-    void ( *bind_texture_to_new ) ( xf_texture_h texture, const xf_texture_params_t* params );
     void ( *bind_texture_to_alias ) ( xf_texture_h texture, xf_texture_h other );
 
     void ( *destroy_texture ) ( xf_texture_h texture );
