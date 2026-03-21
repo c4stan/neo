@@ -99,10 +99,18 @@ void viewapp_gen_brdf_lut ( xg_workload_h workload ) {
 void viewapp_unload_render ( xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer ) {
     viewapp_state_t* state = viewapp_state_get();
     xg_i* xg = state->modules.xg;
+    xf_i* xf = state->modules.xf;
 
     viewapp_destroy_render_graph ( workload, resource_cmd_buffer );
     viewapp_destroy_mouse_pick_graph ( workload, resource_cmd_buffer );
     viewapp_destroy_ibl_cubemap_gen_graph ( workload, resource_cmd_buffer );
+
+    if ( state->render.ibl_cubemap_texture != xg_null_handle_m ) {
+        xg->cmd_destroy_texture ( resource_cmd_buffer, state->render.ibl_cubemap_texture, xg_resource_cmd_buffer_time_workload_complete_m );
+        state->render.ibl_cubemap_texture = xg_null_handle_m;
+    }
+
+    xf->destroy_texture ( state->render.ibl_cubemap );
 
     xg->cmd_destroy_texture ( resource_cmd_buffer, state->render.ibl_lut_texture, xg_resource_cmd_buffer_time_workload_complete_m );
 
@@ -190,6 +198,8 @@ void viewapp_boot_render ( void ) {
 
     state->render.ibl_cubemap_resolution_x = 512;
     state->render.ibl_cubemap_resolution_y = 512;
+
+    state->render.ibl_cubemap = xf->create_texture_from_external ( xf_null_handle_m, xg->get_default_texture ( state->render.device, xg_default_texture_r16g16b16a16_float_cube_black_m ) );
 
     xg_workload_h workload = xg->create_workload ( device );
     viewapp_update_workload_uniforms ( workload );
@@ -446,14 +456,7 @@ void viewapp_load_ibl_cubemap_gen_graph ( void ) {
     ) );
     state->render.ibl_cubemap_gen_graph = graph;
 
-    xf_texture_h cubemap_texture = xf->create_texture ( graph, &xf_texture_params_m (
-        .debug_name = "cubemap_texture",
-        .width = resolution_x,
-        .height = resolution_y,
-        .format = xg_format_r16g16b16a16_sfloat_m,
-        .flags = xg_texture_create_flag_bit_cubemap_e,
-    ) );
-    state->render.ibl_cubemap_gen_texture = cubemap_texture;
+    xf_texture_h cubemap_texture = state->render.ibl_cubemap;
 
     add_sky_cubemap_gen_node ( graph, cubemap_texture, 0 );
     add_sky_cubemap_gen_node ( graph, cubemap_texture, 1 );
@@ -1571,12 +1574,6 @@ static void viewapp_boot_raster_graph ( void ) {
         .shadow_size = shadow_size,
     };
 
-    xf_texture_h sky_radiance_texture = xf->create_texture_from_external ( graph, xg->get_default_texture ( device, xg_default_texture_r8g8b8a8_unorm_black_m ) );
-    state->render.sky_radiance_texture = sky_radiance_texture;
-
-    xf_texture_h sky_radiance_cubemap = xf->create_texture_from_external ( graph, xg->get_default_texture ( device, xg_default_texture_r16g16b16a16_float_cube_black_m ) );
-    state->render.sky_radiance_cubemap = sky_radiance_cubemap;
-
     xf_texture_h lut_texture = xf->create_texture_from_external ( graph, state->render.ibl_lut_texture );
 
     xf->create_node ( graph, &xf_node_params_m (
@@ -1606,7 +1603,7 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
                 xf_compute_texture_dependency_m ( 
-                    .texture = sky_radiance_cubemap,
+                    .texture = state->render.ibl_cubemap,
                     .view = xg_texture_view_m ( .cube = 1 ) ),
                 xf_compute_texture_dependency_m ( .texture = lut_texture ),
             },
@@ -2187,8 +2184,6 @@ uint64_t viewapp_render_update_sky ( viewapp_sky_component_t* sky_component, xg_
         lighting_uniforms->sky_irradiance_sh[i][2] = sky_component->irradiance_sh[i * 3 + 2];
     }
 
-    xf->bind_texture_to_external ( state->render.sky_radiance_texture, sky_component->radiance_texture );
-
     if ( state->render.ibl_cubemap_texture != xg_null_handle_m ) {
         xg->cmd_destroy_texture ( resource_cmd_buffer, state->render.ibl_cubemap_texture, xg_resource_cmd_buffer_time_workload_complete_m );
         state->render.ibl_cubemap_texture = xg_null_handle_m;
@@ -2209,11 +2204,10 @@ uint64_t viewapp_render_update_sky ( viewapp_sky_component_t* sky_component, xg_
             .debug_name = "sky_cubemap",
         ) );
 
-        xf->bind_texture_to_external ( state->render.ibl_cubemap_gen_texture, state->render.ibl_cubemap_texture );
+        xf->bind_texture_to_external ( state->render.ibl_cubemap, state->render.ibl_cubemap_texture );
         key = xf->execute_graph ( state->render.ibl_cubemap_gen_graph, workload, key );
-        xf->bind_texture_to_alias ( state->render.sky_radiance_cubemap, state->render.ibl_cubemap_gen_texture );
     } else {
-        xf->bind_texture_to_external ( state->render.sky_radiance_cubemap, xg->get_default_texture ( state->render.device, xg_default_texture_r16g16b16a16_float_cube_black_m ) );
+        xf->bind_texture_to_external ( state->render.ibl_cubemap, xg->get_default_texture ( state->render.device, xg_default_texture_r16g16b16a16_float_cube_black_m ) );
     }
 
     return key;

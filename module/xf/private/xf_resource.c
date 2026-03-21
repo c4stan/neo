@@ -1,5 +1,7 @@
 #include "xf_resource.h"
 
+#include "xf_graph.h"
+
 #include <xg_enum.h>
 
 #include <std_list.h>
@@ -119,13 +121,17 @@ void xf_resource_unload ( void ) {
 //                                      T E X T U R E
 // ======================================================================================= //
 
-xf_texture_h xf_resource_texture_create ( const xf_texture_params_t* params ) {
+xf_texture_h xf_resource_texture_create ( xf_graph_h graph_handle, const xf_texture_params_t* params ) {
     xf_texture_t* texture = std_list_pop_m ( &xf_resource_state->textures_freelist );
     *texture = xf_texture_m (
+        .graph_handle = graph_handle,
         .params = *params
     );
     xf_texture_h handle = ( xf_texture_h ) ( texture - xf_resource_state->textures_array );
     std_bitset_set ( xf_resource_state->textures_bitset, handle );
+    if ( graph_handle != xf_null_handle_m ) {
+        xf_graph_register_owned_texture ( graph_handle, handle );
+    }
     return handle;
 }
 
@@ -255,7 +261,7 @@ void xf_resource_texture_update_external ( xf_texture_h texture_handle ) {
     }
 }
 
-xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture ) {
+xf_texture_h xf_resource_texture_create_from_external ( xf_graph_h graph_handle, xg_texture_h xg_texture ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_texture_info_t info;
@@ -265,7 +271,7 @@ xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h xg_texture 
         .allow_aliasing = false,
     );
     std_str_copy_static_m ( texture_params.debug_name, info.debug_name );
-    xf_texture_h texture_handle = xf_resource_texture_create ( &texture_params );
+    xf_texture_h texture_handle = xf_resource_texture_create ( graph_handle, &texture_params );
 
     xf_physical_texture_params_t physical_texture_params = xf_physical_texture_params_m (
         .is_external = true,
@@ -289,6 +295,10 @@ void xf_resource_texture_state_barrier ( std_stack_t* stack, xf_texture_h textur
 
 void xf_resource_texture_bind ( xf_texture_h texture_handle, xf_physical_texture_h physical_texture_handle ) {
     xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+    if ( texture->physical_texture_handle != xf_null_handle_m ) {
+        // TODO is this ok? need to verify that texture is external?
+        xf_resource_physical_texture_destroy ( texture->physical_texture_handle );
+    }
     texture->physical_texture_handle = physical_texture_handle;
 }
 
@@ -325,13 +335,6 @@ void xf_resource_texture_bind_to_external ( xf_texture_h texture_handle, xg_text
     xf_resource_texture_bind ( texture_handle, physical_texture_handle );
 }
 
-void xf_resource_texture_bind_to_alias ( xf_texture_h texture_handle, xf_texture_h other_handle ) {
-    // TODO dirty graph
-    xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
-    xf_texture_t* other = xf_resource_texture_get ( other_handle );
-    *texture = *other;
-}
-
 // ======================================================================================= //
 //                                       B U F F E R
 // ======================================================================================= //
@@ -360,15 +363,21 @@ void xf_resource_buffer_destroy ( xf_buffer_h buffer_handle ) {
     }
 }
 
-xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params ) {
+xf_buffer_h xf_resource_buffer_create ( xf_graph_h graph_handle, const xf_buffer_params_t* params ) {
     xf_buffer_t* buffer = std_list_pop_m ( &xf_resource_state->buffers_freelist );
-    *buffer = xf_buffer_m ( .params = *params );
+    *buffer = xf_buffer_m (
+        .graph_handle = graph_handle,
+        .params = *params
+    );
     if ( params->init && params->init->mode != xg_buffer_init_mode_uninitialized_m ) {
         buffer->required_usage |= xg_buffer_usage_bit_copy_dest_m;
         buffer->init = *params->init;
     }
     xf_buffer_h handle = ( xf_buffer_h ) ( buffer - xf_resource_state->buffers_array );
     std_bitset_set ( xf_resource_state->buffers_bitset, handle );
+    if ( graph_handle != xf_null_handle_m ) {
+        xf_graph_register_owned_buffer ( graph_handle, handle );
+    }
     return handle;
 }
 
@@ -378,7 +387,7 @@ void xf_resource_buffer_update_info ( xf_buffer_h buffer_handle, const xg_buffer
     std_str_copy_static_m ( buffer->params.debug_name, info->debug_name );
 }
 
-xf_buffer_h xf_resource_buffer_create_from_external ( xg_buffer_h xg_buffer ) {
+xf_buffer_h xf_resource_buffer_create_from_external ( xf_graph_h graph_handle, xg_buffer_h xg_buffer ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_buffer_info_t info;
@@ -388,7 +397,7 @@ xf_buffer_h xf_resource_buffer_create_from_external ( xg_buffer_h xg_buffer ) {
         .allow_aliasing = false,
     );
     std_str_copy_static_m ( buffer_params.debug_name, info.debug_name );
-    xf_buffer_h buffer_handle = xf_resource_buffer_create ( &buffer_params );
+    xf_buffer_h buffer_handle = xf_resource_buffer_create ( graph_handle, &buffer_params );
     
     xf_physical_buffer_params_t physical_buffer_params = xf_physical_buffer_params_m (
         .is_external = true,
@@ -512,9 +521,12 @@ xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer_handle ) {
 //                                M U L T I   T E X T U R E
 // ======================================================================================= //
 
-xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params ) {
+xf_texture_h xf_resource_multi_texture_create ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params ) {
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
-    *multi_texture = xf_multi_texture_m ( .params = *params );
+    *multi_texture = xf_multi_texture_m (
+        .graph_handle = graph_handle,
+        .params = *params
+    );
 
     for ( uint32_t i = 0; i < params->multi_texture_count; ++i ) {
         char id[8];
@@ -524,8 +536,9 @@ xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t*
         std_string_append ( &string, "(" );
         std_string_append ( &string, id );
         std_string_append ( &string, ")" );
-        xf_texture_h handle = xf_resource_texture_create ( &texture_params );
+        xf_texture_h handle = xf_resource_texture_create ( xf_null_handle_m, &texture_params );
         xf_texture_t* texture = xf_resource_texture_get ( handle );
+        texture->graph_handle = graph_handle;
         texture->is_multi = true;
         multi_texture->textures[i] = handle;
     }
@@ -533,10 +546,13 @@ xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t*
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
     std_bitset_set ( xf_resource_state->multi_textures_bitset, handle );
     handle = xf_resource_handle_tag_as_multi_m ( handle );
+    if ( graph_handle != xf_null_handle_m ) {
+        xf_graph_register_owned_texture ( graph_handle, handle );
+    }
     return handle;
 }
 
-xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain ) {
+xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     xg_swapchain_info_t info;
@@ -555,6 +571,7 @@ xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h sw
 
     xf_multi_texture_t* multi_texture = std_list_pop_m ( &xf_resource_state->multi_textures_freelist );
     *multi_texture = xf_multi_texture_m (
+        .graph_handle = graph_handle,
         .params = params,
         .index = 0,
         .swapchain = swapchain,
@@ -571,9 +588,10 @@ xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h sw
             .info = texture_info
         ) );
 
-        xf_texture_h texture_handle = xf_resource_texture_create ( &params.texture );
+        xf_texture_h texture_handle = xf_resource_texture_create ( xf_null_handle_m, &params.texture );
         xf_resource_texture_bind ( texture_handle, physical_texture_handle );
         xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
+        texture->graph_handle = graph_handle;
         texture->is_multi = true;
         xf_resource_texture_update_info ( texture_handle, &texture_info );
         // TODO check base texture mip mode
@@ -587,6 +605,9 @@ xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h sw
     xf_texture_h handle = ( xf_texture_h ) ( multi_texture - xf_resource_state->multi_textures_array );
     std_bitset_set ( xf_resource_state->multi_textures_bitset, handle );
     handle = xf_resource_handle_tag_as_multi_m ( handle );
+    if ( graph_handle != xf_null_handle_m ) {
+        xf_graph_register_owned_texture ( graph_handle, handle );
+    }
 
     return handle;
 }
@@ -660,9 +681,12 @@ xf_texture_h xf_resource_multi_texture_get_base ( xf_texture_h multi_texture_han
 //                                 M U L T I   B U F F E R
 // ======================================================================================= //
 
-xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* params ) {
+xf_buffer_h xf_resource_multi_buffer_create ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params ) {
     xf_multi_buffer_t* multi_buffer = std_list_pop_m ( &xf_resource_state->multi_buffers_freelist );
-    *multi_buffer = xf_multi_buffer_m ( .params = *params );
+    *multi_buffer = xf_multi_buffer_m (
+        .graph_handle = graph_handle,
+        .params = *params
+    );
 
     for ( uint32_t i = 0; i < params->multi_buffer_count; ++i ) {
         char id[8];
@@ -677,8 +701,9 @@ xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* pa
         } else {
             buffer_params.init = params->buffer.init;
         }
-        xf_buffer_h handle = xf_resource_buffer_create ( &buffer_params );
+        xf_buffer_h handle = xf_resource_buffer_create ( xf_null_handle_m, &buffer_params );
         xf_buffer_t* buffer = xf_resource_buffer_get ( handle );
+        buffer->graph_handle = graph_handle;
         buffer->is_multi = true;
         multi_buffer->buffers[i] = handle;
     }
@@ -686,6 +711,9 @@ xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* pa
     xf_buffer_h handle = ( xf_buffer_h ) ( multi_buffer - xf_resource_state->multi_buffers_array );
     std_bitset_set ( xf_resource_state->multi_buffers_bitset, handle );
     handle = xf_resource_handle_tag_as_multi_m ( handle );
+    if ( graph_handle != xf_null_handle_m ) {
+        xf_graph_register_owned_buffer ( graph_handle, handle );
+    }
     return handle;
 }
 

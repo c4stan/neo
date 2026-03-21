@@ -79,7 +79,6 @@ typedef struct {
     xf_graph_h ibl_cubemap_gen_graph;
     xg_texture_h ibl_cubemap_texture;
     xg_texture_h ibl_lut_texture;
-    xf_texture_h ibl_cubemap_gen_texture;
 
     bool supports_raytrace;
     bool raytrace_world_update;
@@ -88,8 +87,7 @@ typedef struct {
 
     bool clear_history;
     xf_texture_h export_dest;
-    xf_texture_h sky_radiance_texture;
-    xf_texture_h sky_radiance_cubemap;
+    xf_texture_h ibl_cubemap;
     xg_buffer_h tessellation_instance_vertex_buffer;
 } viewapp_render_state_t;
 
@@ -109,7 +107,6 @@ typedef struct {
     .workload_bindings_layout = xg_null_handle_m, \
     .export_dest = xf_null_handle_m, \
     .tessellation_instance_vertex_buffer = xg_null_handle_m, \
-    .sky_radiance_texture = xf_null_handle_m, \
     .ibl_cubemap_texture = xg_null_handle_m, \
     __VA_ARGS__ \
 }

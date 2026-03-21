@@ -176,81 +176,24 @@ void xf_graph_node_destroy ( xf_graph_h graph_handle, xf_node_h node_handle ) {
     }
 }
 
-xf_texture_h xf_graph_texture_create ( xf_graph_h graph_handle, const xf_texture_params_t* params ) {
+void xf_graph_register_owned_texture ( xf_graph_h graph_handle, xf_texture_h texture_handle ) {
     if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_texture_create ( params );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_texture_h texture = xf_resource_texture_create ( params );
-        graph->owned_textures_array[graph->owned_textures_count++] = texture;
-        return texture;
+        return;
     }
+
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    std_assert_m ( graph->owned_textures_count < std_static_array_count_m ( graph->owned_textures_array ) );
+    graph->owned_textures_array[graph->owned_textures_count++] = texture_handle;
 }
 
-xf_texture_h xf_graph_texture_create_from_external ( xf_graph_h graph_handle, xg_texture_h xg_handle ) {
+void xf_graph_register_owned_buffer ( xf_graph_h graph_handle, xf_buffer_h buffer_handle ) {
     if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_texture_create_from_external ( xg_handle );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_texture_h texture = xf_resource_texture_create_from_external ( xg_handle );
-        graph->owned_textures_array[graph->owned_textures_count++] = texture;
-        return texture;
+        return;
     }
-}
 
-xf_texture_h xf_graph_multi_texture_create ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params ) {
-    if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_multi_texture_create ( params );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_texture_h texture = xf_resource_multi_texture_create ( params );
-        graph->owned_textures_array[graph->owned_textures_count++] = texture;
-        return texture;
-    }
-}
-
-xf_texture_h xf_graph_multi_texture_create_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain ) {
-    if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_multi_texture_create_from_swapchain ( swapchain );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_texture_h texture = xf_resource_multi_texture_create_from_swapchain ( swapchain );
-        graph->owned_textures_array[graph->owned_textures_count++] = texture;
-        return texture;
-    }
-}
-
-xf_texture_h xf_graph_buffer_create ( xf_graph_h graph_handle, const xf_buffer_params_t* params ) {
-    if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_buffer_create ( params );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_buffer_h buffer = xf_resource_buffer_create ( params );
-        graph->owned_buffers_array[graph->owned_buffers_count++] = buffer;
-        return buffer;
-    }
-}
-
-xf_buffer_h xf_graph_buffer_create_from_external ( xf_graph_h graph_handle, xg_buffer_h xg_handle ) {
-    if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_buffer_create_from_external ( xg_handle );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_buffer_h buffer = xf_resource_buffer_create_from_external ( xg_handle );
-        graph->owned_buffers_array[graph->owned_buffers_count++] = buffer;
-        return buffer;
-    }
-}
-
-xf_texture_h xf_graph_multi_buffer_create ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params ) {
-    if ( graph_handle == xf_null_handle_m ) {
-        return xf_resource_multi_buffer_create ( params );
-    } else {
-        xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-        xf_buffer_h buffer = xf_resource_multi_buffer_create ( params );
-        graph->owned_buffers_array[graph->owned_buffers_count++] = buffer;
-        return buffer;
-    }
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    std_assert_m ( graph->owned_buffers_count < std_static_array_count_m ( graph->owned_buffers_array ) );
+    graph->owned_buffers_array[graph->owned_buffers_count++] = buffer_handle;
 }
 
 static void xf_graph_add_texture_dependency ( xf_graph_h graph_handle, xf_node_h node_handle, xf_graph_texture_h texture_handle, xg_texture_view_t view, uint32_t resource_idx ) {

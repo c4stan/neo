@@ -181,7 +181,7 @@ sm_mat_4x4f_t sm_matrix_view_lookat ( sm_vec_3f_t position, sm_vec_3f_t dir ) {
     // Build orthonormal basis for lookat, then build view matrix as usual
     sm_mat_4x4f_t result = { 0 };
 
-    sm_vec_3f_t dir = sm_vec_3f_norm ( dir );
+    dir = sm_vec_3f_norm ( dir );
     sm_vec_3f_t right = sm_vec_3f_norm ( sm_vec_3f_cross ( dir, sm_vec_3f_set ( 0, 1, 0 ) ) );
     sm_vec_3f_t up = sm_vec_3f_cross ( right, dir );
 

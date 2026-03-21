@@ -143,11 +143,10 @@ static void viewapp_update_camera ( wm_input_state_t* input_state, wm_input_stat
                 sm_vec_3f_t z_axis = sm_quat_to_vec ( sm_quat ( xform.orientation ) );
                 sm_vec_3f_t up = { 0, 1, 0 };
                 sm_vec_3f_t x_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( up, z_axis ) );
-                //sm_vec_3f_t y_axis = sm_vec_3f_norm ( sm_vec_3f_cross ( x_axis, z_axis ) );
 
                 float forward = ( forward_press ? 1.f : 0.f ) - ( backward_press ? 1.f : 0.f );
                 float right = ( right_press ? 1.f : 0.f ) - ( left_press ? 1.f : 0.f );
-                sm_vec_3f_t move_dir = sm_vec_3f_norm ( sm_vec_3f_add ( sm_vec_3f_mul ( x_axis, right ), sm_vec_3f_mul ( z_axis, forward) ) );
+                sm_vec_3f_t move_dir = sm_vec_3f_norm ( sm_vec_3f_add ( sm_vec_3f_mul ( x_axis, right ), sm_vec_3f_mul ( z_axis, forward ) ) );
                 sm_vec_3f_t move = sm_vec_3f_mul ( move_dir, speed * dt );
 
                 xform.position[0] += move.e[0];

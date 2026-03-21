@@ -79,6 +79,7 @@ typedef uint64_t xf_physical_texture_h;
 typedef uint64_t xf_physical_buffer_h;
 
 typedef struct {
+    xf_graph_h graph_handle;
     xf_physical_texture_h physical_texture_handle;
     xg_texture_usage_bit_e required_usage;
     xf_texture_params_t params;
@@ -86,6 +87,7 @@ typedef struct {
 } xf_texture_t;
 
 #define xf_texture_m( ... ) ( xf_texture_t ) { \
+    .graph_handle = xf_null_handle_m, \
     .physical_texture_handle = xf_null_handle_m, \
     .required_usage = xg_texture_usage_bit_none_m, \
     .params = xf_texture_params_m(), \
@@ -93,6 +95,7 @@ typedef struct {
 }
 
 typedef struct {
+    xf_graph_h graph_handle;
     xf_physical_buffer_h physical_buffer_handle;
     xg_buffer_usage_bit_e required_usage;
     xf_buffer_params_t params;
@@ -101,6 +104,7 @@ typedef struct {
 } xf_buffer_t;
 
 #define xf_buffer_m( ... ) ( xf_buffer_t ) { \
+    .graph_handle = xf_null_handle_m, \
     .physical_buffer_handle = xg_null_handle_m, \
     .required_usage = xg_buffer_usage_bit_none_m, \
     .params = xf_buffer_params_m(), \
@@ -109,6 +113,7 @@ typedef struct {
 }
 
 typedef struct {
+    xf_graph_h graph_handle;
     xf_multi_texture_params_t params;
     uint32_t index;
     xf_texture_h textures[xf_resource_multi_texture_max_textures_m];
@@ -117,6 +122,7 @@ typedef struct {
 } xf_multi_texture_t;
 
 #define xf_multi_texture_m( ... ) ( xf_multi_texture_t ) { \
+    .graph_handle = xf_null_handle_m, \
     .params = xf_multi_texture_params_m(), \
     .index = 0, \
     .swapchain = xg_null_handle_m, \
@@ -124,6 +130,7 @@ typedef struct {
 }
 
 typedef struct {
+    xf_graph_h graph_handle;
     xf_multi_buffer_params_t params;
     uint32_t index;
     xf_buffer_h buffers[xf_resource_multi_buffer_max_buffers_m];
@@ -131,6 +138,7 @@ typedef struct {
 } xf_multi_buffer_t;
 
 #define xf_multi_buffer_m( ... ) ( xf_multi_buffer_t ) { \
+    .graph_handle = xf_null_handle_m, \
     .params = xf_multi_buffer_params_m(), \
     .index = 0, \
     __VA_ARGS__ \
@@ -240,8 +248,8 @@ void xf_resource_unload ( void );
     Multi buffers are equivalent.
 */
 
-xf_texture_h xf_resource_texture_create ( const xf_texture_params_t* params );
-xf_texture_h xf_resource_texture_create_from_external ( xg_texture_h texture );
+xf_texture_h xf_resource_texture_create ( xf_graph_h graph_handle, const xf_texture_params_t* params );
+xf_texture_h xf_resource_texture_create_from_external ( xf_graph_h graph_handle, xg_texture_h texture );
 void xf_resource_texture_destroy ( xf_texture_h texture );
 void xf_resource_texture_get_info ( xf_texture_info_t* info, xf_texture_h texture );
 void xf_resource_texture_add_usage ( xf_texture_h texture, xg_texture_usage_bit_e usage );
@@ -256,10 +264,9 @@ void xf_resource_texture_bind ( xf_texture_h texture, xf_physical_texture_h phys
 void xf_resource_texture_unbind ( xf_texture_h texture );
 bool xf_resource_texture_is_depth ( xf_texture_h texture );
 void xf_resource_texture_bind_to_external ( xf_texture_h texture, xg_texture_h xg_texture );
-void xf_resource_texture_bind_to_alias ( xf_texture_h texture_handle, xf_texture_h other_handle );
 
-xf_texture_h xf_resource_multi_texture_create ( const xf_multi_texture_params_t* params );
-xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xg_swapchain_h swapchain );
+xf_texture_h xf_resource_multi_texture_create ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params );
+xf_texture_h xf_resource_multi_texture_create_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain );
 void xf_resource_multi_texture_advance ( xf_texture_h multi_texture );
 xf_multi_texture_t* xf_resource_multi_texture_get ( xf_texture_h texture );
 void xf_resource_multi_texture_set_index ( xf_texture_h multi_texture, uint32_t index );
@@ -275,8 +282,8 @@ xf_physical_texture_t* xf_resource_physical_texture_get ( xf_physical_texture_h 
 void xf_resource_physical_texture_map_to_new ( xf_physical_texture_h texture, xg_texture_h xg_handle, const xg_texture_info_t* info );
 void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physical_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
 
-xf_buffer_h xf_resource_buffer_create ( const xf_buffer_params_t* params );
-xf_buffer_h xf_resource_buffer_create_from_external ( xg_buffer_h buffer );
+xf_buffer_h xf_resource_buffer_create ( xf_graph_h graph_handle, const xf_buffer_params_t* params );
+xf_buffer_h xf_resource_buffer_create_from_external ( xf_graph_h graph_handle, xg_buffer_h buffer );
 void xf_resource_buffer_destroy ( xf_buffer_h buffer );
 void xf_resource_buffer_get_info ( xf_buffer_info_t* info, xf_buffer_h buffer );
 void xf_resource_buffer_update_info ( xf_buffer_h buffer_handle, const xg_buffer_info_t* info );
@@ -290,7 +297,7 @@ bool xf_resource_buffer_is_external ( xf_buffer_h buffer );
 void xf_resource_buffer_bind ( xf_buffer_h buffer, xf_physical_buffer_h physical_buffer );
 void xf_resource_buffer_unbind ( xf_buffer_h buffer );
 
-xf_buffer_h xf_resource_multi_buffer_create ( const xf_multi_buffer_params_t* params );
+xf_buffer_h xf_resource_multi_buffer_create ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params );
 void xf_resource_multi_buffer_advance ( xf_buffer_h multi_buffer );
 xf_multi_buffer_t* xf_resource_multi_buffer_get ( xf_buffer_h buffer );
 xf_buffer_h xf_resource_multi_buffer_get_buffer ( xf_buffer_h multi_buffer, int32_t offset );

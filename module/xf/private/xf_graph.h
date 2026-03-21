@@ -332,14 +332,6 @@ void xf_graph_unload ( void );
 
 void xf_graph_load_shaders ( xs_i* xs, xs_database_h sdb );
 
-xf_texture_h xf_graph_texture_create ( xf_graph_h graph_handle, const xf_texture_params_t* params );
-xf_texture_h xf_graph_texture_create_from_external ( xf_graph_h graph_handle, xg_texture_h xg_handle );
-xf_texture_h xf_graph_multi_texture_create ( xf_graph_h graph_handle, const xf_multi_texture_params_t* params );
-xf_texture_h xf_graph_multi_texture_create_from_swapchain ( xf_graph_h graph_handle, xg_swapchain_h swapchain );
-xf_buffer_h xf_graph_buffer_create ( xf_graph_h graph_handle, const xf_buffer_params_t* params );
-xf_buffer_h xf_graph_buffer_create_from_external ( xf_graph_h graph_handle, xg_buffer_h xg_handle );
-xf_buffer_h xf_graph_multi_buffer_create ( xf_graph_h graph_handle, const xf_multi_buffer_params_t* params );
-
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
 void xf_graph_node_update ( xf_graph_h graph_handle, xf_node_h node_handle, const xf_node_params_t* params );
@@ -368,3 +360,6 @@ xf_node_h xf_graph_get_node_by_name ( xf_graph_h graph, const char* name );
 void xf_graph_bind_custom_node_routine ( xf_graph_h graph, xf_node_h node, xf_node_execute_f* routine );
 
 xf_texture_h xf_graph_get_texture_by_name ( xf_graph_h graph, const char* name );
+
+void xf_graph_register_owned_texture ( xf_graph_h graph_handle, xf_texture_h texture_handle );
+void xf_graph_register_owned_buffer ( xf_graph_h graph_handle, xf_buffer_h buffer_handle );

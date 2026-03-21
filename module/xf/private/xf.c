@@ -24,13 +24,13 @@ static void xf_load_shaders ( xg_device_h device ) {
 static void xf_api_init ( xf_i* xf ) {
     xf->load_shaders = xf_load_shaders;
     
-    xf->create_texture = xf_graph_texture_create;
-    xf->create_texture_from_external = xf_graph_texture_create_from_external;
-    xf->create_multi_texture = xf_graph_multi_texture_create;
-    xf->create_multi_texture_from_swapchain = xf_graph_multi_texture_create_from_swapchain;
-    xf->create_buffer = xf_graph_buffer_create;
-    xf->create_buffer_from_external = xf_graph_buffer_create_from_external;
-    xf->create_multi_buffer = xf_graph_multi_buffer_create;
+    xf->create_texture = xf_resource_texture_create;
+    xf->create_texture_from_external = xf_resource_texture_create_from_external;
+    xf->create_multi_texture = xf_resource_multi_texture_create;
+    xf->create_multi_texture_from_swapchain = xf_resource_multi_texture_create_from_swapchain;
+    xf->create_buffer = xf_resource_buffer_create;
+    xf->create_buffer_from_external = xf_resource_buffer_create_from_external;
+    xf->create_multi_buffer = xf_resource_multi_buffer_create;
 
     xf->create_graph = xf_graph_create;
     xf->create_node = xf_graph_node_create;
@@ -39,7 +39,6 @@ static void xf_api_init ( xf_i* xf ) {
     xf->get_node_uniform_data = xf_graph_node_get_uniform_data;
 
     xf->bind_texture_to_external = xf_resource_texture_bind_to_external;
-    xf->bind_texture_to_alias = xf_resource_texture_bind_to_alias;
 
     xf->compile_graph = xf_graph_compile;
     //xf->build_graph = xf_graph_build;
