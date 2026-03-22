@@ -29,6 +29,7 @@ void xi_font_load ( xi_font_state_t* state ) {
     xi_font_state->fonts_array = std_virtual_heap_alloc_array_m ( xi_font_t, xi_font_max_fonts_m );
     xi_font_state->fonts_freelist = std_freelist_m ( xi_font_state->fonts_array, xi_font_max_fonts_m );
     xi_font_state->fonts_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( xi_font_max_fonts_m ) );
+    std_mem_zero_array_m ( xi_font_state->fonts_bitset, std_bitset_u64_count_m ( xi_font_max_fonts_m ) );
     xi_font_state->uniform_data = NULL;
     xi_font_state->renderpass = xg_null_handle_m;
 }
@@ -365,6 +366,7 @@ void xi_font_destroy ( xi_font_h font_handle ) {
     xi_font_t* font = &xi_font_state->fonts_array[font_handle];
     xg->destroy_texture ( font->atlas_texture );
     std_virtual_heap_free ( font->char_info );
+    std_list_push ( &xi_font_state->fonts_freelist, font );
     std_bitset_clear ( xi_font_state->fonts_bitset, font_handle );
 }
 

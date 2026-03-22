@@ -44,7 +44,7 @@ static void xg_vk_sampler_deactivate_device_context ( uint64_t device_idx ) {
 }
 
 void xg_vk_sampler_unload ( void ) {
-    for ( uint32_t i = 0; i < xg_default_sampler_count_m; ++i ) {
+    for ( uint32_t i = 0; i < xg_vk_max_devices_m; ++i ) {
         xg_vk_sampler_deactivate_device_context ( i );
     }
 
@@ -171,6 +171,7 @@ bool xg_sampler_destroy ( xg_sampler_h sampler_handle ) {
     const xg_vk_device_t* device = xg_vk_device_get ( sampler->params.device );
     vkDestroySampler ( device->vk_handle, sampler->vk_handle, NULL );
     std_bitset_clear ( xg_vk_sampler_state->samplers_bitset, idx );
+    std_list_push ( &xg_vk_sampler_state->samplers_freelist, sampler );
     return true;
 }
 

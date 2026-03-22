@@ -13,7 +13,7 @@
 void std_list_push ( void* head, void* item );
 void* std_list_pop ( void* list );
 
-// Takes a pointer to a list element (inclusing the list head)
+// Takes a pointer to a list element (including the list head)
 void* std_list_next ( void* item );
 
 // Takes a pointer to the element whose next will be changed, and a pointer to the element to insert/remove

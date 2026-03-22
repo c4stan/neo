@@ -249,9 +249,9 @@ static void std_module_unload_internal ( std_module_t* module ) {
     }
 #endif
 
-    std_list_push ( &std_module_state->modules_freelist, module );
-
     std_verify_m ( std_hash_map_remove_hash ( &std_module_state->modules_name_map, module->name.hash ) );
+    std_verify_m ( std_hash_map_remove_hash ( &std_module_state->modules_api_map, ( uint64_t ) module->api ) );
+    std_list_push(&std_module_state->modules_freelist, module);
 
     std_log_info_m ( "Unload of module " std_fmt_str_m " complete.", module->name.string );
 }

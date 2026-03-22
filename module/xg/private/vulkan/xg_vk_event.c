@@ -107,8 +107,10 @@ xg_queue_event_h xg_gpu_queue_event_create ( const xg_queue_event_params_t* para
 
     xg_queue_event_h handle = event - xg_vk_event_state->gpu_queue_events_array;
     char debug_name[xg_debug_name_size_m];
-    if ( params->debug_name[0] == 0 ) {
+    if ( params->debug_name[0] == '\0' ) {
         std_u64_to_str ( debug_name, xg_debug_name_size_m, handle );
+    } else {
+        std_str_copy_static_m ( debug_name, params->debug_name );
     }
     {
         VkDebugUtilsObjectNameInfoEXT debug_name_info = {

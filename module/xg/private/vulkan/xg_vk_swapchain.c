@@ -353,7 +353,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     VkImage swapchain_textures[xg_swapchain_max_textures_m];
     uint32_t acquired_texture_count = xg_swapchain_max_textures_m;
     vkGetSwapchainImagesKHR ( device->vk_handle, swapchain->vk_handle, &acquired_texture_count, swapchain_textures );
-    texture_count = acquired_texture_count;
+    std_assert_m ( texture_count == acquired_texture_count ); // would be strange if a previously allocated texture count was no longer supported...
 
     xg_texture_params_t swapchain_texture_params = xg_texture_params_m (
         .device = swapchain->device,
@@ -372,8 +372,6 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
 
     swapchain->width = width;
     swapchain->height = height;
-
-    // TODO update info.texture_count
 
     for ( size_t i = 0; i < texture_count; ++i ) {
         xg_vk_texture_update_swapchain_texture ( swapchain->textures[i], &swapchain_texture_params, swapchain_textures[i] );
@@ -699,5 +697,6 @@ void xg_vk_swapchain_destroy ( xg_swapchain_h swapchain_handle ) {
 
     vkDestroySwapchainKHR ( device->vk_handle, swapchain->vk_handle, NULL );
     vkDestroySurfaceKHR ( xg_vk_instance(), swapchain->surface, NULL );
+    std_list_push ( xg_vk_swapchain_state->swapchains_freelist, swapchain );
     std_bitset_clear ( xg_vk_swapchain_state->swapchain_bitset, swapchain_handle );
 }

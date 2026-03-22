@@ -1098,6 +1098,7 @@ bool std_file_copy ( std_file_h file, const char* dest, std_path_already_existin
     off_t copy_offset = 0;
     ssize_t copy_result = sendfile ( ( int ) dest_file.u64, ( int ) file.u64, &copy_offset, file_info.size );
     std_assert_m ( copy_result == file_info.size );
+    std_file_close ( dest_file );
     return true;
 #endif
 }
@@ -1115,7 +1116,9 @@ bool std_file_path_copy ( const char* path, const char* dest, std_path_already_e
 #elif defined(std_platform_linux_m)
     std_file_h source_file = std_file_open ( path, std_file_read_m );
     std_assert_m ( !std_file_handle_is_null_m ( source_file ) );
-    return std_file_copy ( source_file, dest, already_existing );
+    bool result = std_file_copy ( source_file, dest, already_existing );
+    std_file_close ( source_file );
+    return result;
 #endif
 }
 

@@ -156,6 +156,8 @@ void se_entity_family_destroy ( se_component_mask_t mask ) {
     std_list_push ( &se_entity_state->family_freelist, family );
 
     uint64_t family_idx = family - se_entity_state->family_array;
+    uint64_t hash = se_entity_component_mask_hash ( mask );
+    std_hash_map_remove_hash ( &se_entity_state->family_map, hash );
     std_bitset_clear ( se_entity_state->family_bitset, family_idx );
 }
 

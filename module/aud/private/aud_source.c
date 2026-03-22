@@ -10,6 +10,7 @@ void aud_source_load ( aud_source_state_t* state ) {
     state->sources_array = std_virtual_heap_alloc_array_m ( aud_source_t, aud_source_max_sources_m );
     state->sources_freelist = std_freelist_m ( state->sources_array, aud_source_max_sources_m );
     state->sources_bitset = std_virtual_heap_alloc_array_m ( uint64_t, std_bitset_u64_count_m ( aud_source_max_sources_m ) );
+    std_mem_zero_array_m ( state->sources_bitset, std_bitset_u64_count_m ( aud_source_max_sources_m ) );
     std_mutex_init ( &state->sources_mutex );
     state->active_sources_count = 0;
 }
@@ -26,6 +27,8 @@ void aud_source_unload ( void ) {
 
     std_virtual_heap_free ( aud_source_state->sources_array );
     std_virtual_heap_free ( aud_source_state->sources_bitset );
+
+    std_mutex_deinit ( &state->sources_mutex );
 }
 
 aud_source_h aud_source_create ( const aud_source_params_t* params ) {
@@ -38,7 +41,7 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
     source->time_played = 0;
     source->volume = 1;
     source->active_idx = UINT64_MAX;
-    source->total_time = params->sample_count / ( params->sample_frequency * params->channel_count );
+    source->total_time = ( double ) params->sample_count / ( params->sample_frequency * params->channel_count );
 
     aud_source_h handle = ( aud_source_h ) ( source - aud_source_state->sources_array );
     std_bitset_set ( aud_source_state->sources_bitset, handle );
@@ -64,8 +67,13 @@ void aud_source_pause ( aud_source_h source_handle ) {
     std_mutex_lock ( &aud_source_state->sources_mutex );
 
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
-    aud_source_state->active_sources[source->active_idx] = aud_source_state->active_sources[aud_source_state->active_sources_count--];
+    if ( aud_source_state->active_sources_count > 1 ) {
+        aud_source_t* swap_source = aud_source_state->active_sources[aud_source_state->active_sources_count - 1];
+        aud_source_state->active_sources[source->active_idx] = swap_source;
+        swap_source->active_idx = source->active_idx;
+    }
     source->active_idx = UINT64_MAX;
+    aud_source_state->active_sources_count -= 1;
 
     std_mutex_unlock ( &aud_source_state->sources_mutex );
 }
@@ -84,7 +92,13 @@ void aud_source_destroy ( aud_source_h source_handle ) {
 
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
     if ( source->active_idx != UINT64_MAX ) {
-        aud_source_state->active_sources[source->active_idx] = aud_source_state->active_sources[aud_source_state->active_sources_count--];
+        if ( aud_source_state->active_sources_count > 1 ) {
+            aud_source_t* swap_source = aud_source_state->active_sources[aud_source_state->active_sources_count - 1];
+            aud_source_state->active_sources[source->active_idx] = swap_source;
+            swap_source->active_idx = source->active_idx;
+        }
+        source->active_idx = UINT64_MAX;
+        aud_source_state->active_sources_count -= 1;
     }
     std_virtual_heap_free ( source->stack.begin );
     std_list_push ( &aud_source_state->sources_freelist, source );

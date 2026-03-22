@@ -37,7 +37,7 @@ static void* std_thread_launcher ( void* param ) {
 
     std_thread_t* thread = ( std_thread_t* ) param;
     // TODO test this
-    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) std_thread_state->tls_alloc, ( void* ) thread->handle.u64 ) == 0 );
+    std_verify_m ( pthread_setspecific ( std_thread_state->tls_alloc, ( void* ) thread->handle.u64 ) == 0 );
     thread->routine ( thread->arg );
     return NULL;
 }
@@ -124,7 +124,7 @@ static void std_thread_register_main ( std_thread_state_t* state ) {
 #if defined(std_platform_win32_m)
     std_verify_m ( TlsSetValue ( ( DWORD ) state->tls_alloc, ( LPVOID ) thread_handle.u64 ) == TRUE );
 #elif defined(std_platform_linux_m)
-    std_verify_m ( pthread_setspecific ( ( pthread_key_t ) state->tls_alloc, ( void* ) thread_handle.u64 ) == 0 );
+    std_verify_m ( pthread_setspecific ( state->tls_alloc, ( void* ) thread_handle.u64 ) == 0 );
 #endif
 }
 
@@ -143,7 +143,7 @@ void std_thread_init ( std_thread_state_t* state ) {
     state->tls_alloc = TlsAlloc();
     std_assert_m ( state->tls_alloc != TLS_OUT_OF_INDEXES );
 #elif defined(std_platform_linux_m)
-    std_verify_m ( pthread_key_create ( ( pthread_key_t* ) &state->tls_alloc, NULL ) == 0 );
+    std_verify_m ( pthread_key_create ( &state->tls_alloc, NULL ) == 0 );
 #endif
     std_mutex_init ( &state->mutex );
     std_thread_register_main ( state );
@@ -156,6 +156,12 @@ void std_thread_attach ( std_thread_state_t* state ) {
 void std_thread_shutdown ( void ) {
     std_mutex_deinit ( &std_thread_state->mutex );
     std_virtual_heap_free ( std_thread_state->threads_array );
+
+#if defined ( std_platform_win32_m )
+    TlsFree ( std_thread_state->tls_alloc );
+#elif defined ( std_platform_linux_m )
+    pthread_key_delete ( std_thread_state->tls_alloc );
+#endif
 }
 
 //==============================================================================
@@ -246,6 +252,7 @@ bool std_thread_join ( std_thread_h thread_handle ) {
     std_verify_m ( result == 0 );
     thread->is_alive = false;
 #endif
+    CloseHandle ( ( HANDLE ) thread->os_handle );
     ++thread->handle.gen;
     std_mutex_lock ( &std_thread_state->mutex );
     std_list_push ( &std_thread_state->threads_freelist, thread );
@@ -257,17 +264,7 @@ bool std_thread_join ( std_thread_h thread_handle ) {
 
 bool std_thread_alive ( std_thread_h thread_handle ) {
     std_thread_t* thread = &std_thread_state->threads_array[thread_handle.idx];
-#if defined(std_platform_win32_m)
-    DWORD result = WaitForSingleObject ( ( HANDLE ) thread->os_handle, 0 );
-
-    if ( result == WAIT_TIMEOUT ) {
-        return true;
-    } else {
-        return false;
-    }
-#elif defined(std_platform_linux_m)
-    return thread->is_alive;
-#endif
+    return thread->handle.gen == thread_handle.gen;
 }
 
 uint32_t std_thread_uid ( std_thread_h thread_handle ) {
@@ -286,7 +283,7 @@ std_thread_h std_thread_this ( void ) {
 #if defined(std_platform_win32_m)
     thread_handle = ( std_thread_h ) { .u64 = ( uint64_t ) TlsGetValue ( ( DWORD ) std_thread_state->tls_alloc ) };
 #elif defined(std_platform_linux_m)
-    thread_handle = ( std_thread_h ) { .u64 = ( uint64_t ) pthread_getspecific ( ( pthread_key_t ) std_thread_state->tls_alloc ) };
+    thread_handle = ( std_thread_h ) { .u64 = ( uint64_t ) pthread_getspecific ( std_thread_state->tls_alloc ) };
 #endif
     return thread_handle;
 }

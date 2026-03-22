@@ -89,7 +89,7 @@ xi_scissor_h xi_workload_scissor ( xi_workload_h workload_handle, uint32_t x, ui
     scissor->y = y;
     scissor->width = width;
     scissor->height = height;
-    return workload->scissor_array - scissor;
+    return scissor - workload->scissor_array;
 }
 
 void xi_workload_cmd_draw ( xi_workload_h workload_handle, const xi_draw_rect_t* rects, uint64_t rect_count ) {

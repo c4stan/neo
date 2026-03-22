@@ -194,13 +194,20 @@ typedef struct {
     std_thread_t*           threads_freelist;
     uint32_t                uid;
     std_mutex_t             mutex;
+#if defined ( std_platform_win32_m )
     uint64_t                tls_alloc;
+#elif defined ( std_platform_linux_m )
+    pthread_key_t           tls_alloc;
+#endif
 } std_thread_state_t;
 
 //==============================================================================
 
 typedef struct {
     uint64_t                os_handle;
+#if defined ( std_platform_win32_m )
+    uint64_t                os_thread_handle;
+#endif
     uint64_t                os_id;
     uint64_t                stdin_handle;
     uint64_t                stdout_handle;

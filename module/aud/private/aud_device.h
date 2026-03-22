@@ -32,7 +32,7 @@ typedef struct {
 } aud_device_context_t;
 
 typedef enum {
-    aud_devuce_existing_m = 1 << 0,
+    aud_device_existing_m = 1 << 0,
     aud_device_active_m   = 1 << 1,
 } aud_device_f;
 

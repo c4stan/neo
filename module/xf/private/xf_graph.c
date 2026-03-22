@@ -14,7 +14,7 @@
 
 static xf_graph_state_t* xf_graph_state;
 
-#define xf_graph_bitset_u64_count_m std_div_round_up_m ( xf_graph_max_graphs_m, 8 )
+#define xf_graph_bitset_u64_count_m std_div_round_up_m ( xf_graph_max_graphs_m, 64 )
 
 void xf_graph_load ( xf_graph_state_t* state ) {
     state->graphs_array = std_virtual_heap_alloc_array_m ( xf_graph_t, xf_graph_max_graphs_m );

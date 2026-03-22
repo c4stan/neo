@@ -126,7 +126,8 @@ void wm_window_reload ( wm_window_state_t* state ) {
 void wm_window_unload ( void ) {
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, wm_window_state->windows_bitset, idx, wm_window_bitset_u64_count_m ) ) {
-        wm_window_h handle = idx;
+        wm_window_t* window = &wm_window_state->windows_array[idx];
+        wm_window_h handle = wm_make_handle_m ( idx, window->gen );
         wm_window_destroy ( handle );
         ++idx;
     }
@@ -143,6 +144,8 @@ void wm_window_unload ( void ) {
     std_virtual_heap_free ( wm_window_state->map.hashes );
     std_virtual_heap_free ( wm_window_state->map.payloads );
 #endif
+
+    std_mutex_deinit ( &wm_window_state->mutex );
 }
 
 static uint32_t wm_window_keycode ( uint64_t os_keycode ) {

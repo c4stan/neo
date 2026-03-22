@@ -238,6 +238,7 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
     uint64_t os_handle;
     uint64_t os_id;
+    uint64_t os_thread_handle;
 
     {
         PROCESS_INFORMATION pi;
@@ -264,6 +265,7 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
         os_handle = ( uint64_t ) pi.hProcess;
         os_id = ( uint64_t ) pi.dwProcessId;
+        os_thread_handle = ( uint64_t ) pi.hThread;
     }
 
     {
@@ -378,6 +380,10 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
     process->args_count = args_count;
 
+#if defined ( std_platform_win32_m )
+    process->os_thread_handle = os_thread_handle;
+#endif
+
     std_mutex_unlock ( &std_process_state->mutex );
 
     return process_handle;
@@ -413,6 +419,10 @@ bool std_process_wait_for ( std_process_h process_handle ) {
 
     if ( dead ) {
         ++process->handle.gen;
+        CloseHandle ( ( HANDLE ) process->os_handle );
+#if defined ( std_platform_win32_m )
+        CloseHandle ( ( HANDLE ) process->os_thread_handle );
+#endif
         std_list_push ( &std_process_state->processes_freelist, process );
     }
 
@@ -434,6 +444,10 @@ bool std_process_kill ( std_process_h process_handle ) {
 
     if ( dead ) {
         ++process->handle.gen;
+        CloseHandle ( ( HANDLE ) process->os_handle );
+#if defined ( std_platform_win32_m )
+        CloseHandle ( ( HANDLE ) process->os_thread_handle );
+#endif
         std_list_push ( &std_process_state->processes_freelist, process );
     }
 
@@ -447,7 +461,6 @@ std_process_h std_process_this ( void ) {
 void std_process_this_exit ( std_process_exit_code_e exit_code ) {
 #if defined(std_platform_win32_m)
     uint32_t exit_code_value = exit_code == std_process_exit_code_completed_m ? 0 : 1;
-    //ExitProcess ( exit_code_value );
     TerminateProcess ( GetCurrentProcess(), exit_code_value );
 #elif defined(std_platform_linux_m)
     int32_t exit_code_value = exit_code == std_process_exit_code_completed_m ? 0 : 1;

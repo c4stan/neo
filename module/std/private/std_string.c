@@ -93,9 +93,9 @@ size_t std_str_copy ( char* dest, size_t cap, const char* src ) {
         while ( --cap > 0 && *src != '\0' ) {
             *dest++ = *src++;
         }
-    }
 
-    *dest = '\0';
+        *dest = '\0';
+    }
 
     while ( *src++ ) ;
 

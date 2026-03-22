@@ -53,6 +53,7 @@ void se_query_unload ( void ) {
 se_query_h se_query_create ( const se_query_params_t* params ) {
     // TODO avoid creating identical queries
     std_mutex_lock ( &se_query_state->pending_queries_mutex );
+    std_assert_m ( se_query_state->pending_query_count < se_max_pending_queries_m );
     se_pending_query_t* query = &se_query_state->pending_queries[se_query_state->pending_query_count++];
     std_mutex_unlock ( &se_query_state->pending_queries_mutex );
 

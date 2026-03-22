@@ -6,6 +6,7 @@ void aud_device_load ( aud_device_state_t* state ) {
     aud_device_state = state;
 
     state->devices_array = std_virtual_heap_alloc_array_m ( aud_device_t, aud_device_max_devices_m );
+    std_mem_zero_array_m ( state->devices_array, aud_device_max_devices_m );
     state->devices_freelist = std_freelist_m ( state->devices_array, aud_device_max_devices_m );
     std_mutex_init ( &state->devices_mutex );
     state->guid = 0;
@@ -20,7 +21,7 @@ void aud_device_load ( aud_device_state_t* state ) {
         aud_device_t* device = std_list_pop_m ( &state->devices_freelist );
         device->os_id = i;
         device->guid = std_atomic_increment_u64 ( &state->guid );
-        device->flags = aud_devuce_existing_m;
+        device->flags = aud_device_existing_m;
     }
 
     state->hardware_device_count = device_count;
@@ -64,7 +65,7 @@ void aud_device_load ( aud_device_state_t* state ) {
                     device->os_id = ( uint64_t ) device_id;
                     device->os_card_id = ( uint64_t ) card_id;
                     device->guid = std_atomic_increment_u64 ( &state->guid );
-                    device->flags = aud_devuce_existing_m;
+                    device->flags = aud_device_existing_m;
                     ++device_count;
                 }
             }
@@ -99,7 +100,7 @@ size_t aud_device_get_list ( aud_device_h* devices, size_t cap ) {
     size_t count = 0;
 
     for ( size_t i = 0; i < aud_device_max_devices_m && count < cap; ++i ) {
-        if ( aud_device_state->devices_array[i].flags & aud_devuce_existing_m ) {
+        if ( aud_device_state->devices_array[i].flags & aud_device_existing_m ) {
             devices[count++] = i;
         }
     }
@@ -110,7 +111,7 @@ size_t aud_device_get_list ( aud_device_h* devices, size_t cap ) {
 bool aud_device_get_info ( aud_device_info_t* info, aud_device_h device_handle ) {
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
 
-    if ( std_unlikely_m ( ( device->flags & aud_devuce_existing_m ) == 0 ) ) {
+    if ( std_unlikely_m ( ( device->flags & aud_device_existing_m ) == 0 ) ) {
         return false;
     }
 
@@ -156,7 +157,7 @@ bool aud_device_get_info ( aud_device_info_t* info, aud_device_h device_handle )
 bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t* params ) {
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
 
-    if ( std_unlikely_m ( ( device->flags & aud_devuce_existing_m ) == 0 ) ) {
+    if ( std_unlikely_m ( ( device->flags & aud_device_existing_m ) == 0 ) ) {
         return false;
     }
 
@@ -165,7 +166,7 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
 
 #if defined(std_platform_win32_m)
     WORD channel_count = ( WORD ) params->channel_count;
-    WORD frequency = ( WORD ) params->sample_frequency;
+    DWORD frequency = ( DWORD ) params->sample_frequency;
     WORD bits_per_sample = ( WORD ) params->bits_per_sample;
     WORD channel_mask = 0;
 
@@ -215,7 +216,7 @@ bool aud_device_activate ( aud_device_h device_handle, const aud_device_params_t
         size_t device_idx = ( size_t ) device_handle;
         device->context = &aud_device_state->device_contexts_array[device_idx];
 
-        uint64_t submit_block_size = aud_device_submit_block_max_ms_m * params->sample_frequency * params->bits_per_sample / 8;
+        uint64_t submit_block_size = aud_device_submit_block_max_ms_m * params->sample_frequency * params->channel_count * params->bits_per_sample / 8;
         std_assert_m ( submit_block_size % 1000 == 0 );
         submit_block_size = submit_block_size / 1000;
 
@@ -239,10 +240,14 @@ bool aud_device_deactivate ( aud_device_h device_handle ) {
         return false;
     }
 
+    waveOutClose ( ( HWAVEOUT ) device->os_handle );
+
     for ( uint32_t i = 0; i < aud_device_max_submit_contexts_m; ++i ) {
         aud_device_submit_context_t* context = &device->context->submit_contexts[i];
         std_virtual_heap_free ( context->data );
     }
+
+    device->flags &= ~aud_device_active_m;
 
     return true;
 }
@@ -291,7 +296,7 @@ static void aud_device_recycle_submission_contexts ( aud_device_t* device, bool 
 
 char* aud_device_get_buffer ( aud_device_h device_handle ) {
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
-    std_assert_m ( ( device->flags & aud_devuce_existing_m ) );
+    std_assert_m ( ( device->flags & aud_device_existing_m ) );
 
     aud_device_submit_context_t* submit_context = &device->context->submit_contexts[std_ring_top_idx ( &device->submit_ring )];
 
@@ -300,7 +305,7 @@ char* aud_device_get_buffer ( aud_device_h device_handle ) {
 
 void aud_device_push_buffer ( aud_device_h device_handle, uint64_t buffer_size ) {
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
-    std_assert_m ( ( device->flags & aud_devuce_existing_m ) );
+    std_assert_m ( ( device->flags & aud_device_existing_m ) );
 
     aud_device_recycle_submission_contexts ( device, true );
 
@@ -326,13 +331,13 @@ void aud_device_push_buffer ( aud_device_h device_handle, uint64_t buffer_size )
 
 const std_ring_t* aud_device_get_ring ( aud_device_h device_handle ) {
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
-    std_assert_m ( ( device->flags & aud_devuce_existing_m ) );
+    std_assert_m ( ( device->flags & aud_device_existing_m ) );
     return &device->submit_ring;
 }
 
 void aud_device_update_ring ( aud_device_h device_handle ) {
     aud_device_t* device = &aud_device_state->devices_array[device_handle];
-    std_assert_m ( ( device->flags & aud_devuce_existing_m ) );
+    std_assert_m ( ( device->flags & aud_device_existing_m ) );
 
     aud_device_recycle_submission_contexts ( device, false );
 }

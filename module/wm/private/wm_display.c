@@ -81,7 +81,7 @@ size_t wm_display_get ( wm_display_h* displays, size_t cap ) {
 #if defined(std_platform_win32_m)
 static bool wm_display_get_devices ( DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* display, wm_display_h display_handle ) {
     size_t adapter_index = display_handle & 0xffff;
-    size_t display_index = ( display_handle << 16 ) & 0xffff;
+    size_t display_index = ( display_handle >> 16 ) & 0xffff;
     size_t key_hash = display_handle >> 32;
 
     std_assert_m ( adapter );
@@ -106,7 +106,7 @@ static bool wm_display_get_devices ( DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* 
 
         uint32_t display_key_hash = std_hash_block_32_m ( display->DeviceKey, 256 );
 
-        if ( key_hash != display_key_hash || display->StateFlags & DISPLAY_DEVICE_ACTIVE == 0 ) {
+        if ( key_hash != display_key_hash || ( display->StateFlags & DISPLAY_DEVICE_ACTIVE ) == 0 ) {
             std_log_warn_m ( "Invalid display handle" );
             return false;
         }
@@ -163,7 +163,7 @@ size_t wm_display_get_modes_count ( wm_display_h display_handle ) {
     DISPLAY_DEVICEW adapter;
 
     if ( !wm_display_get_devices ( &adapter, NULL, display_handle ) ) {
-        return false;
+        return 0;
     }
 
     DEVMODEW display_settings;

@@ -31,7 +31,7 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
             float nz = z / rad;
 
             float u = ( float ) j / meridians_count;
-            float v = ( float ) j / parallels_count;
+            float v = ( float ) i / parallels_count;
 
             pos[vert_count * 3 + 0] = x;
             pos[vert_count * 3 + 1] = y;
@@ -86,13 +86,13 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
         uint32_t i1 = idx[i + 1];
         uint32_t i2 = idx[i + 2];
 
-        float* v0 = pos + i0;
-        float* v1 = pos + i1;
-        float* v2 = pos + i2;
+        float* v0 = pos + i0 * 3;
+        float* v1 = pos + i1 * 3;
+        float* v2 = pos + i2 * 3;
 
-        float* uv0 = uv + i0;
-        float* uv1 = uv + i1;
-        float* uv2 = uv + i2;
+        float* uv0 = uv + i0 * 2;
+        float* uv1 = uv + i1 * 2;
+        float* uv2 = uv + i2 * 2;
 
         float e1[3] = { v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2] };
         float e2[3] = { v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2] };
@@ -133,8 +133,8 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
     }
 
     for ( uint32_t i = 0; i < vertex_capacity; i += 3 ) {
-        float* t = tan + i;
-        float* b = bitan + i;
+        float* t = tan + i * 3;
+        float* b = bitan + i * 3;
 
         float t_len = sqrtf ( t[0] * t[0] + t[1] * t[1] + t[2] * t[2] );
         t[0] *= 1.f / t_len;
