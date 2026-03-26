@@ -334,8 +334,6 @@ void xf_graph_load_shaders ( xs_i* xs, xs_database_h sdb );
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params );
 xf_node_h xf_graph_node_create ( xf_graph_h graph, const xf_node_params_t* params );
-void xf_graph_node_update ( xf_graph_h graph_handle, xf_node_h node_handle, const xf_node_params_t* params );
-void xf_graph_invalidate ( xf_graph_h graph, xg_workload_h workload );
 void xf_graph_compile ( xf_graph_h graph );
 uint64_t xf_graph_build ( xf_graph_h graph, xg_workload_h workload, uint64_t key );
 uint64_t xf_graph_execute ( xf_graph_h graph, xg_workload_h xg_workload, uint64_t base_key );

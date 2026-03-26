@@ -680,7 +680,6 @@ typedef struct {
     void ( *advance_graph_multi_textures ) ( xf_graph_h graph );
     void ( *destroy_graph ) ( xf_graph_h graph, xg_workload_h workload );
 
-    void ( *update_node ) ( xf_graph_h graph, xf_node_h node, const xf_node_params_t* params );
     void* ( *get_node_uniform_data ) ( xf_graph_h graph, xf_node_h node );
 
     void ( *disable_node ) ( xf_graph_h graph, xf_node_h node );

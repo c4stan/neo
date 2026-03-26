@@ -237,24 +237,6 @@ static void xf_test ( void ) {
             xf->node_set_enabled ( graph, triangle_node, triangle_node_enabled );
         }
 
-        if ( !input_state.keyboard[wm_keyboard_state_f3_m] && new_input_state.keyboard[wm_keyboard_state_f3_m] ) {
-            xf->update_node ( graph, triangle_node, &xf_node_params_m (
-                .debug_name = "triangle",
-                .debug_color = xg_debug_region_color_green_m,
-                .type = xf_node_type_custom_pass_m,
-                .pass.custom = xf_node_custom_pass_params_m (
-                    .routine = xf_triangle_pass,
-                    .user_args = std_buffer_struct_m ( &triangle_pass_args ),
-                    .auto_renderpass = true,
-                ),
-                .resources = xf_node_resource_params_m (
-                    .render_targets_count = 1,
-                    .render_targets = { xf_render_target_dependency_m ( .texture = color_texture ) },
-                    .depth_stencil_target = depth_texture,
-                ),
-            ) );
-        }
-
         wm_window_info_t new_window_info;
         wm->get_window_info ( &new_window_info, window );
 

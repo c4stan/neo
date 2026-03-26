@@ -449,8 +449,10 @@ static void xs_test ( void ) {
             .render_targets_count = 1,
             .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
         ),
-        .render_textures_usage = xg_render_textures_usage_m (
-            .render_targets = { xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m }
+        .render_textures_desc = xg_render_textures_desc_m (
+            .render_targets = {
+                xg_render_texture_desc_m ( .usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m ),
+            },
         ),
         .resolution_x = resolution_x,
         .resolution_y = resolution_y,
@@ -498,8 +500,10 @@ static void xs_test ( void ) {
                     .render_targets_count = 1,
                     .render_targets = { xg_render_target_layout_m ( .format = xg_format_b8g8r8a8_unorm_m ) }
                 ),
-                .render_textures_usage = xg_render_textures_usage_m (
-                    .render_targets = { xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m }
+                .render_textures_desc = xg_render_textures_desc_m (
+                    .render_targets = {
+                        xg_render_texture_desc_m ( .usage = xg_texture_usage_bit_copy_dest_m | xg_texture_usage_bit_render_target_m ),
+                    },
                 ),
                 .resolution_x = new_window_info.width,
                 .resolution_y = new_window_info.height,

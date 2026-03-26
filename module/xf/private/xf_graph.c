@@ -118,50 +118,6 @@ xf_node_h xf_graph_node_create ( xf_graph_h graph_handle, const xf_node_params_t
     return node_handle;
 }
 
-void xf_graph_node_update ( xf_graph_h graph_handle, xf_node_h node_handle, const xf_node_params_t* params ) {
-    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
-    xf_node_t* node = &graph->nodes_array[node_handle];
-
-    // TODO free node resources
-    std_mem_zero_m ( node );
-    node->params = *params;
-    node->enabled = params->enabled;
-    node->renderpass = xg_null_handle_m;
-    node->renderpass_params.render_textures_layout = xg_render_textures_layout_m();
-    node->renderpass_params.render_textures_desc = xg_render_textures_desc_m();
-
-    bool copy_args = false;
-    std_buffer_t user_args = std_buffer_m();
-
-    if ( node->params.type == xf_node_type_custom_pass_m ) {
-        xf_node_custom_pass_params_t* params = &node->params.pass.custom;
-        copy_args = params->copy_args;
-        user_args = params->user_args;
-    } else if ( node->params.type == xf_node_type_compute_pass_m ) {
-        xf_node_compute_pass_params_t* params = &node->params.pass.compute;
-        copy_args = params->copy_uniform_data;
-        user_args = params->uniform_data;
-    } else if ( node->params.type == xf_node_type_raytrace_pass_m ) {
-        xf_node_raytrace_pass_params_t* params = &node->params.pass.raytrace;
-        copy_args = params->copy_uniform_data;
-        user_args = params->uniform_data;
-    } else if ( node->params.type == xf_node_type_compute_indirect_pass_m ) {
-        xf_node_compute_indirect_pass_params_t* params = &node->params.pass.compute_indirect;
-        copy_args = params->copy_uniform_data;
-        user_args = params->uniform_data;
-    }
-
-    if ( copy_args && user_args.base ) {
-        void* alloc = std_stack_alloc_align ( &graph->node_user_arg_allocator, user_args.size, 16 );
-        std_mem_copy ( alloc, user_args.base, user_args.size );
-        node->user_alloc = alloc;
-    } else {
-        node->user_alloc = NULL;
-    }
-
-    graph->needs_clear = true;
-}
-
 void xf_graph_node_destroy ( xf_graph_h graph_handle, xf_node_h node_handle ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     xf_node_t* node = &graph->nodes_array[node_handle];
@@ -1995,8 +1951,7 @@ static uint64_t xf_graph_clear_owned_textures ( xf_graph_h graph_handle, xg_i* x
     std_stack_t texture_barriers_stack = std_static_stack_m ( texture_barriers_array );
 
     for ( uint32_t i = 0; i < graph->owned_textures_count; ++i ) {
-        xf_graph_texture_t* graph_texture = &graph->textures_array[graph->owned_textures_array[i]];
-        xf_texture_h texture_handle = graph_texture->handle;
+        xf_texture_h texture_handle = graph->owned_textures_array[i];
         xf_texture_t* texture = xf_resource_texture_get ( texture_handle );
         if ( texture->params.clear_on_create ) {
             xf_physical_texture_t* physical_texture = xf_resource_texture_get_physical_texture ( texture_handle );
