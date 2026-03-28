@@ -454,9 +454,9 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
 
 void main ( void ) {
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / draw_uniforms.resolution_f32 );
+    vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
     rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
     vec4 gi_ao = ssilvb ( rng_state, screen_uv );
-    vec3 base_color = texture ( sampler2D ( tex_base_color, sampler_linear ), screen_uv ).xyz;
     vec3 out_color = gi_ao.xyz * base_color * gi_ao.w;
     imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( out_color, 1 ) );
 }

@@ -204,6 +204,29 @@ static void viewapp_build_mesh_raytrace_geo ( xg_workload_h workload, se_entity_
     mesh->rt_geo = rt_geo;
 }
 
+viewapp_camera_component_t* viewapp_get_active_camera ( void ) {
+    viewapp_state_t* state = viewapp_state_get();
+    se_i* se = state->modules.se;
+
+    se_query_result_t camera_query_result;
+    se->query_entities ( &camera_query_result, &se_query_params_m (
+        .include_component_count = 1,
+        .include_components = { viewapp_camera_component_id_m }
+    ) );
+
+    se_stream_iterator_t camera_iterator = se_component_iterator_m ( camera_query_result.components, 0 );
+    for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
+        viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
+        if ( !camera_component->enabled ) {
+            continue;
+        }
+
+        return camera_component;
+    }
+
+    return NULL;
+}
+
 static void viewapp_build_raytrace_geo ( xg_workload_h workload ) {
     viewapp_state_t* state = viewapp_state_get();
     if ( !state->render.supports_raytrace ) {
@@ -1682,6 +1705,19 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
     viewapp_state_t* state = viewapp_state_get();
     xs_i* xs = state->modules.xs;
     se_i* se = state->modules.se;
+    rv_i* rv = state->modules.rv;
+
+    sm_vec_3f_t spawn_position = sm_vec_3f_set ( 0, 0, 0 );
+    viewapp_camera_component_t* camera_component = viewapp_get_active_camera();
+    if ( camera_component ) {
+        rv_view_info_t view_info;
+        rv->get_view_info ( &view_info, camera_component->view );
+
+        float spawn_offset = 10.f;
+        sm_vec_3f_t camera_position = sm_vec_3f ( view_info.transform.position );
+        sm_vec_3f_t forward = sm_quat_to_vec ( sm_quat ( view_info.transform.orientation ) );
+        spawn_position = sm_vec_3f_add ( camera_position, sm_vec_3f_mul ( forward, spawn_offset ) );
+    }
 
     xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
     xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
@@ -1710,7 +1746,7 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
     );
 
     viewapp_transform_t transform = viewapp_transform_m (
-        .position = { 0, 0, 0 },
+        .position = { spawn_position.x, spawn_position.y, spawn_position.z },
     );
 
     se_entity_h entity = se->create_entity( &se_entity_params_m (
@@ -1733,6 +1769,7 @@ se_entity_h spawn_plane ( xg_workload_h workload ) {
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
     viewapp_update_raytrace_world();
+    state->ui.mouse_pick_entity = entity;
     return entity;
 }
 
@@ -1740,6 +1777,19 @@ se_entity_h spawn_sphere ( xg_workload_h workload ) {
     viewapp_state_t* state = viewapp_state_get();
     xs_i* xs = state->modules.xs;
     se_i* se = state->modules.se;
+    rv_i* rv = state->modules.rv;
+
+    sm_vec_3f_t spawn_position = sm_vec_3f_set ( 0, 0, 0 );
+    viewapp_camera_component_t* camera_component = viewapp_get_active_camera();
+    if ( camera_component ) {
+        rv_view_info_t view_info;
+        rv->get_view_info ( &view_info, camera_component->view );
+
+        float spawn_offset = 10.f;
+        sm_vec_3f_t camera_position = sm_vec_3f ( view_info.transform.position );
+        sm_vec_3f_t forward = sm_quat_to_vec ( sm_quat ( view_info.transform.orientation ) );
+        spawn_position = sm_vec_3f_add ( camera_position, sm_vec_3f_mul ( forward, spawn_offset ) );
+    }
 
     xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
     xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
@@ -1768,7 +1818,7 @@ se_entity_h spawn_sphere ( xg_workload_h workload ) {
     );
 
     viewapp_transform_t transform = viewapp_transform_m (
-        .position = { 0, 0, 0 },
+        .position = { spawn_position.x, spawn_position.y, spawn_position.z },
     );
 
 
@@ -1792,6 +1842,7 @@ se_entity_h spawn_sphere ( xg_workload_h workload ) {
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
     viewapp_update_raytrace_world();
+    state->ui.mouse_pick_entity = entity;
     return entity;
 }
 
@@ -1800,6 +1851,18 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
     xs_i* xs = state->modules.xs;
     se_i* se = state->modules.se;
     rv_i* rv = state->modules.rv;
+
+    sm_vec_3f_t spawn_position = sm_vec_3f_set ( 0, 0, 0 );
+    viewapp_camera_component_t* camera_component = viewapp_get_active_camera();
+    if ( camera_component ) {
+        rv_view_info_t view_info;
+        rv->get_view_info ( &view_info, camera_component->view );
+
+        float spawn_offset = 5.f;
+        sm_vec_3f_t camera_position = sm_vec_3f ( view_info.transform.position );
+        sm_vec_3f_t forward = sm_quat_to_vec ( sm_quat ( view_info.transform.orientation ) );
+        spawn_position = sm_vec_3f_add ( camera_position, sm_vec_3f_mul ( forward, spawn_offset ) );
+    }
 
     xs_database_pipeline_h geometry_pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "geometry" ) );
     xs_database_pipeline_h shadow_pipeline_state = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "shadow" ) );
@@ -1829,12 +1892,12 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
     );
 
     viewapp_transform_t transform = viewapp_transform_m (
-        .position = { 0, 0, 0 },
+        .position = { spawn_position.x, spawn_position.y, spawn_position.z },
         .scale = 0.1,
     );
 
     viewapp_light_component_t light_component = viewapp_light_component_m (
-        .position = { 0, 0, 0 },
+        .position = { spawn_position.x, spawn_position.y, spawn_position.z },
         .intensity = 5,
         .color = { 1, 1, 1 },
         .shadow_casting = true,
@@ -1890,5 +1953,6 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
     viewapp_mesh_component_t* mesh = se->get_entity_component ( entity, viewapp_mesh_component_id_m, 0 );
     viewapp_build_mesh_raytrace_geo ( workload, entity, mesh );
     viewapp_update_raytrace_world();
+    state->ui.mouse_pick_entity = entity;
     return entity;
 }

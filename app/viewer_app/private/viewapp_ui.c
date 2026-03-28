@@ -135,32 +135,6 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
     state->ui.mouse_pick_entity = se_null_handle_m;
 }
 
-static bool viewapp_get_camera_info ( rv_view_info_t* view_info ) {
-    viewapp_state_t* state = viewapp_state_get();
-    se_i* se = state->modules.se;
-    rv_i* rv = state->modules.rv;
-
-    se_query_result_t camera_query_result;
-    se->query_entities ( &camera_query_result, &se_query_params_m ( 
-        .include_component_count = 1, 
-        .include_components = { viewapp_camera_component_id_m } 
-    ) );
-
-    se_stream_iterator_t camera_iterator = se_component_iterator_m ( camera_query_result.components, 0 );
-    for ( uint32_t i = 0; i < camera_query_result.entity_count; ++i ) {
-        viewapp_camera_component_t* camera_component = se_stream_iterator_next ( &camera_iterator );
-
-        if ( !camera_component->enabled ) {
-            continue;
-        }
-
-        rv->get_view_info ( view_info, camera_component->view );
-        return true;
-    }
-
-    return false;
-}
-
 uint64_t viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* old_input_state, wm_input_state_t* input_state, xg_workload_h workload, uint64_t key ) {
     viewapp_state_t* state = viewapp_state_get();
     wm_i* wm = state->modules.wm;
@@ -177,7 +151,10 @@ uint64_t viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* ol
     wm->get_window_input_buffer ( window, &input_buffer );
 
     rv_view_info_t view_info;
-    viewapp_get_camera_info ( &view_info );
+    viewapp_camera_component_t* camera_component = viewapp_get_active_camera();
+    if ( camera_component ) {
+        state->modules.rv->get_view_info ( &view_info, camera_component->view );
+    }
 
     // TODO remove
     xi->set_workload_view_info ( xi_workload, &view_info );

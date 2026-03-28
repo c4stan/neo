@@ -189,6 +189,7 @@ typedef enum {
 void viewapp_load_scene ( viewapp_scene_e scene );
 
 uint64_t viewapp_load_envmap ( xg_workload_h workload, uint64_t key, viewapp_envmap_e envmap );
+viewapp_camera_component_t* viewapp_get_active_camera ( void );
 
 se_entity_h spawn_plane ( xg_workload_h workload );
 se_entity_h spawn_sphere ( xg_workload_h workload );
