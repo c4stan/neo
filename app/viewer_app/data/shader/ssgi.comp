@@ -425,7 +425,7 @@ vec4 ssrt ( inout rng_wang_state_t rng_state, vec2 screen_uv ) {
             float hit_depth;
             bool hit;
 
-            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * 0.01, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50 ); 
+            hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * 0.01, hemisphere_normal, tex_hiz, draw_uniforms.hiz_mip_count, sampler_linear, 50, 0.5 ); 
 
             if ( hit ) {
                 vec3 hit_lighting = textureLod ( sampler2D ( tex_lighting, sampler_linear ), hit_screen_pos.xy, 5 ).xyz;

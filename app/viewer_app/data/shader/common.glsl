@@ -83,24 +83,22 @@ vec3 tangent_from_normal ( vec3 normal ) {
 
     if ( abs ( normal.x ) > abs ( normal.y ) ) {
         tangent = vec3 ( normal.z, 0.f, -normal.x );
-        tangent *= sqrt ( normal.x * normal.x + normal.z * normal.z );
     } else {
         tangent = vec3 ( 0.f, -normal.z, normal.y );
-        tangent *= sqrt ( normal.y * normal.y + normal.z * normal.z );
     }
 
-    return tangent;
+    return normalize ( tangent );
 }
 
 mat3 tnb_from_normal ( vec3 n ) {
     vec3 t = tangent_from_normal ( n );
-    vec3 b = cross ( n, t );
+    vec3 b = normalize ( cross ( n, t ) );
     return mat3 ( t, n, b );
 }
 
 mat3 tbn_from_normal ( vec3 n ) {
     vec3 t = tangent_from_normal ( n );
-    vec3 b = cross ( n, t );
+    vec3 b = normalize ( cross ( n, t ) );
     return mat3 ( t, b, n );
 }
 
@@ -438,7 +436,7 @@ float intersect_cell_boundary ( vec3 screen_ray_start, vec3 screen_ray_path, vec
     return t;
 }
 
-bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3 view_pos, vec3 hemisphere_normal, texture2D tex_hiz, uint hiz_mip_count, sampler sampler_point, uint max_sample_count ) {
+bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3 view_pos, vec3 hemisphere_normal, texture2D tex_hiz, uint hiz_mip_count, sampler sampler_point, uint max_sample_count, float depth_threshold ) {
     //
     // :: go into screen space ::
     //
@@ -484,8 +482,6 @@ bool trace_screen_space_ray ( out vec3 out_screen_pos, out float out_depth, vec3
     bool screen_ray_is_backward = proj_depth_cmp_lt ( screen_ray_dir.z, 0 );
 
     uint sample_it = 0;
-    float depth_threshold = 0.5;
-
     while ( t > 0.f && t < 1.f && sample_it < max_sample_count ) {
         //
         // :: prepare ::

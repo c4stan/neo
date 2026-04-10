@@ -131,13 +131,9 @@ void draw_debug_line2 ( writeonly image2D img, vec2 uv0, vec2 uv1, vec4 color ) 
 // ---
 // TODO: try: downsample depth & normals -> raytrace in half-resolution -> upsample result back using a bi-filter (read half res depth and normals)
 void main ( void ) {
-    // Compute screen uv
     vec2 screen_uv = vec2 ( gl_GlobalInvocationID.xy / draw_uniforms.resolution_f32 ) + vec2(0.5) / draw_uniforms.resolution_f32;
-    //screen_uv = dejitter_uv ( screen_uv );
 
     // Sample
-    // TODO pass prev frame camera data and account for movement when sampling prev frame textures
-    //vec3 view_normal = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv ).xyz * 2 - 1;
     vec4 norm_rough_sample = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv );
     vec3 view_normal = normalize ( norm_rough_sample.xyz * 2 - 1 );
     float roughness = norm_rough_sample.w;
@@ -146,20 +142,14 @@ void main ( void ) {
     vec3 color = texture ( sampler2D ( tex_color, sampler_point ), screen_uv ).xyz;
     vec3 view_pos = view_from_depth ( screen_uv, depth );
 
-    // Trace
-    //vec3 view_ray_dir = reflect ( normalize ( view_pos ), view_normal );
-
     rng_wang_state_t rng_state = rng_wang_init ( gl_GlobalInvocationID.xy );
     float ex = rng_wang ( rng_state );
     float ey = rng_wang ( rng_state );
     vec2 e2 = vec2 ( ex, ey );
     vec3 wo = normalize ( -view_pos );
     vec3 wi = ggx_sample_vndf ( e2, wo, view_normal, roughness );
-    
     vec3 view_ray_dir = wi;
-    vec3 sample_color = vec3 ( 0, 0, 0 );
-    float sample_distance = 1;
-
+    //view_ray_dir = reflect ( normalize ( view_pos ), view_normal );
     //view_ray_dir = vec3 ( 0, 1, 1 );
 
     /*
@@ -171,28 +161,28 @@ void main ( void ) {
             sample thickness from the SSR shader to determine proper thickness value
     */
 
+    // Trace
+    float normal_offset = 0.01f;
+
+    vec3 sample_color = vec3 ( 0, 0, 0 );
     float hit_distance = 0;
-
-    // helps with self intersections on bad/low poly geometries
-    float normal_offset = 0.1f;
-
     bool ssr_enabled = mat_sample.x == 1;
-    if ( ssr_enabled && !proj_depth_is_out ( depth ) ) {
+    if ( ssr_enabled && !proj_depth_is_out ( depth ) && dot ( wi, view_normal ) > 0 ) {
         vec3 hit_screen_pos;
         float hit_depth;
         bool hit;
 
-        hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_ray_dir * normal_offset, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 100 );
+        hit = trace_screen_space_ray ( hit_screen_pos, hit_depth, view_pos + view_normal * normal_offset, view_ray_dir, tex_hiz, draw_uniforms.hiz_mip_count, sampler_point, 100, 0.5 );
 
         if ( hit ) {
-            if ( length ( screen_uv - hit_screen_pos.xy ) < 0.01 ) {
-                //draw_debug_line ( img_color, screen_uv, hit_screen_pos.xy, vec4 ( 1, 0, 0, 1 ) );
-            }
+            //if ( length ( screen_uv - hit_screen_pos.xy ) < 0.01 ) {
+            //    draw_debug_line ( img_color, screen_uv, hit_screen_pos.xy, vec4 ( 1, 0, 0, 1 ) );
+            //}
             vec3 hit_color = texture ( sampler2D ( tex_color, sampler_point ), hit_screen_pos.xy ).xyz;
+            hit_color = clamp ( hit_color, vec3(0), vec3(1) );
             //float depth_delta = - ( linearize_depth ( hit_screen_pos.z ) - linearize_depth ( hit_depth ) );
             //float depth_threshold = 0.4;
             //sample_color = mix ( hit_color, vec3 ( 0, 0, 0 ), clamp ( depth_delta, 0, depth_threshold ) * 1.f / depth_threshold );
-            hit_color = clamp ( hit_color, vec3(0), vec3(1) );
             sample_color = hit_color;
             vec3 hit_view_pos = view_from_screen ( hit_screen_pos );
             hit_distance = length ( hit_view_pos - view_pos );
