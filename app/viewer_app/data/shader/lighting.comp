@@ -89,16 +89,10 @@ vec2 sample_brdf ( vec3 n, vec3 v, float roughness ) {
 }
 
 float shadow_gather ( vec2 uv, float z ) {
-#if 1
     vec4 depths = textureGather ( sampler2D ( tex_shadows, sampler_linear ), uv );
     vec4 compare = vec4 ( z );
     vec4 test = step ( depths, compare );
     return dot ( test, vec4 ( 1 ) );
-#else
-    float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_linear ), uv ).x;
-    float shadow_contribution = z > shadow_depth ? 1.f : 0.f;
-    return shadow_contribution;
-#endif
 }
 
 // fresnel (F)
@@ -236,55 +230,20 @@ void main ( void ) {
                 }
 
                 float texel_size = ( 1.f / uniform_buffer.shadow_size );
-        #if 0
+                float shadow_bias = 0.00001;
+                vec2 shadow_uv_min = light.shadow_tile.xy + vec2 ( 1 );
+                vec2 shadow_uv_max = light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 );
+
                 int pcf_radius = 2;
-                for ( int dx = -pcf_radius; dx <= pcf_radius; dx += 1 ) {
-                    for ( int dy = -pcf_radius; dy <= pcf_radius; dy += 1 ) {
+                for ( int dx = -pcf_radius; dx < pcf_radius; dx += 2 ) {
+                    for ( int dy = -pcf_radius; dy < pcf_radius; dy += 2 ) {
                         vec2 shadow_uv = shadow_texel + vec2 ( dx, dy );
-                        //shadow_uv = shadow_uv - fract ( shadow_uv );
-                        //shadow_uv += vec2 ( 0.5 );
-                        shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 0.5 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 0.5 ) );
-                        shadow_uv *= ( 1.f / uniform_buffer.shadow_size );
-                        float shadow_depth = texture ( sampler2D ( tex_shadows, sampler_linear ), shadow_uv ).x;
-
-                        float shadow_bias = 0.00002;
-                        float shadow_contribution = shadow_screen.z - shadow_bias > shadow_depth ? 1.f : 0.f;
-
-                        if ( shadow_screen.z > 1.f ) {
-                            shadow_contribution = 0;
-                        }
-
-                        shadow += shadow_contribution;
+                        shadow_uv = clamp ( shadow_uv, shadow_uv_min, shadow_uv_max );
+                        shadow_uv *= texel_size;
+                        shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
                     }
                 }
-
-                shadow /= ( pcf_radius * 2 + 1 ) * ( pcf_radius * 2 + 1 );
-
-        #else
-                float shadow_bias = 0.00001;
-
-                vec2 shadow_uv = shadow_texel + vec2 (-1.0, -1.0 );
-                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-                shadow_uv *= texel_size;
-                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-                
-                shadow_uv = ( shadow_texel + vec2 ( +1.0, -1.0 ) );
-                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-                shadow_uv *= texel_size;
-                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-                
-                shadow_uv = ( shadow_texel + vec2 ( -1.0, +1.0 ) );
-                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-                shadow_uv *= texel_size;
-                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-                
-                shadow_uv = ( shadow_texel + vec2 ( +1.0, +1.0 ) );
-                shadow_uv = clamp ( shadow_uv, light.shadow_tile.xy + vec2 ( 1 ), light.shadow_tile.xy + vec2 ( light.shadow_tile.z, light.shadow_tile.z ) - vec2 ( 1 ) );
-                shadow_uv *= texel_size;
-                shadow += shadow_gather ( shadow_uv, shadow_screen.z - shadow_bias );
-
-                shadow /= 16.0;
-        #endif
+                shadow /= ( pcf_radius * 2 ) * ( pcf_radius * 2 );
 
                 float light_visibility = ( 1.f - shadow );
 
