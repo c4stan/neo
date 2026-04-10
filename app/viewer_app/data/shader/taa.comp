@@ -43,7 +43,7 @@ void main ( void ) {
     vec2 screen_offset = prev_screen.xy - screen_uv;
     vec2 reprojected_uv = screen_uv + screen_offset;
 #else
-    vec2 reprojected_uv = screen_uv - velocity;
+    vec2 reprojected_uv = dejitter_uv ( screen_uv ) - velocity;
 #endif
 
 #if 1

@@ -1599,7 +1599,6 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_texture_dependency_m ( .texture = color_texture ),
                 xf_compute_texture_dependency_m ( .texture = normal_texture ),
                 xf_compute_texture_dependency_m ( .texture = material_texture ),
-                //xf_compute_texture_dependency_m ( .texture = radiosity_texture ),
                 xf_compute_texture_dependency_m ( .texture = depth_texture ),
                 xf_compute_texture_dependency_m ( .texture = shadow_texture ),
                 xf_compute_texture_dependency_m ( 
@@ -1614,7 +1613,11 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) ) },
+            .storage_texture_writes = { xf_texture_passthrough_m ( 
+                .mode = xf_passthrough_mode_copy_m, 
+                .copy_source = xf_copy_texture_dependency_m ( .texture = color_texture ) 
+            ) 
+        },
         ),
     ) );
 

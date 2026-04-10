@@ -83,29 +83,23 @@
 #include <std_log.h>
 #include <std_allocator.h>
 
-// Returns a pointer to the specified module api. Modules are ref counted.
 // TODO give a way to preload all modules at boot time and never unload
+// TODO automatically unload all loaded modules in the right order inside std_shutdown
 void* std_module_get ( const char* module_name );
-#define std_module_get_m( name ) ( std_pp_eval_concat_m( name, _i* ) ) std_module_get ( std_pp_eval_string_m( name ) )
-
-// Decreases the refcount of the module that owns the specified api. When refcount reaches 0 the module DLL gets unloaded.
-//void std_module_release ( void* api );
-
-// TODO: automatically unload all loaded modules in the right order inside std_shutdown
-void* std_module_load ( const char* name );
-void std_module_unload ( const char* name );
-//void std_module_unload ( const char* name );
-#define std_module_load_m( name ) ( std_pp_eval_concat_m ( name, _i* ) ) std_module_load ( std_pp_eval_string_m ( name ) )
-#define std_module_unload_m( name ) std_module_unload ( std_pp_eval_string_m( name ) )
+void* std_module_load ( const char* module_name );
+void std_module_unload ( const char* module_name );
 
 // Unloads a module DLL, recompiles the module code by running neo on it, and loads the new DLL.
 // The new api is loaded in place of the old one (same memory), so all pointers to the module api remain valid.
 // The caller must ensure that calls to the module api functions don't happen until the reload is done
 // https://handmade.network/forums/t/6984-hotloaded_application_dll_drawbacks
 void std_module_reload ( const char* build_target );
+
+#define std_module_get_m( name ) ( std_pp_eval_concat_m( name, _i* ) ) std_module_get ( std_pp_eval_string_m( name ) )
+#define std_module_load_m( name ) ( std_pp_eval_concat_m ( name, _i* ) ) std_module_load ( std_pp_eval_string_m ( name ) )
+#define std_module_unload_m( name ) std_module_unload ( std_pp_eval_string_m( name ) )
 #define std_module_reload_m() std_module_reload ( std_pp_eval_string_m ( std_module_name_m ) )
 
-size_t std_module_build ( const char* build_target, void* output, size_t output_size );
 void* std_module_reboot ( const char* solution_name );
 
 // Implemented in std_state.c

@@ -17,7 +17,6 @@ typedef enum {
 typedef struct {
     net_socket_params_t params;
     net_socket_address_t address;
-    //char address_string[net_address_string_size_m];
 #if defined std_platform_win32_m
     SOCKET os_handle;
 #elif defined std_platform_linux_m

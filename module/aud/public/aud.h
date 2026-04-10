@@ -55,6 +55,8 @@ typedef struct {
     uint64_t sample_count;
     double time_played; // seconds
     double total_time;  // seconds
+    uint64_t frames_played;
+    uint64_t total_frames;
 } aud_source_info_t;
 
 typedef struct {

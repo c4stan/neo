@@ -765,43 +765,44 @@ static bool onda_client_stream_source ( aud_source_h source, char* label, onda_c
         aud_source_info_t source_info;
         aud->get_source_info ( &source_info, source );
         float total_duration = source_info.total_time;
-        float bar_tick = total_duration * 1000.f / 60.f;
 
         aud->update_device_ring ( onda_state->client.device );
         uint64_t ring_count = std_ring_count ( device_ring );
 
+        uint32_t bar_size = 60;
+        float bar_tick_duration = total_duration * 1000.f / bar_size;
         {
             char bar[100] = { 0 };
             size_t i = 0;
 
             bar[i++] = '[';
 
-            uint64_t ms = ( uint64_t ) ( source_info.time_played * 1000.f );
+            uint64_t time_played_ms = ( uint64_t ) ( source_info.time_played * 1000.f );
 
-            while ( ms > bar_tick && i < 60 ) {
+            while ( time_played_ms > bar_tick_duration && i < bar_size ) {
                 bar[i++] = '=';
-                ms -= bar_tick;
+                time_played_ms -= bar_tick_duration;
             }
 
-            uint64_t streamed_ms = ( uint64_t ) ( ( float ) stream_state->read_size / stream_state->total_size * total_duration * 1000.f );
+            uint64_t streamed_ticks = ( float ) stream_state->read_size / stream_state->total_size * bar_size;
 
-            while ( streamed_ms > bar_tick && i < 60 ) {
+            while ( i < streamed_ticks && i < bar_size ) {
                 bar[i++] = '-';
-                streamed_ms -= bar_tick;
             }
 
-            while ( i < 60 ) {
+            while ( i < bar_size ) {
                 bar[i++] = ' ';
             }
 
             bar[i++] = ']';
 
-            std_log_m ( std_log_level_custom_m, std_fmt_clear_m std_fmt_clear_m std_fmt_str_m "\n" std_fmt_str_m " " std_fmt_u64_pad_m(2) "/" std_fmt_u64_m " | " std_fmt_f32_dec_m(2) "\n", 
+            std_log_m ( std_log_level_custom_m, 
+                std_fmt_clear_m std_fmt_clear_m std_fmt_str_m "\n" std_fmt_str_m " " std_fmt_u64_pad_m(2) "/" std_fmt_u64_m " | " std_fmt_f32_dec_m(2) "\n", 
                 label, bar, ring_count, ring_capacity, onda_state->client.volume );
         }
 
         // output
-        if ( source_info.time_played < total_duration ) {
+        if ( source_info.frames_played < source_info.total_frames ) {
             if ( ring_count < ring_capacity && !stream_state->paused ) {
                 aud->output_to_device ( onda_state->client.device, step_ms );
             }

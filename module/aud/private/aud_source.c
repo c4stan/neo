@@ -28,7 +28,7 @@ void aud_source_unload ( void ) {
     std_virtual_heap_free ( aud_source_state->sources_array );
     std_virtual_heap_free ( aud_source_state->sources_bitset );
 
-    std_mutex_deinit ( &state->sources_mutex );
+    std_mutex_deinit ( &aud_source_state->sources_mutex );
 }
 
 aud_source_h aud_source_create ( const aud_source_params_t* params ) {
@@ -42,6 +42,8 @@ aud_source_h aud_source_create ( const aud_source_params_t* params ) {
     source->volume = 1;
     source->active_idx = UINT64_MAX;
     source->total_time = ( double ) params->sample_count / ( params->sample_frequency * params->channel_count );
+    source->frames_played = 0;
+    source->total_frames = params->sample_count / params->channel_count;
 
     aud_source_h handle = ( aud_source_h ) ( source - aud_source_state->sources_array );
     std_bitset_set ( aud_source_state->sources_bitset, handle );
@@ -121,22 +123,26 @@ bool aud_source_get_info ( aud_source_info_t* info, aud_source_h source_handle )
     info->sample_count = source->params.sample_count;
     info->time_played = source->time_played;
     info->total_time = source->total_time;
+    info->frames_played = source->frames_played;
+    info->total_frames = source->total_frames;
 
     return true;
 }
 
 void aud_source_skip ( aud_source_h source_handle, float seconds ) {
     aud_source_t* source = &aud_source_state->sources_array[source_handle];
-    double time = source->time_played; 
-    time += seconds;
-    if ( time < 0 ) {
-        time = 0;
+    int64_t frame_count = ( int64_t ) ( seconds * source->params.sample_frequency );
+    int64_t frames_played = source->frames_played;
+    frames_played += frame_count;
+    if ( frames_played < 0 ) {
+        frames_played = 0;
     }
-    double total_time = source->total_time;
-    if ( time > total_time ) {
-        time = total_time;
+    uint64_t total_frames = source->total_frames;
+    if ( frames_played > total_frames ) {
+        frames_played = total_frames;
     }
-    source->time_played = time;
+    source->frames_played = frames_played;
+    source->time_played = ( uint64_t ) frames_played / source->params.sample_frequency;
 }
 
 void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
@@ -220,6 +226,7 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
         }
 
 next_source:
+        source->frames_played += frame_count;
         source->time_played += seconds;
     }
 

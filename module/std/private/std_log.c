@@ -313,16 +313,20 @@ void std_log_print ( std_log_msg_t msg, ... ) {
         return;
     }
 
-    // TODO avoid limit?
-    char buffer[2048];
-
-    va_list args;
+    va_list args, copy;
     va_start ( args, msg );
-    int len = vsprintf ( buffer, msg.payload, args );
+    
+    va_copy ( copy, args );
+    int len = vsnprintf ( NULL, 0, msg.payload, args );
+    va_end ( copy );
+
+    size_t buffer_size = len + 2;
+    char* buffer = std_virtual_heap_alloc_array_m ( char, buffer_size );
+
+    vsnprintf ( buffer, buffer_size, msg.payload, args );
     va_end ( args );
 
     if ( ( ( 1 << msg.level ) & std_log_level_bit_custom_m ) == 0 ) {
-        // TODO check for overflow
         if ( buffer[len-1] != '\n' ) buffer[len++] = '\n';
         buffer[len++] = '\0';
     }
@@ -331,6 +335,7 @@ void std_log_print ( std_log_msg_t msg, ... ) {
     formatted_msg.payload = buffer;
 
     std_log_state->log_callback ( &formatted_msg );
+    std_virtual_heap_free ( buffer );
 }
 
 void std_log_flush() {

@@ -7,8 +7,9 @@
 typedef struct {
     aud_source_params_t params;
     std_stack_t stack;
-    //std_virtual_buffer_t buffer;
     uint64_t active_idx;
+    uint64_t total_frames;
+    uint64_t frames_played;
     double time_played; // seconds
     double total_time;  // seconds
     float volume;

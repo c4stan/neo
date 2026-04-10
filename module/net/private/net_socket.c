@@ -5,8 +5,6 @@
 #include <std_log.h>
 #include <std_list.h>
 
-static net_socket_state_t* net_socket_state;
-
 /*
     https://www.tenouk.com/Winsock/Winsock2story.html
 
@@ -50,6 +48,8 @@ static void net_socket_address_ip6_from_winsock ( net_socket_address_t* address,
 
 // --
 
+static net_socket_state_t* net_socket_state;
+
 void net_socket_load ( net_socket_state_t* state ) {
     state->sockets_array = std_virtual_heap_alloc_array_m ( net_socket_t, net_socket_max_sockets_m );
     state->sockets_freelist = std_freelist_m ( state->sockets_array, net_socket_max_sockets_m );
@@ -62,6 +62,7 @@ void net_socket_reload ( net_socket_state_t* state ) {
 }
 
 void net_socket_unload ( void ) {
+    std_mutex_deinit ( &net_socket_state->sockets_mutex );
     std_virtual_heap_free ( net_socket_state->sockets_array );
 }
 
