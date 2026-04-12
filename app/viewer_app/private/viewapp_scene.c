@@ -1192,7 +1192,7 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
 
     unsigned int flags = 0;
     flags |= aiProcess_MakeLeftHanded;
-    flags |= aiProcess_FlipWindingOrder;
+    //flags |= aiProcess_FlipWindingOrder;
     flags |= aiProcess_FlipUVs;
     flags |= aiProcess_JoinIdenticalVertices;
     flags |= aiProcess_Triangulate;

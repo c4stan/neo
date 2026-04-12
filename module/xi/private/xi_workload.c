@@ -297,12 +297,12 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[1] = rect->color.g / 255.f;
             vertex->color[2] = rect->color.b / 255.f;
             vertex->color[3] = rect->color.a / 255.f;
-            // top right
+            // bottom left
             vertex = &vertex_buffer_data[i * 6 + 1];
-            vertex->pos[0] = ( ( rect->x + rect->width ) / viewport_w ) * 2 - 1;
-            vertex->pos[1] = ( 1 - ( rect->y / viewport_h ) ) * 2 - 1;
-            vertex->uv[0] = rect->uv1[0];
-            vertex->uv[1] = rect->uv0[1];
+            vertex->pos[0] = ( rect->x / viewport_w ) * 2 - 1;
+            vertex->pos[1] = ( 1 - ( ( rect->y + rect->height ) / viewport_h ) ) * 2 - 1;
+            vertex->uv[0] = rect->uv0[0];
+            vertex->uv[1] = rect->uv1[1];
             vertex->color[0] = rect->color.r / 255.f;
             vertex->color[1] = rect->color.g / 255.f;
             vertex->color[2] = rect->color.b / 255.f;
@@ -320,12 +320,12 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             // bottom right
             vertex = &vertex_buffer_data[i * 6 + 3];
             *vertex = vertex_buffer_data[i * 6 + 2];
-            // bottom left
+            // top right
             vertex = &vertex_buffer_data[i * 6 + 4];
-            vertex->pos[0] = ( rect->x / viewport_w ) * 2 - 1;
-            vertex->pos[1] = ( 1 - ( ( rect->y + rect->height ) / viewport_h ) ) * 2 - 1;
-            vertex->uv[0] = rect->uv0[0];
-            vertex->uv[1] = rect->uv1[1];
+            vertex->pos[0] = ( ( rect->x + rect->width ) / viewport_w ) * 2 - 1;
+            vertex->pos[1] = ( 1 - ( rect->y / viewport_h ) ) * 2 - 1;
+            vertex->uv[0] = rect->uv1[0];
+            vertex->uv[1] = rect->uv0[1];
             vertex->color[0] = rect->color.r / 255.f;
             vertex->color[1] = rect->color.g / 255.f;
             vertex->color[2] = rect->color.b / 255.f;
@@ -354,20 +354,20 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
             vertex->color[3] = tri->color.a / 255.f;
 
             vertex = &vertex_buffer_data[tri_base + i * 3 + 1];
-            vertex->pos[0] = ( tri->xy1[0] / viewport_w ) * 2 - 1;
-            vertex->pos[1] = ( 1 - tri->xy1[1] / viewport_h ) * 2 - 1;
-            vertex->uv[0] = tri->uv1[0];
-            vertex->uv[1] = tri->uv1[1];
+            vertex->pos[0] = ( tri->xy2[0] / viewport_w ) * 2 - 1;
+            vertex->pos[1] = ( 1 - tri->xy2[1] / viewport_h ) * 2 - 1;
+            vertex->uv[0] = tri->uv2[0];
+            vertex->uv[1] = tri->uv2[1];
             vertex->color[0] = tri->color.r / 255.f;
             vertex->color[1] = tri->color.g / 255.f;
             vertex->color[2] = tri->color.b / 255.f;
             vertex->color[3] = tri->color.a / 255.f;
 
             vertex = &vertex_buffer_data[tri_base + i * 3 + 2];
-            vertex->pos[0] = ( tri->xy2[0] / viewport_w ) * 2 - 1;
-            vertex->pos[1] = ( 1 - tri->xy2[1] / viewport_h ) * 2 - 1;
-            vertex->uv[0] = tri->uv2[0];
-            vertex->uv[1] = tri->uv2[1];
+            vertex->pos[0] = ( tri->xy1[0] / viewport_w ) * 2 - 1;
+            vertex->pos[1] = ( 1 - tri->xy1[1] / viewport_h ) * 2 - 1;
+            vertex->uv[0] = tri->uv1[0];
+            vertex->uv[1] = tri->uv1[1];
             vertex->color[0] = tri->color.r / 255.f;
             vertex->color[1] = tri->color.g / 255.f;
             vertex->color[2] = tri->color.b / 255.f;

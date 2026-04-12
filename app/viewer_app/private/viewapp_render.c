@@ -1383,9 +1383,9 @@ static void viewapp_boot_raster_graph ( void ) {
         .debug_name = "tessellation_ibuffer"
     ) );
     float tess_instance_vertex_data[6] = {
-        0, 0,
-        0, 1,
-        1, 0,
+        0, 0,   // bottom left    |\
+        1, 0,   // bottom right   | \
+        0, 1,   // top left       |__\
     };
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( tess_workload );
     xg_buffer_h tess_instance_vertex_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (

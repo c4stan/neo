@@ -5,10 +5,6 @@
 
 #extension GL_EXT_debug_printf : enable
 
-//
-// GPU Zen 2 - Adaptive GPU Tessellation with Compute Shaders
-//
-
 layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) buffer readonly culled_subdivision_buffer_t {
     uint count;
     uint _pad0[3];

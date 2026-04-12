@@ -6,5 +6,5 @@ end
 
 begin rasterizer
     cull back
-    front clockwise
+    front counterclockwise
 end

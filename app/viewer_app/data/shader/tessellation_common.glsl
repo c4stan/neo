@@ -1,6 +1,6 @@
-////
 //
 // https://mrl.cs.nyu.edu/~perlin/noise/
+//
 float perlin_fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 float perlin_lerp(float t, float a, float b) { return mix(a, b, t); /*a + t * (b - a);*/ }
 float perlin_grad(int hash, float x, float y, float z) {
@@ -64,5 +64,96 @@ float field_height ( float x, float z ) {
     float height_scale = 10.f;
     return perlin_noise ( x * param_scale, 0, z * param_scale ) * height_scale;
 }
+
 //
-////
+// GPU Zen 2 - Adaptive GPU Tessellation with Compute Shaders
+//
+//  Main changes from the original:
+//      - bit_to_xform winding order
+//          the original author bit_to_xform implementation seems wrong? it flips the winding order every other lod level.
+//          current implementation uses re-derived barycentric-space xform matrix values that avoid doing that. 
+//      - update_subdivision logic
+//          the original subdivision logic causes split-merge cycles (flickering) and merge disagreeing siblings (missing triangles/flickering).
+//          current implementation computes and uses parent_target_lod to stabilize the update and avoid those issues, while also not introducing t-junction issues.
+//
+
+/*
+    Barycentric space:
+      0,1                                
+        |\                   |\          
+        | \                  | \ <- 0.5, 0.5         
+        |__\ 1,0             |/_\    
+      0,0                             
+
+    Barycentric space mapping for zero-key child (S0):
+    | a  b  0.5 |   | 0 |   | 0.5 |
+    | c  d  0.5 | * | 0 | = | 0.5 |
+    | 0  0   1  |   | 1 |   |  1  |
+
+    | a  b  0.5 |   | 1 |   |  0  |
+    | c  d  0.5 | * | 0 | = |  1  |
+    | 0  0   1  |   | 1 |   |  1  |
+
+    | a  b  0.5 |   | 0 |   |  0  |
+    | c  d  0.5 | * | 1 | = |  0  |
+    | 0  0   1  |   | 1 |   |  1  |
+
+    Barycentric space mapping for one-key child (S1):
+    | a  b  0.5 |   | 0 |   | 0.5 |
+    | c  d  0.5 | * | 0 | = | 0.5 |
+    | 0  0   1  |   | 1 |   |  1  |
+
+    | a  b  0.5 |   | 1 |   |  0  |
+    | c  d  0.5 | * | 0 | = |  0  |
+    | 0  0   1  |   | 1 |   |  1  |
+
+    | a  b  0.5 |   | 0 |   |  1  |
+    | c  d  0.5 | * | 1 | = |  0  |
+    | 0  0   1  |   | 1 |   |  1  |
+
+    Solve for a,b,c,d and obrain the following xform matrix.
+*/
+mat3 bit_to_xform ( uint bit ) {
+#if 1
+    float s = float ( bit );
+    vec3 c1 = vec3 ( -0.5, -0.5 + s, 0 ); 
+    vec3 c2 = vec3 ( 0.5 - s, -0.5, 0 ); 
+    vec3 c3 = vec3 (  0.5,  0.5, 1 );
+    return mat3 ( c1, c2, c3 );
+#else
+    float s = float ( bit ) - 0.5;
+    vec3 c1 = vec3 (    s, -0.5, 0 ); 
+    vec3 c2 = vec3 ( -0.5,   -s, 0 ); 
+    vec3 c3 = vec3 (  0.5,  0.5, 1 );
+    return mat3 ( c1, c2, c3 );
+#endif
+}
+
+mat3 key_to_xform ( uint key ) {
+    mat3 xform = mat3 ( 1.0 );
+    
+    while ( key > 1 ) {
+        xform = bit_to_xform ( key & 1 ) * xform;
+        key = key >> 1;
+    }
+
+    return xform;
+}
+
+vec3 berp ( vec3 v[3], vec2 u ) {
+    return v[0] + u.x * ( v[1] - v[0] ) + u.y * ( v[2] - v[0] );
+}
+
+void build_key_verts ( uint key, vec3 prim_verts[3], out vec3 out_verts[3] ) {
+    mat3 xform = key_to_xform ( key );
+
+    // transform barycentric-space vertices
+    vec2 u1 = ( xform * vec3 ( 0, 0, 1 ) ).xy;  // bottom left    |\ 
+    vec2 u2 = ( xform * vec3 ( 1, 0, 1 ) ).xy;  // bottom right   | \  
+    vec2 u3 = ( xform * vec3 ( 0, 1, 1 ) ).xy;  // top left       |__\ 
+
+    // Baricentric interpolate the primitive vertices at the new barycentric space coordinates for the transformed vertices
+    out_verts[0] = berp ( prim_verts, u1 );
+    out_verts[1] = berp ( prim_verts, u2 );
+    out_verts[2] = berp ( prim_verts, u3 );
+}

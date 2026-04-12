@@ -8,10 +8,6 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_debug_printf : enable
 
-//
-// GPU Zen 2 - Adaptive GPU Tessellation with Compute Shaders
-//
-
 struct vertex_t {
     float pos[3];
 };
@@ -42,41 +38,6 @@ layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) buffer culled_sub
     uvec2 data[];
 } culled_subdivision_buffer;
 
-mat3 bit_to_xform ( uint bit ) {
-    float s = float ( bit ) - 0.5;
-    vec3 c1 = vec3 ( -0.5,   -s, 0 ); 
-    vec3 c2 = vec3 (    s, -0.5, 0 ); 
-    vec3 c3 = vec3 (  0.5,  0.5, 1 );
-    return mat3 ( c1, c2, c3 );
-}
-
-mat3 key_to_xform ( uint key ) {
-    mat3 xform = mat3 ( 1.0 );
-    
-    while ( key > 1 ) {
-        xform = bit_to_xform ( key & 1 ) * xform;
-        key = key >> 1;
-    }
-
-    return xform;
-}
-
-vec3 berp ( vec3 v[3], vec2 u ) {
-    return v[0] + u.x * ( v[1] - v[0] ) + u.y * ( v[2] - v[0] );
-}
-
-void build_key_verts ( uint key, vec3 prim_verts[3], out vec3 out_verts[3] ) {
-    mat3 xform = key_to_xform ( key );
-
-    vec2 u1 = ( xform * vec3 ( 0, 0, 1 ) ).xy;
-    vec2 u2 = ( xform * vec3 ( 0, 1, 1 ) ).xy;
-    vec2 u3 = ( xform * vec3 ( 1, 0, 1 ) ).xy;
-
-    out_verts[0] = berp ( prim_verts, u1 );
-    out_verts[1] = berp ( prim_verts, u2 );
-    out_verts[2] = berp ( prim_verts, u3 );
-}
-
 vec3 load_vec3 ( float[3] f32 ) {
     return vec3 ( f32[0], f32[1], f32[2] );
 }
@@ -94,11 +55,12 @@ void build_prim_verts ( uint prim_id, out vec3 out_verts[3] ) {
 }
 
 float compute_lod ( vec2 subdivision, float distance_to_camera, float prim_world_size ) {
+#if 1
     // image plane size at given distance
     float img_plane_size = 2 * tan ( frame_uniforms.fov_y / 2 ) * distance_to_camera;
     // how many pixels per unit size at given distance
     float screen_scale = frame_uniforms.resolution_f32.y / img_plane_size;
-    //float prim_world_size = 10.0;
+    prim_world_size = 10.0;
     // pixel size of primitive triangle side    
     float prim_pixel_size = prim_world_size * screen_scale;
     float target_pixel_size = 10.0;
@@ -107,6 +69,11 @@ float compute_lod ( vec2 subdivision, float distance_to_camera, float prim_world
     float lod = -log2 ( s ) * 2;
     lod = clamp ( lod, 0, 30 );
     return lod;
+#else
+    float lod = ( distance_to_camera * 0.002 );
+    lod = clamp ( lod, 0.0, 1.0 ) ;
+    return - 2.0 * log2 ( lod );
+#endif
 }
 
 bool is_leaf_key ( uint key ) {
@@ -213,7 +180,7 @@ void write_subdivision ( uvec2 subdivision ) {
     }
 }
 
-void update_subdivision ( uvec2 subdivision, int target_lod ) {
+void update_subdivision ( uvec2 subdivision, int target_lod, int parent_target_lod ) {
     uint key = subdivision.x;
     int key_lod = findMSB ( key );
 
@@ -223,7 +190,7 @@ void update_subdivision ( uvec2 subdivision, int target_lod ) {
         uvec2 children_keys = make_children_keys ( key );
         write_subdivision ( uvec2 ( children_keys.x, prim_id ) );
         write_subdivision ( uvec2 ( children_keys.y, prim_id ) );
-    } else if ( key_lod == target_lod ) {
+    } else if ( key_lod <= parent_target_lod ) {
         // keep
         write_subdivision ( uvec2 ( key, prim_id ) );
     } else {
@@ -251,14 +218,35 @@ void main ( void ) {
     vec3 prim_verts[3];
     build_prim_verts ( prim_id, prim_verts );
 
-    //uint key = subdivision.x;
-    //vec3 key_verts[3];
-    //build_key_verts ( key, prim_verts, key_verts );
-
-    // TODO
-    //  ref impl uses key_verts instead of prim_verts here, which is right? 
+#if 0
     float distance_to_camera = distance ( ( prim_verts[1] + prim_verts[2] ) / 2.0, frame_uniforms.cam_world_pos );
     int target_lod = int ( compute_lod ( subdivision, distance_to_camera, distance ( prim_verts[0], prim_verts[1] ) ) );
-
     update_subdivision ( subdivision, target_lod );
+#else
+    // subdivision
+    uint key = subdivision.x;
+    vec3 key_verts[3];
+    build_key_verts ( key, prim_verts, key_verts );
+
+    key_verts[0].y = field_height ( key_verts[0].x, key_verts[0].z );
+    key_verts[1].y = field_height ( key_verts[1].x, key_verts[1].z );
+    key_verts[2].y = field_height ( key_verts[2].x, key_verts[2].z );
+
+    float distance_to_camera = distance ( ( key_verts[1] + key_verts[2] ) / 2.0, frame_uniforms.cam_world_pos );
+    int target_lod = int ( compute_lod ( subdivision, distance_to_camera, distance ( key_verts[0], key_verts[1] ) ) );
+    
+    // parent
+    uint parent_key = make_parent_key ( key );
+    vec3 parent_key_verts[3];
+    build_key_verts ( parent_key, prim_verts, parent_key_verts );
+
+    parent_key_verts[0].y = field_height ( parent_key_verts[0].x, parent_key_verts[0].z );
+    parent_key_verts[1].y = field_height ( parent_key_verts[1].x, parent_key_verts[1].z );
+    parent_key_verts[2].y = field_height ( parent_key_verts[2].x, parent_key_verts[2].z );
+
+    float parent_distance_to_camera = distance ( ( parent_key_verts[1] + parent_key_verts[2] ) / 2.0, frame_uniforms.cam_world_pos );
+    int parent_target_lod = int ( compute_lod ( subdivision, parent_distance_to_camera, distance ( parent_key_verts[0], parent_key_verts[1] ) ) );
+
+    update_subdivision ( subdivision, target_lod, parent_target_lod );
+#endif
 }

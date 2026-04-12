@@ -9,6 +9,11 @@ begin scissor
     dynamic on
 end
 
+begin rasterizer
+    cull back
+    front counterclockwise
+end
+
 begin render_target 0
     blend on
     blend_color_op add

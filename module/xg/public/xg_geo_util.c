@@ -59,9 +59,9 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
                 uint32_t i2 = k2;
                 uint32_t i3 = k1 + 1;
 
-                idx[idx_count++] = i3;
-                idx[idx_count++] = i2;
                 idx[idx_count++] = i1;
+                idx[idx_count++] = i2;
+                idx[idx_count++] = i3;
             }
 
             if ( i != parallels_count - 1 ) {
@@ -69,9 +69,9 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_sphere ( float rad, uint32_t me
                 uint32_t i2 = k2;
                 uint32_t i3 = k2 + 1;
 
-                idx[idx_count++] = i3;
-                idx[idx_count++] = i2;
                 idx[idx_count++] = i1;
+                idx[idx_count++] = i2;
+                idx[idx_count++] = i3;
             }
         }
     }
@@ -239,12 +239,12 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_plane ( float side ) {
 
     // TODO uv
     STORE_VERTEX ( -h, 0, -h, 0, 0 );
+    STORE_VERTEX (  h, 0, -h, 0, 0 );
     STORE_VERTEX ( -h, 0,  h, 0, 0 );
-    STORE_VERTEX (  h, 0,  h, 0, 0 );
 
     STORE_VERTEX (  h, 0,  h, 0, 0 );
+    STORE_VERTEX ( -h, 0,  h, 0, 0 );
     STORE_VERTEX (  h, 0, -h, 0, 0 );
-    STORE_VERTEX ( -h, 0, -h, 0, 0 );
 
 #undef STORE_POS
 #undef STORE_NOR
@@ -338,12 +338,12 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_grid ( uint32_t x_cells, uint32
             uint32_t i3 = (z + 1) * x_cells + (x + 1);
 
             STORE_IDX ( i0 );
-            STORE_IDX ( i2 );
             STORE_IDX ( i1 );
+            STORE_IDX ( i2 );
 
             STORE_IDX ( i3 );
-            STORE_IDX ( i1 );
             STORE_IDX ( i2 );
+            STORE_IDX ( i1 );
         }
     }
 
@@ -401,57 +401,57 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_cube ( float side ) {
 
     // FRONT (+Z)
     STORE_VERTEX(-h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
-    STORE_VERTEX( h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
     STORE_VERTEX( h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+    STORE_VERTEX( h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
 
     STORE_VERTEX( h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
-    STORE_VERTEX(-h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
     STORE_VERTEX(-h, -h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
+    STORE_VERTEX(-h,  h,  h, 0, 0, 1, 1, 0, 0, 0, 1, 0);
 
     // BACK (-Z)
     STORE_VERTEX( h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
-    STORE_VERTEX(-h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
     STORE_VERTEX(-h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+    STORE_VERTEX(-h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
 
     STORE_VERTEX(-h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
-    STORE_VERTEX( h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
     STORE_VERTEX( h, -h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
+    STORE_VERTEX( h,  h, -h, 0, 0,-1,-1, 0, 0, 0, 1, 0);
 
     // LEFT (-X)
     STORE_VERTEX(-h, -h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
-    STORE_VERTEX(-h, -h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
     STORE_VERTEX(-h,  h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+    STORE_VERTEX(-h, -h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
 
     STORE_VERTEX(-h,  h,  h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
-    STORE_VERTEX(-h,  h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
     STORE_VERTEX(-h, -h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
+    STORE_VERTEX(-h,  h, -h,-1, 0, 0, 0, 0,-1, 0, 1, 0);
 
     // RIGHT (+X)
     STORE_VERTEX( h, -h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
-    STORE_VERTEX( h, -h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
     STORE_VERTEX( h,  h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+    STORE_VERTEX( h, -h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
 
     STORE_VERTEX( h,  h, -h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
-    STORE_VERTEX( h,  h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
     STORE_VERTEX( h, -h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
+    STORE_VERTEX( h,  h,  h, 1, 0, 0, 0, 0, 1, 0, 1, 0);
 
     // TOP (+Y)
     STORE_VERTEX(-h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
-    STORE_VERTEX( h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
     STORE_VERTEX( h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+    STORE_VERTEX( h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
 
     STORE_VERTEX( h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
-    STORE_VERTEX(-h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
     STORE_VERTEX(-h,  h,  h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
+    STORE_VERTEX(-h,  h, -h, 0, 1, 0, 1, 0, 0, 0, 0,-1);
 
     // BOTTOM (-Y)
     STORE_VERTEX(-h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
-    STORE_VERTEX( h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
     STORE_VERTEX( h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+    STORE_VERTEX( h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
 
     STORE_VERTEX( h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
-    STORE_VERTEX(-h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
     STORE_VERTEX(-h, -h, -h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
+    STORE_VERTEX(-h, -h,  h, 0,-1, 0, 1, 0, 0, 0, 0, 1);
 
 #undef STORE_POS
 #undef STORE_NOR

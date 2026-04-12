@@ -9,6 +9,11 @@ fragment_shader xi_font_atlas.frag
 //    define outline 1
 //end
 
+begin rasterizer
+    cull back
+    front counterclockwise
+end
+
 begin viewport
     width 512
     height 512
