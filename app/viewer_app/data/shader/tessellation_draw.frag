@@ -32,8 +32,8 @@ vec3 subdivision_color ( void ) {
 
 void main ( void ) {
     vec3 color = subdivision_color();
-    //color = vec3 ( 1, 0, 0 );
-    //color = in_bary;
+    color = vec3 ( 1, 0, 0 );
+    color = in_bary;
     out_color = vec4 ( color, 0 );
     out_nor = vec4 ( 0, 1, 0, 1 );
     out_mat = vec4 ( 0 );

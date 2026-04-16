@@ -488,6 +488,8 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
 
 #undef xg_vk_workload_max_descriptor_writes_per_batch_m
 
+    uint32_t total_update_count = 0;
+
     for ( size_t i = 0; i < workload->resource_cmd_buffers_count; ++i ) {
         xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( workload->resource_cmd_buffers[i] );
         xg_resource_cmd_header_t* cmd_header = ( xg_resource_cmd_header_t* ) cmd_buffer->cmd_headers_allocator.begin;
@@ -495,11 +497,10 @@ void xg_vk_workload_update_resource_groups ( xg_workload_h workload_handle ) {
         size_t cmd_headers_size = std_stack_used_size ( &cmd_buffer->cmd_headers_allocator );
         const xg_resource_cmd_header_t* cmd_headers_end = ( xg_resource_cmd_header_t* ) ( cmd_buffer->cmd_headers_allocator.begin + cmd_headers_size );
 
-        uint32_t c = 0;
         for ( const xg_resource_cmd_header_t* header = cmd_header; header < cmd_headers_end; ++header ) {
-            ++c;
             switch ( header->type ) {
                 case xg_resource_cmd_resource_bindings_update_m: {
+                    ++total_update_count;
                     std_auto_m args = ( xg_resource_cmd_resource_bindings_update_t* ) header->args;
 
                     xg_resource_bindings_h group_handle = args->group;

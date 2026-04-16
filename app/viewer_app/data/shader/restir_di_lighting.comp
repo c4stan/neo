@@ -67,6 +67,7 @@ void main ( void ) {
     vec3 world_geo_pos = ( frame_uniforms.world_from_view * vec4 ( view_geo_pos, 1.f ) ).xyz;
     vec3 world_normal = mat3 ( frame_uniforms.world_from_view ) * view_normal;
 
+    // Compute pixel color
     uint reservoir_idx = gl_GlobalInvocationID.y * frame_uniforms.resolution_u32.x + gl_GlobalInvocationID.x;
     reservoir_t reservoir = reservoir_buffer.data[reservoir_idx];
     light_t light = light_buffer.data[reservoir.light];

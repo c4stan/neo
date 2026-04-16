@@ -60,7 +60,7 @@ float compute_lod ( vec2 subdivision, float distance_to_camera, float prim_world
     float img_plane_size = 2 * tan ( frame_uniforms.fov_y / 2 ) * distance_to_camera;
     // how many pixels per unit size at given distance
     float screen_scale = frame_uniforms.resolution_f32.y / img_plane_size;
-    prim_world_size = 10.0;
+    prim_world_size = 20.0;
     // pixel size of primitive triangle side    
     float prim_pixel_size = prim_world_size * screen_scale;
     float target_pixel_size = 10.0;

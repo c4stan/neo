@@ -147,6 +147,7 @@ void main ( void ) {
     reservoir_t reservoir = reservoir_init();
     
     if ( !proj_depth_is_out ( depth ) ) {
+        // Generate intial candidates via RIS (uniform light sampling)
         for ( uint i = 0; i < light_pool; ++i ) {
             uint light_idx = int ( rng_wang ( rng_state ) * light_pool );
             float p_hat = light_p ( light_idx, world_geo_pos, world_normal, base_color );
@@ -156,6 +157,7 @@ void main ( void ) {
         float p_hat = light_p ( reservoir.light, world_geo_pos, world_normal, base_color );
         update_reservoir_weight ( reservoir, p_hat );
 
+        // Evaluate visibility for initial candidate
         light_t light = light_buffer.data[reservoir.light];
         vec3 light_pos = load_vec3 ( light.pos );
         vec3 light_dir = normalize ( light_pos - world_geo_pos );

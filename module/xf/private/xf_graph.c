@@ -3462,7 +3462,8 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             xg->cmd_bind_queue ( cmd_buffer, sort_key++, &bind_queue_params );
         }
 
-        // if timing enabled
+        xg->cmd_begin_debug_region ( cmd_buffer, sort_key++, node->params.debug_name, node->params.debug_color );
+
         xg->cmd_query_timestamp ( cmd_buffer, sort_key++, &xg_cmd_query_timestamp_params_m (
             .pool = timestamp_query_pool,
             .idx = node_it * 2 + 0,
@@ -3470,7 +3471,6 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
         ) );
 
         if ( node->enabled ) {
-            xg->cmd_begin_debug_region ( cmd_buffer, sort_key++, node->params.debug_name, node->params.debug_color );
             {
                 xg_barrier_set_t barrier_set = xg_barrier_set_m();
                 barrier_set.texture_memory_barriers = texture_barriers;
@@ -3648,17 +3648,13 @@ uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, 
             xg->cmd_barrier_set ( cmd_buffer, sort_key++, &barrier_set );
         }
 
-        // TODO
-        if ( node->enabled ) {
-            xg->cmd_end_debug_region ( cmd_buffer, sort_key++ );
-        }
-
-        // if timing enabled
         xg->cmd_query_timestamp ( cmd_buffer, sort_key++, &xg_cmd_query_timestamp_params_m (
             .pool = timestamp_query_pool,
             .idx = node_it * 2 + 1,
             .stage = xg_pipeline_stage_bit_bottom_of_pipe_m,
         ) );
+
+        xg->cmd_end_debug_region ( cmd_buffer, sort_key++ );
 
         // TODO properly support this
         //      a node writes to a non-external texture once -> the following clear/rebuild causes the texture to be immediately destroyed and made unusable
