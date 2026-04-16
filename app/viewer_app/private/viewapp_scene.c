@@ -290,10 +290,7 @@ void viewapp_build_raytrace_world ( void ) {
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
         viewapp_transform_t* transform_component = se_stream_iterator_next ( &transform_iterator );
 
-        sm_vec_3f_t up = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 1, 0 ) );
-        sm_vec_3f_t dir = sm_quat_transform_f3 ( sm_quat ( transform_component->orientation ), sm_vec_3f_set ( 0, 0, 1 ) );
-        dir = sm_vec_3f_norm ( dir );
-        sm_mat_4x4f_t rot = sm_matrix_4x4f_dir_rotation ( dir, up );
+        sm_mat_4x4f_t rot = sm_quat_to_4x4f ( sm_quat ( transform_component->orientation ) );
         float scale = transform_component->scale;
         sm_mat_4x4f_t trans = {
             .r0[0] = scale,
