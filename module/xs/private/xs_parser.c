@@ -253,6 +253,10 @@ static xg_format_e xs_parser_format_to_enum ( const char* format ) {
 
     if ( std_str_cmp ( format, "R8_UINT" ) == 0 ) {
         return xg_format_r8_uint_m;
+    } else if ( std_str_cmp ( format, "R16_UINT" ) == 0 ) {
+        return xg_format_r16_uint_m;
+    } else if ( std_str_cmp ( format, "R32_UINT" ) == 0 ) {
+        return xg_format_r32_uint_m;
     }
 
     else if ( std_str_cmp ( format, "R16_FLOAT" ) == 0 ) {

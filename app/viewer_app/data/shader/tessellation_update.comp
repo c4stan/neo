@@ -105,9 +105,9 @@ bool cull_subdivision ( uvec2 subdivision ) {
     vec3 key_verts[3];
     build_key_verts ( key, prim_verts, key_verts );
 
-    key_verts[0].y = field_height ( key_verts[0].x, key_verts[0].z );
-    key_verts[1].y = field_height ( key_verts[1].x, key_verts[1].z );
-    key_verts[2].y = field_height ( key_verts[2].x, key_verts[2].z );
+    key_verts[0].y += field_height ( key_verts[0].x, key_verts[0].z );
+    key_verts[1].y += field_height ( key_verts[1].x, key_verts[1].z );
+    key_verts[2].y += field_height ( key_verts[2].x, key_verts[2].z );
 
     // TODO move planes to world space instead?
     key_verts[0] = ( frame_uniforms.view_from_world * vec4 ( key_verts[0], 1 ) ).xyz;
@@ -228,9 +228,9 @@ void main ( void ) {
     vec3 key_verts[3];
     build_key_verts ( key, prim_verts, key_verts );
 
-    key_verts[0].y = field_height ( key_verts[0].x, key_verts[0].z );
-    key_verts[1].y = field_height ( key_verts[1].x, key_verts[1].z );
-    key_verts[2].y = field_height ( key_verts[2].x, key_verts[2].z );
+    key_verts[0].y += field_height ( key_verts[0].x, key_verts[0].z );
+    key_verts[1].y += field_height ( key_verts[1].x, key_verts[1].z );
+    key_verts[2].y += field_height ( key_verts[2].x, key_verts[2].z );
 
     float distance_to_camera = distance ( ( key_verts[1] + key_verts[2] ) / 2.0, frame_uniforms.cam_world_pos );
     int target_lod = int ( compute_lod ( subdivision, distance_to_camera, distance ( key_verts[0], key_verts[1] ) ) );
@@ -240,9 +240,9 @@ void main ( void ) {
     vec3 parent_key_verts[3];
     build_key_verts ( parent_key, prim_verts, parent_key_verts );
 
-    parent_key_verts[0].y = field_height ( parent_key_verts[0].x, parent_key_verts[0].z );
-    parent_key_verts[1].y = field_height ( parent_key_verts[1].x, parent_key_verts[1].z );
-    parent_key_verts[2].y = field_height ( parent_key_verts[2].x, parent_key_verts[2].z );
+    parent_key_verts[0].y += field_height ( parent_key_verts[0].x, parent_key_verts[0].z );
+    parent_key_verts[1].y += field_height ( parent_key_verts[1].x, parent_key_verts[1].z );
+    parent_key_verts[2].y += field_height ( parent_key_verts[2].x, parent_key_verts[2].z );
 
     float parent_distance_to_camera = distance ( ( parent_key_verts[1] + parent_key_verts[2] ) / 2.0, frame_uniforms.cam_world_pos );
     int parent_target_lod = int ( compute_lod ( subdivision, parent_distance_to_camera, distance ( parent_key_verts[0], parent_key_verts[1] ) ) );

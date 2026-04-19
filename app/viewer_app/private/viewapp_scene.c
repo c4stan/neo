@@ -37,9 +37,8 @@ void viewapp_boot_scene ( void ) {
     ) );
 
     se->set_component_properties ( viewapp_light_component_id_m, "Light", &se_component_properties_params_m (
-        .count = 5,
+        .count = 4,
         .properties = {
-            se_field_property_m ( 0, viewapp_light_component_t, position, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, intensity, se_property_f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, color, se_property_3f32_m ),
             se_field_property_m ( 0, viewapp_light_component_t, radius, se_property_f32_m ),
@@ -610,7 +609,6 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
-            .position = { 0, 1.5, 0 },
             .intensity = 5,
             .color = { 1, 1, 1 },
             .shadow_casting = true,
@@ -622,11 +620,7 @@ static void viewapp_boot_scene_cornell_box ( xg_workload_h workload ) {
             sm_quat_t orientation = sm_quat_from_vec ( dir );
             rv_view_params_t view_params = rv_view_params_m (
                 .transform = rv_view_transform_m (
-                    .position = {
-                        light_component.position[0],
-                        light_component.position[1],
-                        light_component.position[2],
-                    },
+                    .position = { 0, 1.5, 0 },
                     .orientation = {
                         orientation.e[0],
                         orientation.e[1],
@@ -909,7 +903,6 @@ static void viewapp_boot_scene_field ( xg_workload_h workload ) {
         );
 
         viewapp_light_component_t light_component = viewapp_light_component_m (
-            .position = { 0, 30, -10 },
             .intensity = 2000,
             .radius = 1000,
             .color = { 1, 1, 1 },
@@ -981,7 +974,7 @@ static void viewapp_create_cameras ( void ) {
         .proj_params.perspective = rv_perspective_projection_params_m (
             .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
             .near_z = 0.1,
-            .far_z = 10000,
+            .infinite_far_z = true,
             .fov_y = 50.f * rv_deg_to_rad_m,
             .jitter = { 1.f / resolution_x, 1.f / resolution_y },
             .reverse_z = viewapp_main_view_reverse_z_m,
@@ -1391,7 +1384,6 @@ static void viewapp_import_scene ( xg_workload_h workload, uint64_t key, const c
             const struct aiLight* light = scene->mLights[light_it];
             
             viewapp_light_component_t light_component = viewapp_light_component_m (
-                .position = { light->mPosition.x, light->mPosition.y, light->mPosition.z },
                 .intensity = 5,
                 .color = { light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b },
                 .shadow_casting = false,
@@ -1894,7 +1886,6 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
     );
 
     viewapp_light_component_t light_component = viewapp_light_component_m (
-        .position = { spawn_position.x, spawn_position.y, spawn_position.z },
         .intensity = 5,
         .color = { 1, 1, 1 },
         .shadow_casting = true,
@@ -1906,9 +1897,9 @@ se_entity_h spawn_light ( xg_workload_h workload ) {
         rv_view_params_t view_params = rv_view_params_m (
             .transform = rv_view_transform_m (
                 .position = {
-                    light_component.position[0],
-                    light_component.position[1],
-                    light_component.position[2],
+                    transform.position[0],
+                    transform.position[1],
+                    transform.position[2],
                 },
                 .orientation = {
                     orientation.e[0],

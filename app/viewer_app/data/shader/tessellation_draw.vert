@@ -64,11 +64,11 @@ void main ( void ) {
     vec4 pos = vec4 ( berp ( key_verts, in_pos ), 1 );
 
     //pos.y = sin(pos.x) * sin (pos.z);
-    pos.y = field_height ( pos.x, pos.z );
+    pos.y += field_height ( pos.x, pos.z );
     float normal_step = 0.05f;
-    float hx = field_height ( pos.x + normal_step, pos.z ) - field_height ( pos.x - normal_step, pos.z );
-    float hz = field_height ( pos.x, pos.z + normal_step ) - field_height ( pos.x, pos.z - normal_step );
-    vec3 normal = normalize ( vec3 ( -hx, 2.f * normal_step, -hz ) );
+    float hx = field_height ( pos.x - normal_step, pos.z ) - field_height ( pos.x + normal_step, pos.z );
+    float hz = field_height ( pos.x, pos.z - normal_step ) - field_height ( pos.x, pos.z + normal_step );
+    vec3 normal = normalize ( vec3 ( hx, 2.f * normal_step, hz ) );
 
     gl_Position = frame_uniforms.jittered_proj_from_view * frame_uniforms.view_from_world * draw_uniforms.world_from_model * pos;
     out_nor = normalize ( mat3 ( frame_uniforms.view_from_world * draw_uniforms.world_from_model ) * normal );

@@ -72,6 +72,7 @@ typedef struct {
     viewapp_render_graph_e new_render_graph;
     
     xf_graph_h mouse_pick_graph;
+    xf_texture_h object_id_texture;
     xg_texture_h object_id_readback_texture;
 
     uint32_t ibl_cubemap_resolution_x;    

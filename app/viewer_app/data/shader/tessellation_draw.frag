@@ -55,7 +55,7 @@ void main ( void ) {
     // obj id
     uint tri_id = in_subdivision.x; // TODO
     uint object_id = draw_uniforms.object_id;
-    out_id = uvec4 ( object_id >> 8, object_id & 0xff, tri_id >> 8, tri_id & 0xff );
+    out_id = uvec4 ( object_id & 0xff, object_id >> 8, tri_id & 0xff, tri_id >> 8 );
     out_vel = vec2 ( 0.5 );
 
     // velocity

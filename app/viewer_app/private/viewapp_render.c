@@ -359,7 +359,9 @@ static void viewapp_bind_mouse_pick_graph_routines ( void ) {
     viewapp_state_t* state = viewapp_state_get();
     xf_graph_h graph = state->render.mouse_pick_graph;
     if ( graph == xf_null_handle_m ) return;
-    bind_object_id_routine ( graph );
+    if ( state->render.active_render_graph != viewapp_render_graph_raster_m ) {
+        bind_object_id_routine ( graph );
+    }
 }
 
 void viewapp_load_mouse_pick_graph ( void ) {
@@ -376,46 +378,54 @@ void viewapp_load_mouse_pick_graph ( void ) {
     ) );
     state->render.mouse_pick_graph = graph;
 
-    xf_texture_h object_id_texture = xf->create_texture ( graph, &xf_texture_params_m (
-        .width = resolution_x,
-        .height = resolution_y,
-        .format = xg_format_r8_uint_m,
-        .debug_name = "mouse_pick_object_id"
-    ) );
+    xf_texture_h object_id_texture;
+    xg_format_e object_id_texture_format;
+    if ( state->render.active_render_graph != viewapp_render_graph_raster_m ) {
+        object_id_texture_format = xg_format_r16_uint_m;
+        object_id_texture = xf->create_texture ( graph, &xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = object_id_texture_format,
+            .debug_name = "mouse_pick_object_id"
+        ) );
 
-    xf_texture_h depth_texture = xf->create_texture ( graph, &xf_texture_params_m (
-        .width = resolution_x,
-        .height = resolution_y,
-        .format = xg_format_d32_sfloat_m,
-        .debug_name = "mouse_pick_depth"
-    ) );
+        xf_texture_h depth_texture = xf->create_texture ( graph, &xf_texture_params_m (
+            .width = resolution_x,
+            .height = resolution_y,
+            .format = xg_format_d32_sfloat_m,
+            .debug_name = "mouse_pick_depth"
+        ) );
 
-    xf->create_node ( graph, &xf_node_params_m ( 
-        .debug_name = "mouse_pick_clear",
-        .type = xf_node_type_clear_pass_m,
-        .pass.clear = {
-            .textures = { 
-                xf_texture_clear_m (),
-                xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m ) ),
-            }
-        },
-        .resources = xf_node_resource_params_m (
-            .copy_texture_writes_count = 2,
-            .copy_texture_writes = { 
-                xf_copy_texture_dependency_m ( .texture = object_id_texture ),
-                xf_copy_texture_dependency_m ( .texture = depth_texture ),
-            }
-        )
-    ) );
+        xf->create_node ( graph, &xf_node_params_m ( 
+            .debug_name = "mouse_pick_clear",
+            .type = xf_node_type_clear_pass_m,
+            .pass.clear = {
+                .textures = { 
+                    xf_texture_clear_m (),
+                    xf_texture_clear_m ( .type = xf_texture_clear_depth_stencil_m, .depth_stencil = xg_depth_stencil_clear_m ( .depth = viewapp_main_view_depth_clear_m ) ),
+                }
+            },
+            .resources = xf_node_resource_params_m (
+                .copy_texture_writes_count = 2,
+                .copy_texture_writes = { 
+                    xf_copy_texture_dependency_m ( .texture = object_id_texture ),
+                    xf_copy_texture_dependency_m ( .texture = depth_texture ),
+                }
+            )
+        ) );
 
-    add_object_id_node ( graph, object_id_texture, depth_texture );
+        add_object_id_node ( graph, object_id_texture, depth_texture );
+    } else {
+        object_id_texture_format = xg_format_r8g8b8a8_uint_m;
+        object_id_texture = state->render.object_id_texture;
+    }
 
     xg_texture_h readback_texture = xg->create_texture ( &xg_texture_params_m (
         .memory_type = xg_memory_type_readback_m,
         .device = device,
         .width = resolution_x,
         .height = resolution_y,
-        .format = xg_format_r8_uint_m,
+        .format = object_id_texture_format,
         .allowed_usage = xg_texture_usage_bit_copy_dest_m,
         .tiling = xg_texture_tiling_linear_m,
         .debug_name = "object_id_readback",
@@ -1308,10 +1318,12 @@ static void viewapp_boot_raster_graph ( void ) {
             .format = xg_format_r8g8b8a8_uint_m,
             .debug_name = "gbuffer_object_id",
             .clear_on_create = true,
-            .clear.color = xg_color_clear_m()
+            .clear.color = xg_color_clear_m(),
+            .usage = xg_texture_usage_bit_copy_source_m,
         ),
     ) );
     xf_texture_h prev_object_id_texture = xf->get_multi_texture ( object_id_texture, -1 );
+    state->render.object_id_texture = object_id_texture;
 
     xf_texture_h velocity_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x,
@@ -2113,6 +2125,11 @@ void viewapp_load_render_graph ( viewapp_render_graph_e graph, xg_workload_h wor
         break;
     default:
         std_assert_m ( false );
+    }
+
+    if ( state->render.mouse_pick_graph != xf_null_handle_m ) {
+        viewapp_destroy_mouse_pick_graph ( workload, resource_cmd_buffer );
+        viewapp_load_mouse_pick_graph();
     }
 
     //if ( viewapp_render_graph_is_raytrace ( graph ) ) {

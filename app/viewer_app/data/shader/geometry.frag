@@ -63,7 +63,7 @@ void main() {
     // obj id
     uint tri_id = gl_PrimitiveID;
     uint object_id = draw_uniforms.object_id;
-    out_id = uvec4 ( object_id >> 8, object_id & 0xff, tri_id >> 8, tri_id & 0xff );
+    out_id = uvec4 ( object_id & 0xff, object_id >> 8, tri_id & 0xff, tri_id >> 8 );
     
     // velocity
     vec2 curr_vel_pos = in_curr_clip_pos.xy / in_curr_clip_pos.w;

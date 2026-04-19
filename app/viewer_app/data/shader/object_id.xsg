@@ -5,7 +5,7 @@ include common_graphics.xsi
 include depth_write_d32.xsi
 
 begin render_target 0 // x: object id
-    format R8_UINT
+    format R16_UINT
 end
 
 begin input 0

@@ -104,10 +104,16 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
 
     xg_texture_info_t info;
     xg->get_texture_info ( &info, state->render.object_id_readback_texture );
-    std_auto_m data = ( uint8_t* ) info.allocation.mapped_address;
-
-    uint8_t pixel = data[y * resolution_x + x];
-    uint8_t id = pixel;
+    uint16_t id;
+    if ( state->render.active_render_graph != viewapp_render_graph_raster_m ) {
+        std_auto_m data = ( uint16_t* ) info.allocation.mapped_address;
+        uint32_t pixel_value = data[y * resolution_x + x];
+        id = pixel_value;
+    } else {
+        std_auto_m data = ( uint32_t* ) info.allocation.mapped_address;
+        uint32_t pixel_value = data[y * resolution_x + x];
+        id = pixel_value & 0xffff;
+    }
 
     se_i* se = state->modules.se;
     se_query_result_t query_result;
@@ -122,6 +128,26 @@ static void mouse_pick ( uint32_t x, uint32_t y ) {
     for ( uint32_t i = 0; i < mesh_count; ++i ) {
         se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
         viewapp_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
+
+        if ( mesh_component->object_id == id ) {
+            state->ui.mouse_pick_entity = *entity;
+            se_entity_properties_t props;
+            se->get_entity_properties ( &props, *entity );
+            std_log_info_m ( "Mouse pick entity id " std_fmt_u8_m " handle " std_fmt_u64_m " " std_fmt_str_m, id, state->ui.mouse_pick_entity, props.name );
+            return;
+        }
+    }
+
+    se->query_entities ( &query_result, &se_query_params_m (
+        .include_component_count = 1,
+        .include_components = { viewapp_tessellation_mesh_component_id_m }
+    ) );
+    mesh_iterator = se_component_iterator_m ( &query_result.components[0], 0 );
+    entity_iterator = se_entity_iterator_m ( &query_result.entities );
+    mesh_count = query_result.entity_count;
+    for ( uint32_t i = 0; i < mesh_count; ++i ) {
+        se_entity_h* entity = se_stream_iterator_next ( &entity_iterator );
+        viewapp_tessellation_mesh_component_t* mesh_component = se_stream_iterator_next ( &mesh_iterator );
 
         if ( mesh_component->object_id == id ) {
             state->ui.mouse_pick_entity = *entity;

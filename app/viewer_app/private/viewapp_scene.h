@@ -154,7 +154,6 @@ typedef struct {
     bool shadow_casting;
     rv_view_h views[viewapp_light_max_views_m];
     uint32_t view_count;
-    float position[3]; // TODO remove, always only use xform
     float radius;
     float color[3];
     float intensity;
@@ -165,7 +164,6 @@ typedef struct {
     .shadow_casting = false, \
     .views = { [0 ... viewapp_light_max_views_m-1] = rv_null_handle_m }, \
     .view_count = 0, \
-    .position = { 0, 0, 0 }, \
     .radius = 100, \
     .color = { 0, 0, 0 }, \
     .intensity = 0, \
