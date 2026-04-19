@@ -19,14 +19,13 @@ layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D
 
 layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_linear;
 
-layout ( location = 0 ) in vec3 in_pos;
-layout ( location = 1 ) in vec3 in_nor;
-layout ( location = 2 ) in vec3 in_t;
-layout ( location = 3 ) in vec3 in_b;
-layout ( location = 4 ) in vec3 in_n;
-layout ( location = 5 ) in vec2 in_uv;
-layout ( location = 6 ) in vec4 in_curr_clip_pos;
-layout ( location = 7 ) in vec4 in_prev_clip_pos;
+layout ( location = 0 ) in vec3 in_nor;
+layout ( location = 1 ) in vec3 in_t;
+layout ( location = 2 ) in vec3 in_b;
+layout ( location = 3 ) in vec3 in_n;
+layout ( location = 4 ) in vec2 in_uv;
+layout ( location = 5 ) in vec4 in_curr_clip_pos;
+layout ( location = 6 ) in vec4 in_prev_clip_pos;
 
 layout ( location = 0 ) out vec4 out_color;
 layout ( location = 1 ) out vec4 out_nor;

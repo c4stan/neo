@@ -15,8 +15,11 @@ layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform draw_unif
     uint mat_id;
 } draw_uniforms;
 
-layout ( location = 0 ) in flat uvec2 in_subdivision;
-layout ( location = 1 ) in vec3 in_bary;
+layout ( location = 0 ) in vec3 in_nor;
+layout ( location = 1 ) in vec4 in_curr_clip_pos;
+layout ( location = 2 ) in vec4 in_prev_clip_pos;
+layout ( location = 3 ) in flat uvec2 in_subdivision;
+layout ( location = 4 ) in vec3 in_bary;
 
 layout ( location = 0 ) out vec4 out_color;
 layout ( location = 1 ) out vec4 out_nor;
@@ -31,19 +34,34 @@ vec3 subdivision_color ( void ) {
 }
 
 void main ( void ) {
+    // color
     vec3 color = subdivision_color();
-    color = vec3 ( 1, 0, 0 );
-    color = in_bary;
-    out_color = vec4 ( color, 0 );
-    out_nor = vec4 ( 0, 1, 0, 1 );
-    out_mat = vec4 ( 0 );
-    out_rad = vec3 ( 0 );
+    color = vec3 ( 1, 1, 1 );
+    //color = in_bary;
+    out_color = vec4 ( color, 1 );
+    
+    // normal
+    float backface_flip = gl_FrontFacing ? 1.f : -1.f;
+    out_nor = vec4 ( vec3 ( in_nor * 0.5 * backface_flip + 0.5 ), draw_uniforms.roughness );
+    
+    // material
+    float mat_id = draw_uniforms.mat_id;
+    vec3 mat_data = vec3 ( 0, 0, 0 );
+    out_mat = vec4 ( mat_id, mat_data );
+
+    // radiosity
+    out_rad = draw_uniforms.emissive;
+
+    // obj id
     uint tri_id = in_subdivision.x; // TODO
     uint object_id = draw_uniforms.object_id;
     out_id = uvec4 ( object_id >> 8, object_id & 0xff, tri_id >> 8, tri_id & 0xff );
     out_vel = vec2 ( 0.5 );
 
-    vec3 normal = vec3 ( 0, 1, 0 );
-    normal = normalize ( ( frame_uniforms.view_from_world * vec4 ( normal, 0 ) ).xyz );
-    out_nor = vec4 ( normal * 0.5 + 0.5, 1 );
+    // velocity
+    vec2 curr_vel_pos = in_curr_clip_pos.xy / in_curr_clip_pos.w;
+    vec2 prev_vel_pos = in_prev_clip_pos.xy / in_prev_clip_pos.w;
+    vec2 velocity = curr_vel_pos.xy - prev_vel_pos.xy;
+    velocity = velocity * vec2 ( 0.5, -0.5 ) + 0.5;
+    out_vel = velocity;
 }

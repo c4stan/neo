@@ -27,8 +27,11 @@ layout ( binding = 4, set = xs_shader_binding_set_dispatch_m, scalar ) buffer re
 
 layout ( location = 0 ) in vec2 in_pos;
 
-layout ( location = 0 ) out uvec2 out_subdivision;
-layout ( location = 1 ) out vec3 out_bary;
+layout ( location = 0 ) out vec3 out_nor;
+layout ( location = 1 ) out vec4 out_curr_clip_pos;
+layout ( location = 2 ) out vec4 out_prev_clip_pos;
+layout ( location = 3 ) out uvec2 out_subdivision;
+layout ( location = 4 ) out vec3 out_bary;
 
 vec3 load_vert ( uint vert_id ) {
     uint idx = index_buffer.data[vert_id];
@@ -58,14 +61,21 @@ void main ( void ) {
     vec3 key_verts[3];
     build_key_verts ( key, prim_verts, key_verts );
 
-    vec3 pos = berp ( key_verts, in_pos );
+    vec4 pos = vec4 ( berp ( key_verts, in_pos ), 1 );
 
     //pos.y = sin(pos.x) * sin (pos.z);
     pos.y = field_height ( pos.x, pos.z );
-    gl_Position = frame_uniforms.jittered_proj_from_view * frame_uniforms.view_from_world * draw_uniforms.world_from_model * vec4 ( pos, 1 );
+    float normal_step = 0.05f;
+    float hx = field_height ( pos.x + normal_step, pos.z ) - field_height ( pos.x - normal_step, pos.z );
+    float hz = field_height ( pos.x, pos.z + normal_step ) - field_height ( pos.x, pos.z - normal_step );
+    vec3 normal = normalize ( vec3 ( -hx, 2.f * normal_step, -hz ) );
+
+    gl_Position = frame_uniforms.jittered_proj_from_view * frame_uniforms.view_from_world * draw_uniforms.world_from_model * pos;
+    out_nor = normalize ( mat3 ( frame_uniforms.view_from_world * draw_uniforms.world_from_model ) * normal );
+    out_curr_clip_pos = ( frame_uniforms.proj_from_view * frame_uniforms.view_from_world * draw_uniforms.world_from_model * pos ).xyzw;
+    out_prev_clip_pos = ( frame_uniforms.prev_proj_from_view * frame_uniforms.prev_view_from_world * draw_uniforms.prev_world_from_model * pos ).xyzw;
 
     out_subdivision = subdivision;
-
     vec3 bary[3];
     bary[0] = vec3 ( 1, 0, 0 );
     bary[1] = vec3 ( 0, 1, 0 );

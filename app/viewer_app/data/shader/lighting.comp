@@ -164,7 +164,7 @@ float light_falloff ( float distance, float radius ) {
 }
 
 // TODO
-#define scalar_light_loop_m 1
+#define scalar_light_loop_m 0
 
 void main ( void ) {
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );

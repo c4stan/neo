@@ -627,22 +627,28 @@ def create_local_workspace(root, name):
 
 def git_push(tokens):
     local = False
+    remote = False
     if len(tokens) > 0 and tokens[0] == '-l':
         local = True
         tokens.pop(0)
 
-    comment = ''
-    for token in tokens:
-        if comment:
-            comment += ' '
-        comment += token
-    if not comment:
-        comment = 'sync'
+    if len(tokens) == 1 and tokens[0] == '-r':
+        remote = True
+        tokens.pop(0)
 
-    print(Color.OKBLUE + 'git add .' + Color.ENDC)
-    os.system('git add .')
-    print(Color.OKBLUE + 'git commit -m "' + comment + '"'  + Color.ENDC)
-    os.system('git commit -m "' + comment + '"')
+    if not remote:
+        comment = ''
+        for token in tokens:
+            if comment:
+                comment += ' '
+            comment += token
+        if not comment:
+            comment = 'sync'
+
+        print(Color.OKBLUE + 'git add .' + Color.ENDC)
+        os.system('git add .')
+        print(Color.OKBLUE + 'git commit -m "' + comment + '"'  + Color.ENDC)
+        os.system('git commit -m "' + comment + '"')
 
     if not local:
         print(Color.OKBLUE + 'git push'  + Color.ENDC)
