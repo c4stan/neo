@@ -974,6 +974,7 @@ static void viewapp_create_cameras ( void ) {
         .proj_params.perspective = rv_perspective_projection_params_m (
             .aspect_ratio = ( float ) resolution_x / ( float ) resolution_y,
             .near_z = 0.1,
+            .far_z = 100000,
             .infinite_far_z = true,
             .fov_y = 50.f * rv_deg_to_rad_m,
             .jitter = { 1.f / resolution_x, 1.f / resolution_y },

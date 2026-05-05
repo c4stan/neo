@@ -58,14 +58,13 @@ static void run_aud_test ( void ) {
         params.bits_per_sample = 32;
         bool result = aud->activate_device ( device, &params );
         std_assert_m ( result );
+        aud_device_info_t device_info;
+        aud->get_device_info ( &device_info, device );
+        std_log_info_m ( "Picking device 0: " std_fmt_str_m, device_info.name );
         std_log_info_m ( "\tChannels: " std_fmt_size_m, params.channel_count );
         std_log_info_m ( "\tSample frequency: " std_fmt_size_m, params.sample_frequency );
         std_log_info_m ( "\tbpp: " std_fmt_size_m, params.bits_per_sample );
     }
-
-    aud_device_info_t device_info;
-    aud->get_device_info ( &device_info, device );
-    std_log_info_m ( "Picking device 0: " std_fmt_str_m, device_info.name );
 
     // source0
     aud_source_h source0;
@@ -110,8 +109,7 @@ static void run_aud_test ( void ) {
     // source2
     aud_source_h source2 = aud_null_handle_m;
     {
-        const char* input_filename = "c.a.n.d.y..mp3";
-        //const char* input_filename = "output.mp3";
+        const char* input_filename = "source.mp3";
         mp3dec_ex_t mp3dec;
         if ( mp3dec_ex_open ( &mp3dec, input_filename, MP3D_SEEK_TO_SAMPLE ) == 0 ) {
             std_log_info_m ( "Creating audio source 2..." );
@@ -159,7 +157,7 @@ static void run_aud_test ( void ) {
         aud->get_source_info ( &source_info, source2 );
         //float total_duration = source_info.sample_count / source_info.sample_frequency / device_info.channel_count;
         float total_duration = source_info.total_time;
-        float bar_tick = total_duration * 1000.f / 60.f;
+        float bar_tick = total_duration * 1000.f / 60;
 
         aud->update_device_ring ( device );
         uint64_t ring_count = std_ring_count ( device_ring );
@@ -194,7 +192,7 @@ static void run_aud_test ( void ) {
             std_log_m ( 0, std_fmt_str_m std_fmt_clear_m std_fmt_str_m " " std_fmt_u64_pad_m ( 2 ) "/" std_fmt_u64_m, prefix, bar, ring_count, ring_capacity );
         }
 
-        if ( source_info.time_played < total_duration ) {
+        if ( source_info.frames_played < source_info.total_frames ) {
             if ( ring_count < ring_capacity ) {
                 aud->output_to_device ( device, step_ms );
             }

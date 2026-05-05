@@ -40,17 +40,6 @@ vec3 load_vec3 ( float[3] f32 ) {
     return vec3 ( f32[0], f32[1], f32[2] );
 }
 
-float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_color ) {
-    light_t light = light_buffer.data[light_idx];
-    vec3 light_pos = load_vec3 ( light.pos );
-    vec3 light_color = load_vec3 ( light.color );
-    vec3 light_dir = normalize ( light_pos - world_pos );
-    float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
-    float d = distance ( light_pos, world_pos );
-    float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
-    return p_hat;
-}
-
 void main ( void ) {
     vec2 screen_uv = vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 );
 

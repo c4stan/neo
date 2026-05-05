@@ -224,15 +224,13 @@ static void xs_database_set_pipeline_state_shader ( xg_pipeline_state_shader_t* 
 
 xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle, xg_workload_h workload ) {
     xs_database_t* db = &xs_database_state->database_array[db_handle];
+    std_log_info_m ( "Building shader database " std_fmt_str_m "...", db->debug_name );
 
     xs_database_build_result_t result = xs_database_build_result_m();
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
     const bool verbose = false;
-    if ( verbose ) {
-        std_log_info_m ( "Starting build for database " std_fmt_str_m, db->debug_name );
-    }
 
     // check headers, froce rebuild all shaders if one changed
     // TODO try to take dependencies into account and avoid rebuilding everything?
@@ -689,7 +687,7 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
         std_file_close ( stats_file );
     }
 
-    std_log_info_m ( "Shader database build " std_fmt_str_m std_fmt_newline_m 
+    std_log_info_m ( "Shader database build " std_fmt_str_m " ended" std_fmt_newline_m 
         "Pipeline states: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached" std_fmt_newline_m 
         "Shaders: " std_fmt_tab_m std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", db->debug_name,
         result.failed_pipeline_states, result.successful_pipeline_states, result.skipped_pipeline_states,

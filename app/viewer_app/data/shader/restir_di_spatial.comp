@@ -44,7 +44,7 @@ float light_p ( uint light_idx, vec3 world_pos, vec3 world_normal, vec3 base_col
     vec3 light_dir = normalize ( light_pos - world_pos );
     float cos_theta = max ( 0, dot ( world_normal, light_dir ) );
     float d = distance ( light_pos, world_pos );
-    float p_hat = length ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
+    float p_hat = rgb_to_luma ( light.emissive * light_color * base_color * cos_theta / ( d * d * PI ) );
     return p_hat;
 }
 

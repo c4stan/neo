@@ -171,7 +171,7 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
             double source_frame = t * source->params.sample_frequency;
             uint64_t source_frame_idx_a = ( uint64_t ) source_frame;
             double decimal = source_frame - source_frame_idx_a;
-            uint64_t source_frame_idx_b = ( uint64_t ) ( source_frame + 1 );
+            uint64_t source_frame_idx_b = std_min_u64 ( ( uint64_t ) ( source_frame + 1 ), source->params.sample_count - 1 );
 
             float sample_value = 0;
             for ( uint32_t channel_it = 0; channel_it < device_info.channel_count; ++channel_it ) {
@@ -181,8 +181,8 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
                     void* source_sample_a = source->stack.begin + source_frame_idx_a * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
                     void* source_sample_b = source->stack.begin + source_frame_idx_b * source_sample_stride * source->params.channel_count + source_sample_stride * channel_it;
                     if ( source_sample_a >= source->stack.top || source_sample_b >= source->stack.top ) {
-                        // update seconds to reflect the actual play time
-                        seconds = ( double ) frame_it / device_info.sample_frequency;
+                        // update seconds to reflect actual play time
+                        seconds = ( double ) frame_it / source->params.sample_frequency;
                         goto next_source;
                     }
                     double sample_a = 0;
@@ -226,7 +226,8 @@ void aud_source_output_to_device ( aud_device_h device_handle, uint64_t ms ) {
         }
 
 next_source:
-        source->frames_played += frame_count;
+        uint64_t source_frames_played = ( uint64_t ) ( seconds * source->params.sample_frequency );
+        source->frames_played += source_frames_played;
         source->time_played += seconds;
     }
 

@@ -13,6 +13,7 @@ static void std_init_log ( void ) {
     char* build_mode = "optimized";
 #endif
     std_log_info_m ( "Running executable " std_fmt_str_m " in " std_fmt_str_m " mode", proc_info.executable_path, build_mode );
+    std_log_info_m ( "Working path: " std_fmt_str_m, proc_info.working_path );
 }
 
 void std_init ( int argc, char** argv ) {
@@ -49,9 +50,6 @@ void std_init ( int argc, char** argv ) {
     std_runtime_bind ( state );
 
     std_init_log();
-
-    // TODO pass these to std_process_init?
-    //std_process_set_args ( ( const char** ) argv, ( size_t ) argc );
 }
 
 size_t std_runtime_size ( void ) {

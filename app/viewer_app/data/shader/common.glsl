@@ -1,7 +1,7 @@
 #include <xs.glsl>
 
 #define PI 3.1415f
-#define reverse_depth_m 0
+#define reverse_depth_m 1
 
 #if defined enable_debug_print_m
 #extension GL_EXT_debug_printf : enable
@@ -166,12 +166,19 @@ bool proj_depth_is_out ( float d ) {
 
 // can be computed by solving [depth = A + B / z_eye] for z_eye given A,B from proj matrix
 float linearize_depth ( float d ) {
+#if 0
     float z_near = frame_uniforms.z_near;
     float z_far = frame_uniforms.z_far;
 #if reverse_depth_m
     return z_near * z_far / ( z_near + d * ( z_far - z_near ) );
 #else
     return z_near * z_far / ( z_far + d * ( z_near - z_far ) );
+#endif
+#else
+    // d = A + B / z -> z = B / ( d - A ) 
+    float A = frame_uniforms.proj_from_view[2][2];
+    float B = frame_uniforms.proj_from_view[3][2];
+    return B / ( d - A );
 #endif
 }
 

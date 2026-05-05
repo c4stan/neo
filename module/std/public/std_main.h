@@ -12,7 +12,6 @@ void std_main ( void );
 // *****************************************************************************
 void std_init ( int argc, char** argv );
 void std_shutdown ( void );
-size_t std_runtime_size ( void );
 int main ( int argc, char** argv ) {
     std_init ( argc, argv );
     std_main();

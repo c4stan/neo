@@ -78,9 +78,10 @@ std_module_implement_state_m ( onda );
 static void onda_print_help ( void ) {
     char buffer[128];
     std_string_t string = std_static_string_m ( buffer );
-    std_string_append ( &string, "onda ( -s | -c )\n" );
+    std_string_append ( &string, "onda [--] ( -s | -c )\n" );
     std_string_append ( &string, std_fmt_tab_m "if -s: PORT PATH\n" );
     std_string_append ( &string, std_fmt_tab_m "if -c: IP PORT\n" );
+    std_string_append ( &string, std_fmt_tab_m "-- is required if running from cli.py\n" );
     std_log_info_m ( buffer );
 }
 
