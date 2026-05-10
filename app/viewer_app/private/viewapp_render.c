@@ -1384,7 +1384,7 @@ static void viewapp_boot_raster_graph ( void ) {
     add_sky_node ( graph, &gbuffer, depth_texture );
 
     // tessellation
-    // TODO remove the setup pass, have a proper susystem that suballocates multiple meshes vertex/index/meta data into buffers, properly render on gbuffer, shadows, ...
+    // TODO remove the setup pass, have a proper subsystem that suballocates multiple meshes vertex/index/meta data into buffers, shadows, ...
     xg_workload_h tess_workload = xg->create_workload ( device );
     xf_buffer_h tess_vertex_buffer = xf->create_buffer ( graph, &xf_buffer_params_m (
         .size = 1024 * 1024 * 16,

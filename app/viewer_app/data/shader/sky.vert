@@ -22,6 +22,10 @@ void main() {
     out_dir = in_pos.xyz;
 
     vec4 proj_pos = frame_uniforms.jittered_proj_from_view * view_pos;
+#if reverse_depth_m
+    proj_pos.z = 0;
+#else
     proj_pos.z = proj_pos.w;
+#endif
     gl_Position = proj_pos;
 }

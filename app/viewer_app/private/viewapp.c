@@ -436,8 +436,6 @@ static std_app_state_e viewapp_update ( void ) {
     state->render.window_info = new_window_info;
     state->render.input_state = new_input_state;
 
-    viewapp_update_workload_uniforms ( workload );
-
     static bool first = true;
     if ( first ) {
         //xg->debug_capture_workload ( workload );
@@ -445,6 +443,7 @@ static std_app_state_e viewapp_update ( void ) {
     }
 
     key = xf->execute_graph ( state->render.render_graph, workload, key );
+    viewapp_update_workload_uniforms ( workload );
     xg->submit_workload ( workload );
     xg->present_swapchain ( state->render.swapchain, workload );
 

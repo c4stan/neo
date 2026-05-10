@@ -448,21 +448,15 @@ static size_t std_u64_to_str_approx ( char* dest, size_t cap, uint64_t u64, uint
             continue;
         }
 
-        int retval;
-
         if ( u64 % multiplier == 0 ) {
-            retval = snprintf ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
+            return std_str_format ( dest, cap, std_fmt_u64_m " " std_fmt_str_m, u64 / multiplier, tokens[i] );
         } else {
             // The ~ character breaks a number of fonts when used for text rendering... better if avoided
-            //retval = snprintf ( dest, cap, "~" std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
-            retval = snprintf ( dest, cap, std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
+            return std_str_format ( dest, cap, /*"~"*/ std_fmt_f32_dec_m ( 1 ) " " std_fmt_str_m, ( float ) u64 / multiplier, tokens[i] );
         }
-
-        std_assert_m ( retval >= 0 );
-        return ( size_t ) retval;
     }
 
-    return std_str_copy ( dest, cap, "0" );
+    return std_str_format ( dest, cap, "0 " std_fmt_str_m, tokens[token_count - 1] );
 }
 
 size_t std_count_to_str_approx ( char* dest, size_t cap, size_t count_value ) {

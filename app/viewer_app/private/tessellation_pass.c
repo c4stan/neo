@@ -112,44 +112,43 @@ static void tessellation_setup_pass ( const xf_node_execute_args_t* node_args, v
         ) );
     }
 
-    // TODO this assumes the graph never gets destroyed, which isn't the case at all
-    static bool was_enabled = false;
-    if ( enabled != was_enabled ) {
-        was_enabled = enabled;
-        if ( enabled ) {
-            uint32_t tess_update_indirect_data[4];
-            tess_update_indirect_data[0] = std_div_round_up_u32 ( tess_prim_count, 64 );
-            tess_update_indirect_data[1] = 1;
-            tess_update_indirect_data[2] = 1;
-            tess_update_indirect_data[3] = 1; // enabled flag
-            xg_buffer_range_t indirect_range = xg->write_workload_staging ( node_args->workload, tess_update_indirect_data, sizeof ( tess_update_indirect_data ), 1 );
-            xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
-                .destination = indirect_buffer, 
-                .source = indirect_range.handle,
-                .source_offset = indirect_range.offset,
-                .destination_offset = 0,
-                .size = indirect_range.size,
-            ) );
+    static bool first_run = true;
+    bool was_enabled = !first_run && !state->render.clear_history;
+    if ( enabled && !was_enabled ) {
+        first_run = false;
 
-            uint32_t tess_subdivision_data_len = 4 + tess_prim_count * 2;
-            uint32_t* tess_subdivision_data = std_virtual_heap_alloc_array_m ( uint32_t, tess_subdivision_data_len );
-            tess_subdivision_data[0] = tess_prim_count;
-            for ( uint32_t i = 0; i < tess_prim_count; ++i ) {
-                tess_subdivision_data[4 + i * 2 + 0] = 1; // key
-                tess_subdivision_data[4 + i * 2 + 1] = i; // prim_id
-            }
+        uint32_t tess_update_indirect_data[4];
+        tess_update_indirect_data[0] = std_div_round_up_u32 ( tess_prim_count, 64 );
+        tess_update_indirect_data[1] = 1;
+        tess_update_indirect_data[2] = 1;
+        tess_update_indirect_data[3] = 1; // enabled flag
+        xg_buffer_range_t indirect_range = xg->write_workload_staging ( node_args->workload, tess_update_indirect_data, sizeof ( tess_update_indirect_data ), 1 );
+        xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
+            .destination = indirect_buffer, 
+            .source = indirect_range.handle,
+            .source_offset = indirect_range.offset,
+            .destination_offset = 0,
+            .size = indirect_range.size,
+        ) );
 
-            xg_buffer_range_t subdiv_range = xg->write_workload_staging ( node_args->workload, tess_subdivision_data, sizeof ( uint32_t ) * tess_subdivision_data_len, 1 );
-            xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
-                .destination = prev_sub_buffer, 
-                .source = subdiv_range.handle,
-                .source_offset = subdiv_range.offset,
-                .destination_offset = 0,
-                .size = subdiv_range.size,
-            ) );
-
-            std_virtual_heap_free ( tess_subdivision_data );
+        uint32_t tess_subdivision_data_len = 4 + tess_prim_count * 2;
+        uint32_t* tess_subdivision_data = std_virtual_heap_alloc_array_m ( uint32_t, tess_subdivision_data_len );
+        tess_subdivision_data[0] = tess_prim_count;
+        for ( uint32_t i = 0; i < tess_prim_count; ++i ) {
+            tess_subdivision_data[4 + i * 2 + 0] = 1; // key
+            tess_subdivision_data[4 + i * 2 + 1] = i; // prim_id
         }
+
+        xg_buffer_range_t subdiv_range = xg->write_workload_staging ( node_args->workload, tess_subdivision_data, sizeof ( uint32_t ) * tess_subdivision_data_len, 1 );
+        xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 
+            .destination = prev_sub_buffer, 
+            .source = subdiv_range.handle,
+            .source_offset = subdiv_range.offset,
+            .destination_offset = 0,
+            .size = subdiv_range.size,
+        ) );
+
+        std_virtual_heap_free ( tess_subdivision_data );
     }
 }
 

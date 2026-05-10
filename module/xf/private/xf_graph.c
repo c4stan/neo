@@ -1828,8 +1828,18 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
             std_assert_m ( end >= heap.size );
             heap.size = end;
             heap_texture.range = ( xf_graph_memory_range_t ) { .begin = aligned_begin, .end = end };
+            if ( print_alias_list ) {
+                char buffer[32];
+                std_size_to_str_approx ( buffer, sizeof ( buffer ), req.size );
+                std_log_info_m ( std_fmt_str_m " +" std_fmt_str_m, texture->params.debug_name, buffer );
+            }
         } else {
             heap_texture.range = ( xf_graph_memory_range_t ) { .begin = offset, .end = offset + req.size };
+            if ( print_alias_list ) {
+                char buffer[32];
+                std_size_to_str_approx ( buffer, sizeof ( buffer ), offset );
+                std_log_info_m ( std_fmt_str_m " @" std_fmt_str_m, texture->params.debug_name, buffer );
+            }
         }
         heap.textures_array[heap.textures_count++] = heap_texture;
     }

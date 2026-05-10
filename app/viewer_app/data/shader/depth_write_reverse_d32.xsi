@@ -5,6 +5,6 @@ begin depth_stencil
     depth_bound_test off
     depth_test on
     depth_write on
-    depth_test_op greater
+    depth_test_op greater_eq
     stencil_test off
 end

@@ -2,16 +2,11 @@ vertex_shader sky.vert
 fragment_shader sky.frag
 
 include common_graphics.xsi
+include depth_write_reverse_d32.xsi
 
 begin depth_stencil
-    format D32_SFLOAT
-    min_depth_bound 0
-    max_depth_bound 1
-    depth_bound_test off
     depth_test on
     depth_write off
-    depth_test_op less_eq
-    stencil_test off
 end
 
 begin rasterizer
