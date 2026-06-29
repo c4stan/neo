@@ -101,6 +101,8 @@ def print_help():
     print('\t' + Color.OKGREEN + 'cmd' + Color.OKBLUE + ' <name> <cmd>' + Color.ENDC + ' to run a system cmd on a workspace')
     print('\t' + Color.OKGREEN + 'create' + Color.OKBLUE + ' <root> <name>' + Color.ENDC + ' to create a new workspace under the root')
     print('\t' + Color.OKGREEN + 'gitpush' + Color.OKBLUE + ' <comment>' + Color.ENDC + ' to git push local changes')
+    print('\t\t' + Color.OKBLUE + '-l' + Color.OKBLUE + ' <comment>' + Color.ENDC + ' to keep the commit local')
+    print('\t\t' + Color.OKBLUE + '-r' + Color.ENDC + ' to push to remote previous local commits')
     print('\t' + Color.OKGREEN + 'gitpull' + Color.OKBLUE + Color.ENDC + ' to git pull remote changes')
     print('\t' + Color.OKGREEN + 'gitstatus' + Color.ENDC + ' to get the git status')
     print('\t' + Color.OKGREEN + 'title' + Color.OKBLUE + ' <title>' + Color.ENDC + ' to format a code comment title')
@@ -108,8 +110,8 @@ def print_help():
     print('\t' + Color.OKGREEN + 'showstash' + Color.OKBLUE + ' <workspace> <file>' + Color.ENDC + ' to show the latest stash version of the file')
     print('\t' + Color.OKGREEN + 'killeditor' + Color.ENDC + ' to kill the text editor process')
     print('\t' + Color.OKGREEN + 'adblist' + Color.ENDC + ' to list adb devices')
-    print('\t' + Color.OKGREEN + 'adbpair' + Color.OKBLUE + '<ip:port> <code>' + Color.ENDC + ' to wifi pair an android device')
-    print('\t' + Color.OKGREEN + 'adbrun' + Color.OKBLUE + '<name>' + Color.ENDC + ' to push and run an executable on the paired device')
+    print('\t' + Color.OKGREEN + 'adbpair' + Color.OKBLUE + ' <ip:port> <code>' + Color.ENDC + ' to wifi pair an android device')
+    print('\t' + Color.OKGREEN + 'adbrun' + Color.OKBLUE + ' <name>' + Color.ENDC + ' to push and run an executable on the paired device')
     print('')
 
 def format_title_string(words):

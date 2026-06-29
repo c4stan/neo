@@ -2030,6 +2030,7 @@ void xg_vk_pipeline_get_info ( xg_pipeline_info_t* info, xg_pipeline_state_h pip
                 exec_info->statistics_array[stat_it].value.f64 = stat_array[stat_it].value.f64;
                 break;
             default:
+                break;
             }
         }
     }

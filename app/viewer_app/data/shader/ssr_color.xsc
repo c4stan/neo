@@ -1,0 +1,9 @@
+include common.xsi
+
+compute_shader ssr_color.comp
+
+begin bindings
+    texture[8] sampled
+    texture storage
+    sampler
+end

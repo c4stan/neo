@@ -1,0 +1,122 @@
+#version 450
+
+#include "xs.glsl"
+
+#include "common.glsl"
+
+layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_color;
+layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_normal;
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_material;
+layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
+layout ( binding = 4, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_lighting;
+layout ( binding = 5, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_ssr_uv;
+layout ( binding = 6, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_ssr_wi;
+layout ( binding = 7, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_ssr_pdf;
+
+layout ( binding = 8, set = xs_shader_binding_set_dispatch_m ) uniform writeonly image2D img_ssr_color;
+
+layout ( binding = 9, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
+
+// fresnel (F)
+vec3 ggx_f ( float cos_theta, vec3 f0 ) {
+    return f0 + ( vec3 ( 1.0 ) - f0 ) * pow ( 1.0 - cos_theta, 5 );
+}
+
+// normal distribution function (D)
+float ggx_ndf ( float nh, float roughness ) {
+    float a2 = roughness * roughness;
+    float f = ( nh * a2 - nh ) * nh + 1.0;
+    return a2 / ( PI * f * f );
+}
+
+// visibility (V) - includes geometric shadowing (G)
+float ggx_v ( float nv, float nl, float roughness ) {
+    float a = roughness;
+    float ggx_v = nl * ( nv * ( 1.0 - a ) + a );
+    float ggx_l = nv * ( nl * ( 1.0 - a ) + a );
+    return 0.5 / ( ggx_v + ggx_l );
+}
+
+vec3 brdf ( vec3 l, vec3 n, vec3 v, vec3 base_color, float roughness, float metalness ) {
+    vec3 h = normalize ( v + l );
+    float nv = abs ( dot ( n, v ) ) + 1e-5;
+    float nl = clamp ( dot ( n, l ), 0, 1 );
+    float nh = clamp ( dot ( n, h ), 0, 1 );
+    float lh = clamp ( dot ( l, h ), 0, 1 );
+
+    roughness = clamp ( roughness, 0.045, 1 );
+    vec3 f0 = mix ( vec3 ( 0.04 ), base_color, metalness );
+    
+    // spec
+    float d = ggx_ndf ( nh, roughness );
+    vec3 f = ggx_f ( lh, f0 );
+    float g = ggx_v ( nv, nl, roughness );
+    vec3 fr = d * g * f;
+
+    return fr;
+}
+
+layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
+void main ( void ) {
+    vec2 screen_uv = compute_screen_uv_m( frame_uniforms.resolution_f32 );
+
+    float depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
+    vec3 view_geo_pos = view_from_depth ( screen_uv, depth );
+    vec3 wo = normalize ( -view_geo_pos );
+
+    vec4 normal_rough_sample = texture ( sampler2D ( tex_normal, sampler_point ), screen_uv );
+    vec3 view_normal = normalize ( normal_rough_sample.xyz * 2 - 1 );
+    float roughness = normal_rough_sample.w;
+
+    vec4 color_metal_sample = texture ( sampler2D ( tex_color, sampler_point ), screen_uv );
+    vec3 base_color = color_metal_sample.xyz;
+    float metalness = color_metal_sample.w;
+
+    vec2 intersect_uv = texture ( sampler2D ( tex_ssr_uv, sampler_point ), screen_uv ).xy;
+    vec3 light = texture ( sampler2D ( tex_lighting, sampler_point ), intersect_uv ).xyz;
+
+    //float pdf = texture ( sampler2D ( tex_ssr_pdf, sampler_point ), screen_uv ).x;
+
+#if 0
+    vec3 sum_light = vec3 ( 0 );
+    float sum_w = 0;
+    int r = 1;
+    for ( int dy = -r; dy <= r; ++dy ) {
+        for ( int dx = -r; dx <= r; ++dx ) {
+            vec2 neighbor_uv = ( compute_screen_pixel_m() + vec2 ( dx, dy ) + vec2 ( 0.5, 0.5 ) ) / frame_uniforms.resolution_f32;
+            vec4 neighbor_normal_rough_sample = texture ( sampler2D ( tex_color, sampler_point ), neighbor_uv );
+            vec3 neighbor_normal = normalize ( neighbor_normal_rough_sample.xyz * 2 - 1 );
+            float neighbor_roughness = normal_rough_sample.w;
+
+            vec2 neighbor_wi_sample = texture ( sampler2D ( tex_ssr_wi, sampler_point ), neighbor_uv ).xy;
+            vec3 neighbor_wi = normal_from_oct_decode ( neighbor_wi_sample * 2.0 - 1.0 );
+
+            float neighbor_depth = texture ( sampler2D ( tex_depth, sampler_point ), screen_uv ).x;
+            vec3 neighbor_geo_pos = view_from_depth ( neighbor_uv, neighbor_depth );
+            vec3 neighbor_wo = normalize ( -neighbor_geo_pos );
+
+            float neighbor_pdf = ggx_vndf_pdf ( neighbor_wi, neighbor_wo, neighbor_normal, neighbor_roughness );
+
+            float target_pdf = ggx_vndf_pdf ( neighbor_wi, wo, view_normal, roughness );
+
+            vec3 target_f = brdf ( neighbor_wi, view_normal, wo, base_color, roughness, metalness );
+            float target_nl = clamp ( dot ( neighbor_wi, view_normal ), 0, 1 );
+
+            float w = target_pdf / neighbor_pdf;
+
+            vec3 contrib = light * target_f * target_nl / neighbor_pdf;
+
+            sum_light += contrib * w;
+            sum_w += w;
+        }
+    }
+
+    vec3 color = sum_light / sum_w;
+
+    if ( sum_w != sum_w ) {
+        color = vec3 ( 0 );
+    }
+
+    imageStore ( img_ssr_color, compute_screen_pixel_m(), vec4 ( color, 1 ) );
+#endif
+}

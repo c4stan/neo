@@ -4,9 +4,7 @@
 #include <sky_pass.h>
 #include <lighting_pass.h>
 #include <hiz_pass.h>
-#include <ssgi_pass.h>
 #include <blur_pass.h>
-#include <ssr_pass.h>
 #include <ui_pass.h>
 #include <shadow_pass.h>
 #include <raytrace_pass.h>
@@ -1724,7 +1722,45 @@ static void viewapp_boot_raster_graph ( void ) {
         //.format = xg_format_r8g8b8a8_unorm_m,
         .debug_name = "ssgi_raymarch_texture",
     ) );
-    add_ssgi_raymarch_pass ( graph, "ssgi", ssgi_raymarch_texture, normal_texture, color_texture, downsampled_lighting_texture, hiz_texture );
+
+    struct {
+        float resolution_x_f32;
+        float resolution_y_f32;
+        uint32_t hiz_mip_count;
+    } ssgi_uniform_data = {
+        .resolution_x_f32 = ( float ) resolution_x / ssgi_scale,
+        .resolution_y_f32 = ( float ) resolution_y / ssgi_scale,
+        .hiz_mip_count = ( uint32_t ) hiz_mip_count,
+    };
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .debug_name = "ssgi",
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ssgi" ) ),
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssgi_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssgi_scale, 8 ), 1 },
+            .uniform_data = std_buffer_struct_m ( &ssgi_uniform_data ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .sampled_textures_count = 4,
+            .sampled_textures = {
+                xf_compute_texture_dependency_m ( .texture = normal_texture ),
+                xf_compute_texture_dependency_m ( .texture = color_texture ),
+                xf_compute_texture_dependency_m ( .texture = downsampled_lighting_texture ),
+                xf_compute_texture_dependency_m ( .texture = hiz_texture ),
+            },
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = {
+                xf_shader_texture_dependency_m ( .texture = ssgi_raymarch_texture, .stage = xg_pipeline_stage_bit_compute_shader_m )
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) }
+        ),
+    ) );
 
     // ssgi blur
 #if 0
@@ -1857,19 +1893,84 @@ static void viewapp_boot_raster_graph ( void ) {
 
     // ssr
     uint32_t ssr_scale = 1;
-    xf_texture_h ssr_raymarch_texture = xf->create_texture ( graph, &xf_texture_params_m (
-        .width = resolution_x / ssr_scale,
-        .height = resolution_y / ssr_scale,
-        .format = xg_format_b10g11r11_ufloat_pack32_m,
-        .debug_name = "ssr_raymarch_texture",
-    ) );
-    xf_texture_h ssr_intersection_distance = xf->create_texture ( graph, &xf_texture_params_m (
+    xf_texture_h ssr_distance_texture = xf->create_texture ( graph, &xf_texture_params_m (
         .width = resolution_x / ssr_scale,
         .height = resolution_y / ssr_scale,
         .format = xg_format_r16_sfloat_m,
-        .debug_name = "ssr_intersect_distance",
+        .debug_name = "ssr_distance",
     ) );
-    add_ssr_raymarch_pass ( graph, ssr_raymarch_texture, ssr_intersection_distance, normal_texture, material_texture, lighting_texture, hiz_texture );
+    xf_texture_h ssr_pdf_texture = xf->create_texture ( graph, &xf_texture_params_m (
+        .width = resolution_x / ssr_scale,
+        .height = resolution_y / ssr_scale,
+        .format = xg_format_r16_sfloat_m,
+        .debug_name = "ssr_pdf",
+    ) );
+    xf_texture_h ssr_wi_texture = xf->create_texture ( graph, &xf_texture_params_m (
+        .width = resolution_x / ssr_scale,
+        .height = resolution_y / ssr_scale,
+        .format = xg_format_r8g8_unorm_m,
+        .debug_name = "ssr_wi",
+    ) );
+    xf_texture_h ssr_uv_texture = xf->create_texture ( graph, &xf_texture_params_m (
+        .width = resolution_x / ssr_scale,
+        .height = resolution_y / ssr_scale,
+        .format = xg_format_r16g16_unorm_m,
+        .debug_name = "ssr_uv",
+    ) );
+
+    struct {
+        float resolution_x_f32;
+        float resolution_y_f32;
+        float scale_f32;
+        uint32_t hiz_mip_count;
+    } ssr_uniforms = {
+        .resolution_x_f32 = ( float ) resolution_x / ssr_scale,
+        .resolution_y_f32 = ( float ) resolution_y / ssr_scale,
+        .scale_f32 = ( float ) ssr_scale,
+        .hiz_mip_count = hiz_mip_count,
+    };
+
+    // ssr color resolve
+    xf_texture_h ssr_color_texture = xf->create_texture ( graph, &xf_texture_params_m (
+        .width = resolution_x,
+        .height = resolution_y,
+        .format = xg_format_b10g11r11_ufloat_pack32_m,
+        .debug_name = "ssr_color_texture",
+    ) );
+
+    xf->create_node ( graph, &xf_node_params_m (
+        .debug_name = "ssr_trace",
+        .type = xf_node_type_compute_pass_m,
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( state->render.sdb, xs_hash_static_string_m ( "ssr" ) ),
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssr_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssr_scale, 8 ), 1 },
+            .uniform_data = std_buffer_struct_m ( &ssr_uniforms ),
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) }
+        ),
+        .resources = xf_node_resource_params_m (
+            .sampled_textures_count = 5,
+            .sampled_textures = {
+                xf_compute_texture_dependency_m ( .texture = normal_texture ),
+                xf_compute_texture_dependency_m ( .texture = material_texture ),
+                xf_compute_texture_dependency_m ( .texture = hiz_texture ),
+                xf_compute_texture_dependency_m ( .texture = color_texture ),
+                xf_compute_texture_dependency_m ( .texture = lighting_texture ),
+            },
+            .storage_texture_writes_count = 5,
+            .storage_texture_writes = {
+                xf_shader_texture_dependency_m ( .texture = ssr_uv_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = ssr_wi_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = ssr_pdf_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = ssr_distance_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ),
+                xf_shader_texture_dependency_m ( .texture = ssr_color_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ),
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
+        ),
+    ) );
 
     // ssr blur
 #if 0
@@ -1890,11 +1991,43 @@ static void viewapp_boot_raster_graph ( void ) {
     add_bilateral_blur_pass ( graph, ssr_blur_y_texture, ssr_blur_x_texture, normal_texture, depth_texture, 11, 3, blur_pass_direction_vertical_m, "ssr_blur_y" );
 #endif
 
+#if 1    
+    xf->create_node ( graph, &xf_node_params_m (
+        .type = xf_node_type_compute_pass_m,
+        .debug_name = "ssr_color",
+        .pass.compute = xf_node_compute_pass_params_m (
+            .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_color" ) ),
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
+            .samplers_count = 1,
+            .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ) },
+        ),
+        .resources = xf_node_resource_params_m (
+            .storage_texture_writes_count = 1,
+            .storage_texture_writes = { xf_compute_texture_dependency_m ( .texture = ssr_color_texture ) },
+            .sampled_textures_count = 8,
+            .sampled_textures = {
+                xf_compute_texture_dependency_m ( .texture = color_texture ),
+                xf_compute_texture_dependency_m ( .texture = normal_texture ),
+                xf_compute_texture_dependency_m ( .texture = material_texture ),
+                xf_compute_texture_dependency_m ( .texture = depth_texture ),
+                xf_compute_texture_dependency_m ( .texture = lighting_texture ),
+                xf_compute_texture_dependency_m ( .texture = ssr_uv_texture ),
+                xf_compute_texture_dependency_m ( .texture = ssr_wi_texture ),
+                xf_compute_texture_dependency_m ( .texture = ssr_pdf_texture ),
+            },
+        ),
+        .passthrough = xf_node_passthrough_params_m (
+            .enable = true,
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
+        )
+    ) );
+#endif
+
     // ssr ta
     xf_texture_h ssr_accumulation_texture = xf->create_multi_texture ( graph, &xf_multi_texture_params_m (
         .texture = xf_texture_params_m (
-            .width = resolution_x / ssr_scale,
-            .height = resolution_y / ssr_scale,
+            .width = resolution_x,
+            .height = resolution_y,
             .format = xg_format_b10g11r11_ufloat_pack32_m,
             .debug_name = "ssr_accumulation_texture",
             .clear_on_create = true,
@@ -1908,16 +2041,16 @@ static void viewapp_boot_raster_graph ( void ) {
         //.queue = xg_cmd_queue_compute_m,
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "ssr_ta" ) ),
-            .workgroup_count = { std_div_round_up_u32 ( resolution_x / ssr_scale, 8 ), std_div_round_up_u32 ( resolution_y / ssr_scale, 8 ), 1 },
+            .workgroup_count = { std_div_round_up_u32 ( resolution_x, 8 ), std_div_round_up_u32 ( resolution_y, 8 ), 1 },
             .samplers_count = 2,
             .samplers = { xg->get_default_sampler ( device, xg_default_sampler_point_clamp_m ), xg->get_default_sampler ( device, xg_default_sampler_linear_clamp_m ) },
         ),
         .resources = xf_node_resource_params_m (
             .storage_texture_writes_count = 1,
-            .storage_texture_writes = { xf_shader_texture_dependency_m ( .texture = ssr_accumulation_texture, .stage = xg_pipeline_stage_bit_compute_shader_m ) },
+            .storage_texture_writes = { xf_compute_texture_dependency_m ( .texture = ssr_accumulation_texture ) },
             .sampled_textures_count = 9,
             .sampled_textures = { 
-                xf_compute_texture_dependency_m ( .texture = ssr_raymarch_texture ), 
+                xf_compute_texture_dependency_m ( .texture = ssr_color_texture ), 
                 xf_compute_texture_dependency_m ( .texture = ssr_history_texture ), 
                 xf_compute_texture_dependency_m ( .texture = depth_texture ), 
                 xf_compute_texture_dependency_m ( .texture = prev_depth_texture ), 
@@ -1925,12 +2058,12 @@ static void viewapp_boot_raster_graph ( void ) {
                 xf_compute_texture_dependency_m ( .texture = object_id_texture ), 
                 xf_compute_texture_dependency_m ( .texture = prev_object_id_texture ),
                 xf_compute_texture_dependency_m ( .texture = velocity_texture ),
-                xf_compute_texture_dependency_m ( .texture = ssr_intersection_distance ),
+                xf_compute_texture_dependency_m ( .texture = ssr_distance_texture ),
             },
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssr_raymarch_texture ) ) }
+            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_copy_m, .copy_source = xf_copy_texture_dependency_m ( .texture = ssr_color_texture ) ) }
         )
     ) );
 

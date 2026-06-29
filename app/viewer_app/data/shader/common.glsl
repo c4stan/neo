@@ -102,6 +102,22 @@ mat3 tbn_from_normal ( vec3 n ) {
     return mat3 ( t, b, n );
 }
 
+// https://jcgt.org/published/0003/02/01/paper.pdf
+// fast f32x3 -> oct
+vec2 normal_to_oct_encode ( vec3 n ) {
+    vec2 p = n.xy *  ( 1.0 / ( abs ( n.x ) + abs ( n.y ) + abs ( n.z ) ) );
+    vec2 sign = vec2 ( ( n.x >= 0.0 ) ? +1.0 : -1.0, ( n.y >= 0.0 ) ? +1.0 : -1.0 );
+    vec2 e = n.z <= 0.0 ? ( ( 1.0 - abs ( p.yx ) ) * sign ) : p;
+    return e;
+}
+
+vec3 normal_from_oct_decode ( vec2 e ) {
+    vec3 n = vec3 ( e.xy, 1.0 - abs ( e.x ) - abs ( e.y ) );
+    vec2 sign = vec2 ( ( n.x >= 0.0 ) ? +1.0 : -1.0, ( n.y >= 0.0 ) ? +1.0 : -1.0 );
+    if ( n.z < 0 ) n.xy = ( 1.0 - abs ( n.yx ) ) * sign;
+    return normalize ( n );
+}
+
 bool proj_depth_cmp_ge ( float a, float b ) {
 #if reverse_depth_m
     return a <= b;
@@ -233,18 +249,18 @@ vec2 dejitter_uv ( vec2 screen_uv ) {
 #endif
 }
 
-//vec2 dejittered_screen_uv() { 
-//    vec2 screen_uv = vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 );
-//    screen_uv = dejitter_uv ( screen_uv );
-//    return screen_uv;
-//}
-
 bool is_outside_screen ( vec2 uv ) {
     return any ( lessThan ( uv, vec2 ( 0 ) ) ) || any ( greaterThan ( uv, vec2 ( 1 ) ) );
 }
 
-#define compute_screen_uv_m() vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / frame_uniforms.resolution_f32 )
-#define fragment_screen_uv_m() vec2 ( gl_FragCoord.xy / frame_uniforms.resolution_f32 )
+vec2 snap_uv_to_pixel_center ( vec2 uv, vec2 resolution ) {
+    vec2 pixel = floor ( uv * resolution );
+    return ( pixel + 0.5 ) / resolution;
+}
+
+#define compute_screen_pixel_m() ivec2 ( gl_GlobalInvocationID.xy )
+#define compute_screen_uv_m( res ) vec2 ( ( gl_GlobalInvocationID.xy + vec2 ( 0.5 ) ) / res )
+#define fragment_screen_uv_m( res ) vec2 ( gl_FragCoord.xy / res )
 
 // ======================================================================================= //
 //                                 C O L O R   S P A C E S
@@ -402,18 +418,84 @@ vec2 rng_hammersley ( uint i, uint n ) {
 // ======================================================================================= //
 //                                          G G X
 // ======================================================================================= //
-
+// https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf eq.33
 float ggx_d ( float NoH, float roughness ) {
     float den = NoH * NoH * ( roughness * roughness - 1 ) + 1;
     return ( roughness * roughness ) / ( PI * den * den );
 }
 
+// https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf eq.34
+float ggx_g ( float cos_theta, float alpha2 ) {
+    // tan2 + 1 = sec2 = (1/cos)^2
+    // tan2 = 1/cos2 - 1
+    float tan_theta2 = 1.f / ( cos_theta * cos_theta ) - 1.f;
+    return 2.f / ( 1.f + sqrt ( 1.f + alpha2 * tan_theta2 ) );
+}
+
+// https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf eq.35, 36, 39
+vec3 ggx_sample ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
+    float theta = atan ( roughness * sqrt ( e.x / ( 1.f - e.x ) ) );
+    float phi = PI * 2.f * e.y;
+    vec3 h = vec3_from_spherical ( theta, phi );
+
+    mat3 tnb = tnb_from_normal ( normal );
+    h = normalize ( tnb * h );
+
+    vec3 wi = ( h * dot ( wo, h ) * 2 ) - wo;
+    return wi;
+}
+
+// https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf eq.24
+// https://www.graphics.cornell.edu/~bjw/wardnotes.pdf eq. 17
 float ggx_pdf ( vec3 wi, vec3 wo, vec3 normal, float roughness ) {
     vec3 wh = normalize ( wi + wo );
     float NoH = max ( 0, dot ( normal, wh ) );
     float d = ggx_d ( NoH, roughness );
     float HoV = max ( 0, dot (wh, wo ) );
     return ( d * NoH ) / ( 4.f * HoV );
+}
+
+// http://jcgt.org/published/0007/04/01/paper.pdf
+vec3 sampleGGXVNDF(vec3 Ve, float alpha_x, float alpha_y, float U1, float U2)
+{
+    // Section 3.2: transforming the view direction to the hemisphere configuration
+    vec3 Vh = normalize(vec3(alpha_x * Ve.x, alpha_y * Ve.y, Ve.z));
+    // Section 4.1: orthonormal basis (with special case if cross product is zero)
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    vec3 T1 = lensq > 0 ? vec3(-Vh.y, Vh.x, 0) / sqrt (lensq) : vec3(1,0,0);
+    vec3 T2 = cross(Vh, T1);
+    // Section 4.2: parameterization of the projected area
+    float r = sqrt(U1);
+    float phi = 2.0 * PI * U2;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s)*sqrt(1.0 - t1*t1) + s*t2;
+    // Section 4.3: reprojection onto hemisphere
+    vec3 Nh = t1*T1 + t2*T2 + sqrt(max(0.0, 1.0 - t1*t1 - t2*t2))*Vh;
+    // Section 3.4: transforming the normal back to the ellipsoid configuration
+    vec3 Ne = normalize(vec3(alpha_x * Nh.x, alpha_y * Nh.y, max(0.0, Nh.z)));
+    return Ne;
+}
+
+vec3 ggx_vndf_sample ( vec2 e, vec3 wo, vec3 normal, float roughness ) {
+    mat3 tbn = tbn_from_normal ( normal );
+    vec3 view_tangent = normalize ( transpose ( tbn ) * wo );
+    vec3 h = sampleGGXVNDF ( view_tangent, roughness, roughness, e.x, e.y );
+    h = normalize ( tbn * h );
+    vec3 wi = ( h * dot ( wo, h ) * 2 ) - wo;
+    return wi;
+}
+
+// https://jcgt.org/published/0007/04/01/ eq. 3, 17
+float ggx_vndf_pdf ( vec3 wi, vec3 wo, vec3 normal, float roughness ) {
+    vec3 wh =  normalize ( wi + wo );
+    float NoH = max ( 0.f, dot ( normal, wh ) );
+    float d = ggx_d ( NoH, roughness * roughness );
+    float NoV = max ( 0.f, dot ( normal, wo ) );
+    float g = ggx_g ( NoV, roughness * roughness );
+    float HoV = max ( 0.f, dot ( wh, wo ) );
+    return ( g * HoV * d ) / ( NoV * 4.f * HoV );
 }
 
 // ======================================================================================= //
