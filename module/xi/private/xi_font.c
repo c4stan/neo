@@ -135,8 +135,6 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
 
     std_virtual_heap_free ( atlas_alloc );
 
-    //xg->cmd_start_debug_capture ( cmd_buffer, xg_debug_capture_stop_time_workload_submit_m, key );
-
     // copy from staging to source atlas
     {
         xg_texture_memory_barrier_t barrier = xg_texture_memory_barrier_m (
@@ -192,7 +190,7 @@ xi_font_h xi_font_create_ttf ( std_buffer_t ttf_data, const xi_font_params_t* pa
             .layout.new = xg_texture_layout_render_target_m,
             .memory.flushes = xg_memory_access_bit_none_m,
             .memory.invalidations = xg_memory_access_bit_color_write_m,
-            .execution.blocker = xg_pipeline_stage_bit_top_of_pipe_m,
+            .execution.blocker = xg_pipeline_stage_bit_color_output_m,
             .execution.blocked = xg_pipeline_stage_bit_color_output_m,
         );
 
