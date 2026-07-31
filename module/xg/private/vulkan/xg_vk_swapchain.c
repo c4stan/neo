@@ -265,13 +265,13 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
 
 xg_swapchain_h xg_vk_swapchain_create_display ( const xg_swapchain_display_params_t* params ) {
     std_unused_m ( params );
-    std_log_error_m ( "TODO" );
+    std_not_implemented_m();
     return xg_null_handle_m;
 }
 
 xg_swapchain_h xg_vk_swapchain_create_virtual ( const xg_swapchain_virtual_params_t* params ) {
     std_unused_m ( params );
-    std_log_error_m ( "TODO" );
+    std_not_implemented_m();
     return xg_null_handle_m;
 }
 

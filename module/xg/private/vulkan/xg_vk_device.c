@@ -1104,63 +1104,6 @@ bool xg_vk_device_get_info ( xg_device_info_t* info, xg_device_h device_handle )
     return true;
 }
 
-// TODO query this at init and cache?
-size_t xg_vk_device_get_displays_count ( xg_device_h handle ) {
-    std_mutex_lock ( &xg_vk_device_state->devices_mutex );
-
-    uint32_t displays_count = 0;
-    xg_vk_device_t* device = &xg_vk_device_state->devices_array[handle];
-    xg_vk_safecall_m ( vkGetPhysicalDeviceDisplayPropertiesKHR ( device->vk_physical_handle, &displays_count, NULL ), 0 );
-
-    std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
-
-    return displays_count;
-}
-
-size_t xg_vk_device_get_displays_info ( xg_display_info_t* displays, size_t cap, xg_device_h handle ) {
-    std_mutex_lock ( &xg_vk_device_state->devices_mutex );
-
-    // Diplays
-    uint32_t device_displays_count = 0;
-    xg_vk_device_t* device = &xg_vk_device_state->devices_array[handle];
-    xg_vk_safecall_m ( vkGetPhysicalDeviceDisplayPropertiesKHR ( device->vk_physical_handle, &device_displays_count, NULL ), 0 );
-    uint32_t displays_count = device_displays_count;
-
-    if ( std_unlikely_m ( device_displays_count > cap ) ) {
-        std_log_warn_m ( "Found display count higher than display limit!" );
-        displays_count = ( uint32_t ) cap;
-    }
-
-    std_assert_m ( xg_vk_query_max_device_displays_m >= device_displays_count, "Device is connected to more displays than current cap. Increase xg_vk_query_max_device_displays_m." );
-    VkDisplayPropertiesKHR vk_displays[xg_vk_query_max_device_displays_m];
-    xg_vk_safecall_m ( vkGetPhysicalDeviceDisplayPropertiesKHR ( device->vk_physical_handle, &displays_count, vk_displays ), 0 );
-
-    for ( size_t i = 0; i < displays_count; ++i ) {
-        displays[i].display_handle = ( uint64_t ) vk_displays[i].display;
-        std_str_copy ( displays[i].name, xg_display_name_size_m, vk_displays[i].displayName );
-        displays[i].pixel_width = vk_displays[i].physicalResolution.width;
-        displays[i].pixel_height = vk_displays[i].physicalResolution.height;
-        displays[i].millimeter_width = vk_displays[i].physicalDimensions.width;
-        displays[i].millimeter_height = vk_displays[i].physicalDimensions.height;
-        uint32_t modes_count = 0;
-        xg_vk_safecall_m ( vkGetDisplayModePropertiesKHR ( device->vk_physical_handle, vk_displays[i].display, &modes_count, NULL ), 0 );
-        std_assert_m ( xg_display_max_modes_m >= modes_count, "Display has more display modes than current cap. Increase xg_display_max_modes_m." );
-        VkDisplayModePropertiesKHR vk_modes[xg_display_max_modes_m];
-        xg_vk_safecall_m ( vkGetDisplayModePropertiesKHR ( device->vk_physical_handle, vk_displays[i].display, &modes_count, vk_modes ), 0 );
-
-        for ( size_t j = 0; j < modes_count; ++j ) {
-            displays[i].display_modes[j].id = ( uint64_t ) vk_modes[i].displayMode;
-            displays[i].display_modes[j].refresh_rate = vk_modes[i].parameters.refreshRate;
-            displays[i].display_modes[j].width = vk_modes[i].parameters.visibleRegion.width;
-            displays[i].display_modes[j].height = vk_modes[i].parameters.visibleRegion.height;
-        }
-    }
-
-    std_mutex_unlock ( &xg_vk_device_state->devices_mutex );
-
-    return device_displays_count;
-}
-
 char* xg_vk_device_map_alloc ( const xg_alloc_t* alloc ) {
     const xg_vk_device_t* device = xg_vk_device_get ( alloc->device );
     std_assert_m ( device );

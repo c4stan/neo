@@ -14,9 +14,6 @@ bool        xg_vk_device_get_info ( xg_device_info_t* info, xg_device_h device )
 bool        xg_vk_device_activate ( xg_device_h device );
 bool        xg_vk_device_deactivate ( xg_device_h device );
 
-size_t      xg_vk_device_get_displays_count ( xg_device_h device );
-size_t      xg_vk_device_get_displays_info ( xg_display_info_t* displays, size_t cap, xg_device_h device );
-
 // ---- Public xg_vk API ----
 typedef enum {
     xg_vk_device_existing_m                 = 1 << 0,

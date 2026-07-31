@@ -11,7 +11,6 @@ std_module_export_m void xg_reload ( void*, void* );
 std_module_export_m void xg_unload ( void );
 
 // -- Handle types --
-typedef uint64_t xg_display_h;
 typedef uint64_t xg_device_h;
 typedef uint64_t xg_pipeline_state_h;
 typedef uint64_t xg_graphics_pipeline_state_h;
@@ -2452,25 +2451,6 @@ typedef struct {
     __VA_ARGS__ \
 }
 
-// -- Display --
-// TODO is this working?
-typedef struct {
-    uint64_t id;
-    size_t width;
-    size_t height;
-    size_t refresh_rate;
-} xg_display_mode_t;
-
-typedef struct {
-    xg_display_h display_handle;
-    size_t pixel_width;
-    size_t pixel_height;
-    size_t millimeter_width;
-    size_t millimeter_height;
-    char name[xg_display_name_size_m];
-    xg_display_mode_t display_modes[xg_display_max_modes_m];
-} xg_display_info_t;
-
 // -- Swapchain --
 typedef enum {
     xg_present_mode_immediate_m,        // no wait for vblank, tear
@@ -2492,7 +2472,7 @@ typedef struct {
     xg_present_mode_e present_mode;
     xg_device_h device;
     wm_window_h window;
-    xg_display_h display;
+    wm_display_h display;
     char debug_name[xg_debug_name_size_m];
 } xg_swapchain_info_t;
 
@@ -2545,7 +2525,7 @@ typedef struct {
     xg_color_space_e color_space;
     xg_present_mode_e present_mode;
     xg_device_h device;
-    xg_display_h display;
+    wm_display_h display;
     char debug_name[xg_debug_name_size_m];
 } xg_swapchain_display_params_t;
 
@@ -2574,13 +2554,6 @@ typedef struct {
 
     bool                    ( *activate_device )                    ( xg_device_h device );
     bool                    ( *deactivate_device )                  ( xg_device_h deivce );
-
-    // Display
-    // TODO determine availability of this vulkan API and either add this to xg_test or remove it completely
-    size_t                  ( *get_device_display_info_count )      ( xg_device_h device );
-    size_t                  ( *get_device_display_info )            ( xg_display_info_t* displays, size_t cap, xg_device_h device );
-    size_t                  ( *get_device_display_modes_count )     ( xg_display_info_t* display, xg_device_h device );
-    size_t                  ( *get_device_display_modes )           ( xg_display_info_t* display, xg_display_mode_t* modes, size_t cap, xg_device_h device );
 
     // Swapchain
     xg_swapchain_h          ( *create_window_swapchain )            ( const xg_swapchain_window_params_t* params );

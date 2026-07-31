@@ -260,7 +260,6 @@ void xg_vk_instance_load ( xg_vk_instance_state_t* state, xg_runtime_layer_bit_e
 
     const char* base_extensions[] = {   // Always enabled
         "VK_KHR_surface",
-        "VK_KHR_display",
         "VK_EXT_debug_utils", // TODO enable only if a "debug something" define is set?
         //"VK_EXT_layer_settings",
         //"VK_KHR_get_physical_device_properties2", //https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_KHR_synchronization2.html lists it as required, but not enabling it doesn't trigger an error on sync2?
