@@ -247,12 +247,12 @@ bool std_thread_join ( std_thread_h thread_handle ) {
 #if defined(std_platform_win32_m)
     DWORD result = WaitForSingleObject ( ( HANDLE ) thread->os_handle, INFINITE );
     std_verify_m ( result == WAIT_OBJECT_0 );
+    CloseHandle ( ( HANDLE ) thread->os_handle );
 #elif defined(std_platform_linux_m)
     int result = pthread_join ( ( pthread_t ) thread->os_handle, NULL );
     std_verify_m ( result == 0 );
     thread->is_alive = false;
 #endif
-    CloseHandle ( ( HANDLE ) thread->os_handle );
     ++thread->handle.gen;
     std_mutex_lock ( &std_thread_state->mutex );
     std_list_push ( &std_thread_state->threads_freelist, thread );

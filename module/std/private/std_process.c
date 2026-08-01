@@ -419,8 +419,8 @@ bool std_process_wait_for ( std_process_h process_handle ) {
 
     if ( dead ) {
         ++process->handle.gen;
-        CloseHandle ( ( HANDLE ) process->os_handle );
 #if defined ( std_platform_win32_m )
+        CloseHandle ( ( HANDLE ) process->os_handle );
         CloseHandle ( ( HANDLE ) process->os_thread_handle );
 #endif
         std_list_push ( &std_process_state->processes_freelist, process );
@@ -444,8 +444,8 @@ bool std_process_kill ( std_process_h process_handle ) {
 
     if ( dead ) {
         ++process->handle.gen;
-        CloseHandle ( ( HANDLE ) process->os_handle );
 #if defined ( std_platform_win32_m )
+        CloseHandle ( ( HANDLE ) process->os_handle );
         CloseHandle ( ( HANDLE ) process->os_thread_handle );
 #endif
         std_list_push ( &std_process_state->processes_freelist, process );
