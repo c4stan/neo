@@ -223,7 +223,7 @@ static void test_process ( void ) {
     {
         char buffer[64];
         size_t read_size = 0;
-        std_process_io_read ( buffer, &read_size, sizeof ( buffer ), io.stdout_handle ) ;
+        std_process_io_read ( buffer, &read_size, sizeof ( PARENT_PROCESS_MESSAGE ), io.stdout_handle ) ;
         std_assert_m ( read_size == sizeof ( PARENT_PROCESS_MESSAGE ) );
         bool match = std_str_cmp ( buffer, PARENT_PROCESS_MESSAGE ) == 0;
         std_assert_m ( match );
@@ -233,7 +233,7 @@ static void test_process ( void ) {
     {
         char buffer[64];
         size_t read_size = 0;
-        std_process_io_read ( buffer, &read_size, sizeof ( buffer ), io.stdout_handle );
+        std_process_io_read ( buffer, &read_size, sizeof ( CHILD_PROCESS_OUTPUT ), io.stdout_handle );
         std_assert_m ( read_size == sizeof ( CHILD_PROCESS_OUTPUT ) );
         bool match = std_str_cmp ( buffer, CHILD_PROCESS_OUTPUT ) == 0;
         std_assert_m ( match );

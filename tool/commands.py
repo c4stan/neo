@@ -451,20 +451,21 @@ def debug_app(name, flags, params):
     if ('-o' in flags):
         config = 'release'
 
-    params = ' '.join(params)
 
     output_path = path + '/build/' + config + '/output/'
     push_path(output_path)
     if platform.system() == 'Windows':
+        params = ' '.join(params)
         if makedef['output'] == ['app']:
             cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'std_launcher.exe' + ' ' + name + ' ' + params
         else:
             #cmd = 'start ..\\remedybg.exe ' + 'output\\debug\\' + name + '.exe'
             cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + name + '.exe' + ' ' + params
+        os.system(cmd)
     elif platform.system() == 'Linux':
-        # TODD try https://github.com/nakst/gf
-        cmd = 'code .' # TODO probably needs to be fixed after changing cwd to /output/
-    os.system(cmd)
+        debugger_path = bindings.get('linux_debugger')
+        subprocess.Popen([debugger_path, name + '.exe'] + params, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, preexec_fn=os.setsid)
+
     pop_path()
 
 def adb_setup_debug_app(name, flags):

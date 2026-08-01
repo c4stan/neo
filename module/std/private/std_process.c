@@ -558,6 +558,16 @@ bool std_process_io_write ( uint64_t pipe, size_t* out_write_size, const void* s
 #endif
 }
 
+bool std_process_io_is_terminal ( uint64_t handle ) {
+#if defined ( std_platform_win32_m ) 
+    DWORD _;
+    BOOL result = GetConsoleMode ( GetStdHandle ( handle ), &_ );
+    return result == TRUE;
+#elif defined ( std_platform_linux_m )
+    return isatty ( handle );
+#endif
+}
+
 // -----------------------
 
 std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {

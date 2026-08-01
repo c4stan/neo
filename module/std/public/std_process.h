@@ -69,6 +69,7 @@ void                            std_process_this_exit ( std_process_exit_code_e 
 
 bool                            std_process_io_read ( void* dest, size_t* read_size, size_t cap, uint64_t handle );
 bool                            std_process_io_write ( uint64_t handle, size_t* write_size, const void* source, size_t size );
+bool                            std_process_io_is_terminal ( uint64_t handle );
 
 // TODO standardize pipes better across win32/linux
 //      avoid read-write access (on linux can't block, self-consumes)

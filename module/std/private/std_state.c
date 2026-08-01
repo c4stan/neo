@@ -4,17 +4,23 @@
 
 static std_runtime_state_t* std_runtime_state;
 
+#if std_log_print_executable_info_at_start_m
 static void std_init_log ( void ) {
     std_process_info_t proc_info;
     std_process_info ( &proc_info, std_process_this() );
+
+    if ( std_process_io_is_terminal ( proc_info.io.stdout_handle ) ) {
 #if std_build_debug_m
-    char* build_mode = "debug";
+        char* build_mode = "debug";
 #else
-    char* build_mode = "optimized";
+        char* build_mode = "optimized";
 #endif
-    std_log_info_m ( "Running executable " std_fmt_str_m " in " std_fmt_str_m " mode", proc_info.executable_path, build_mode );
-    std_log_info_m ( "Working path: " std_fmt_str_m, proc_info.working_path );
+
+        std_log_info_m ( "Running executable " std_fmt_str_m " in " std_fmt_str_m " mode", proc_info.executable_path, build_mode );
+        std_log_info_m ( "Working path: " std_fmt_str_m, proc_info.working_path );
+    }
 }
+#endif
 
 void std_init ( int argc, char** argv ) {
     std_log_boot();
@@ -49,7 +55,9 @@ void std_init ( int argc, char** argv ) {
 
     std_runtime_bind ( state );
 
+#if std_log_print_executable_info_at_start_m
     std_init_log();
+#endif
 }
 
 size_t std_runtime_size ( void ) {

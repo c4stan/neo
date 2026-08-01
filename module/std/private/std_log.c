@@ -315,11 +315,13 @@ void std_log_print ( std_log_msg_t msg, ... ) {
 
     va_list args, copy;
     va_start ( args, msg );
-    
+
+    // copy vargs and consume the copy to find out the required buffer size    
     va_copy ( copy, args );
-    int len = vsnprintf ( NULL, 0, msg.payload, args );
+    int len = vsnprintf ( NULL, 0, msg.payload, copy );
     va_end ( copy );
 
+    // allocate the buffer and print
     size_t buffer_size = len + 2;
     char* buffer = std_virtual_heap_alloc_array_m ( char, buffer_size );
 
