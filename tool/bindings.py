@@ -3,13 +3,18 @@ import os
 BINDINGS = {}
 
 def get(name, default = None):
+    error_color = '\033[91m'
+    clear_color = '\033[0m'
+
     global BINDINGS
     if name in BINDINGS:
         return BINDINGS[name]
     else:
+        if default is None:
+            print(error_color + 'Missing binding: ' + name + clear_color)
         return default
 
-def read(path = 'bindings'):
+def load(path = 'bindings'):
     global BINDINGS
     BINDINGS = {}
     if os.path.exists(path):

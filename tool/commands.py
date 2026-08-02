@@ -73,10 +73,12 @@ def init(root_path, tool_path, workspace_paths):
     PATH_STACK = []
     push_path(root_path)
     INDEX.init(root_path, tool_path, workspace_paths)
-    if not bindings.read('tool/bindings'):
-        print(Color.FAIL + 'Bindings file not found' + Color.ENDC)
+    bindings_path = 'tool/bindings'
+    if not bindings.load(bindings_path):
+        print(Color.FAIL + 'Failed to load bindings: "' + bindings_path + '"' + Color.ENDC)
 
 def reload(root_path, tool_path, workspace_paths):
+    importlib.reload(bindings)
     importlib.reload(makegen)
     init(root_path, tool_path, workspace_paths)
 

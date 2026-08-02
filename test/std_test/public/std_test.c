@@ -173,6 +173,35 @@ static void test_process ( void ) {
     }
 
 #if !defined std_platform_android_m
+    // test process local pipe
+    {
+        std_process_pipe_params_t pipe_params = {
+            .name = "std_test_echo_pipe",
+            .flags = std_process_pipe_flags_write_m,
+            .write_capacity = 1024,
+            .read_capacity = 1024
+        };
+
+        std_pipe_h write_pipe = std_process_pipe_create ( &pipe_params);
+        std_assert_m ( !std_handle_is_null_m ( write_pipe ) );
+
+        std_pipe_h read_pipe = std_process_pipe_connect ( pipe_params.name, std_process_pipe_flags_read_m );
+        std_assert_m ( !std_handle_is_null_m ( read_pipe ) );
+
+        std_process_pipe_wait_for_connection ( write_pipe );
+
+        char* write_buffer = "echo_data";
+        size_t write_size = std_str_len ( write_buffer ) + 1;
+        bool write_result = std_process_pipe_write ( NULL, write_pipe, write_buffer, write_size );
+        std_assert_m ( write_result );
+
+        char read_buffer[64];
+        size_t read_size;
+        std_process_pipe_read ( &read_size, read_buffer, write_size, read_pipe );
+        bool match = std_str_cmp ( write_buffer, read_buffer ) == 0;
+        std_assert_m ( match );
+    }
+
     // create named pipe
     std_process_pipe_params_t pipe_params = {
         .name = "std_test_pipe",
@@ -187,7 +216,7 @@ static void test_process ( void ) {
     // create child process
     const char* process_arg = CHILD_PROCESS_MAGIC_NUMBER;
     const char* process_path = info.executable_path;
-    std_process_h process = std_process ( process_path, "std_test", &process_arg, 1, std_process_type_default_m, std_process_io_capture_m );
+    std_process_h child_process = std_process ( process_path, "std_test", &process_arg, 1, std_process_type_default_m, std_process_io_capture_m );
 
 #if !defined std_platform_android_m
     // wait for child to connect to pipe and write to it
@@ -199,7 +228,7 @@ static void test_process ( void ) {
     std_process_pipe_destroy ( pipe );
     pipe = std_process_pipe_connect ( "std_test_pipe_2", std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
-    // read echo from pipe
+    // read echo from pipe from child process
     {
         char buffer[64];
         size_t data_size = 0;
@@ -211,7 +240,7 @@ static void test_process ( void ) {
 
     std_process_pipe_destroy ( pipe );
 
-    std_process_io_t io = std_process_get_io ( process );
+    std_process_io_t io = std_process_get_io ( child_process );
     // write to child stdin
     {
         char buffer[64];
@@ -240,7 +269,7 @@ static void test_process ( void ) {
     }
 #endif
 
-    std_process_wait_for ( process );
+    std_process_wait_for ( child_process );
 
     std_log_info_m ( "std_process test complete." );
 }
