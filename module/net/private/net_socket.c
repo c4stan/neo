@@ -77,7 +77,7 @@ void net_socket_set_is_blocking ( net_socket_h socket_handle, bool is_blocking )
     int flags = fcntl ( sock->os_handle, F_GETFL, 0 );
     std_assert_m ( flags != -1 );
     if ( is_blocking ) {
-        flags = std_bit_clear_32_m ( flags, O_NONBLOCK );
+        flags &= ~O_NONBLOCK;
     } else {
         flags |= O_NONBLOCK;
     }
@@ -159,6 +159,8 @@ bool net_socket_destroy ( net_socket_h socket_handle ) {
 
     if ( error == 0 ) {
         std_list_push ( &net_socket_state->sockets_freelist, sock );
+    } else {
+        std_log_os_error_m();
     }
 
     std_mutex_unlock ( &net_socket_state->sockets_mutex );
