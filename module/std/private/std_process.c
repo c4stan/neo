@@ -60,10 +60,10 @@ static void std_process_register_self ( std_process_state_t* state, char** args,
 
     // remaining invocation args
     {
-        std_stack_t stack = std_static_stack_m ( process->args_buffer );
+        std_stack_t args_stack = std_static_stack_m ( process->args_buffer );
 
         for ( size_t i = 1; i < args_count; ++i ) {
-            process->args[i - 1] = std_stack_string_copy ( &stack, args[i] );
+            process->args[i - 1] = std_stack_string_copy ( &args_stack, args[i] );
         }
     }
     process->args_count = args_count - 1;
@@ -240,48 +240,38 @@ std_process_h std_process ( const char* executable, const char* process_name, co
     uint64_t os_id;
     uint64_t os_thread_handle;
 
+    PROCESS_INFORMATION pi;
+    std_mem_zero_m ( &pi );
+
+    char cmdline[std_process_cmdline_max_len_m];
     {
-        PROCESS_INFORMATION pi;
-        std_mem_zero_m ( &pi );
-
-        char cmdline[std_process_cmdline_max_len_m];
-        {
-            std_stack_t stack = std_static_stack_m ( cmdline );
-
-            std_stack_string_append ( &stack, executable );
-
-            for ( size_t i = 0; i < args_count; ++i ) {
-                std_stack_string_append ( &stack, " " );
-                std_stack_string_append ( &stack, args[i] );
-            }
-        }
-
-        //BOOL retval = CreateProcess ( executable, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
-        BOOL retval = CreateProcess ( NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
-        if ( !retval ) {
-            std_log_os_error_m();
-            return std_null_handle_m ( std_process_h );
-        }
-
-        os_handle = ( uint64_t ) pi.hProcess;
-        os_id = ( uint64_t ) pi.dwProcessId;
-        os_thread_handle = ( uint64_t ) pi.hThread;
-    }
-
-    {
-        BOOL retval;
-
-        if ( stdin_read != NULL ) {
-            retval = CloseHandle ( stdin_read );
-            std_assert_m ( retval == TRUE );
-        }
-
-        if ( stdout_write != NULL ) {
-            retval = CloseHandle ( stdout_write );
-            std_assert_m ( retval == TRUE );
+        std_string_t string = std_static_string_m ( cmdline );
+        std_string_append ( &string, executable );
+        for ( size_t i = 0; i < args_count; ++i ) {
+            std_string_append ( &string, " " );
+            std_string_append ( &string, args[i] );
         }
     }
 
+    BOOL retval = CreateProcess ( NULL, cmdline, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi );
+    if ( !retval ) {
+        std_log_os_error_m();
+        return std_null_handle_m ( std_process_h );
+    }
+
+    os_handle = ( uint64_t ) pi.hProcess;
+    os_id = ( uint64_t ) pi.dwProcessId;
+    os_thread_handle = ( uint64_t ) pi.hThread;
+
+    if ( stdin_read != NULL ) {
+        retval = CloseHandle ( stdin_read );
+        std_assert_m ( retval == TRUE );
+    }
+
+    if ( stdout_write != NULL ) {
+        retval = CloseHandle ( stdout_write );
+        std_assert_m ( retval == TRUE );
+    }
 #elif defined(std_platform_linux_m)
 
     // 0 is read, 1 is write
@@ -364,7 +354,6 @@ std_process_h std_process ( const char* executable, const char* process_name, co
 
     process->os_handle = os_handle;
     process->os_id = os_id;
-    //process->os_main_thread_handle = os_main_thread_handle;
     process->stdin_handle = ( uint64_t ) stdin_write;
     process->stdout_handle = ( uint64_t ) stdout_read;
     process->stderr_handle = ( uint64_t ) stdout_read;
@@ -625,7 +614,7 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     return pipe_handle;
 #else
 #if defined std_platform_android_m
-    // TODO android /sdcard/ FS doesnt' support named pipes - https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    // TODO
     return std_null_handle_m ( std_pipe_h );
 #else
     char pipe_name[256];
@@ -635,24 +624,30 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
         std_string_append ( &string, params->name );
     }
 
-    // Remove any pre-existing
-    struct stat st;
-    if ( stat ( pipe_name, &st ) == 0 ) {
-        if ( !S_ISFIFO ( st.st_mode ) ) {
-            std_log_error_m ( "Pipe name " std_fmt_str_m " already exists as path" );
-            return std_null_handle_m ( std_pipe_h );
-        }
-        if ( unlink ( pipe_name ) != 0 ) {
-            std_log_os_error_m();
-        }
-    } else if ( errno != ENOENT ) {
+    int fd = socket ( AF_UNIX, SOCK_STREAM, 0 );
+    if ( fd < 0 ) {
         std_log_os_error_m();
+        return std_null_handle_m ( std_pipe_h );
     }
 
-    if ( mkfifo ( pipe_name, 0666 ) != 0 ) {
-        if ( errno != EEXIST ) {
-            std_log_os_error_m();
-        }
+    unlink ( pipe_name );
+
+    struct sockaddr_un addr = { 0 };
+    addr.sun_family = AF_UNIX;
+    std_str_copy_static_m ( addr.sun_path, pipe_name );
+
+    if ( bind ( fd, ( struct sockaddr * ) &addr, sizeof ( addr ) ) < 0 ) {
+        close ( fd );
+        std_log_os_error_m();
+        return std_null_handle_m ( std_pipe_h );
+    }
+
+    if ( listen ( fd, SOMAXCONN ) < 0 )
+    {
+        unlink ( pipe_name );
+        close ( fd );
+        std_log_os_error_m();
+        return std_null_handle_m ( std_pipe_h );
     }
 
 #if 0
@@ -679,7 +674,8 @@ std_pipe_h std_process_pipe_create ( const std_process_pipe_params_t* params ) {
     // TODO lock/unlock a mutex
     std_process_pipe_t* pipe = std_list_pop_m ( &std_process_state->pipes_freelist );
     std_assert_m ( pipe );
-    pipe->os_handle = -1;//( uint64_t ) fd;
+    pipe->os_handle = fd;
+    pipe->peer_handle = -1;
     pipe->is_owner = true;
     pipe->params = *params;
     std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, params->name );
@@ -717,27 +713,13 @@ bool std_process_pipe_wait_for_connection ( std_pipe_h pipe_handle ) {
         std_string_append ( &string, pipe->params.name );
     }
 
-    int flags = 0;
-
-    if ( ( pipe->params.flags & std_process_pipe_flags_read_m ) && ( pipe->params.flags & std_process_pipe_flags_write_m ) ) {
-        flags |= O_RDWR;
-    } else if ( pipe->params.flags & std_process_pipe_flags_read_m ) {
-        flags |= O_RDONLY;
-    } else if ( pipe->params.flags & std_process_pipe_flags_write_m ) {
-        flags |= O_WRONLY;
-    }
-
-    if ( ( pipe->params.flags & std_process_pipe_flags_blocking_m ) == 0 ) {
-        flags |= O_NONBLOCK;
-    }
-
-    int fd = open ( pipe_name, flags );
-    pipe->os_handle = fd;
-
-    if ( fd == -1 ) {
+    int accept_result = accept ( pipe->os_handle, NULL, NULL );
+    if ( accept_result < 0 ) {
         std_log_os_error_m();
         return false;
     }
+
+    pipe->peer_handle = accept_result;
 
     return true;
 #endif
@@ -799,45 +781,50 @@ wait_for_pipe_creation:
 
 #elif defined(std_platform_linux_m)
 #if defined std_platform_android_m
-    // TODO android /sdcard/ FS doesnt' support named pipes - https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    // TODO
     return std_null_handle_m ( std_pipe_h );
 #else
-    int open_flags = 0;
-
-    if ( ( flags & std_process_pipe_flags_read_m ) && ( flags & std_process_pipe_flags_write_m ) ) {
-        open_flags |= O_RDWR;
-    } else if ( flags & std_process_pipe_flags_read_m ) {
-        open_flags |= O_RDONLY;
-    } else if ( flags & std_process_pipe_flags_write_m ) {
-        open_flags |= O_WRONLY;
-    }
-
-    if ( !( flags & std_process_pipe_flags_blocking_m ) ) {
-        open_flags |= O_NONBLOCK;
-    }
-
-    char pipe_path[256];
+    char pipe_name[256];
     {
-        std_stack_t stack = std_static_stack_m ( pipe_path );
-        std_stack_string_append ( &stack, "/tmp/" );
-        std_stack_string_append ( &stack, name );
+        std_string_t string = std_static_string_m ( pipe_name );
+        std_string_append ( &string, "/tmp/" );
+        std_string_append ( &string, name );
     }
 
-    int fd = open ( pipe_path, open_flags );
-    if ( fd >= 0 ) {
-        std_process_pipe_t* pipe = std_list_pop_m ( &std_process_state->pipes_freelist );
-        std_assert_m ( pipe );
-        pipe->os_handle = ( uint64_t ) fd;
-        pipe->is_owner = false;
-        std_mem_zero_m ( &pipe->params );
-        std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, name );
-
-        std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
-        return pipe_handle;
-    } else {
+    int fd = socket ( AF_UNIX, SOCK_STREAM, 0 );
+    if ( fd < 0 ) {
         std_log_os_error_m();
         return std_null_handle_m ( std_pipe_h );
     }
+
+    struct sockaddr_un addr = { 0 };
+    addr.sun_family = AF_UNIX;
+    std_str_copy_static_m ( addr.sun_path, pipe_name );
+
+wait_for_pipe_creation:
+    int connect_result = connect ( fd, ( struct sockaddr* ) &addr, sizeof ( addr ) );
+    if ( connect_result < 0 ) {
+        // non existing socket || no one is listening at the other end
+        if ( ( errno == ENOENT || errno == ECONNREFUSED ) && ( flags & std_process_pipe_flags_blocking_m ) ) {
+            std_thread_this_sleep ( 0 );
+            goto wait_for_pipe_creation;
+        } else {
+            close ( fd );
+            std_log_os_error_m();
+            return std_null_handle_m ( std_pipe_h );
+        }
+    }
+
+    std_process_pipe_t* pipe = std_list_pop_m ( &std_process_state->pipes_freelist );
+    std_assert_m ( pipe );
+    pipe->os_handle = fd;
+    pipe->peer_handle = fd;
+    pipe->is_owner = false;
+    std_mem_zero_m ( &pipe->params );
+    std_str_copy ( pipe->name, std_process_pipe_name_max_len_m, name );
+
+    std_pipe_h pipe_handle = ( std_pipe_h ) { .gen = pipe->gen, .idx = pipe - std_process_state->pipes_array };
+    return pipe_handle;
 #endif
 #endif
 }
@@ -862,7 +849,7 @@ bool std_process_pipe_write ( size_t* out_write_size, std_pipe_h pipe_handle, co
 
     return true;
 #elif defined(std_platform_linux_m)
-    ssize_t result = write ( pipe->os_handle, data, size );
+    ssize_t result = write ( pipe->peer_handle, data, size );
     if ( result == -1 ) {
         std_log_os_error_m();
         return false;
@@ -895,7 +882,7 @@ bool std_process_pipe_read ( size_t* out_read_size, void* dest, size_t capacity,
 
     return true;
 #elif defined(std_platform_linux_m)
-    ssize_t result = read ( pipe->os_handle, dest, capacity );
+    ssize_t result = read ( pipe->peer_handle, dest, capacity );
     if ( result == -1 ) {
         std_log_os_error_m();
         return false;

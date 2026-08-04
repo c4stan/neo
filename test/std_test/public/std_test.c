@@ -221,11 +221,12 @@ static void test_process ( void ) {
 #if !defined std_platform_android_m
     // wait for child to connect to pipe and write to it
     std_process_pipe_wait_for_connection ( pipe );
-    char* write_buffer = "pipe_write_data";
-    bool write_result = std_process_pipe_write ( NULL, pipe, write_buffer, std_str_len ( write_buffer ) + 1 );
+    const char* write_buffer = "pipe_write_data";
+    size_t write_size = std_str_len ( write_buffer ) + 1;
+    bool write_result = std_process_pipe_write ( NULL, pipe, write_buffer, write_size );
     std_assert_m ( write_result );
-
     std_process_pipe_destroy ( pipe );
+
     pipe = std_process_pipe_connect ( "std_test_pipe_2", std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
     // read echo from pipe from child process
@@ -279,9 +280,9 @@ static void test_process_child ( void ) {
     std_pipe_h pipe = std_process_pipe_connect ( "std_test_pipe", std_process_pipe_flags_read_m | std_process_pipe_flags_blocking_m );
 
     char buffer[64];
-    size_t data_size = 0;
+    size_t read_size = 0;
 
-    std_process_pipe_read ( &data_size, buffer, sizeof ( buffer ), pipe );
+    std_process_pipe_read ( &read_size, buffer, sizeof ( buffer ), pipe );
     std_process_pipe_destroy ( pipe );
 
     std_process_pipe_params_t pipe_params = {
@@ -293,13 +294,12 @@ static void test_process_child ( void ) {
     pipe = std_process_pipe_create ( &pipe_params );
     std_assert_m ( !std_handle_is_null_m ( pipe ) );
     std_process_pipe_wait_for_connection ( pipe );
-    std_process_pipe_write ( NULL, pipe, buffer, data_size  );
+    std_process_pipe_write ( NULL, pipe, buffer, read_size  );
     std_process_pipe_destroy ( pipe );
 
     std_process_io_t io = std_process_get_io ( std_process_this() );
-
-    std_process_io_read ( buffer, &data_size, sizeof ( PARENT_PROCESS_MESSAGE ), io.stdin_handle );
-    std_process_io_write ( io.stdout_handle, NULL, buffer, data_size );
+    std_process_io_read ( buffer, &read_size, sizeof ( PARENT_PROCESS_MESSAGE ), io.stdin_handle );
+    std_process_io_write ( io.stdout_handle, NULL, buffer, read_size );
     std_process_io_write ( io.stdout_handle, NULL, CHILD_PROCESS_OUTPUT, sizeof ( CHILD_PROCESS_OUTPUT ) );
 }
 #endif

@@ -49,6 +49,8 @@
     #include <sys/sysinfo.h>
     #include <sys/mman.h>
     #include <sys/resource.h>
+    #include <sys/socket.h>
+    #include <sys/un.h>
     #include <pthread.h>
     #include <time.h>
     #include <sched.h>

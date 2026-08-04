@@ -222,6 +222,9 @@ typedef struct {
 
 typedef struct {
     uint64_t os_handle;
+#if defined ( std_platform_linux_m )
+    uint64_t peer_handle;
+#endif
     bool is_owner;
     std_handle_gen_t gen;
     char name[std_process_pipe_name_max_len_m];
