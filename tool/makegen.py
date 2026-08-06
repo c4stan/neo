@@ -4,7 +4,6 @@ import xml.dom.minidom
 import shutil
 import ntpath
 import pprint
-import configparser
 import sys
 import platform
 import time
@@ -272,17 +271,19 @@ def parse_def(path):
 
     # Read
     file = open(path)
-    content = file.read()
-    # Add dummy header
-    hdr = 'DEFAULT'
-    content = '[' + hdr + ']\n' + content
-    # Parse
-    parser = configparser.RawConfigParser(delimiters=(' '))
-    parser.optionxform = lambda option: option
-    parser.read_string(content)
     result = []
-    for key in parser[hdr]:
-        value = parser[hdr][key]
+    lines = file.readlines()
+    file.close()
+    result = []
+    for line in lines:
+        line = line.strip()
+        if len(line) == 0:
+            continue
+        if line[0] == '#':
+            continue
+        parts = line.partition(' ')
+        key = parts[0]
+        value = parts[2].strip()
         if value[0].isdigit():
             try:
                 value = calc(value)
@@ -298,7 +299,6 @@ def parse_def(path):
             #    value = '(' + value + ')'
         log.verbose(key + ' ' + value)
         result.append((key, value))
-    file.close()
 
     log.pop_verbose()
     return result
