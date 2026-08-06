@@ -387,7 +387,7 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
     xg_cpu_queue_event_params_t fence_params = {
         .device = device_handle,
     };
-    std_str_format_m ( fence_params.debug_name, "Workload fence " std_fmt_u64_m, workload_id );
+    std_str_format_static_m ( fence_params.debug_name, "Workload fence " std_fmt_u64_m, workload_id );
 
     // Keep old gen, increased on destroy
     uint64_t gen = workload->gen;

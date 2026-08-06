@@ -3,6 +3,7 @@
 #include <std_compiler.h>
 #include <std_thread.h>
 #include <std_process.h>
+#include <std_string.h>
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -29,9 +30,55 @@ void std_log_print_callstack ( void ) {
 #if defined std_platform_android_m
     // TODO
 #else
+#if 0
     void* array[1024];
     size_t size = backtrace ( array, 1024 );
     backtrace_symbols_fd ( array, size, std_process_get_io ( std_process_this() ).stderr_handle );
+#else
+    void* stack[100];
+    size_t frame_count = backtrace ( stack, std_static_array_count_m ( stack ) );
+
+    char buffer[512] = "-------------- BACKTRACE --------------\n";
+    write ( std_process_get_io ( std_process_this() ).stderr_handle, buffer, std_str_len ( buffer ) );
+
+    for ( size_t i = 0; i < frame_count; ++i ) {
+        Dl_info info;
+        if ( !dladdr ( stack[i], &info ) ) {
+            std_str_format_static_m ( buffer, "%p\n", stack[i] );
+            write ( std_process_get_io ( std_process_this() ).stderr_handle, buffer, std_str_len ( buffer ) );
+            continue;
+        }
+
+        if ( !info.dli_sname ) {
+            void* offset = (void*) ( stack[i] - info.dli_fbase );
+            std_str_format_static_m ( buffer, "%s+%p\n", info.dli_fname, offset );
+            write ( std_process_get_io ( std_process_this() ).stderr_handle, buffer, std_str_len ( buffer ) );
+            continue;
+        }
+
+        void* offset = (void*) ( stack[i] - info.dli_saddr );
+        std_str_format ( buffer, std_static_array_count_m ( buffer ), std_fmt_str_m "+" std_fmt_ptr_m, 
+            info.dli_sname, offset );
+        const char* args[] = {
+            "-f",
+            "-C",
+            "-p",
+            "-s",
+            "-e",
+            info.dli_fname,
+            buffer,
+        };
+        std_process_h proc = std_process ( "addr2line", "addr2line", args, 7, std_process_type_background_m, std_process_io_capture_m );
+        std_process_io_t io = std_process_get_io ( proc );
+        std_process_wait_for ( proc );
+        size_t read_size = 0;
+        std_process_io_read ( buffer, &read_size, std_static_array_count_m ( buffer ), io.stdout_handle );
+        buffer[read_size] = '\0';
+        write ( std_process_get_io ( std_process_this() ).stderr_handle, buffer, std_str_len ( buffer ) );
+    }
+    std_str_copy_static_m ( buffer, "---------------------------------------\n" );
+    write ( std_process_get_io ( std_process_this() ).stderr_handle, buffer, std_str_len ( buffer ) );
+#endif
 #endif
 }
 #else
@@ -57,7 +104,7 @@ void std_log_print_callstack ( void ) {
         SymFromAddr ( process, ( DWORD64 ) ( stack[i] ), 0, symbol );
         DWORD displacement;
         SymGetLineFromAddr ( process, ( DWORD64 ) ( stack[i] ), &displacement, &line );
-        std_str_format_m ( buffer, std_fmt_str_m ":" std_fmt_u32_m std_fmt_newline_m, symbol->Name, line.LineNumber );
+        std_str_format_static_m ( buffer, std_fmt_str_m ":" std_fmt_u32_m std_fmt_newline_m, symbol->Name, line.LineNumber );
         WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, std_str_len ( buffer ), NULL, NULL );
     }
 

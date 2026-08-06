@@ -845,9 +845,9 @@ static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
         std_stack_string_append ( &stack, buffer );
         std_stack_string_append ( &stack, std_fmt_tab_m );
 
-        //std_str_format_m ( buffer, std_fmt_u32_m, heap->available_rows & ( 1ull << x ) ? 1 : 0 );
+        //std_str_format_static_m ( buffer, std_fmt_u32_m, heap->available_rows & ( 1ull << x ) ? 1 : 0 );
         //uint32_t idx = std_bit_scan_64 ( heap->available_rows );
-        std_str_format_m ( buffer, std_fmt_u64_pad_m ( 2 ), x );
+        std_str_format_static_m ( buffer, std_fmt_u64_pad_m ( 2 ), x );
         std_stack_string_append ( &stack, buffer );
         std_stack_string_append ( &stack, " | " );
 
@@ -863,7 +863,7 @@ static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
                     item = header->next;
                 }
             }
-            std_str_format_m ( buffer, std_fmt_u32_m, count );
+            std_str_format_static_m ( buffer, std_fmt_u32_m, count );
             std_stack_string_append ( &stack, buffer );
             std_stack_string_append ( &stack, "  " );
         }

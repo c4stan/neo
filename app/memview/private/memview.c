@@ -500,7 +500,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
                 if ( line_first ) {
                     line_first = false;
                     xi_label_state_t label = xi_label_state_m ( .width = 150 );
-                    std_str_format_m ( label.text, std_fmt_ptr_m, base_address );
+                    std_str_format_static_m ( label.text, std_fmt_ptr_m, base_address );
                     xi->add_label ( xi_workload, &label );
                 }
                 
@@ -530,7 +530,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
                     xi_label_state_t tooltip = xi_label_state_m (
                         .sort_order = 1,
                     );
-                    std_str_format_m ( tooltip.text, std_fmt_ptr_m ":" std_fmt_u64_m " " std_fmt_str_m ":" std_fmt_size_m, 
+                    std_str_format_static_m ( tooltip.text, std_fmt_ptr_m ":" std_fmt_u64_m " " std_fmt_str_m ":" std_fmt_size_m, 
                         record->address, record->size, record->scope.file, record->scope.line );
                     xi->draw_tooltip ( xi_workload, &tooltip );
                     tooltip_visible = true;
@@ -556,7 +556,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
 
             if ( !line_first ) {
                 xi_label_state_t label = xi_label_state_m ( .width = 150, .style = xi_style_m ( .horizontal_alignment = xi_horizontal_alignment_right_to_left_m ) );
-                std_str_format_m ( label.text, std_fmt_ptr_m, range_max );
+                std_str_format_static_m ( label.text, std_fmt_ptr_m, range_max );
                 xi->add_label ( xi_workload, &label );
             }
         }

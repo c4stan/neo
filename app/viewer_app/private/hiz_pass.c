@@ -177,7 +177,7 @@ xf_node_h add_hiz_submip_gen_pass ( xf_graph_h graph, xf_texture_h hiz, uint32_t
             },
         )
     );
-    std_str_format_m ( params.debug_name, "hiz_gen_mip_" std_fmt_u32_m, mip_level );
+    std_str_format_static_m ( params.debug_name, "hiz_gen_mip_" std_fmt_u32_m, mip_level );
 
     xf_node_h hiz_submip_gen_node = xf->create_node ( graph, &params );
 

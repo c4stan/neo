@@ -1246,6 +1246,7 @@ static void test_array ( void ) {
 #endif
 
 void std_main ( void ) {
+    std_not_implemented_m();
     std_process_info_t process_info;
     std_process_info ( &process_info, std_process_this() );
 
