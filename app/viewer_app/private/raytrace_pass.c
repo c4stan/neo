@@ -71,7 +71,7 @@ static void raytrace_setup_pass ( const xf_node_execute_args_t* node_args, void*
         instance_data[i].id = mesh_component->object_id;
     }
 
-    xg_buffer_range_t instance_buffer_range = xg->write_workload_staging ( node_args->workload, std_buffer_m ( .data = instance_data, .size = instance_data_size ), 1 );
+    xg_buffer_range_t instance_buffer_range = xg->write_workload_staging ( node_args->workload, std_buffer_m ( .base = instance_data, .size = instance_data_size ), 1 );
     std_virtual_heap_free ( instance_data );
 
     // Fill light buffer
@@ -111,7 +111,7 @@ static void raytrace_setup_pass ( const xf_node_execute_args_t* node_args, void*
     }
     light_data->light_count = light_count;
 
-    xg_buffer_range_t light_buffer_range = xg->write_workload_staging ( node_args->workload, std_buffer_m ( .data = light_data, .size = light_data_size ), 1 );
+    xg_buffer_range_t light_buffer_range = xg->write_workload_staging ( node_args->workload, std_buffer_m ( .base = light_data, .size = light_data_size ), 1 );
     std_virtual_heap_free ( light_data );
 
     xg->cmd_copy_buffer ( node_args->cmd_buffer, node_args->base_key, &xg_buffer_copy_params_m ( 

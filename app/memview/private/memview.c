@@ -237,7 +237,7 @@ static void memview_boot ( void ) {
     ) );
     state->render.render_graph = graph;
 
-    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( swapchain );
+    xf_texture_h swapchain_multi_texture = xf->create_multi_texture_from_swapchain ( graph, swapchain );
 
     xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "clear",
@@ -640,6 +640,7 @@ std_module_export_m void* memview_load ( void* runtime ) {
 
     memview_state_t* state = memview_state_alloc();
     state->api.tick = memview_tick;
+    state->tick_id = 0;
     state->modules = ( memview_modules_t ) {
         .wm = std_module_load_m ( wm_module_name_m ),
         .xg = std_module_load_m ( xg_module_name_m ),
