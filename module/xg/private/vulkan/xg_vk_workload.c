@@ -3002,7 +3002,7 @@ static xg_buffer_range_t xg_vk_workload_buffer_write ( xg_vk_workload_buffer_t* 
 }
 #endif
 
-xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, void* data, size_t data_size ) {
+xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, std_buffer_t buffer ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_vk_workload_buffer_t* uniform_buffer = workload->uniform_buffer;
 
@@ -3011,71 +3011,71 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, voi
 
     uint64_t offset = uniform_buffer->used_size;
     offset = std_align_u64 ( offset, alignment );
-    if ( offset + data_size > uniform_buffer->total_size ) {
+    if ( offset + buffer.size > uniform_buffer->total_size ) {
         uniform_buffer = xg_vk_uniform_buffer_pop ( workload->device, workload_handle );
         workload->uniform_buffer = uniform_buffer;
         offset = 0;
-        std_assert_m ( uniform_buffer->total_size > data_size );
+        std_assert_m ( uniform_buffer->total_size > buffer.size );
     }
 
     char* base = uniform_buffer->alloc.mapped_address;
-    std_mem_copy ( base + offset, data, data_size );
-    uniform_buffer->used_size = offset + data_size;
+    std_mem_copy ( base + offset, buffer.base, buffer.size );
+    uniform_buffer->used_size = offset + buffer.size;
 
     xg_buffer_range_t range = {
         .handle = uniform_buffer->handle,
         .offset = offset,
-        .size = data_size,
+        .size = buffer.size,
     };
     return range;
 }
 
-xg_buffer_range_t xg_workload_alloc_staging ( xg_workload_h workload_handle, void* data, size_t data_size ) {
+xg_buffer_range_t xg_workload_alloc_staging ( xg_workload_h workload_handle, std_buffer_t buffer ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_buffer_params_t params = xg_buffer_params_m (
         .memory_type = xg_memory_type_upload_m,
         .device = workload->device,
-        .size = data_size,
+        .size = buffer.size,
         .allowed_usage = xg_buffer_usage_bit_copy_source_m,
     );
     uint32_t idx = workload->staging_allocs_count++;
     std_string_t string = std_static_string_m ( params.debug_name );
     std_string_append_format ( &string, "workload_staging_alloc(" std_fmt_u32_m ")", idx );
-    xg_buffer_h buffer = xg_buffer_create ( &params );
-    workload->staging_allocs_array[idx] = buffer;
+    xg_buffer_h xg_buffer = xg_buffer_create ( &params );
+    workload->staging_allocs_array[idx] = xg_buffer;
 
     xg_buffer_info_t buffer_info;
-    xg_buffer_get_info ( &buffer_info, buffer );
-    std_mem_copy ( buffer_info.allocation.mapped_address, data, data_size );
+    xg_buffer_get_info ( &buffer_info, xg_buffer );
+    std_mem_copy ( buffer_info.allocation.mapped_address, buffer.base, buffer.size );
 
-    return xg_buffer_range_whole_buffer_m ( buffer );
+    return xg_buffer_range_whole_buffer_m ( xg_buffer );
 }
 
-xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, void* data, size_t data_size, size_t alignment ) {
+xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, std_buffer_t buffer, size_t alignment ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_vk_workload_buffer_t* staging_buffer = workload->staging_buffer;
 
-    if ( staging_buffer->total_size <= data_size ) {
-        return xg_workload_alloc_staging ( workload_handle, data, data_size );
+    if ( staging_buffer->total_size <= buffer.size ) {
+        return xg_workload_alloc_staging ( workload_handle, buffer );
     }
 
     uint64_t offset = staging_buffer->used_size;
     offset = std_align_u64 ( offset, alignment );
-    if ( offset + data_size > staging_buffer->total_size ) {
+    if ( offset + buffer.size > staging_buffer->total_size ) {
         staging_buffer = xg_vk_staging_buffer_pop ( workload->device, workload_handle );
         workload->staging_buffer = staging_buffer;
         offset = 0;
-        std_assert_m ( staging_buffer->total_size > data_size );
+        std_assert_m ( staging_buffer->total_size > buffer.size );
     }
 
     char* base = staging_buffer->alloc.mapped_address;
-    std_mem_copy ( base + offset, data, data_size );
-    staging_buffer->used_size = offset + data_size;
+    std_mem_copy ( base + offset, buffer.base, buffer.size );
+    staging_buffer->used_size = offset + buffer.size;
 
     xg_buffer_range_t range = {
         .handle = staging_buffer->handle,
         .offset = offset,
-        .size = data_size,
+        .size = buffer.size,
     };
     return range;
 }

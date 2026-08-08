@@ -1151,6 +1151,8 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
         return;
     }
 
+    std_mutex_lock ( &heap->mutex );
+
 #if std_allocator_track_allocations_m
     address -= 8;
     std_auto_m debug_record = ( std_allocator_debug_record_t* ) * (void**) address;
@@ -1161,8 +1163,6 @@ void std_tlsf_heap_free ( std_allocator_tlsf_heap_t* heap, void* address ) {
 #endif
 
     std_auto_m segment = ( char* ) address - std_allocator_tlsf_header_size_m;
-
-    std_mutex_lock ( &heap->mutex );
 
     // check for alignment
     std_auto_m alignment_block = *( uint64_t* ) segment;
@@ -1405,7 +1405,8 @@ void std_allocator_shutdown ( void ) {
     uint64_t idx = 0;
     while ( std_bitset_scan ( &idx, heap->debug_records_bitset, idx, std_bitset_u64_count_m ( std_allocator_max_debug_records_m ) ) ) {
         std_allocator_debug_record_t* record = &heap->debug_records_array[idx];
-        std_log_warn_m ( "MEMLEAK: " std_fmt_str_m " " std_fmt_str_m ":" std_fmt_size_m, record->scope.file, record->scope.function, record->scope.line );
+        std_log_warn_m ( "MEMLEAK: " std_fmt_str_m " " std_fmt_str_m ":" std_fmt_size_m,
+            record->scope.file, record->scope.function, record->scope.line );
         ++idx;
     }
 #endif

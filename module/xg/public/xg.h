@@ -349,7 +349,7 @@ typedef struct {
 // TODO does non-coherent memory mean write-combine? e.g. a read after a write on host doesn't return the written value? https://fgiesen.wordpress.com/2013/01/29/write-combining-is-not-your-friend/
 typedef enum {
     xg_memory_type_bit_device_m   = 1 << 0,
-    xg_memory_type_bit_mapped_m = 1 << 1,
+    xg_memory_type_bit_mapped_m   = 1 << 1,
     xg_memory_type_bit_cached_m   = 1 << 2,
     xg_memory_type_bit_coherent_m = 1 << 3,
     //xg_memory_type_for_gpu_only_m = xg_memory_type_device_m,
@@ -2704,9 +2704,8 @@ typedef struct {
 
     void                    ( *get_allocator_info )                 ( xg_allocator_info_t* info, xg_device_h device, xg_memory_type_e type );
 
-    // TODO remove from workload, write a proper allocator for uniform data and use resource_cmd_buffer_time to free at workload completion
-    xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, void* data, size_t size ); // TODO take in a std_buffer_t ?
-    xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, void* data, size_t size, size_t align );
+    xg_buffer_range_t       ( *write_workload_uniform )             ( xg_workload_h workload, std_buffer_t buffer );
+    xg_buffer_range_t       ( *write_workload_staging )             ( xg_workload_h workload, std_buffer_t data, size_t align );
 
     void                    ( *wait_all_workload_complete )         ( void );
     void                    ( *wait_for_device_workloads )          ( xg_device_h device );

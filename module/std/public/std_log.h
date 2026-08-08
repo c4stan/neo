@@ -3,6 +3,7 @@
 #include <std_string.h>
 #include <std_compiler.h>
 #include <std_process.h>
+#include <std_allocator.h>
 
 // Type encodings for format, same as stdio
 #if defined(std_compiler_gcc_m)
@@ -173,6 +174,5 @@ bool std_log_debugger_attached ( void );
 void std_log_os_error ( std_log_scope_t scope );
 #define std_log_os_error_m() std_log_os_error ( std_log_scope_m() )
 
-void std_log_print_callstack ( void );
-
 void std_debug_break ( void );
+size_t std_callstack ( std_buffer_t buffer );

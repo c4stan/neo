@@ -49,6 +49,7 @@ void*   std_virtual_heap_alloc ( size_t size, size_t align );
 #define std_virtual_heap_alloc_array_m( type, count ) ( type* ) ( std_virtual_heap_alloc_m ( sizeof ( type ) * (count), std_alignof_m ( type ) ) )
 #define std_virtual_heap_alloc_struct_m( type ) std_virtual_heap_alloc_array_m ( type, 1 )
 #endif
+
 bool    std_virtual_heap_free ( void* ptr );
 
 typedef struct {
@@ -99,7 +100,8 @@ typedef struct {
     __VA_ARGS__ \
 }
 #define std_buffer_struct_m( item ) std_buffer_m ( .base = item, .size = sizeof ( *item ) )
-#define std_buffer_static_array_m( array ) std_buffer_m ( .base = array, .size = sizeof ( array ) )
+#define std_buffer_array_m( array, count ) std_buffer_m ( .base = array, .size = sizeof ( *array ) * count )
+#define std_static_buffer_m( array ) std_buffer_m ( .base = array, .size = sizeof ( array ) )
 
 // Linear allocator based on virtual memory. The mapped segment will grow until the whole reserved range is full. It will not grow further.
 typedef struct {

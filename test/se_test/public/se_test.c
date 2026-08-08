@@ -55,7 +55,7 @@ static void se_test_pass ( const xf_node_execute_args_t* node_args, void* user_a
 
         xg_graphics_pipeline_state_h pipeline_state = xs->get_pipeline_state ( test_pass_component->pipeline_state );
 
-        xg_buffer_range_t vert_uniform_range = xg->write_workload_uniform ( node_args->workload, &test_pass_component->vertex_uniform_data, sizeof ( vertex_uniforms_t ) );
+        xg_buffer_range_t vert_uniform_range = xg->write_workload_uniform ( node_args->workload, std_buffer_struct_m ( &test_pass_component->vertex_uniform_data ) );
         xg_buffer_resource_binding_t buffer = xg_buffer_resource_binding_m ( .shader_register = 0, .range = vert_uniform_range );
 
         xg_resource_bindings_h draw_bindings = xg->cmd_create_workload_bindings ( node_args->resource_cmd_buffer, &xg_resource_bindings_params_m ( 

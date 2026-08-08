@@ -13,6 +13,9 @@ import bindings
 if platform.system() == 'Windows':
     import win32pipe, win32file, pywintypes
 
+if platform.system() == 'Linux':
+    import socket
+
 # -----------------------------------------------------------------------------
 
 # -- pipe
@@ -380,7 +383,7 @@ def parse_makedef(path, bindings):
                 for x in values:
                     if x.startswith('$'):
                         if not x[1:] in bindings:
-                            log.error("Missing makedef binding for key " + x + ' while parsing makedef ' + path + '. If not already existing, please create a file named makedef_bindings in the same folder as the makedef, and then add line ' + x + '=' + '...' + ' specifying the desired value for that binding.')
+                            log.error("Missing makedef binding for key " + x + ' while parsing makedef ' + path + '. If not already existing, please create a file named "makedef_bindings" in the same folder as the makedef, and then add line "' + x[1:] + '=' + '...' + '" specifying the desired value for that binding.')
 
             if bindings is not None:
                 values = [x if not x.startswith('$') else bindings[x[1:]] for x in values]
@@ -399,7 +402,7 @@ def resolve_bindings(makedef, bindings):
 
     for name in makedef['bindings']:
         if not name in bindings:
-            log.error('Module ' + makedef['name'][0] + " is missing makedef binding for key " + name + ' in its makedef. If not already existing, please create a file named makedef_bindings in the same folder as the makedef, and then add line ' + name + '=' + '...' + ' specifying the desired value for that binding.')
+            log.error('Module ' + makedef['name'][0] + ' is missing makedef binding for key "' + name + '" in its makedef. If not already existing, please create a file named makedef_bindings in the same folder as the makedef, and then add line "' + name + '=' + '...' + '" specifying the desired value for that binding.')
         entries[name] = bindings[name]
 
     return entries
@@ -1059,7 +1062,8 @@ class Project:
         # TODO remove this, use external_exes instead
         if self.output == OUTPUT_APP and not (BUILD_FLAGS & BUILD_FLAG_RELOAD):
             shutil.copy(self.launcher_path, modules_path)
-            shutil.copy(self.launcher_pdb_path, modules_path)
+            if os.path.exists(self.launcher_pdb_path):
+                shutil.copy(self.launcher_pdb_path, modules_path)
 
         dlls_to_copy = self.external_dlls
         if self.output == OUTPUT_APP:
@@ -1191,9 +1195,11 @@ class Solution:
             win32file.WriteFile(pipe, message.encode(), None)
             pipe.close()
         elif platform.system() == 'Linux':
-            pipe = os.open('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME, os.O_WRONLY)
-            os.write(pipe, message.encode())
-            os.close(pipe)
+            #pipe = os.open('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME, os.O_WRONLY)
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME)
+            sock.sendall(message.encode())
+            sock.close()
 
     def output_build_error(self):
         if platform.system() == 'Windows':
@@ -1202,9 +1208,13 @@ class Solution:
             win32file.WriteFile(pipe, message.encode(), None)
             pipe.close()
         elif platform.system() == 'Linux':
-            pipe = os.open('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME, os.O_WRONLY)
-            os.write(pipe, message.encode())
-            os.close(pipe)
+            #pipe = os.open('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME, os.O_WRONLY)
+            #os.write(pipe, message.encode())
+            #os.close(pipe)
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect('/tmp/' + BUILD_CHANGES_OUTPUT_PIPE_NAME)
+            sock.sendall(message.encode())
+            sock.close()
 
     def get_build_path(self):
         config_path = config_str(self.config)

@@ -321,7 +321,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         ),
     ) ) ) {
         char path_buffer[std_path_size_m] = {};
-        if ( xi->file_pick ( std_buffer_static_array_m ( path_buffer ), NULL ) ) {
+        if ( xi->file_pick ( std_static_buffer_m ( path_buffer ), NULL ) ) {
             std_str_copy_static_m ( state->log.path, path_buffer );
             memview_log_load_data();
             load = true;

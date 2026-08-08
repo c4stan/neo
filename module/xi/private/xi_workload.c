@@ -249,7 +249,7 @@ uint64_t xi_workload_flush ( xi_workload_h workload_handle, const xi_flush_param
                     .buffers = {
                         xg_buffer_resource_binding_m (
                             .shader_register = 0,
-                            .range = xg->write_workload_uniform ( flush_params->workload, &draw_uniforms, sizeof ( draw_uniforms ) )
+                            .range = xg->write_workload_uniform ( flush_params->workload, std_buffer_struct_m ( &draw_uniforms ) )
                         )
                     },
                 )

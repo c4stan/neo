@@ -75,7 +75,7 @@ def init(root_path, tool_path, workspace_paths):
     INDEX.init(root_path, tool_path, workspace_paths)
     bindings_path = 'tool/bindings'
     if not bindings.load(bindings_path):
-        print(Color.FAIL + 'Failed to load bindings: "' + bindings_path + '"' + Color.ENDC)
+        print(Color.WARNING + 'Failed to load bindings: "' + bindings_path + '"' + Color.ENDC)
 
 def reload(root_path, tool_path, workspace_paths):
     importlib.reload(bindings)

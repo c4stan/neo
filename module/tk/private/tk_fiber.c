@@ -217,7 +217,6 @@ static void tk_fiber_exit_to_thread ( tk_fiber_context_t* context ) {
     std_unused_m ( context );
     ConvertFiberToThread();
 #elif defined(std_platform_linux_m)
-    std_log_info_m ( std_fmt_ptr_m, context->stack );
     std_virtual_heap_free ( context->stack );
 #endif
 }

@@ -2649,7 +2649,7 @@ void xf_graph_compute_indirect_pass_routine ( const xf_node_execute_args_t* node
     if ( pass_args->uniform_data.base ) {
         draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m (
             .shader_register = binding_id++,
-            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data.base, pass_args->uniform_data.size ),
+            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data ),
         );
     }
 
@@ -2742,7 +2742,7 @@ void xf_graph_compute_pass_routine ( const xf_node_execute_args_t* node_args, vo
     if ( pass_args->uniform_data.base ) {
         draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m (
             .shader_register = binding_id++,
-            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data.base, pass_args->uniform_data.size ),
+            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data ),
         );
     }
 
@@ -2849,7 +2849,7 @@ void xf_graph_raytrace_pass_routine ( const xf_node_execute_args_t* node_args, v
     if ( pass_args->uniform_data.base ) {
         draw_bindings.buffers[buffer_idx++] = xg_buffer_resource_binding_m (
             .shader_register = binding_id++,
-            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data.base, pass_args->uniform_data.size ),
+            .range = xg->write_workload_uniform ( node_args->workload, pass_args->uniform_data ),
         );
     }
 

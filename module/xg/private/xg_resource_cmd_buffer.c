@@ -131,7 +131,7 @@ xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cm
         if ( init->mode == xg_texture_init_mode_upload_m ) {
             size_t bpp = xg_format_size ( params->format );
             size_t size = params->array_layers * params->mip_levels * params->width * params->height * bpp;
-            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload.data, size, bpp );
+            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, std_buffer_m ( .base = init->upload.data, .size = size ), bpp );
         } else if ( init->mode == xg_texture_init_mode_clear_m ) {
             cmd_args->clear = init->clear;
         } else if ( init->mode == xg_texture_init_mode_clear_depth_stencil_m ) {
@@ -169,7 +169,7 @@ xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_
         cmd_args->init_mode = init->mode;
         if ( init->mode == xg_buffer_init_mode_upload_m ) {
             size_t size = params->size;
-            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, init->upload_data, size, 1 );
+            cmd_args->staging = xg_workload_write_staging ( cmd_buffer->workload, std_buffer_m ( .base = init->upload_data, .size = size ), 1 );
         } else if ( init->mode == xg_buffer_init_mode_clear_m ) {
             cmd_args->clear = init->clear;
         }

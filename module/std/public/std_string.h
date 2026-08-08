@@ -76,6 +76,7 @@ typedef struct {
     .cap = 0, \
     __VA_ARGS__ \
 }
+#define std_empty_string_m( s, c ) ({ if ( c > 0 ) ((char*)s)[0] = 0; std_string_m ( .str = s, .len = 0, .cap = c ); })
 #define std_literal_string_m( s ) std_string_m ( .str = s, .len = sizeof ( s ) - 1, .cap = sizeof ( s ) )
 #define std_static_string_m( s, ... ) std_string_m ( .str = s, .len = 0, .cap = sizeof ( s ), __VA_ARGS__ )
 #define std_static_string_parse_m( s, ... ) std_string_m ( .str = s, .len = std_str_len ( s ), .cap = sizeof ( s ), __VA_ARGS__ )

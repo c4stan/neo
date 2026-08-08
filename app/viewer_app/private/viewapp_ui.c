@@ -336,7 +336,7 @@ uint64_t viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* ol
         );
         if ( xi->add_select ( xi_workload, &scene_select ) ) {
             if ( scene_select.item_idx == 2 ) {
-                xi->file_pick ( std_buffer_static_array_m ( state->scene.custom_scene_path ), NULL );
+                xi->file_pick ( std_static_buffer_m ( state->scene.custom_scene_path ), NULL );
             }
             if ( scene_select.item_idx != 2 || state->scene.custom_scene_path[0] != '\0' ) {
                 viewapp_load_scene ( scene_select.item_idx );
@@ -359,7 +359,7 @@ uint64_t viewapp_update_ui ( wm_window_info_t* window_info, wm_input_state_t* ol
         );
         if ( xi->add_select ( xi_workload, &envmap_select ) ) {
             if ( envmap_select.item_idx == viewapp_envmap_external_m ) {
-                xi->file_pick ( std_buffer_static_array_m ( state->scene.envmap_path ), NULL );
+                xi->file_pick ( std_static_buffer_m ( state->scene.envmap_path ), NULL );
             }
             if ( envmap_select.item_idx != viewapp_envmap_external_m || state->scene.envmap_path[0] != '\0' ) {
                 key = viewapp_load_envmap ( workload, key, envmap_select.item_idx );

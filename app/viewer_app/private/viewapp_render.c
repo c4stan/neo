@@ -73,7 +73,7 @@ void viewapp_gen_brdf_lut ( xg_workload_h workload ) {
                 .buffers = {
                     xg_buffer_resource_binding_m (
                         .shader_register = 0,
-                        .range = xg->write_workload_uniform ( workload, &uniform_data, sizeof ( uniform_data ) ),
+                        .range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &uniform_data ) ),
                     ),
                 },
                 .texture_count = 1,
@@ -313,7 +313,7 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             }
         }
 
-        xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
+        xg_buffer_range_t range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &uniforms ) );
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
             .layout = state->render.workload_bindings_layout,
@@ -338,7 +338,7 @@ void viewapp_update_workload_uniforms ( xg_workload_h workload ) {
             .resolution_y_f32 = ( float ) state->render.resolution_y,
         };
 
-        xg_buffer_range_t range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) );
+        xg_buffer_range_t range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &uniforms ) );
         xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
         xg_resource_bindings_h bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m (
             .layout = state->render.workload_bindings_layout,
@@ -1541,7 +1541,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cluster_build" ) ),
             .workgroup_count = { std_div_round_up_u32 ( light_cluster_count, 64 ), 1, 1 },
-            .uniform_data = std_buffer_static_array_m ( light_grid_size ),
+            .uniform_data = std_static_buffer_m ( light_grid_size ),
         ),
         .resources = xf_node_resource_params_m (
             .storage_buffer_writes_count = 1,
@@ -1559,7 +1559,7 @@ static void viewapp_boot_raster_graph ( void ) {
         .pass.compute = xf_node_compute_pass_params_m (
             .pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "light_cull" ) ),
             .workgroup_count = { std_div_round_up_u32 ( light_cluster_count, 64 ), 1, 1 },
-            .uniform_data = std_buffer_static_array_m ( light_grid_size ),
+            .uniform_data = std_static_buffer_m ( light_grid_size ),
         ),
         .resources = xf_node_resource_params_m (
             .storage_buffer_reads_count = 2,

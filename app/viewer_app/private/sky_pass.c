@@ -172,7 +172,7 @@ static void sky_cubemap_gen_pass_routine ( const xf_node_execute_args_t* node_ar
             .buffers = {
                 xg_buffer_resource_binding_m (
                     .shader_register = 0,
-                    .range = xg->write_workload_uniform ( workload, &uniforms, sizeof ( uniforms ) ),
+                    .range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &uniforms ) ),
                 ),
             },
             .texture_count = 1,

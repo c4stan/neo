@@ -118,11 +118,11 @@ static void geometry_pass ( const xf_node_execute_args_t* node_args, void* user_
                 .buffers = {
                     xg_buffer_resource_binding_m (
                         .shader_register = 0,
-                        .range = xg->write_workload_uniform ( workload, &vs, sizeof ( vs ) ),
+                        .range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &vs ) ),
                     ),
                     xg_buffer_resource_binding_m (
                         .shader_register = 1,
-                        .range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) ),
+                        .range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &fs ) ),
                     )
                 },
                 .texture_count = 2,
@@ -286,11 +286,11 @@ static void object_id_pass ( const xf_node_execute_args_t* node_args, void* user
                 .buffers = {
                     xg_buffer_resource_binding_m (
                         .shader_register = 0,
-                        .range = xg->write_workload_uniform ( workload, &vs, sizeof ( vs ) ),
+                        .range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &vs ) ),
                     ),
                     xg_buffer_resource_binding_m (
                         .shader_register = 1,
-                        .range = xg->write_workload_uniform ( workload, &fs, sizeof ( fs ) ),
+                        .range = xg->write_workload_uniform ( workload, std_buffer_struct_m ( &fs ) ),
                     )
                 }
             )

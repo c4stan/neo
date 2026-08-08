@@ -99,7 +99,7 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
                 .view_from_world = view_info.view_matrix,
                 .proj_from_view = view_info.proj_matrix,
             };
-            xg_buffer_range_t range = xg->write_workload_uniform ( node_args->workload, &pass_uniforms, sizeof ( pass_uniforms ) );
+            xg_buffer_range_t range = xg->write_workload_uniform ( node_args->workload, std_buffer_struct_m ( &pass_uniforms ) );
 
             xg_resource_bindings_h pass_bindings = xg->cmd_create_workload_bindings ( resource_cmd_buffer, &xg_resource_bindings_params_m ( 
                 .layout = pass_layout,
@@ -155,7 +155,7 @@ static void shadow_pass_routine ( const xf_node_execute_args_t* node_args, void*
                         .buffer_count = 1,
                         .buffers = xg_buffer_resource_binding_m (
                             .shader_register = 0,
-                            .range = xg->write_workload_uniform ( node_args->workload, &draw_uniforms, sizeof ( draw_uniforms ) ),
+                            .range = xg->write_workload_uniform ( node_args->workload, std_buffer_struct_m ( &draw_uniforms ) ),
                         )
                     )
                 ) );
