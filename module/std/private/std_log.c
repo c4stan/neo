@@ -89,7 +89,7 @@ size_t std_callstack ( std_buffer_t buffer ) {
         SymFromAddr ( process, ( DWORD64 ) ( stack[i] ), 0, symbol );
         DWORD displacement;
         SymGetLineFromAddr ( process, ( DWORD64 ) ( stack[i] ), &displacement, &line );
-        std_string_append ( &string, buffer );
+        std_string_append_format ( &string, std_fmt_str_m ":" std_fmt_u32_m std_fmt_newline_m, symbol->Name, line.LineNumber );
     }
 
     SymCleanup ( process );
