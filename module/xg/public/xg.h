@@ -324,47 +324,22 @@ typedef enum {
 } xg_cmd_queue_e;
 
 // -- Device Memory --
-/*
-    We keep memory management explicit to the user. The backend only targets modern apis.
-    GPU Allocators work much like cpu allocators. An allocator is required as parameter
-    every time a resource is created.
-*/
-
-// TODO remove allocators interface entirely, just pass memory type enum to resource creation api?
-
 typedef struct {
     uint64_t id;
     uint64_t size : 56;
-    uint64_t device : 4; // TODO use log2 macro on xg_max_active_devices_m
+    uint64_t device : 4;
     uint64_t type :  4;
 } xg_memory_h;
+std_static_assert_m ( xg_max_active_devices_m < 16 );
 
 // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkMemoryPropertyFlagBits.html
-// xg_memory_type_device_m tells whether the memory is resident on GPU or CPU (host)
-// xg_memory_type_mappable_m can only be set if memory is on GPU and tells whether that memory can be memmapped by the host
-// xg_memory_type_cached_m tells whether the memory gets cached on the host.
-// xg_memory_type_coherent_m tells whether the memory is coherent.
-// Non-coherent memory means the host needs to manually flush its writes for the device to be able to see them, and also needs to manually invalidate its own memory in order to see device writes.
-// All current desktop retail GPUs are also coherent when host-visible. Coherent cached memory is good for readback/staging download from GPU. Coherent only memory is good for staging upload to GPU.
-// TODO does non-coherent memory mean write-combine? e.g. a read after a write on host doesn't return the written value? https://fgiesen.wordpress.com/2013/01/29/write-combining-is-not-your-friend/
 typedef enum {
-    xg_memory_type_bit_device_m   = 1 << 0,
-    xg_memory_type_bit_mapped_m   = 1 << 1,
-    xg_memory_type_bit_cached_m   = 1 << 2,
-    xg_memory_type_bit_coherent_m = 1 << 3,
-    //xg_memory_type_for_gpu_only_m = xg_memory_type_device_m,
-    //xg_memory_type_for_dynamic_data_m = xg_memory_type_device_m | xg_memory_type_mappable_m | xg_memory_type_coherent_m,
-    //xg_memory_type_for_upload_m = xg_memory_type_mappable_m | xg_memory_type_coherent_m,
-    //xg_memory_type_for_readback_m = xg_memory_type_mappable_m | xg_memory_type_coherent_m | xg_memory_type_cached_m
+    xg_memory_type_bit_device_m   = 1 << 0, // set if this mem type is the most efficient to access for the GPU
+    xg_memory_type_bit_mapped_m   = 1 << 1, // set if this mem type can be memory mapped for CPU access
+    xg_memory_type_bit_cached_m   = 1 << 2, // set if CPU accesses to this mem type are cached.
+    xg_memory_type_bit_coherent_m = 1 << 3, // set if CPU caching needs to be manually flushed and invalidated. Non-cached memory is always coherent.
 } xg_memory_flag_bit_e;
-/*
-    Handle is internal to the allocator only, it's unique per valid xg_alloc_t but (usually) has no meaning to the backend API
-    Base is the base gpu memory address of the allocation
-    In vulkan (TODO d3d12?) this is also the backend API object result of the backend API function call
-    Offset is relative to Base, and two xg_alloc_t result of two different xg_alloc call can have same Base but different Offset fields
-        This tipically translates in one underlying API gpu memory chunk being shared between two xg_alloc_t
-    Device and Flags are there to provide additional info
-*/
+
 typedef struct {
     xg_memory_h handle;
     uint64_t base;
@@ -377,7 +352,6 @@ typedef struct {
 
 #define xg_null_memory_handle_m ( xg_memory_h ) { -1, -1, -1, -1  }
 #define xg_memory_handle_is_null_m( handle ) ( handle.id == UINT64_MAX || handle.size == UINT64_MAX )
-
 #define xg_null_alloc_m ( xg_alloc_t ) { \
     .handle = xg_null_memory_handle_m, \
     .base = 0, \
@@ -387,23 +361,6 @@ typedef struct {
     .flags = 0, \
     .device = xg_null_handle_m \
 }
-
-#if 0
-// TODO remove completely, just have an alloc/free main API that takes in an enum for the mem type,
-// similar to get_default_allocator but does the alloc/free directly. can then store the mem type into the handle
-// Storing function pointers like this causes crashes when hot reloading the xg dll
-typedef xg_alloc_t ( xg_alloc_f ) ( void* allocator, xg_device_h device, size_t size, size_t alignment );
-typedef void ( xg_free_f ) ( void* allocator, xg_memory_h mem );
-
-typedef struct {
-    void* impl;
-    xg_alloc_f* alloc;
-    xg_free_f* free;
-} xg_allocator_i;
-
-#define xg_null_allocator_m (xg_allocator_i) { NULL, NULL, NULL }
-#define xg_allocator_is_null_m( allocator ) ( allocator.alloc == NULL || allocator.free == NULL )
-#endif
 
 typedef enum {
     xg_memory_type_gpu_only_m,
@@ -957,20 +914,11 @@ typedef enum {
     xg_shader_binding_set_invalid_m
 } xg_shader_binding_set_e;
 
-#if 0
-typedef struct {
-    uint32_t shader_register;
-    xg_shading_stage_bit_e stages;
-    xg_resource_binding_e type;
-    xg_shader_binding_set_e set;
-} xg_resource_binding_layout_t;
-#else
 typedef struct {
     uint32_t shader_register;
     xg_shading_stage_bit_e stages;
     xg_resource_binding_e type;
 } xg_resource_binding_layout_t;
-#endif
 
 #define xg_resource_binding_layout_m( ... ) ( xg_resource_binding_layout_t ) { \
     .shader_register = -1, \
@@ -983,10 +931,6 @@ typedef struct {
     xg_device_h device;
     xg_resource_binding_layout_t resources[xg_pipeline_resource_max_bindings_m];
     uint32_t resource_count;
-    //uint32_t uniform_buffer_count;
-    //uint32_t texture_count;
-    //uint32_t sampler_count;
-    //uint32_t raytrace_world_count;
     char debug_name[xg_debug_name_size_m];
 } xg_resource_bindings_layout_params_t;
 
@@ -1012,6 +956,8 @@ typedef struct {
     .binding_points_count = 0, \
     __VA_ARGS__ \
 }
+
+// -- Pipeline states --
 
 typedef struct {
     bool enable;
@@ -1112,23 +1058,9 @@ typedef struct {
     __VA_ARGS__ \
 }
 
-#if 0
-typedef struct {
-    uint32_t closest;
-    uint32_t any;
-    uint32_t intersect;
-} xg_raytrace_pipeline_hit_shader_group_t;
-
-#define xg_raytrace_pipeline_hit_shader_group_m( ... ) ( xg_raytrace_pipeline_hit_shader_group_t ) {\
-    .closest = -1, \
-    .any = -1, \
-    .intersect = -1, \
-    __VA_ARGS__ \
-}
-#else
 typedef struct {
     uint32_t binding;
-    uint32_t shader;
+    uint32_t shader; // index into shader_state shaders array
 } xg_raytrace_pipeline_gen_shader_t;
 
 #define xg_raytrace_pipeline_gen_shader_m( ... ) ( xg_raytrace_pipeline_gen_shader_t ) { \
@@ -1139,7 +1071,7 @@ typedef struct {
 
 typedef struct {
     uint32_t binding;
-    uint32_t shader;
+    uint32_t shader; // index into shader_state shaders array
 } xg_raytrace_pipeline_miss_shader_t;
 
 #define xg_raytrace_pipeline_miss_shader_m( ... ) ( xg_raytrace_pipeline_miss_shader_t ) { \
@@ -1149,6 +1081,7 @@ typedef struct {
 }
 
 typedef struct {
+    // indices into shader_state shaders array
     uint32_t binding;
     uint32_t closest_shader;
     uint32_t any_shader;
@@ -1162,7 +1095,6 @@ typedef struct {
     .intersection_shader = -1, \
     __VA_ARGS__ \
 }
-#endif
 
 typedef struct {
     int32_t shader_count;
@@ -1252,26 +1184,6 @@ typedef struct {
 } xg_pipeline_info_t;
 
 // -- Resource Management --
-// TODO simplyfy/abstract a bit the below?
-// Where not specified, a usage encompasses both pipeline output and pipeline resource usage
-/*
-    ** TODO make sure all of what is said here is actually happening **
-
-    Texture layouts are used to specify a physical layout for the data associated with a texture.
-    Layouts are aexclusive, meaning that only one layout can be active at a time.
-
-    Texture usages are used to specify all the possible ways a texture will be used in the future.
-    Multiple usages can and ofter are specified for a single texture.
-    In practice, some of those usages are exclusive with each other, meaning that one cannot
-    always use a texture in any two different ways at the same time. For example, a textrure cannot
-    both be a pipeline resource and a color output. If the runtime detects that a texture is
-    being used in those two ways at the same time, an error will be thrown (TODO more info on this). Moreover,
-    some usages are always incompatible. For example, a texture can never be a color output and
-    a depth stencil output, not even at different times. In this case, an error will be thrown
-    when trying to create such resource.
-
-*/
-
 typedef enum {
     xg_buffer_usage_bit_none_m                          =      0,
     xg_buffer_usage_bit_copy_source_m                   = 1 << 0,
@@ -1352,13 +1264,6 @@ typedef enum {
     xg_pipeline_stage_bit_ray_acceleration_structure_build_m    = 0x02000000,
 } xg_pipeline_stage_bit_e;
 
-/*
-typedef struct {
-    xg_pipeline_stage_bit_e blocker;    // srcStageMask
-    xg_pipeline_stage_bit_e blocked;    // dstStageMask
-} xg_execution_barrier_t;
-*/
-
 // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccessFlagBits.html
 // TODO add and use acceleration_structure related bits
 typedef enum {
@@ -1383,21 +1288,6 @@ typedef enum {
 } xg_memory_access_bit_e;
 
 /*
-typedef struct {
-    //xg_execution_barrier_t execution;
-    xg_memory_access_bit_e cache_flushes;           // make any cache that can possibly contain one of these memory accesses flush its content, thus making the changes visible from outside. srcAccessMask
-    xg_memory_access_bit_e cache_invalidations;     // make any cache that can possibly contain one of these memory accesses invalidate its content, thus making it able to see outside changes. dstAccessMask
-} xg_memory_barrier_t;
-
-typedef struct {
-    xg_texture_h texture;
-    xg_texture_layout_e old_layout;
-    xg_texture_layout_e new_layout;
-    xg_memory_barrier_t memory;
-} xg_texture_memory_barrier_t;
-*/
-
-/*
     execution dependencies ensure that work in specified stages completes fully before starting work on other specified stages
     memory dependencies ensure that data written on one cache will be visible on other caches by flushing the source cache to main memory and invalidating the dest cache
 
@@ -1406,7 +1296,6 @@ typedef struct {
     RaW and WaW dependencies require a memory dependency in order to assure that the first write is visible to the following read, and that the 2 writes read main memory in the right order
     https://github.com/ARM-software/vulkan-sdk/issues/25
 */
-
 typedef struct {
     xg_pipeline_stage_bit_e blocker; // the stages that need to complete before blocked can be executed
     xg_pipeline_stage_bit_e blocked; // the stages that need to wait for blocker to complete before executing
@@ -1641,18 +1530,6 @@ typedef struct {
 }
 
 // TODO rename to xg_shader_resource_bindings_t?
-// TODO store whole arrays instead of pointers here? makes filling this struct easier
-#if 0
-typedef struct {
-    xg_shader_binding_set_e set;
-    uint32_t buffer_count;
-    uint32_t texture_count;
-    uint32_t sampler_count;
-    xg_buffer_resource_binding_t* buffers;
-    xg_texture_resource_binding_t* textures;
-    xg_sampler_resource_binding_t* samplers;
-} xg_pipeline_resource_bindings_t;
-#else
 typedef struct {
     uint32_t buffer_count;
     uint32_t texture_count;
@@ -1663,20 +1540,7 @@ typedef struct {
     xg_sampler_resource_binding_t samplers[xg_pipeline_resource_max_samplers_per_set_m];
     xg_raytrace_world_resource_binding_t raytrace_worlds[xg_pipeline_resource_max_raytrace_worlds_per_set_m];
 } xg_pipeline_resource_bindings_t; // TODO rename?
-#endif
 
-#if 0
-#define xg_pipeline_resource_bindings_m( ... ) ( xg_pipeline_resource_bindings_t ) { \
-    .set = xg_shader_binding_set_invalid_m, \
-    .buffer_count = 0, \
-    .texture_count = 0, \
-    .sampler_count = 0, \
-    .buffers = NULL, \
-    .textures = NULL, \
-    .samplers = NULL, \
-    __VA_ARGS__ \
-}
-#else
 #define xg_pipeline_resource_bindings_m( ... ) ( xg_pipeline_resource_bindings_t ) { \
     .buffer_count = 0, \
     .texture_count = 0, \
@@ -1687,11 +1551,9 @@ typedef struct {
     .raytrace_worlds = { [0 ... xg_pipeline_resource_max_raytrace_worlds_per_set_m-1] = xg_raytrace_world_resource_binding_m() }, \
     __VA_ARGS__ \
 }
-#endif
 
 typedef struct {
     xg_resource_bindings_layout_h layout;
-    //xg_pipeline_state_h pipeline;
     xg_pipeline_resource_bindings_t bindings;
 } xg_resource_bindings_params_t;
 
@@ -1842,10 +1704,6 @@ typedef struct {
     .depth_stencil = xg_depth_stencil_binding_m(), \
     __VA_ARGS__ \
 }
-//    .dynamic_state = xg_graphics_pipeline_dynamic_state_bit_none_m, \
-//    .dynamic_viewport = xg_dynamic_viewport_state_m(), \
-//    .dynamic_scissor = xg_dynamic_scissor_state_m(), \
-
 
 typedef struct {
     xg_raytrace_pipeline_state_h pipeline;
@@ -1865,9 +1723,6 @@ typedef struct {
 }
 
 typedef struct {
-    //xg_execution_barrier_t execution_barrier;
-    //xg_execution_barrier_t* execution_barriers;
-    //size_t execution_barriers_count;
     xg_memory_barrier_t* memory_barriers;
     size_t memory_barriers_count;
     xg_buffer_memory_barrier_t* buffer_memory_barriers;
@@ -2157,8 +2012,7 @@ typedef struct {
 } xg_sampler_info_t;
 
 // TODO remove resource cmd buffers entirely and just pass a workload handle 
-// and a time when calling current resource cmd buffer api? what's the point
-// of having resource cmd buffers?
+// and a time when calling current resource cmd buffer api?
 typedef enum {
     // TODO add prev_workload_complete ?
     xg_resource_cmd_buffer_time_workload_start_m, // TODO rename to workload_submit?

@@ -34,20 +34,23 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
     std_log_info_m ( "Creating new VkInstance with " std_fmt_size_m " requested layers and " std_fmt_size_m " requested extensions...", layers_count, extensions_count );
     VkInstance instance;
 
+    const bool print_instance_validation = true;
     // Validate Layers
     const char* enabled_layers[xg_vk_query_max_layers_m];
     uint32_t enabled_layers_count = 0;
     {
         uint32_t supported_layers_count = 0;
-        xg_vk_safecall_m ( vkEnumerateInstanceLayerProperties ( &supported_layers_count, NULL ), VK_NULL_HANDLE );
+        xg_vk_verify_m ( vkEnumerateInstanceLayerProperties ( &supported_layers_count, NULL ) );
         std_assert_m ( xg_vk_query_max_layers_m >= supported_layers_count, "Device supports more layers than current cap. Increase xg_vk_query_max_layers_m." );
         VkLayerProperties supported_layers[xg_vk_query_max_layers_m];
-        xg_vk_safecall_m ( vkEnumerateInstanceLayerProperties ( &supported_layers_count, supported_layers ), VK_NULL_HANDLE );
+        xg_vk_verify_m ( vkEnumerateInstanceLayerProperties ( &supported_layers_count, supported_layers ) );
         enabled_layers_count = 0;
 
         for ( size_t i = 0; i < layers_count; ++i ) {
             bool found = false;
-            std_log_info_m ( "Validating requested layer " std_fmt_str_m " ...", layers[i] );
+            if ( print_instance_validation ) {
+                std_log_info_m ( "Validating requested layer " std_fmt_str_m " ...", layers[i] );
+            }
 
             for ( uint32_t j = 0; j < supported_layers_count; ++j ) {
                 if ( std_str_cmp ( layers[i], supported_layers[j].layerName ) == 0 ) {
@@ -68,14 +71,16 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
     uint32_t enabled_extensions_count = 0;
     {
         uint32_t supported_extensions_count = 0;
-        xg_vk_safecall_m ( vkEnumerateInstanceExtensionProperties ( NULL, &supported_extensions_count, NULL ), VK_NULL_HANDLE );
+        xg_vk_verify_m ( vkEnumerateInstanceExtensionProperties ( NULL, &supported_extensions_count, NULL ) );
         std_assert_m ( xg_vk_query_max_instance_extensions_m >= supported_extensions_count, "Vulkan Instance supports more extensions than current cap. Increase xg_vk_query_max_instance_extensions_m." );
         VkExtensionProperties supported_extensions[xg_vk_query_max_instance_extensions_m];
-        xg_vk_safecall_m ( vkEnumerateInstanceExtensionProperties ( NULL, &supported_extensions_count, supported_extensions ), VK_NULL_HANDLE );
+        xg_vk_verify_m ( vkEnumerateInstanceExtensionProperties ( NULL, &supported_extensions_count, supported_extensions ) );
 
         for ( uint32_t i = 0; i < extensions_count; ++i ) {
             bool found = false;
-            std_log_info_m ( "Validating requested instance extension " std_fmt_str_m " ...", extensions[i] );
+            if ( print_instance_validation ) {
+                std_log_info_m ( "Validating requested instance extension " std_fmt_str_m " ...", extensions[i] );
+            }
 
             for ( uint32_t j = 0; j < supported_extensions_count; ++j ) {
                 if ( std_str_cmp ( extensions[i], supported_extensions[j].extensionName ) == 0 ) {
@@ -93,16 +98,14 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
 
     // Create Instance
     {
-    #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
-        uint32_t instance_version;
-        xg_vk_safecall_m ( vkEnumerateInstanceVersion ( &instance_version ), VK_NULL_HANDLE );
-        uint32_t variant = VK_API_VERSION_VARIANT ( instance_version );
-        uint32_t major = VK_API_VERSION_MAJOR ( instance_version );
-        uint32_t minor = VK_API_VERSION_MINOR ( instance_version );
-        uint32_t patch = VK_API_VERSION_PATCH ( instance_version );
-        std_assert_m ( variant == 0 );
-        std_log_info_m ( "Using Vulkan API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m, major, minor, patch );
-    #endif
+    uint32_t instance_version;
+    xg_vk_verify_m ( vkEnumerateInstanceVersion ( &instance_version ) );
+    uint32_t variant = VK_API_VERSION_VARIANT ( instance_version );
+    uint32_t major = VK_API_VERSION_MAJOR ( instance_version );
+    uint32_t minor = VK_API_VERSION_MINOR ( instance_version );
+    uint32_t patch = VK_API_VERSION_PATCH ( instance_version );
+    std_assert_m ( variant == 0 );
+    std_log_info_m ( "Found Vulkan API " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m, major, minor, patch );
 
         // TODO enable in debug only
 #if 1
@@ -121,7 +124,7 @@ static VkInstance xg_vk_instance_create ( const char** layers, size_t layers_cou
             .applicationVersion = 1,
             .pEngineName = "XG",
             .engineVersion = 1,
-            .apiVersion = VK_API_VERSION_1_3,//instance_version;
+            .apiVersion = instance_version,//instance_version;
         };
         VkInstanceCreateInfo instanceInfo = {
             .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,

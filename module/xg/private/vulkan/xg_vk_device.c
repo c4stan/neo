@@ -141,7 +141,6 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
             .sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2,
             .pNext = &device->queue_checkpoint_properties[i]
         };
-        //vkGetPhysicalDeviceQueueFamilyProperties ( device->vk_physical_handle, &device->queue_family_count, device->queue_family_properties );
     }
     vkGetPhysicalDeviceQueueFamilyProperties2 ( device->vk_physical_handle, &device->queue_family_count, queue_faimily_queries );
     for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
@@ -157,118 +156,121 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructureHostCommands );
 #endif
 
-    // needed for sv_primitiveID I think
+    // needed for sv_primitiveID
     // TODO avoid using this? 
     //      see https://x.com/SebAaltonen/status/1821440546096689383
     //          Variable Rate Shading with Visibility Buffer Rendering - John Hable - SIGGRAPH 2024
     std_assert_m ( device->supported_features.geometryShader );
 
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
-    // Print generic properties
-    uint32_t api_major = VK_VERSION_MAJOR ( device->generic_properties.apiVersion );
-    uint32_t api_minor = VK_VERSION_MINOR ( device->generic_properties.apiVersion );
-    uint32_t api_patch = VK_VERSION_PATCH ( device->generic_properties.apiVersion );
-    std_log_info_m ( std_fmt_str_m " (" std_fmt_h32_m ") " std_fmt_str_m " (" std_fmt_str_m ") - driver version " std_fmt_u32_m " - supported API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m,
-        xg_vk_device_vendor_name ( device->generic_properties.vendorID ), device->generic_properties.vendorID, device->generic_properties.deviceName,
-        xg_vk_device_type_str ( device->generic_properties.deviceType ), device->generic_properties.driverVersion, api_major, api_minor, api_patch );
+    const bool print_device_properties = true;
+    if ( print_device_properties ) {
+        // Print generic properties
+        uint32_t api_major = VK_VERSION_MAJOR ( device->generic_properties.apiVersion );
+        uint32_t api_minor = VK_VERSION_MINOR ( device->generic_properties.apiVersion );
+        uint32_t api_patch = VK_VERSION_PATCH ( device->generic_properties.apiVersion );
+        std_log_info_m ( std_fmt_str_m " (" std_fmt_h32_m ") " std_fmt_str_m " (" std_fmt_str_m ") - driver version " std_fmt_u32_m " - supported API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m,
+            xg_vk_device_vendor_name ( device->generic_properties.vendorID ), device->generic_properties.vendorID, device->generic_properties.deviceName,
+            xg_vk_device_type_str ( device->generic_properties.deviceType ), device->generic_properties.driverVersion, api_major, api_minor, api_patch );
 
-    uint32_t uniform_buffer_alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
-    uint32_t texel_buffer_alignment = device->generic_properties.limits.minTexelBufferOffsetAlignment;
-    uint32_t storage_buffer_alignment = device->generic_properties.limits.minStorageBufferOffsetAlignment;
-    uint32_t max_uniform_range = device->generic_properties.limits.maxUniformBufferRange;
-    uint32_t max_texel_elements = device->generic_properties.limits.maxTexelBufferElements;
-    uint32_t max_storage_range = device->generic_properties.limits.maxStorageBufferRange;
-    uint32_t max_set_bindings = device->generic_properties.limits.maxBoundDescriptorSets;
-    uint32_t max_uniform_buffers_per_stage = device->generic_properties.limits.maxPerStageDescriptorUniformBuffers;
-    uint32_t max_storage_buffers_per_stage = device->generic_properties.limits.maxPerStageDescriptorStorageBuffers;
-    uint32_t max_sampled_images_per_stage = device->generic_properties.limits.maxPerStageDescriptorSampledImages;
-    uint32_t max_resources_per_stage = device->generic_properties.limits.maxPerStageResources;
-    uint32_t max_vertex_input_attributes = device->generic_properties.limits.maxVertexInputAttributes;
-    uint32_t max_vertex_input_streams = device->generic_properties.limits.maxVertexInputBindings;
-    uint32_t max_sampled_images_per_set = device->generic_properties.limits.maxDescriptorSetSampledImages;
-#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
-    char max_uniform_range_str[32];
-    char max_texel_elements_str[32];
-    char max_storage_range_str[32];
-    std_size_to_str_approx ( max_uniform_range_str, 32, max_uniform_range );
-    std_count_to_str_approx ( max_texel_elements_str, 32, max_texel_elements );
-    std_size_to_str_approx ( max_storage_range_str, 32, max_storage_range );
-#endif
-    std_log_info_m ( "Uniform buffer binding required alignment: " std_fmt_u32_m, uniform_buffer_alignment );
-    std_log_info_m ( "Texel buffer binding required alignment: " std_fmt_u32_m, texel_buffer_alignment );
-    std_log_info_m ( "Storage buffer binding required alignment: " std_fmt_u32_m, storage_buffer_alignment );
-    std_log_info_m ( "Uniform buffer binding maximum range size: " std_fmt_u32_m " (" std_fmt_str_m ")", max_uniform_range, max_uniform_range_str );
-    std_log_info_m ( "Texel buffer binding maximum texel count: " std_fmt_u32_m  " (" std_fmt_str_m ")", max_texel_elements, max_texel_elements_str );
-    std_log_info_m ( "Storage buffer binding maximum range size: " std_fmt_u32_m  " (" std_fmt_str_m ")", max_storage_range, max_storage_range_str );
-    std_log_info_m ( "Max set bindings:" std_fmt_u32_m, max_set_bindings );
-    std_log_info_m ( "Max uniform buffers per stage: " std_fmt_u32_m, max_uniform_buffers_per_stage );
-    std_log_info_m ( "Max storage buffers per stage: " std_fmt_u32_m, max_storage_buffers_per_stage );
-    std_log_info_m ( "Max sampled images per stage: " std_fmt_u32_m, max_sampled_images_per_stage );
-    std_log_info_m ( "Max sampled images per set: " std_fmt_u32_m, max_sampled_images_per_set );
-    std_log_info_m ( "Max resources per stage: " std_fmt_u32_m, max_resources_per_stage );
-    std_log_info_m ( "Max vertex input attributes: " std_fmt_u32_m, max_vertex_input_attributes );
-    std_log_info_m ( "Max vertex input streams: " std_fmt_u32_m, max_vertex_input_streams );
+        uint32_t uniform_buffer_alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
+        uint32_t texel_buffer_alignment = device->generic_properties.limits.minTexelBufferOffsetAlignment;
+        uint32_t storage_buffer_alignment = device->generic_properties.limits.minStorageBufferOffsetAlignment;
+        uint32_t max_uniform_range = device->generic_properties.limits.maxUniformBufferRange;
+        uint32_t max_texel_elements = device->generic_properties.limits.maxTexelBufferElements;
+        uint32_t max_storage_range = device->generic_properties.limits.maxStorageBufferRange;
+        uint32_t max_set_bindings = device->generic_properties.limits.maxBoundDescriptorSets;
+        uint32_t max_uniform_buffers_per_stage = device->generic_properties.limits.maxPerStageDescriptorUniformBuffers;
+        uint32_t max_storage_buffers_per_stage = device->generic_properties.limits.maxPerStageDescriptorStorageBuffers;
+        uint32_t max_sampled_images_per_stage = device->generic_properties.limits.maxPerStageDescriptorSampledImages;
+        uint32_t max_resources_per_stage = device->generic_properties.limits.maxPerStageResources;
+        uint32_t max_vertex_input_attributes = device->generic_properties.limits.maxVertexInputAttributes;
+        uint32_t max_vertex_input_streams = device->generic_properties.limits.maxVertexInputBindings;
+        uint32_t max_sampled_images_per_set = device->generic_properties.limits.maxDescriptorSetSampledImages;
+    #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
+        char max_uniform_range_str[32];
+        char max_texel_elements_str[32];
+        char max_storage_range_str[32];
+        std_size_to_str_approx ( max_uniform_range_str, 32, max_uniform_range );
+        std_count_to_str_approx ( max_texel_elements_str, 32, max_texel_elements );
+        std_size_to_str_approx ( max_storage_range_str, 32, max_storage_range );
+    #endif
+        std_log_info_m ( "Uniform buffer binding required alignment: " std_fmt_u32_m, uniform_buffer_alignment );
+        std_log_info_m ( "Texel buffer binding required alignment: " std_fmt_u32_m, texel_buffer_alignment );
+        std_log_info_m ( "Storage buffer binding required alignment: " std_fmt_u32_m, storage_buffer_alignment );
+        std_log_info_m ( "Uniform buffer binding maximum range size: " std_fmt_u32_m " (" std_fmt_str_m ")", max_uniform_range, max_uniform_range_str );
+        std_log_info_m ( "Texel buffer binding maximum texel count: " std_fmt_u32_m  " (" std_fmt_str_m ")", max_texel_elements, max_texel_elements_str );
+        std_log_info_m ( "Storage buffer binding maximum range size: " std_fmt_u32_m  " (" std_fmt_str_m ")", max_storage_range, max_storage_range_str );
+        std_log_info_m ( "Max set bindings:" std_fmt_u32_m, max_set_bindings );
+        std_log_info_m ( "Max uniform buffers per stage: " std_fmt_u32_m, max_uniform_buffers_per_stage );
+        std_log_info_m ( "Max storage buffers per stage: " std_fmt_u32_m, max_storage_buffers_per_stage );
+        std_log_info_m ( "Max sampled images per stage: " std_fmt_u32_m, max_sampled_images_per_stage );
+        std_log_info_m ( "Max sampled images per set: " std_fmt_u32_m, max_sampled_images_per_set );
+        std_log_info_m ( "Max resources per stage: " std_fmt_u32_m, max_resources_per_stage );
+        std_log_info_m ( "Max vertex input attributes: " std_fmt_u32_m, max_vertex_input_attributes );
+        std_log_info_m ( "Max vertex input streams: " std_fmt_u32_m, max_vertex_input_streams );
 
-    // Print list of formats that support render target
-    std_log_info_m ( "Supported render target formats:" );
+        // Print list of formats that support render target
+        std_log_info_m ( "Supported render target formats:" );
 
-    for ( uint64_t i = 0; i < xg_format_count_m; ++i ) {
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties ( device->vk_physical_handle, xg_format_to_vk ( ( xg_format_e ) i ), &props );
+        for ( uint64_t i = 0; i < xg_format_count_m; ++i ) {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties ( device->vk_physical_handle, xg_format_to_vk ( ( xg_format_e ) i ), &props );
 
-        if ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT ) {
-            std_assert_m ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT );
-            std_log_info_m ( std_fmt_tab_m std_fmt_str_m, xg_format_str ( ( xg_format_e ) i ) );
+            if ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT ) {
+                std_assert_m ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT );
+                std_log_info_m ( std_fmt_tab_m std_fmt_str_m, xg_format_str ( ( xg_format_e ) i ) );
+            }
         }
-    }
 
-    // Print list of formats that support depth stencil target
-    std_log_info_m ( "Supported depth stencil target formats:" );
-    for ( uint64_t i = 0; i < xg_format_count_m; ++i ) {
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties ( device->vk_physical_handle, xg_format_to_vk ( ( xg_format_e ) i ), &props );
+        // Print list of formats that support depth stencil target
+        std_log_info_m ( "Supported depth stencil target formats:" );
+        for ( uint64_t i = 0; i < xg_format_count_m; ++i ) {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties ( device->vk_physical_handle, xg_format_to_vk ( ( xg_format_e ) i ), &props );
 
-        if ( ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT ) ) {
-            std_assert_m ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT );
-            std_log_info_m ( std_fmt_tab_m std_fmt_str_m, xg_format_str ( ( xg_format_e ) i ) );
+            if ( ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT ) ) {
+                std_assert_m ( props.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT );
+                std_log_info_m ( std_fmt_tab_m std_fmt_str_m, xg_format_str ( ( xg_format_e ) i ) );
+            }
         }
-    }
 
-    // Print memory properties
-    for ( uint32_t i = 0; i < device->memory_properties.memoryHeapCount; ++i ) {
-        VkMemoryHeapFlags flags = device->memory_properties.memoryHeaps[i].flags;
-        VkDeviceSize size = device->memory_properties.memoryHeaps[i].size;
-        const char* desc = xg_vk_device_memory_heap_str ( flags );
+        // Print memory properties
+        for ( uint32_t i = 0; i < device->memory_properties.memoryHeapCount; ++i ) {
+            VkMemoryHeapFlags flags = device->memory_properties.memoryHeaps[i].flags;
+            VkDeviceSize size = device->memory_properties.memoryHeaps[i].size;
+            const char* desc = xg_vk_device_memory_heap_str ( flags );
 
-        if ( size < 1024 ) {
-            std_log_info_m ( "Memory Heap " std_fmt_u32_m ": " std_fmt_str_m " - " std_fmt_u64_m " B", i, desc, size );
-        } else {
-            char short_size[16];
-            std_size_to_str_approx ( short_size, 16, size );
-            std_log_info_m ( "Memory Heap " std_fmt_u32_m ": " std_fmt_str_m " - " std_fmt_u64_m " B (" std_fmt_str_m ")", i, desc, size, short_size );
+            if ( size < 1024 ) {
+                std_log_info_m ( "Memory Heap " std_fmt_u32_m ": " std_fmt_str_m " - " std_fmt_u64_m " B", i, desc, size );
+            } else {
+                char short_size[16];
+                std_size_to_str_approx ( short_size, 16, size );
+                std_log_info_m ( "Memory Heap " std_fmt_u32_m ": " std_fmt_str_m " - " std_fmt_u64_m " B (" std_fmt_str_m ")", i, desc, size, short_size );
+            }
         }
-    }
 
-    // Print memory types
-    for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
-        VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
-        uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
-        const char* desc = xg_vk_device_memory_type_str ( flags );
-        std_log_info_m ( "Memory Type " std_fmt_u32_m ": " std_fmt_str_m " - Heap " std_fmt_u32_m, i, desc, heap );
-    }
+        // Print memory types
+        for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
+            VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
+            uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
+            const char* desc = xg_vk_device_memory_type_str ( flags );
+            std_log_info_m ( "Memory Type " std_fmt_u32_m ": " std_fmt_str_m " - Heap " std_fmt_u32_m, i, desc, heap );
+        }
 
-    // Print queue family properties
-    for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
-        VkQueueFlags flags = device->queue_family_properties[i].queueFlags;
-        uint32_t count = device->queue_family_properties[i].queueCount;
-        uint32_t timestap_bits = device->queue_family_properties[i].timestampValidBits;
-        VkExtent3D copy_granularity = device->queue_family_properties[i].minImageTransferGranularity;
-        char buffer[32];
-        std_u32_to_bin_str ( buffer, device->queue_checkpoint_properties[i].checkpointExecutionStageMask );
-        const char* desc = xg_vk_device_queue_str ( flags );
-        std_log_info_m ( "Queue family " std_fmt_u32_m ": " std_fmt_u32_m " queues - " std_fmt_str_m " - <" std_fmt_u32_m
-            "," std_fmt_u32_m "," std_fmt_u32_m "> copy granulatity - " std_fmt_u32_m " bits timestamps - " std_fmt_str_m " checkpoint stages",
-            i, count, desc, copy_granularity.width, copy_granularity.height, copy_granularity.depth, timestap_bits, buffer );
+        // Print queue family properties
+        for ( uint32_t i = 0; i < device->queue_family_count; ++i ) {
+            VkQueueFlags flags = device->queue_family_properties[i].queueFlags;
+            uint32_t count = device->queue_family_properties[i].queueCount;
+            uint32_t timestap_bits = device->queue_family_properties[i].timestampValidBits;
+            VkExtent3D copy_granularity = device->queue_family_properties[i].minImageTransferGranularity;
+            char buffer[32];
+            std_u32_to_bin_str ( buffer, device->queue_checkpoint_properties[i].checkpointExecutionStageMask );
+            const char* desc = xg_vk_device_queue_str ( flags );
+            std_log_info_m ( "Queue family " std_fmt_u32_m ": " std_fmt_u32_m " queues - " std_fmt_str_m " - <" std_fmt_u32_m
+                "," std_fmt_u32_m "," std_fmt_u32_m "> copy granulatity - " std_fmt_u32_m " bits timestamps - " std_fmt_str_m " checkpoint stages",
+                i, count, desc, copy_granularity.width, copy_granularity.height, copy_granularity.depth, timestap_bits, buffer );
+        }
     }
 #endif
 
@@ -637,7 +639,6 @@ const xg_vk_device_t* xg_vk_device_get ( xg_device_h device_handle ) {
     return device;
 }
 
-// avoid having external code depending on the handle format
 uint64_t xg_vk_device_get_idx ( xg_device_h device_handle ) {
     return device_handle;
 }
@@ -799,24 +800,6 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
 
     xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
 
-    // Fill Layers list
-    // *** Device layers are deprecated ***
-#if 0
-    uint32_t supported_layers_count = 0;
-    xg_vk_safecall_m ( vkEnumerateDeviceLayerProperties ( device->physical_id, &supported_layers_count, NULL ), false );
-    VkLayerProperties* supported_layers = std_stack_push_array_m ( allocator, VkLayerProperties, supported_layers_count );
-    xg_vk_safecall_m ( vkEnumerateDeviceLayerProperties ( device->physical_id, &supported_layers_count, supported_layers ), false );
-    const char** enabled_layers = std_stack_push_array_m ( allocator, const char*, supported_layers_count );
-
-    for ( uint32_t i = 0; i < supported_layers_count; ++i ) {
-        enabled_layers[i] = supported_layers[i].layerName;
-    }
-
-    uint32_t enabled_layers_count = supported_layers_count;
-#endif
-    const char** enabled_layers = NULL;
-    uint32_t enabled_layers_count = 0;
-
     // Fill Extensions list
     VkExtensionProperties supported_extensions[xg_vk_query_max_device_extensions_m];
     uint32_t supported_extensions_count = 0;
@@ -908,7 +891,7 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     }
 
     // Fill queue info
-    // We only support one queue per type for now
+    // Support is limited to one queue per type (for now)
     VkDeviceQueueCreateInfo* queue_create_info = device->queue_create_info;
     float queue_priority = 1;
 
@@ -980,15 +963,14 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     device_create_info.flags = 0;
     device_create_info.queueCreateInfoCount = device->queue_create_info_count;
     device_create_info.pQueueCreateInfos = queue_create_info;
-    device_create_info.enabledLayerCount = enabled_layers_count;
-    device_create_info.ppEnabledLayerNames = enabled_layers;
+    device_create_info.enabledLayerCount = 0; // Device layers are legacy
+    device_create_info.ppEnabledLayerNames = NULL;
     device_create_info.enabledExtensionCount = enabled_extensions_count;
     device_create_info.ppEnabledExtensionNames = enabled_extensions;
     device_create_info.pEnabledFeatures = &enabled_features;
     vkCreateDevice ( device->vk_physical_handle, &device_create_info, xg_vk_cpu_allocator(), &device->vk_handle );
 
     // Create Device queues
-    // We only support one queue per type for now
     vkGetDeviceQueue ( device->vk_handle, device->queues[xg_cmd_queue_graphics_m].vk_family_idx, 0, &device->queues[xg_cmd_queue_graphics_m].vk_handle );
     vkGetDeviceQueue ( device->vk_handle, device->queues[xg_cmd_queue_compute_m].vk_family_idx, 0, &device->queues[xg_cmd_queue_compute_m].vk_handle );
     vkGetDeviceQueue ( device->vk_handle, device->queues[xg_cmd_queue_copy_m].vk_family_idx, 0, &device->queues[xg_cmd_queue_copy_m].vk_handle );

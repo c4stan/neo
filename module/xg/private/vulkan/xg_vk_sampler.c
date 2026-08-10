@@ -85,7 +85,7 @@ xg_sampler_h xg_sampler_create ( const xg_sampler_params_t* params ) {
     create_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
     create_info.unnormalizedCoordinates = VK_FALSE;
     VkSampler vk_sampler;
-    xg_vk_assert_m ( vkCreateSampler ( device->vk_handle, &create_info, NULL, &vk_sampler ) );
+    xg_vk_verify_m ( vkCreateSampler ( device->vk_handle, &create_info, NULL, &vk_sampler ) );
 
     std_mutex_lock ( &xg_vk_sampler_state->samplers_mutex );
     xg_vk_sampler_t* sampler = std_list_pop_m ( &xg_vk_sampler_state->samplers_freelist );

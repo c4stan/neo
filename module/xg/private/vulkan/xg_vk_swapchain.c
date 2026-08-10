@@ -74,7 +74,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     surface_create_info.flags = 0;
     surface_create_info.hinstance = ( HINSTANCE ) window_info.os_handle.win32.hinstance;
     surface_create_info.hwnd = ( HWND ) window_info.os_handle.win32.hwnd;
-    xg_vk_safecall_m ( vkCreateWin32SurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &swapchain->surface ), xg_null_handle_m );
+    xg_vk_verify_m ( vkCreateWin32SurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &swapchain->surface ) );
 #elif defined(std_platform_linux_m)
     VkXlibSurfaceCreateInfoKHR surface_create_info;
     surface_create_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -82,18 +82,20 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     surface_create_info.flags = 0;
     surface_create_info.dpy = ( Display* ) window_info.os_handle.x11.display;
     surface_create_info.window = ( Window ) window_info.os_handle.x11.window;
-    xg_vk_safecall_m ( vkCreateXlibSurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &swapchain->surface ), xg_null_handle_m );
+    xg_vk_verify_m ( vkCreateXlibSurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &swapchain->surface ) );
 #endif
 
     // Get surface capabilities
     VkSurfaceCapabilitiesKHR surface_capabilities;
-    xg_vk_safecall_m ( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ( device->vk_physical_handle, swapchain->surface, &surface_capabilities ), xg_null_handle_m );
+    xg_vk_verify_m ( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ( device->vk_physical_handle, swapchain->surface, &surface_capabilities ) );
 
     // Print surface capabilities
+    const bool print_surface_info = true;
     // note: maxImageCount==0 means no upper limit
-    std_log_info_m ( "Window supports texture resolution between " std_fmt_u32_m "x" std_fmt_u32_m " and " std_fmt_u32_m "x" std_fmt_u32_m " and texture count between " std_fmt_u32_m " and " std_fmt_u32_m,
-        surface_capabilities.minImageExtent.width, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.width, surface_capabilities.maxImageExtent.height,
-        surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
+    if ( print_surface_info ) {
+        std_log_info_m ( "Window supports texture resolution between " std_fmt_u32_m "x" std_fmt_u32_m " and " std_fmt_u32_m "x" std_fmt_u32_m " and texture count between " std_fmt_u32_m " and " std_fmt_u32_m,
+            surface_capabilities.minImageExtent.width, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.width, surface_capabilities.maxImageExtent.height, surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
+    }
     swapchain->width = surface_capabilities.currentExtent.width;
     swapchain->height = surface_capabilities.currentExtent.height;
 
@@ -113,7 +115,9 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         if ( surface_format_count == 0 ) {
             std_log_error_m ( "Window doesn't support any surface format?" );
         } else {
-            std_log_info_m ( "Window supports " std_fmt_u32_m " swapchain texture formats:", surface_format_count );
+            if ( print_surface_info ) {
+                std_log_info_m ( "Window supports " std_fmt_u32_m " swapchain texture formats:", surface_format_count );
+            }
 
             for ( uint32_t i = 0; i < surface_format_count; ++i ) {
                 xg_format_e format = xg_format_from_vk ( surface_formats[i].format );
@@ -121,7 +125,9 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
                 if ( params->format == format && params->color_space == colorspace ) {
                     supported_format = true;
                 }
-                std_log_info_m ( "\t" std_fmt_str_m " - " std_fmt_str_m, xg_format_str ( format ), xg_color_space_str ( colorspace ) );
+                if ( print_surface_info ) {
+                    std_log_info_m ( "\t" std_fmt_str_m " - " std_fmt_str_m, xg_format_str ( format ), xg_color_space_str ( colorspace ) );
+                }
             }
         }
     }
@@ -140,21 +146,22 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     // Get surface present modes
     {
         uint32_t surface_present_mode_count;
-        xg_vk_safecall_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, NULL ), xg_null_handle_m );
+        xg_vk_verify_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, NULL ) );
         std_assert_m ( xg_vk_query_max_present_modes_m >= surface_present_mode_count, "Device supports more present modes than current cap. Increase xg_vk_query_max_present_modes_m." );
         VkPresentModeKHR surface_present_modes[xg_vk_query_max_present_modes_m];
-        xg_vk_safecall_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, surface_present_modes ), xg_null_handle_m );
+        xg_vk_verify_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, surface_present_modes ) );
 
         // Print surface present modes
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
         if ( surface_present_mode_count == 0 ) {
             std_log_error_m ( "Window doesn't support any present mode?" );
         } else {
-            std_log_info_m ( "Window supports " std_fmt_u32_m " present modes:", surface_present_mode_count );
-
-            for ( uint32_t i = 0; i < surface_present_mode_count; ++i ) {
-                xg_present_mode_e present_mode = xg_present_mode_from_vk ( surface_present_modes[i] );
-                std_log_info_m ( "\t" std_fmt_str_m, xg_present_mode_str ( present_mode ) );
+            if ( print_surface_info ) {
+                std_log_info_m ( "Window supports " std_fmt_u32_m " present modes:", surface_present_mode_count );
+                for ( uint32_t i = 0; i < surface_present_mode_count; ++i ) {
+                    xg_present_mode_e present_mode = xg_present_mode_from_vk ( surface_present_modes[i] );
+                    std_log_info_m ( "\t" std_fmt_str_m, xg_present_mode_str ( present_mode ) );
+                }
             }
         }
 #endif
@@ -162,7 +169,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
 
     // Test for present support on given device
     VkBool32 is_surface_supported = VK_FALSE;
-    xg_vk_safecall_m ( vkGetPhysicalDeviceSurfaceSupportKHR ( device->vk_physical_handle, device->queues[xg_cmd_queue_graphics_m].vk_family_idx, swapchain->surface, &is_surface_supported ), xg_null_handle_m );
+    xg_vk_verify_m ( vkGetPhysicalDeviceSurfaceSupportKHR ( device->vk_physical_handle, device->queues[xg_cmd_queue_graphics_m].vk_family_idx, swapchain->surface, &is_surface_supported ) );
 
     if ( is_surface_supported == VK_FALSE ) {
         return xg_null_handle_m;
@@ -199,7 +206,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
         .clipped = VK_TRUE,
         .oldSwapchain = VK_NULL_HANDLE,
     };
-    xg_vk_safecall_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ), xg_null_handle_m );
+    xg_vk_verify_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ) );
 
     if ( params->debug_name[0] != '\0' ) {
         VkDebugUtilsObjectNameInfoEXT debug_name;
@@ -299,7 +306,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
 
     if ( swapchain->window != wm_null_handle_m ) {
         VkSurfaceCapabilitiesKHR surface_capabilities;
-        xg_vk_safecall_m ( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ( device->vk_physical_handle, swapchain->surface, &surface_capabilities ), xg_null_handle_m );
+        xg_vk_verify_m ( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ( device->vk_physical_handle, swapchain->surface, &surface_capabilities ) );
 
         if ( width != surface_capabilities.currentExtent.width || height != surface_capabilities.currentExtent.height ) {
             std_log_warn_m ( "Resize call for swapchain " std_fmt_u64_m " bound to window " std_fmt_u64_m " will ignore provided size of " std_fmt_size_m "x" std_fmt_size_m ", will resize instead to "std_fmt_u32_m "x" std_fmt_u32_m", matching window size.",
@@ -338,7 +345,7 @@ bool xg_vk_swapchain_resize ( xg_swapchain_h swapchain_handle, size_t width, siz
     swapchain_create_info.presentMode = vk_present_mode; //VK_PRESENT_MODE_MAILBOX_KHR;
     swapchain_create_info.clipped = VK_TRUE;
     swapchain_create_info.oldSwapchain = VK_NULL_HANDLE; // TODO
-    xg_vk_safecall_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ), xg_null_handle_m );
+    xg_vk_verify_m ( vkCreateSwapchainKHR ( device->vk_handle, &swapchain_create_info, NULL, &swapchain->vk_handle ) );
 
     if ( swapchain->debug_name[0] != '\0' ) {
         VkDebugUtilsObjectNameInfoEXT debug_name;
@@ -400,7 +407,7 @@ void xg_vk_swapchain_get_window_capabilities ( xg_device_h device_handle, wm_win
     surface_create_info.flags = 0;
     surface_create_info.hinstance = ( HINSTANCE ) window_info.os_handle.win32.hinstance;
     surface_create_info.hwnd = ( HWND ) window_info.os_handle.win32.hwnd;
-    xg_vk_assert_m ( vkCreateWin32SurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &surface ) );
+    xg_vk_verify_m ( vkCreateWin32SurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &surface ) );
 #elif defined(std_platform_linux_m)
     VkXlibSurfaceCreateInfoKHR surface_create_info;
     surface_create_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -408,12 +415,12 @@ void xg_vk_swapchain_get_window_capabilities ( xg_device_h device_handle, wm_win
     surface_create_info.flags = 0;
     surface_create_info.dpy = ( Display* ) window_info.os_handle.x11.display;
     surface_create_info.window = ( Window ) window_info.os_handle.x11.window;
-    xg_vk_assert_m ( vkCreateXlibSurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &surface ) );
+    xg_vk_verify_m ( vkCreateXlibSurfaceKHR ( xg_vk_instance(), &surface_create_info, NULL, &surface ) );
 #endif
 
     // Get surface capabilities
     VkSurfaceCapabilitiesKHR surface_capabilities;
-    xg_vk_assert_m ( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ( device->vk_physical_handle, surface, &surface_capabilities ) );
+    xg_vk_verify_m ( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ( device->vk_physical_handle, surface, &surface_capabilities ) );
 
     // Print surface capabilities
     // note: maxImageCount==0 means no upper limit
@@ -453,10 +460,10 @@ void xg_vk_swapchain_get_window_capabilities ( xg_device_h device_handle, wm_win
     // Get surface present modes
     {
         uint32_t surface_present_mode_count;
-        xg_vk_safecall_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, NULL ), xg_null_handle_m );
+        xg_vk_verify_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, NULL ) );
         std_assert_m ( xg_vk_query_max_present_modes_m >= surface_present_mode_count, "Device supports more present modes than current cap. Increase xg_vk_query_max_present_modes_m." );
         VkPresentModeKHR surface_present_modes[xg_vk_query_max_present_modes_m];
-        xg_vk_safecall_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, surface_present_modes ), xg_null_handle_m );
+        xg_vk_verify_m ( vkGetPhysicalDeviceSurfacePresentModesKHR ( device->vk_physical_handle, swapchain->surface, &surface_present_mode_count, surface_present_modes ) );
 
         // Print surface present modes
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
@@ -656,7 +663,7 @@ void xg_vk_swapchain_present ( xg_swapchain_h swapchain_handle, xg_workload_h wo
         if ( present_result == VK_ERROR_OUT_OF_DATE_KHR ) {
             std_log_warn_m ( "Swapchain " std_fmt_u64_m " out of date, present call failed", swapchain_handle );
         } else {
-            xg_vk_assert_m ( present_result );
+            xg_vk_verify_m ( present_result );
         }
     }
 

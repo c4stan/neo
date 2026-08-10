@@ -329,7 +329,7 @@ static VkImageView xg_texture_view_create_vk ( xg_device_h device_handle, const 
         .subresourceRange.baseArrayLayer = params->desc.array_base,
         .subresourceRange.layerCount = params->array_count,
     };
-    xg_vk_assert_m ( vkCreateImageView ( device->vk_handle, &vk_view_info, NULL, &vk_view ) );
+    xg_vk_verify_m ( vkCreateImageView ( device->vk_handle, &vk_view_info, NULL, &vk_view ) );
 
     if ( params->debug_name[0] ) {        
         VkDebugUtilsObjectNameInfoEXT debug_name;

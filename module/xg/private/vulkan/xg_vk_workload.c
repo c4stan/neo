@@ -193,7 +193,7 @@ static void xg_vk_desc_allocator_init ( xg_vk_desc_allocator_t* allocator, xg_de
     };
 
     VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, NULL, &allocator->vk_desc_pool );
-    xg_vk_assert_m ( result );
+    xg_vk_verify_m ( result );
 
     xg_vk_desc_allocator_reset_counters ( allocator );
 }
@@ -208,7 +208,7 @@ static void xg_vk_cmd_allocator_init ( xg_vk_cmd_allocator_t* allocator, xg_devi
         .queueFamilyIndex = device->queues[queue].vk_family_idx,
     };
     VkResult result = vkCreateCommandPool ( device->vk_handle, &pool_info, NULL, &allocator->vk_cmd_pool );
-    xg_vk_assert_m ( result );
+    xg_vk_verify_m ( result );
 
     // cmd buffers
     VkCommandBufferAllocateInfo buffer_info = {
@@ -219,7 +219,7 @@ static void xg_vk_cmd_allocator_init ( xg_vk_cmd_allocator_t* allocator, xg_devi
         .commandBufferCount = xg_vk_workload_cmd_buffers_per_allocator_m,       // TODO preallocate only some and allocate more when we run out?
     };
     result = vkAllocateCommandBuffers ( device->vk_handle, &buffer_info, allocator->vk_cmd_buffers );
-    xg_vk_assert_m ( result );
+    xg_vk_verify_m ( result );
 
     allocator->cmd_buffers_count = 0;
 }
@@ -451,7 +451,7 @@ void xg_vk_workload_allocate_resource_groups ( xg_workload_h workload_handle ) {
         .pSetLayouts = vk_layouts,
     };
     VkResult set_alloc_result = vkAllocateDescriptorSets ( device->vk_handle, &vk_set_alloc_info, workload->desc_sets_array );
-    xg_vk_assert_m ( set_alloc_result ); // TODO test for available desc count, use multiple allocators if needed
+    xg_vk_verify_m ( set_alloc_result ); // TODO test for available desc count, use multiple allocators if needed
 }
 
 VkDescriptorSet xg_vk_workload_resource_bindings_get_desc_set ( xg_device_h device_handle, xg_workload_h workload_handle, xg_resource_bindings_h bindings_handle ) {
@@ -2745,7 +2745,7 @@ static void xg_vk_workload_wait ( xg_vk_workload_device_context_t* device_contex
         xg_vk_cmd_allocator_reset ( &workload_context->translate.cmd_allocators[xg_cmd_queue_copy_m], device_handle );
 
         VkResult r = vkResetFences ( device->vk_handle, 1, &fence->vk_fence );
-        xg_vk_assert_m ( r );
+        xg_vk_verify_m ( r );
         workload_context->is_submitted = false;
 
         for ( uint32_t i = 0; i < workload_context->submit.events_count; ++i ) {

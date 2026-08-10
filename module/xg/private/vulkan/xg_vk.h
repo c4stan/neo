@@ -16,12 +16,7 @@
 
 #include <vulkan/vulkan.h>
 
-// TODO remove these
-#define xg_vk_safecall_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); return x; }
-#define xg_vk_safecall_return_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); return x; }
-#define xg_vk_safecall_goto_m( f, x ) if (f != VK_SUCCESS) { std_log_error_m("Vulakn API returned an error code!"); goto x; }
-// TODO rename this to xg_vk_verify_m
-#define xg_vk_assert_m( result ) std_verify_m ( ( result ) == VK_SUCCESS )
+#define xg_vk_verify_m( exp ) std_verify_m ( ( exp ) == VK_SUCCESS )
 
 /*
 -------------------------------------------------------------------------------
