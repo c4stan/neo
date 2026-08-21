@@ -326,9 +326,10 @@ typedef enum {
 // -- Device Memory --
 typedef struct {
     uint64_t id;
-    uint64_t size : 56;
     uint64_t device : 4;
-    uint64_t type :  4;
+    uint64_t heap : 10;
+    uint64_t type : 4;
+    uint64_t size : 46;
 } xg_memory_h;
 std_static_assert_m ( xg_max_active_devices_m < 16 );
 
@@ -1200,6 +1201,8 @@ typedef enum {
     xg_buffer_usage_bit_count_m = 11
 } xg_buffer_usage_bit_e;
 
+// TODO map shader_read layout to GENERAL (storage read)
+//      create new sampled layout for SHADER_READ_ONLY_OPTIMAL
 typedef enum {
     xg_texture_layout_undefined_m,                    // UNDEFINED - layout of a texture that was just created
     xg_texture_layout_all_m,                          // GENERAL

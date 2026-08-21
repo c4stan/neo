@@ -7,6 +7,10 @@
 
 // https://www.asawicki.info/news_1637_how_to_change_display_mode_using_winapi
 
+#if defined(std_platform_linux_m)
+    #include <X11/extensions/Xrandr.h>
+#endif
+
 size_t wm_display_get_count ( void ) {
 #ifdef std_platform_win32_m
     size_t count = 0;
@@ -26,8 +30,28 @@ size_t wm_display_get_count ( void ) {
 
     return count;
 #elif defined(std_platform_linux_m)
-    std_not_implemented_m();
-    return 0;
+    // TODO open just one display for the whole X11 session and keep it open for the entire application lifetime
+    Display* display = XOpenDisplay ( NULL );
+    Window root = DefaultRootWindow ( display );
+    XRRScreenResources* resources = XRRGetScreenResourcesCurrent ( display, root );
+
+    size_t count = 0;
+    for ( uint32_t i = 0; i < resources->noutput; ++i ) {
+        XRROutputInfo *output = XRRGetOutputInfo ( display, resources, resources->outputs[i] );
+
+        if ( output ) {
+            if ( output->connection == RR_Connected && output->crtc != None ) {
+                ++count;
+            }
+
+            XRRFreeOutputInfo ( output );
+        }
+    }
+
+    XRRFreeScreenResources ( resources );
+    XCloseDisplay ( display );
+
+    return count;
 #endif
 }
 
@@ -71,10 +95,38 @@ size_t wm_display_get ( wm_display_h* displays, size_t cap ) {
 
     return display_count;
 #elif defined(std_platform_linux_m)
-    // TODO linux
-    std_unused_m ( displays );
-    std_unused_m ( cap );
-    return 0;
+    Display *display = XOpenDisplay ( NULL );
+    Window root = DefaultRootWindow ( display );
+    XRRScreenResources *resources = XRRGetScreenResourcesCurrent ( display, root );
+
+    size_t display_count = 0;
+    for ( int i = 0; i < resources->noutput; ++i ) {
+        RROutput output_id = resources->outputs[i];
+
+        XRROutputInfo *output = XRRGetOutputInfo ( display, resources, output_id );
+        if ( !output ) {
+            continue;
+        }
+
+        if ( output->connection == RR_Connected && output->crtc != None ) {
+            if ( display_count >= cap ) {
+                std_log_warn_m ( "Found display count higher than display limit!" );
+                XRRFreeOutputInfo ( output );
+                XRRFreeScreenResources ( resources );
+                XCloseDisplay ( display );
+                return display_count;
+            }
+
+            displays[display_count++] = ( wm_display_h ) output_id;
+        }
+
+        XRRFreeOutputInfo ( output );
+    }
+
+    XRRFreeScreenResources ( resources );
+    XCloseDisplay ( display );
+
+    return display_count;
 #endif
 }
 
@@ -151,10 +203,45 @@ bool wm_display_get_info ( wm_display_info_t* info, wm_display_h display_handle 
 
     return true;
 #elif defined(std_platform_linux_m)
-    std_not_implemented_m();
-    std_unused_m ( info );
-    std_unused_m ( display_handle );
-    return false;
+    Display *display = XOpenDisplay ( NULL );
+    Window root = DefaultRootWindow ( display );
+    XRRScreenResources* resources = XRRGetScreenResourcesCurrent ( display, root );
+
+    RROutput output_id = display_handle & 0xffffffff;
+
+    XRROutputInfo* output = XRRGetOutputInfo ( display, resources, output_id );
+    std_assert_m ( output->connection == RR_Connected );
+    std_assert_m ( output->crtc != None );
+
+    std_str_copy_static_m ( info->display_id, "" );
+    std_str_copy_static_m ( info->display_name, output->name );
+    std_str_copy_static_m ( info->adapter_id, "" );
+    std_str_copy_static_m ( info->adapter_name, "" );
+
+    XRRCrtcInfo* crtc = XRRGetCrtcInfo ( display, resources, output->crtc );
+    info->mode.width = crtc->width;
+    info->mode.height = crtc->height;
+    info->mode.refresh_rate = 0;
+
+    for ( int i = 0; i < resources->nmode; ++i ) {
+        XRRModeInfo *mode = &resources->modes[i];
+
+        if ( mode->id == crtc->mode ) {
+            info->mode.refresh_rate = mode->dotClock / ( mode->hTotal * mode->vTotal );
+            info->mode.bits_per_pixel = DefaultDepth ( display, DefaultScreen ( display ) );
+            break;
+        }
+    }
+
+    RROutput primary_output = XRRGetOutputPrimary ( display, root );
+    info->is_primary = ( primary_output == output_id );
+
+    XRRFreeCrtcInfo ( crtc );
+    XRRFreeOutputInfo ( output );
+    XRRFreeScreenResources ( resources );
+    XCloseDisplay ( display );
+
+    return true;
 #endif
 }
 
@@ -175,9 +262,19 @@ size_t wm_display_get_modes_count ( wm_display_h display_handle ) {
 
     return idx;
 #elif defined(std_platform_linux_m)
-    std_not_implemented_m();
-    std_unused_m ( display_handle );
-    return 0;
+    Display* display = XOpenDisplay ( NULL );
+    Window root = DefaultRootWindow ( display );
+    XRRScreenResources* resources = XRRGetScreenResourcesCurrent ( display, root );
+    RROutput output_id = display_handle;
+    XRROutputInfo* output = XRRGetOutputInfo ( display, resources, output_id );
+
+    size_t count = ( size_t ) output->nmode;
+
+    XRRFreeOutputInfo ( output );
+    XRRFreeScreenResources ( resources );
+    XCloseDisplay ( display );
+
+    return count;
 #endif
 }
 
@@ -208,10 +305,48 @@ bool wm_display_get_modes ( wm_display_mode_t* modes, size_t cap, wm_display_h d
 
     return true;
 #elif defined(std_platform_linux_m)
-    std_not_implemented_m();
-    std_unused_m ( modes );
-    std_unused_m ( cap );
-    std_unused_m ( display_handle );
-    return false;
+    Display* display = XOpenDisplay ( NULL );
+    Window root = DefaultRootWindow ( display );
+    XRRScreenResources* resources = XRRGetScreenResourcesCurrent ( display, root );
+    RROutput output_id = display_handle;
+    XRROutputInfo* output = XRRGetOutputInfo ( display, resources, output_id );
+
+    size_t idx = 0;
+    for ( int i = 0; i < output->nmode; ++i ) {
+        RRMode mode_id = output->modes[i];
+        XRRModeInfo* mode = NULL;
+
+        for ( int j = 0; j < resources->nmode; ++j ) {
+            if ( resources->modes[j].id == mode_id ) {
+                mode = &resources->modes[j];
+                break;
+            }
+        }
+
+        if ( !mode ) {
+            continue;
+        }
+
+        if ( idx >= cap ) {
+            std_log_warn_m ( "Found display modes count higher than display modes limit!" );
+            XRRFreeOutputInfo ( output );
+            XRRFreeScreenResources ( resources );
+            XCloseDisplay ( display );
+            return false;
+        }
+
+        modes[idx].bits_per_pixel = DefaultDepth ( display, DefaultScreen ( display ) );
+        modes[idx].width = mode->width;
+        modes[idx].height = mode->height;
+        modes[idx].refresh_rate = mode->dotClock / ( mode->hTotal * mode->vTotal );
+
+        ++idx;
+    }
+
+    XRRFreeOutputInfo ( output );
+    XRRFreeScreenResources ( resources );
+    XCloseDisplay ( display );
+
+    return true;
 #endif
 }

@@ -57,11 +57,12 @@ size_t std_callstack ( std_buffer_t buffer ) {
             "-C",
             "-p",
             "-s",
+            "-i",
             "-e",
             info.dli_fname,
             a2l_buffer,
         };
-        std_process_h proc = std_process ( "addr2line", "addr2line", args, 7, std_process_type_background_m, std_process_io_capture_m );
+        std_process_h proc = std_process ( "addr2line", "addr2line", args, std_static_array_count_m ( args ), std_process_type_background_m, std_process_io_capture_m );
         std_process_io_t io = std_process_get_io ( proc );
         std_process_wait_for ( proc );
         size_t read_size = 0;
@@ -99,7 +100,7 @@ size_t std_callstack ( std_buffer_t buffer ) {
 }
 
 static void std_log_print_callstack() {
-    char buffer[1024];
+    char buffer[2048];
     size_t len = std_callstack ( std_static_buffer_m ( buffer ) );
 #if defined std_platform_win32_m
     WriteFile ( ( HANDLE ) ( std_process_get_io ( std_process_this() ).stderr_handle ), buffer, len, NULL, NULL );
@@ -187,7 +188,7 @@ static void std_log_default_callback ( const std_log_msg_t* msg ) {
         std_log_print_callstack();
     }
 
-    if ( ( 1 << msg->level ) & ( std_log_level_bit_warn_m | std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
+    if ( ( 1 << msg->level ) & ( std_log_level_bit_error_m | std_log_level_bit_crash_m ) ) {
         fflush ( stdout );
         if ( std_log_state->is_debugger_attached ) {
             std_debug_break_m();

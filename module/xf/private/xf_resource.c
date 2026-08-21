@@ -968,6 +968,23 @@ void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physica
     }
 }
 
+void xf_resource_physical_texture_discard_layout ( xf_physical_texture_h physical_texture_handle ) {
+    xf_physical_texture_t* physical_texture = xf_resource_physical_texture_get ( physical_texture_handle );
+
+    if ( physical_texture->info.view_access == xg_texture_view_access_default_only_m ) {
+        physical_texture->state.shared.execution.layout = xg_texture_layout_undefined_m;
+    } else {
+        uint32_t mip_count = physical_texture->info.mip_levels;
+        uint32_t array_count = physical_texture->info.array_layers;
+        for ( uint32_t array_it = 0; array_it < array_count; ++array_it ) {
+            for ( uint32_t mip_it = 0; mip_it < mip_count; ++mip_it ) {
+                uint32_t subres_idx = array_it * physical_texture->info.mip_levels + mip_it;
+                physical_texture->state.subresources[subres_idx].execution.layout = xg_texture_layout_undefined_m;
+            }
+        }
+    }
+}
+
 // ======================================================================================= //
 //                                D E V I C E   B U F F E R
 // ======================================================================================= //

@@ -146,6 +146,10 @@ xg_texture_h xg_resource_cmd_buffer_texture_create ( xg_resource_cmd_buffer_h cm
 }
 
 void xg_resource_cmd_buffer_texture_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_texture_h texture, xg_resource_cmd_buffer_time_e destroy_time ) {
+    if ( texture == xg_null_handle_m ) {
+        return;
+    }
+
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
     xg_resource_cmd_texture_destroy_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_texture_destroy_m, xg_resource_cmd_texture_destroy_t );
 
@@ -181,6 +185,10 @@ xg_buffer_h xg_resource_cmd_buffer_buffer_create ( xg_resource_cmd_buffer_h cmd_
 }
 
 void xg_resource_cmd_buffer_buffer_destroy ( xg_resource_cmd_buffer_h cmd_buffer_handle, xg_buffer_h buffer, xg_resource_cmd_buffer_time_e destroy_time ) {
+    if ( buffer == xg_null_handle_m ) {
+        return;
+    }
+
     xg_resource_cmd_buffer_t* cmd_buffer = xg_resource_cmd_buffer_get ( cmd_buffer_handle );
     xg_resource_cmd_buffer_destroy_t* cmd_args = xg_resource_cmd_buffer_record_cmd_m ( cmd_buffer, xg_resource_cmd_buffer_destroy_m, xg_resource_cmd_buffer_destroy_t );
 

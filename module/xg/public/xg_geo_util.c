@@ -476,7 +476,15 @@ xg_geo_util_geometry_data_t xg_geo_util_generate_cube ( float side ) {
 xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h device, xg_workload_h workload, const xg_geo_util_geometry_data_t* geo ) {
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
+    xg_device_info_t device_info;
+    xg->get_device_info ( &device_info, device );
+
     xg_resource_cmd_buffer_h resource_cmd_buffer = xg->create_resource_cmd_buffer ( workload );
+
+    xg_buffer_usage_bit_e rt_buffer_flags = 0;
+    if ( device_info.supports_raytrace ) {
+        rt_buffer_flags |= xg_buffer_usage_bit_shader_device_address_m | xg_buffer_usage_bit_raytrace_geometry_buffer_m;
+    }
 
     xg_buffer_h pos_buffer = xg->cmd_create_buffer ( resource_cmd_buffer, &xg_buffer_params_m (
         .device = device,
@@ -484,9 +492,8 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
             | xg_buffer_usage_bit_copy_source_m 
             | xg_buffer_usage_bit_vertex_buffer_m 
-            | xg_buffer_usage_bit_shader_device_address_m 
-            | xg_buffer_usage_bit_raytrace_geometry_buffer_m
-            | xg_buffer_usage_bit_storage_m,
+            | xg_buffer_usage_bit_storage_m
+            | rt_buffer_flags,
         .debug_name = "vbuffer_pos"
     ), &xg_buffer_init_m (
         .mode = xg_buffer_init_mode_upload_m,
@@ -501,9 +508,8 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
             .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
                 | xg_buffer_usage_bit_copy_source_m 
                 | xg_buffer_usage_bit_vertex_buffer_m 
-                | xg_buffer_usage_bit_shader_device_address_m 
-                | xg_buffer_usage_bit_raytrace_geometry_buffer_m
-                | xg_buffer_usage_bit_storage_m,
+                | xg_buffer_usage_bit_storage_m
+                | rt_buffer_flags,
             .debug_name = "vbuffer_nor"
         ), &xg_buffer_init_m (
             .mode = xg_buffer_init_mode_upload_m,
@@ -519,9 +525,8 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
             .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
                 | xg_buffer_usage_bit_copy_source_m 
                 | xg_buffer_usage_bit_vertex_buffer_m 
-                | xg_buffer_usage_bit_shader_device_address_m 
-                | xg_buffer_usage_bit_raytrace_geometry_buffer_m
-                | xg_buffer_usage_bit_storage_m,
+                | xg_buffer_usage_bit_storage_m
+                | rt_buffer_flags,
             .debug_name = "vbuffer_tan"
         ), &xg_buffer_init_m (
             .mode = xg_buffer_init_mode_upload_m,
@@ -537,9 +542,8 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
             .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
                 | xg_buffer_usage_bit_copy_source_m 
                 | xg_buffer_usage_bit_vertex_buffer_m 
-                | xg_buffer_usage_bit_shader_device_address_m 
-                | xg_buffer_usage_bit_raytrace_geometry_buffer_m
-                | xg_buffer_usage_bit_storage_m,
+                | xg_buffer_usage_bit_storage_m
+                | rt_buffer_flags,
             .debug_name = "vbuffer_bitan"
         ), &xg_buffer_init_m (
             .mode = xg_buffer_init_mode_upload_m,
@@ -555,9 +559,8 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
             .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
                 | xg_buffer_usage_bit_copy_source_m 
                 | xg_buffer_usage_bit_vertex_buffer_m 
-                | xg_buffer_usage_bit_shader_device_address_m 
-                | xg_buffer_usage_bit_raytrace_geometry_buffer_m
-                | xg_buffer_usage_bit_storage_m,
+                | xg_buffer_usage_bit_storage_m
+                | rt_buffer_flags,
             .debug_name = "vbuffer_uv"
         ), &xg_buffer_init_m (
             .mode = xg_buffer_init_mode_upload_m,
@@ -571,9 +574,8 @@ xg_geo_util_geometry_gpu_data_t xg_geo_util_upload_geometry_to_gpu ( xg_device_h
         .allowed_usage = xg_buffer_usage_bit_copy_dest_m 
             | xg_buffer_usage_bit_copy_source_m 
             | xg_buffer_usage_bit_index_buffer_m 
-            | xg_buffer_usage_bit_shader_device_address_m 
-            | xg_buffer_usage_bit_raytrace_geometry_buffer_m
-            | xg_buffer_usage_bit_storage_m,
+            | xg_buffer_usage_bit_storage_m
+            | rt_buffer_flags,
         .debug_name = "ibuffer"
     ), &xg_buffer_init_m (
         .mode = xg_buffer_init_mode_upload_m,

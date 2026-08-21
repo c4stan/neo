@@ -97,7 +97,6 @@ static void xg_test_run ( void ) {
     std_verify_m ( xg->activate_device ( device ) );
     xg_device_info_t device_info;
     xg->get_device_info ( &device_info, device );
-    std_log_info_m ( "Picking device 0 (" std_fmt_str_m ") as default device", device_info.name );
 
     xg_swapchain_h swapchain = xg->create_window_swapchain ( &xg_swapchain_window_params_m (
         .window = window,

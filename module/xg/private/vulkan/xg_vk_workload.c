@@ -170,25 +170,30 @@ static void xg_vk_desc_allocator_init ( xg_vk_desc_allocator_t* allocator, xg_de
         [xg_resource_binding_buffer_storage_m] = { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = xg_vk_max_storage_buffer_per_descriptor_pool_m },
         [xg_resource_binding_buffer_texel_uniform_m] = { .type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, .descriptorCount = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m },
         [xg_resource_binding_buffer_texel_storage_m] = { .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, .descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m },
-#if xg_enable_raytracing_m
-    #if xg_vk_enable_nv_raytracing_ext_m
-        [xg_resource_binding_raytrace_world_m] = { .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV,
-    #else
-        [xg_resource_binding_raytrace_world_m] = { .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-    #endif
-        .descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m },
-#endif
     };
+#if xg_enable_raytracing_m
+    if ( device->supports_raytrace ) {
+    #if xg_vk_enable_nv_raytracing_ext_m
+        sizes[xg_resource_binding_raytrace_world_m] = ( VkDescriptorPoolSize ) { .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV,
+    #else
+        sizes[xg_resource_binding_raytrace_world_m] = ( VkDescriptorPoolSize ) { .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+    #endif
+        .descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m };
+    }
+#endif
+    uint32_t size_count = xg_resource_binding_count_m - 1;
+#if xg_enable_raytracing_m
+    if ( device->supports_raytrace ) {
+        size_count = xg_resource_binding_count_m;
+    }
+#endif
+
     VkDescriptorPoolCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .pNext = NULL,
         .flags = 0,
         .maxSets = xg_vk_max_sets_per_descriptor_pool_m,
-    #if xg_enable_raytracing_m
-        .poolSizeCount = xg_resource_binding_count_m,
-    #else
-        .poolSizeCount = xg_resource_binding_count_m - 1,
-    #endif
+        .poolSizeCount = size_count,
         .pPoolSizes = sizes,
     };
 

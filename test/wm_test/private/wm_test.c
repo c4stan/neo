@@ -26,6 +26,7 @@ static void wm_test_run ( void ) {
 #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
     wm_display_h displays[8];
     size_t display_count = wm->get_displays ( displays, 8 );
+    std_log_info_m ( "Found " std_fmt_size_m " display(s)", display_count );
 
     for ( size_t i = 0; i < display_count; ++i ) {
         wm_display_info_t info;
@@ -50,13 +51,10 @@ static void wm_test_run ( void ) {
 
     wm_window_params_t params = { .name = "wm_test", .x = 0, .y = 0, .width = 600, .height = 400, .gain_focus = true, .borderless = false };
     wm_window_h window = wm->create_window ( &params );
-    //wm_window_h window = wm->get_console_window();
 
 #if wm_enable_input_state_m
     bool first_print = true;
 #endif
-
-    std_unused_m ( window );
 
     while ( true ) {
         wm->update_window ( window );

@@ -453,10 +453,15 @@ def debug_app(name, flags, params):
     if ('-o' in flags):
         config = 'release'
 
-
     output_path = path + '/build/' + config + '/output/'
     push_path(output_path)
+
+    env_vars = os.environ.copy()
+    if ('-rd' in flags):
+        env_vars["ENABLE_VULKAN_RENDERDOC_CAPTURE"] = "1"
+
     if platform.system() == 'Windows':
+        #TODO switch to subprocess.Popen, use env_vars
         params = ' '.join(params)
         if makedef['output'] == ['app']:
             cmd = "start \"cmd\" \"" + bindings.get('devenv') + "\"" + ' /debugexe ' + 'std_launcher.exe' + ' ' + name + ' ' + params
@@ -466,7 +471,12 @@ def debug_app(name, flags, params):
         os.system(cmd)
     elif platform.system() == 'Linux':
         debugger_path = bindings.get('linux_debugger')
-        subprocess.Popen([debugger_path, name + '.exe'] + params, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, preexec_fn=os.setsid)
+        if makedef['output'] == ['app']:
+            subprocess.Popen([debugger_path, '--args', 'std_launcher.exe', name] + params,
+                env=env_vars, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, preexec_fn=os.setsid)
+        else:
+            subprocess.Popen([debugger_path, '--args', name + '.exe'] + params,
+                env=env_vars, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, preexec_fn=os.setsid)
 
     pop_path()
 

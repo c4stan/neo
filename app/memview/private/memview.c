@@ -470,7 +470,7 @@ static void memview_update_ui ( const wm_window_info_t* new_window_info, const w
         if ( new_input_state->keyboard[wm_keyboard_state_ctrl_left_m] ) {
             if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] || new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
                 if ( new_input_state->mouse[wm_mouse_state_wheel_up_m] ) {
-                    min_allocation = max ( min_allocation / 2, 8 );
+                    min_allocation = std_max ( min_allocation / 2, 8 );
                 } else if ( new_input_state->mouse[wm_mouse_state_wheel_down_m] ) {
                     min_allocation *= 2;
                 }

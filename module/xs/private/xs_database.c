@@ -230,6 +230,9 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
 
+    xg_device_info_t device_info;
+    xg->get_device_info ( &device_info, db->device );
+
     const bool verbose = false;
 
     // check headers, froce rebuild all shaders if one changed
@@ -414,6 +417,15 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
             }
             result.skipped_shaders += shader_references->count;
             result.skipped_pipeline_states += 1;
+            continue;
+        }
+
+        if ( pipeline_state->type == xg_pipeline_raytrace_m && !device_info.supports_raytrace ) {
+            if ( verbose ) {
+                std_log_info_m ( "Skipping unsupported raytrace pipeline " std_fmt_str_m, pipeline_state->path );
+            }
+            result.unsupported_shaders += shader_references->count;
+            result.unsupported_pipeline_states += 1;
             continue;
         }
 
@@ -635,8 +647,7 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
             } else {
                 if ( db->build_flags & xs_database_build_flag_bit_output_statistics_m ) {
                     std_assert_m ( db->pipeline_flags & xg_pipeline_flag_bit_capture_statistics_m ); // TODO auto-enable?
-                    char buffer[2048]; // TODO
-                    std_stack_t stack = std_static_stack_m ( buffer );
+                    std_stack_t stack = std_stack_create ( 1024 * 32 );
                     xg_pipeline_info_t pipe_info;
                     xg->get_pipeline_info ( &pipe_info, pipeline_handle, &stack );
 
@@ -668,6 +679,7 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
                     }
 
                     std_file_write ( stats_file, string.str, string.len );
+                    std_stack_destroy ( &stack );
                 }
             }
 
@@ -687,14 +699,29 @@ xs_database_build_result_t xs_database_build_internal ( xs_database_h db_handle,
         std_file_close ( stats_file );
     }
 
-    std_log_info_m ( "Shader database build " std_fmt_str_m " ended" std_fmt_newline_m 
-        "Pipeline states: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached" std_fmt_newline_m 
-        "Shaders: " std_fmt_tab_m std_fmt_tab_m std_fmt_u32_pad_m(3) " failed " std_fmt_tab_m std_fmt_u32_pad_m(3) " built " std_fmt_tab_m std_fmt_u32_pad_m(3) " cached", db->debug_name,
-        result.failed_pipeline_states, result.successful_pipeline_states, result.skipped_pipeline_states,
-        result.failed_shaders, result.successful_shaders, result.skipped_shaders );
+    std_log_info_m ( "Shader database build " std_fmt_str_m " ended"
+        std_fmt_newline_m
+        "Shaders: " std_fmt_tab_m std_fmt_tab_m std_fmt_u32_pad_m(3) " failed "
+        std_fmt_tab_m std_fmt_u32_pad_m(3) " unsupported "
+        std_fmt_tab_m std_fmt_u32_pad_m(3) " built "
+        std_fmt_tab_m std_fmt_u32_pad_m(3) " cached"
+        std_fmt_newline_m
+        "Pipeline states: " std_fmt_tab_m std_fmt_u32_pad_m(3) " failed "
+        std_fmt_tab_m std_fmt_u32_pad_m(3) " unsupported "
+        std_fmt_tab_m std_fmt_u32_pad_m(3) " built "
+        std_fmt_tab_m std_fmt_u32_pad_m(3) " cached",
+        db->debug_name,
+        result.failed_shaders, result.unsupported_shaders, result.successful_shaders, result.skipped_shaders,
+        result.failed_pipeline_states, result.unsupported_pipeline_states, result.successful_pipeline_states, result.skipped_pipeline_states );
 
     if ( result.failed_shaders || result.failed_pipeline_states ) {
-        std_log_warn_m ( "Shader database build: " std_fmt_size_m " states, " std_fmt_size_m " shaders failed", result.failed_pipeline_states, result.failed_shaders );
+        std_log_warn_m ( "Shader database " std_fmt_str_m ": " std_fmt_size_m " states, " std_fmt_size_m " shaders failed",
+            db->debug_name, result.failed_pipeline_states, result.failed_shaders );
+    }
+
+    if ( result.unsupported_shaders || result.unsupported_pipeline_states ) {
+        std_log_warn_m ( "Shader database " std_fmt_str_m ": " std_fmt_size_m " states, " std_fmt_size_m " shaders are unsupported",
+            db->debug_name, result.unsupported_pipeline_states, result.unsupported_shaders );
     }
 
     db->dirty_build_params = false;

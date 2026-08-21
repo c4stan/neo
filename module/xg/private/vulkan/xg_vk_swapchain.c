@@ -64,7 +64,7 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
     const xg_vk_device_t* device = xg_vk_device_get ( params->device );
     std_assert_m ( device );
 
-    std_log_info_m ( "Creating swapchain for window '" std_fmt_str_m "'", window_info.title );
+    std_log_info_m ( "Creating swapchain for window '" std_fmt_str_m "'...", window_info.title );
 
     // Create Vk surface
 #if defined(std_platform_win32_m)
@@ -91,10 +91,13 @@ xg_swapchain_h xg_vk_swapchain_create_window ( const xg_swapchain_window_params_
 
     // Print surface capabilities
     const bool print_surface_info = true;
-    // note: maxImageCount==0 means no upper limit
     if ( print_surface_info ) {
-        std_log_info_m ( "Window supports texture resolution between " std_fmt_u32_m "x" std_fmt_u32_m " and " std_fmt_u32_m "x" std_fmt_u32_m " and texture count between " std_fmt_u32_m " and " std_fmt_u32_m,
-            surface_capabilities.minImageExtent.width, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.width, surface_capabilities.maxImageExtent.height, surface_capabilities.minImageCount, surface_capabilities.maxImageCount );
+        char max_img_count[] = "any";
+        if ( surface_capabilities.maxImageCount > 0 ) {
+            std_u32_to_str ( max_img_count, sizeof ( max_img_count ), surface_capabilities.maxImageCount, 0 );
+        }
+        std_log_info_m ( "Window supports texture resolution between " std_fmt_u32_m "x" std_fmt_u32_m " and " std_fmt_u32_m "x" std_fmt_u32_m " and texture count between " std_fmt_u32_m " and " std_fmt_str_m,
+            surface_capabilities.minImageExtent.width, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.width, surface_capabilities.maxImageExtent.height, surface_capabilities.minImageCount, max_img_count );
     }
     swapchain->width = surface_capabilities.currentExtent.width;
     swapchain->height = surface_capabilities.currentExtent.height;
@@ -582,7 +585,11 @@ void xg_vk_swapchain_acquire_next_texture ( xg_swapchain_acquire_result_t* resul
     xg_gpu_queue_event_log_signal ( workload->swapchain_texture_acquired_event );
     const xg_vk_gpu_queue_event_t* vk_acquire_event = xg_vk_gpu_queue_event_get ( workload->swapchain_texture_acquired_event );
     VkResult vk_result = vkAcquireNextImageKHR ( device->vk_handle, swapchain->vk_handle, UINT64_MAX, vk_acquire_event->vk_semaphore, VK_NULL_HANDLE, &texture_idx );
-    std_assert_msg_m ( vk_result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, vk_result );
+    if ( vk_result == VK_ERROR_SURFACE_LOST_KHR ) {
+        std_log_warn_m ( "Surface lost" );
+    } else {
+        std_assert_msg_m ( vk_result == VK_SUCCESS, "Acquire fail: "  std_fmt_int_m, vk_result );
+    }
     swapchain->acquired_texture_idx = texture_idx;
     xg_workload_set_execution_complete_gpu_event ( workload_handle, swapchain->execution_complete_gpu_events[texture_idx] );
 

@@ -63,7 +63,7 @@ void        std_mem_move ( void* dest, void* source, size_t size );
 
 // Stores the position of the first bit found to be 1
 // The lookup is performed in the required direction (default is lsb->msb)
-// The index position stored is always an offset relative to the lsb/msb (starts from zero)
+// The resulting index is always an offset relative to the starting bit (starts from zero)
 // Caller must ensure that the value passed is not 0, if that's the case the return value is undefined.
 uint32_t    std_bit_scan_32         ( uint32_t u32 );
 uint32_t    std_bit_scan_64         ( uint64_t u64 );

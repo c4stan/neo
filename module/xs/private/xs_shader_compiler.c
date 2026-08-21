@@ -52,7 +52,7 @@ bool xs_shader_compiler_compile ( const xs_shader_compiler_params_t* params ) {
             std_string_t include_path_string = std_static_string_m ( include_path );
             std_string_append ( &include_path_string, "-I" );
             std_string_append ( &include_path_string, std_source_data_path_m );
-            std_string_append ( &include_path_string, "/shader/" );
+            //std_string_append ( &include_path_string, "/shader/" );
             args[argc++] = std_stack_string_copy ( &stack, include_path );
         }
 

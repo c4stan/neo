@@ -87,6 +87,35 @@ static void xg_vk_device_load_ext_api ( xg_device_h device_handle ) {
 #undef xg_vk_instance_ext_init_pfn_m
 }
 
+static xg_vk_device_memory_type_t xg_vk_device_pick_memory_type ( VkMemoryPropertyFlags required_flags, const VkPhysicalDeviceMemoryProperties* memory_properties ) {
+    xg_vk_device_memory_type_t memory_type = xg_vk_device_memory_type_m();
+    for ( uint32_t i = 0; i < memory_properties->memoryTypeCount; ++i ) {
+        VkMemoryPropertyFlags flags = memory_properties->memoryTypes[i].propertyFlags;
+
+        if ( ( flags & required_flags ) != required_flags ) {
+            continue;
+        }
+        flags &= ~ required_flags;
+
+        if ( flags == 0 || !memory_type.found ) {
+            uint32_t heap_idx = memory_properties->memoryTypes[i].heapIndex;
+            memory_type = xg_vk_device_memory_type_m (
+                .found = true,
+                .vk_memory_type_idx = i,
+                .vk_flags = memory_properties->memoryTypes[i].propertyFlags,
+                .vk_heap_idx = heap_idx,
+                .size = memory_properties->memoryHeaps[heap_idx].size,
+            );
+        }
+
+        if ( flags == 0 ) {
+            break;
+        }
+    }
+
+    return memory_type;
+}
+
 static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_log_info_m ( "Querying device " std_fmt_size_m " for properties", device->id );
     
@@ -99,9 +128,13 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
         .pNext = &device->raytrace_properties
     };
+    device->maintenance3_properties = ( VkPhysicalDeviceMaintenance3Properties ) {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES,
+        .pNext = &device->acceleration_structure_properties
+    };
     VkPhysicalDeviceProperties2 properties_query = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-        .pNext = &device->acceleration_structure_properties
+        .pNext = &device->maintenance3_properties
     };
     vkGetPhysicalDeviceProperties2 ( device->vk_physical_handle, &properties_query );
     device->generic_properties = properties_query.properties;
@@ -149,11 +182,13 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_virtual_heap_free ( queue_faimily_queries );
 
 #if xg_enable_raytracing_m
-    std_assert_m ( device->supported_features.shaderInt64 );
-    //std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
-    std_assert_m ( device->supported_device_address_features.bufferDeviceAddress );
-    //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructure );
-    //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructureHostCommands );
+    if ( device->supports_raytrace ) {
+        std_assert_m ( device->supported_features.shaderInt64 );
+        //std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
+        std_assert_m ( device->supported_device_address_features.bufferDeviceAddress );
+        //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructure );
+        //std_assert_m ( device->supported_acceleration_structure_features.accelerationStructureHostCommands );
+    }
 #endif
 
     // needed for sv_primitiveID
@@ -169,9 +204,9 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         uint32_t api_major = VK_VERSION_MAJOR ( device->generic_properties.apiVersion );
         uint32_t api_minor = VK_VERSION_MINOR ( device->generic_properties.apiVersion );
         uint32_t api_patch = VK_VERSION_PATCH ( device->generic_properties.apiVersion );
-        std_log_info_m ( std_fmt_str_m " (" std_fmt_h32_m ") " std_fmt_str_m " (" std_fmt_str_m ") - driver version " std_fmt_u32_m " - supported API version " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m,
-            xg_vk_device_vendor_name ( device->generic_properties.vendorID ), device->generic_properties.vendorID, device->generic_properties.deviceName,
-            xg_vk_device_type_str ( device->generic_properties.deviceType ), device->generic_properties.driverVersion, api_major, api_minor, api_patch );
+        std_log_info_m ( std_fmt_str_m ": " std_fmt_str_m " - driver " std_fmt_u32_m " - supported API " std_fmt_u32_m "." std_fmt_u32_m "." std_fmt_u32_m,
+            xg_vk_device_type_str ( device->generic_properties.deviceType ),
+            device->generic_properties.deviceName, device->generic_properties.driverVersion, api_major, api_minor, api_patch );
 
         uint32_t uniform_buffer_alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
         uint32_t texel_buffer_alignment = device->generic_properties.limits.minTexelBufferOffsetAlignment;
@@ -187,14 +222,12 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         uint32_t max_vertex_input_attributes = device->generic_properties.limits.maxVertexInputAttributes;
         uint32_t max_vertex_input_streams = device->generic_properties.limits.maxVertexInputBindings;
         uint32_t max_sampled_images_per_set = device->generic_properties.limits.maxDescriptorSetSampledImages;
-    #if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
         char max_uniform_range_str[32];
         char max_texel_elements_str[32];
         char max_storage_range_str[32];
         std_size_to_str_approx ( max_uniform_range_str, 32, max_uniform_range );
         std_count_to_str_approx ( max_texel_elements_str, 32, max_texel_elements );
         std_size_to_str_approx ( max_storage_range_str, 32, max_storage_range );
-    #endif
         std_log_info_m ( "Uniform buffer binding required alignment: " std_fmt_u32_m, uniform_buffer_alignment );
         std_log_info_m ( "Texel buffer binding required alignment: " std_fmt_u32_m, texel_buffer_alignment );
         std_log_info_m ( "Storage buffer binding required alignment: " std_fmt_u32_m, storage_buffer_alignment );
@@ -254,8 +287,23 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
         for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
             VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
             uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
-            const char* desc = xg_vk_device_memory_type_str ( flags );
-            std_log_info_m ( "Memory Type " std_fmt_u32_m ": " std_fmt_str_m " - Heap " std_fmt_u32_m, i, desc, heap );
+
+            char buffer[128];
+            std_string_t string = std_static_string_m ( buffer );
+            uint64_t bitset = flags;
+            uint64_t idx = 0;
+            bool first = true;
+            while ( std_bitset_scan ( &idx, &bitset, idx, 1 ) ) {
+                if ( !first ) {
+                    std_string_append ( &string, " | " );
+                }
+                std_string_append ( &string, xg_vk_device_memory_type_str ( 1 << idx ) );
+                first = false;
+                ++idx;
+            }
+
+            //const char* desc = xg_vk_device_memory_type_str ( flags );
+            std_log_info_m ( "Memory Type " std_fmt_u32_m ": " std_fmt_str_m " - Heap " std_fmt_u32_m, i, buffer, heap );
         }
 
         // Print queue family properties
@@ -274,191 +322,43 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     }
 #endif
 
-    std_log_info_m ( "Mapping device properties to runtime objects" );
-
     //
     // Map heaps
     //
-    // TODO: rename host_uncached_memory_heap to something better?
-    uint32_t device_memory_type = UINT32_MAX;
-    uint32_t device_mapped_memory_type = UINT32_MAX;
-    uint32_t host_uncached_memory_type = UINT32_MAX;
-    uint32_t host_cached_memory_type = UINT32_MAX;
-    char used_memory_types[VK_MAX_MEMORY_TYPES] = {0};
+    xg_vk_device_memory_type_t gpu_local_memory_type = xg_vk_device_pick_memory_type ( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &device->memory_properties );
+    xg_vk_device_memory_type_t gpu_mapped_memory_type = xg_vk_device_pick_memory_type ( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &device->memory_properties );
+    xg_vk_device_memory_type_t upload_memory_type = xg_vk_device_pick_memory_type ( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &device->memory_properties );
+    xg_vk_device_memory_type_t readback_memory_type = xg_vk_device_pick_memory_type ( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT, &device->memory_properties );
 
-    // Pass 1. try to look for a good match
-    for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
-        VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
-#if std_log_enabled_levels_bitflag_m & ( std_log_level_bit_info_m | std_log_level_bit_warn_m )
-        uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
-#endif
-
-        if ( flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
-            flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-            if ( flags == 0 ) {
-                if ( device_memory_type != UINT32_MAX ) {
-                    std_log_warn_m ( "More than one device local memory heap found" );
-                }
-
-                device_memory_type = i;
-                std_log_info_m ( "Device memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                used_memory_types[i] = 1;
-                continue;
-            } else if ( flags & ( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) ) {
-                flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-                flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-                if ( flags == 0 ) {
-                    if ( device_mapped_memory_type != UINT32_MAX ) {
-                        std_log_warn_m ( "More than one device mapped memory heap found" );
-                    }
-
-                    device_mapped_memory_type = i;
-                    std_log_info_m ( "Device mapped memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                    used_memory_types[i] = 1;
-                    continue;
-                }
-            }
-        } else if ( flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ) {
-            flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-            if ( flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) {
-                flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-                if ( flags == 0 ) {
-                    if ( host_uncached_memory_type != UINT32_MAX ) {
-                        std_log_warn_m ( "More than one staging cached memory heap found" );
-                    }
-
-                    host_uncached_memory_type = i;
-                    std_log_info_m ( "Host uncached memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                    used_memory_types[i] = 1;
-                    continue;
-                } else if ( flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ) {
-                    flags &= ~ ( uint32_t ) VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-
-                    if ( flags == 0 ) {
-                        if ( host_cached_memory_type != UINT32_MAX ) {
-                            std_log_warn_m ( "More than one staging uncached memory heap found" );
-                        }
-
-                        host_cached_memory_type = i;
-                        std_log_info_m ( "Host cached memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                        used_memory_types[i] = 1;
-                        continue;
-                    }
-                }
-            }
-        }
+    if ( gpu_local_memory_type.found ) {
+        std_log_info_m ( "GPU local memory mapped to Heap " std_fmt_u32_m " - Memory Type " std_fmt_u32_m,
+            gpu_local_memory_type.vk_heap_idx, gpu_local_memory_type.vk_memory_type_idx );
+    } else {
+        std_log_error_m ( "GPU local heap not found" );
+    }
+    if ( gpu_mapped_memory_type.found ) {
+        std_log_info_m ( "GPU mapped memory mapped to Heap " std_fmt_u32_m " - Memory Type " std_fmt_u32_m,
+            gpu_mapped_memory_type.vk_heap_idx, gpu_mapped_memory_type.vk_memory_type_idx );
+    } else {
+        std_log_error_m ( "GPU mapped heap not found" );
+    }
+    if ( upload_memory_type.found ) {
+        std_log_info_m ( "Upload memory mapped to Heap " std_fmt_u32_m " - Memory Type " std_fmt_u32_m,
+            upload_memory_type.vk_heap_idx, upload_memory_type.vk_memory_type_idx );
+    } else {
+        std_log_error_m ( "Upload heap not found" );
+    }
+    if ( readback_memory_type.found ) {
+        std_log_info_m ( "Readback memory mapped to Heap " std_fmt_u32_m " - Memory Type " std_fmt_u32_m,
+            readback_memory_type.vk_heap_idx, readback_memory_type.vk_memory_type_idx );
+    } else {
+        std_log_error_m ( "Readback heap not found" );
     }
 
-    // Pass 2. use whatever is compatible
-    for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
-        VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
-
-#if std_log_enabled_levels_bitflag_m & std_log_level_bit_info_m
-        uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
-#endif
-
-        if ( flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) {
-            if ( device_memory_type == UINT32_MAX ) {
-                device_memory_type = i;
-                std_log_info_m ( "Device memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                used_memory_types[i] = 1;
-            }
-
-            if ( flags & ( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ) ) {
-                if ( device_mapped_memory_type == UINT32_MAX ) {
-                    device_mapped_memory_type = i;
-                    std_log_info_m ( "Device mapped memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                    used_memory_types[i] = 1;
-                }
-            }
-        }
-
-        if ( flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ) {
-            if ( flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ) {
-                if ( host_cached_memory_type == UINT32_MAX ) {
-                    host_cached_memory_type = i;
-                    std_log_info_m ( "Host cached memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                    used_memory_types[i] = 1;
-                }
-            }
-
-            if ( flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) {
-                if ( host_uncached_memory_type == UINT32_MAX ) {
-                    host_uncached_memory_type = i;
-                    std_log_info_m ( "Host uncached memory heap mapped to heap "std_fmt_u32_m" - memory type "std_fmt_u32_m, heap, i );
-                    used_memory_types[i] = 1;
-                }
-            }
-        }
-    }
-
-    // Pass 3. check that we're good to go
-#if std_log_enabled_levels_bitflag_m & std_log_level_bit_warn_m
-    for ( uint32_t i = 0; i < device->memory_properties.memoryTypeCount; ++i ) {
-        if ( used_memory_types[i] == 0 ) {
-            VkMemoryPropertyFlags flags = device->memory_properties.memoryTypes[i].propertyFlags;
-            uint32_t heap = device->memory_properties.memoryTypes[i].heapIndex;
-
-            if ( flags == 0 ) {
-                // Skip warning on null memory types
-                continue;
-            }
-
-            const char* desc = xg_vk_device_memory_type_str ( flags );
-            std_log_warn_m ( "Device memory type left unmapped: "std_fmt_u32_m": " std_fmt_str_m" - " std_fmt_u32_m, i, desc, heap );
-        }
-    }
-#endif
-
-    if ( device_memory_type == UINT32_MAX ) {
-        std_log_error_m ( "Device local memory heap not found!" );
-    }
-
-    if ( device_mapped_memory_type == UINT32_MAX ) {
-        std_log_error_m ( "Device mapped memory heap not found!" );
-    }
-
-    if ( host_cached_memory_type == UINT32_MAX ) {
-        std_log_error_m ( "Host cached memory heap not found!" );
-    }
-
-    if ( host_uncached_memory_type == UINT32_MAX ) {
-        std_log_error_m ( "Host uncached memory heap not found!" );
-    }
-
-    uint32_t device_memory_heap = device->memory_properties.memoryTypes[device_memory_type].heapIndex;
-    uint32_t device_mapped_memory_heap = device->memory_properties.memoryTypes[device_mapped_memory_type].heapIndex;
-    uint32_t host_uncached_memory_heap = device->memory_properties.memoryTypes[host_uncached_memory_type].heapIndex;
-    uint32_t host_cached_memory_heap = device->memory_properties.memoryTypes[host_cached_memory_type].heapIndex;
-
-    device->memory_heaps[xg_memory_type_gpu_only_m] = ( xg_vk_device_memory_heap_t ) { 
-        .vk_memory_type_idx = device_memory_type,
-        .vk_heap_idx = device_memory_heap,
-        .size = device->memory_properties.memoryHeaps[device_memory_heap].size,
-        .memory_flags = xg_memory_flags_from_vk ( device->memory_properties.memoryTypes[device_memory_type].propertyFlags ),
-    };
-    device->memory_heaps[xg_memory_type_gpu_mapped_m] = ( xg_vk_device_memory_heap_t ) { 
-        .vk_memory_type_idx = device_mapped_memory_type,
-        .vk_heap_idx = device_mapped_memory_heap,
-        .size = device->memory_properties.memoryHeaps[device_mapped_memory_heap].size,
-        .memory_flags = xg_memory_flags_from_vk ( device->memory_properties.memoryTypes[device_mapped_memory_type].propertyFlags ),
-    };
-    device->memory_heaps[xg_memory_type_upload_m] = ( xg_vk_device_memory_heap_t ) { 
-        .vk_memory_type_idx = host_uncached_memory_type,
-        .vk_heap_idx = host_uncached_memory_heap,
-        .size = device->memory_properties.memoryHeaps[host_uncached_memory_heap].size,
-        .memory_flags = xg_memory_flags_from_vk ( device->memory_properties.memoryTypes[host_uncached_memory_type].propertyFlags ),
-    };
-    device->memory_heaps[xg_memory_type_readback_m] = ( xg_vk_device_memory_heap_t ) { 
-        .vk_memory_type_idx = host_cached_memory_type,
-        .vk_heap_idx = host_cached_memory_heap,
-        .size = device->memory_properties.memoryHeaps[host_cached_memory_heap].size,
-        .memory_flags = xg_memory_flags_from_vk ( device->memory_properties.memoryTypes[host_cached_memory_type].propertyFlags ),
-    };
+    device->memory_types[xg_memory_type_gpu_only_m] = gpu_local_memory_type;
+    device->memory_types[xg_memory_type_gpu_mapped_m] = gpu_mapped_memory_type;
+    device->memory_types[xg_memory_type_upload_m] = upload_memory_type;
+    device->memory_types[xg_memory_type_readback_m] = readback_memory_type;
 
     // Map queue families
     // Only support one queue per type for now(?)
@@ -644,48 +544,25 @@ uint64_t xg_vk_device_get_idx ( xg_device_h device_handle ) {
 }
 
 const char* xg_vk_device_memory_type_str ( VkMemoryPropertyFlags flags ) {
-    // Cases from https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceMemoryProperties.html
     switch ( flags ) {
         case 0:
-            return "Null memory type";
+            return "";
 
-        case VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT:
-            //return "Staging memory (host coherent)";
-            return "Host visible | Host coherent (upload)";
+        case VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT:
+            return "Host visible";
 
-        case VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT:
-            //return "Staging memory (host cached)";
-            return "Host visible | Host cached (uncoherent readback) ";
+        case VK_MEMORY_PROPERTY_HOST_CACHED_BIT:
+            return "Host cached";
 
-        case VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT:
+        case VK_MEMORY_PROPERTY_HOST_COHERENT_BIT:
             //return "Staging memory (host cached coherent)";
-            return "Host visible | Host cached | Host coherent (readback)";
+            return "Host coherent";
 
         case VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT:
-            //return "Device only memory";
-            return "Device local (device)";
-
-        case VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT:
-            //return "Device mapped memory (host coherent)";
-            return "Device local | Host visible | Host coherent (device mappable)";
-
-        //case VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT:
-        //return "Device mapped memory (host cached)";
-
-        //case VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT:
-        //return "Device mapped memory (host cached coherent)";
-
-        //case VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT:
-        //return "Device only memory (lazy)";
-
-        //case VK_MEMORY_PROPERTY_PROTECTED_BIT:
-        //return "Protected memory";
-
-        //case VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_PROTECTED_BIT:
-        //return "Device protected memory";
+            return "Device local";
 
         default:
-            return "Unknown memory type";
+            return "Unknown";
     }
 }
 
@@ -782,10 +659,10 @@ const char* xg_vk_device_type_str ( VkPhysicalDeviceType type ) {
             return "Discrete GPU";
 
         case ( VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU ) :
-            return "Virtual GPU";
+            return "Virtualized GPU";
 
         case ( VK_PHYSICAL_DEVICE_TYPE_CPU ) :
-            return "CPU";
+            return "Software GPU (CPU)";
 
         case ( VK_PHYSICAL_DEVICE_TYPE_OTHER ) :
         default:
@@ -799,6 +676,8 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     std_mutex_lock ( &xg_vk_device_state->devices_mutex );
 
     xg_vk_device_t* device = &xg_vk_device_state->devices_array[device_handle];
+
+    std_log_info_m ( "Activating device " std_fmt_str_m "...", device->generic_properties.deviceName );
 
     // Fill Extensions list
     VkExtensionProperties supported_extensions[xg_vk_query_max_device_extensions_m];
@@ -992,6 +871,8 @@ bool xg_vk_device_activate ( xg_device_h device_handle ) {
     xg_vk_texture_activate_device ( device_handle, workload );
 
     xg_workload_submit ( workload );
+
+    std_log_info_m ( "Activated device " std_fmt_str_m, device->generic_properties.deviceName );
 
     return true;
 }

@@ -1954,9 +1954,9 @@ bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir ) {
     }
 #if defined(std_platform_win32_m)
     char* filename = path_buffer.base;
+    filename[0] = '\0';
     OPENFILENAMEA ofn;
     ZeroMemory ( &ofn, sizeof ( ofn ) );
-    filename[0] = '\0';
     ofn.lStructSize = sizeof ( OPENFILENAME );
     ofn.hwndOwner = ( HWND ) xi_ui_state->update.os_window_handle.win32.hwnd;
     ofn.lpstrFilter = NULL;
@@ -1975,7 +1975,20 @@ bool xi_ui_file_pick ( std_buffer_t path_buffer, const char* initial_dir ) {
     int result = GetOpenFileName ( &ofn );
     return result != 0;
 #else
-    std_not_implemented_m();
+    const char* args[] = {
+        "--file-selection"
+    };
+    std_process_h proc = std_process ( "zenity", "zenity", args, std_static_array_count_m ( args ), std_process_type_background_m, std_process_io_capture_m );
+    std_process_io_t io = std_process_get_io ( proc );
+    std_process_wait_for ( proc );
+    size_t read_size = 0;
+    char* filename = path_buffer.base;
+    filename[0] = '\0';
+    std_process_io_read ( filename, &read_size, path_buffer.size, io.stdout_handle );
+    if ( read_size > 0 ) {
+        filename[read_size - 1] = '\0'; // remove trailing \n
+        return true;
+    }
     return false;
 #endif
 }

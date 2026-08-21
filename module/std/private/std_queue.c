@@ -146,25 +146,25 @@ exit:
 
 //==============================================================================
 
-std_queue_local_t std_queue_local ( void* base, size_t size ) {
+std_queue_t std_queue ( void* base, size_t size ) {
     if ( !std_pow2_test ( size ) ) {
         size = std_pow2_round_down ( size );
     }
 
-    std_queue_local_t queue;
+    std_queue_t queue;
     queue.base = base;
     queue.ring = std_ring ( size );
     return queue;
 }
 
-std_queue_local_t std_queue_local_create ( size_t size ) {
-    std_queue_local_t queue;
+std_queue_t std_queue_create ( size_t size ) {
+    std_queue_t queue;
     std_queue_virtual_alloc_aliased ( &queue.base, &queue.alias, &size );
     queue.ring = std_ring ( size );
     return queue;
 }
 
-void std_queue_local_destroy ( std_queue_local_t* queue ) {
+void std_queue_destroy ( std_queue_t* queue ) {
 #if defined ( std_platform_win32_m )
     UnmapViewOfFile ( queue->base );
     UnmapViewOfFile ( queue->alias );
@@ -173,19 +173,19 @@ void std_queue_local_destroy ( std_queue_local_t* queue ) {
 #endif
 }
 
-void std_queue_local_clear ( std_queue_local_t* queue ) {
+void std_queue_clear ( std_queue_t* queue ) {
     std_ring_clear ( &queue->ring );
 }
 
-size_t std_queue_local_size ( const std_queue_local_t* queue ) {
+size_t std_queue_size ( const std_queue_t* queue ) {
     return std_ring_capacity ( &queue->ring );
 }
 
-size_t std_queue_local_used_size ( const std_queue_local_t* queue ) {
+size_t std_queue_used_size ( const std_queue_t* queue ) {
     return std_ring_count ( &queue->ring );
 }
 
-void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t size ) {
+void std_queue_push ( std_queue_t* queue, const void* item, size_t size ) {
     std_assert_m ( item != NULL );
     char* base = queue->base;
     uint64_t offset = std_ring_top_idx ( &queue->ring );
@@ -193,25 +193,25 @@ void std_queue_local_push ( std_queue_local_t* queue, const void* item, size_t s
     std_ring_push ( &queue->ring, size );
 }
 
-void std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size ) {
+void std_queue_pop_discard ( std_queue_t* queue, size_t size ) {
     std_ring_pop ( &queue->ring, size );
 }
 
-void std_queue_local_pop_move ( std_queue_local_t* queue, void* dest, size_t size ) {
+void std_queue_pop_move ( std_queue_t* queue, void* dest, size_t size ) {
     char* base = queue->base;
     uint64_t offset = std_ring_bot_idx ( &queue->ring );
     std_mem_copy ( dest, base + offset, size );
     std_ring_pop ( &queue->ring, size );
 }
 
-void* std_queue_local_emplace ( std_queue_local_t* queue, size_t size ) {
+void* std_queue_emplace ( std_queue_t* queue, size_t size ) {
     char* base = queue->base;
     uint64_t offset = std_ring_top_idx ( &queue->ring );
     std_ring_push ( &queue->ring, size );
     return base + offset;
 }
 
-void std_queue_local_align_push ( std_queue_local_t* queue, size_t align ) {
+void std_queue_align_push ( std_queue_t* queue, size_t align ) {
     // Load
     size_t top = queue->ring.top;
     size_t new_top = std_align ( top, align );
@@ -228,7 +228,7 @@ void std_queue_local_align_push ( std_queue_local_t* queue, size_t align ) {
     queue->ring.top = new_top;
 }
 
-void std_queue_local_align_pop ( std_queue_local_t* queue, size_t align ) {
+void std_queue_align_pop ( std_queue_t* queue, size_t align ) {
     // Load
     size_t bot = queue->ring.bot;
     size_t new_bot = std_align ( bot, align );

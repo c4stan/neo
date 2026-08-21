@@ -2,8 +2,6 @@
 
 #include <xg.h>
 
-//typedef struct RENDERDOC_API_1_5_0 RENDERDOC_API_1_5_0;
-
 typedef struct {
     void* renderdoc_api;
 } xg_debug_capture_state_t;

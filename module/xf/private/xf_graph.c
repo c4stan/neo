@@ -47,7 +47,9 @@ void xf_graph_unload ( void ) {
 }
 
 void xf_graph_load_shaders ( xs_i* xs, xs_database_h sdb ) {
-    xf_graph_state->export_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xf_export" ) );
+    // TODO restore xf_export
+    //xf_graph_state->export_pipeline = xs->get_database_pipeline ( sdb, xs_hash_static_string_m ( "xf_export" ) );
+    xf_graph_state->export_pipeline = xs_null_handle_m;
 }
 
 xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
@@ -882,7 +884,6 @@ static void xf_graph_scan_physical_textures ( xf_graph_h graph_handle ) {
                 ) );
             }
             graph_texture->physical_texture_handle = physical_texture_idx;
-            std_noop_m;
         }
     }
 
@@ -1696,7 +1697,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
             char buffer[16];
             std_u32_to_str ( buffer, 16, committed_textures_count, 0 );
             std_string_append ( &string, graph->params.debug_name );
-            std_string_append ( &string, " CT" ); // Committed Texture
+            std_string_append ( &string, "_CT" ); // Committed Texture
             std_string_append ( &string, buffer );
 
             committed_textures_array[committed_textures_count++] = ( xf_graph_committed_texture_t ) {
@@ -2519,6 +2520,15 @@ static void xf_graph_clear_physical_resources ( xf_graph_h graph_handle ) {
     std_stack_clear ( &graph->physical_resource_dependencies_allocator );
 }
 
+static void xf_graph_discard_transient_textures ( xf_graph_h graph_handle ) {
+    xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
+    xf_graph_memory_heap_t* heap = &graph->heap;
+
+    for ( uint32_t i = 0; i < heap->textures_count; ++i ) {
+        xf_resource_physical_texture_discard_layout ( heap->textures_array[i] );
+    }
+}
+
 static uint64_t xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg, xg_workload_h workload, xg_resource_cmd_buffer_h resource_cmd_buffer, uint64_t key ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
 
@@ -2551,6 +2561,7 @@ static uint64_t xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg
     xf_graph_scan_physical_textures ( graph_handle );
     xf_graph_accumulate_physical_resources_dependencies ( graph_handle );
     xf_graph_compute_resource_transitions ( graph_handle );
+    xf_graph_discard_transient_textures ( graph_handle );
 
     return key;
 }

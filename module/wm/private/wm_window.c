@@ -22,7 +22,6 @@
     // https://www.khronos.org/opengl/wiki/Programming_OpenGL_in_Linux:_GLX_and_Xlib
 #endif
 
-typedef uint64_t wm_window_h;
 #define wm_make_handle_m( idx, gen )          ( ( uint64_t ) (idx) + ( ( uint64_t ) (gen) << 32 ) )
 #define wm_handle_idx_m( handle )             ( (handle) & 0xffffffff )
 #define wm_handle_gen_m( handle )             ( ( (handle) >> 32 ) & 0xffffffff )
@@ -1191,10 +1190,10 @@ void wm_window_debug_print_input_state ( wm_window_h handle, bool overwrite_cons
     const char* prefix = "";
 
     if ( overwrite_console ) {
-        prefix = std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m;
+        prefix = std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m std_fmt_clear_m;
     }
 
-    std_log_m ( 0, std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n",
+    std_log_info_m ( std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n"std_fmt_str_m"\n",
         prefix, line1, line2, line3, line4, line5, line6, line7 );
 }
 
@@ -1799,6 +1798,7 @@ bool wm_window_destroy ( wm_window_h handle ) {
 #elif defined(std_platform_linux_m)
     if ( !window->info.is_console ) {
         XDestroyWindow ( ( Display* ) window->info.os_handle.root, ( Window ) window->info.os_handle.window );
+        XFlush ( ( Display* ) window->info.os_handle.root );
     }
 #endif
 

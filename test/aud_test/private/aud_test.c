@@ -78,7 +78,7 @@ static void run_aud_test ( void ) {
         };
         source0 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
-        std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
+        std_log_info_m ( "\tbpp: " std_fmt_size_m, params.bits_per_sample );
         std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channel_count );
 
         char buffer[8000 * 60] = {0};
@@ -98,7 +98,7 @@ static void run_aud_test ( void ) {
         };
         source1 = aud->create_source ( &params );
         std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
-        std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
+        std_log_info_m ( "\tbpp: " std_fmt_size_m, params.bits_per_sample );
         std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channel_count );
 
         char buffer[8000 * 60] = {0};
@@ -121,7 +121,7 @@ static void run_aud_test ( void ) {
             };
             source2 = aud->create_source ( &params );
             std_log_info_m ( "\tsample frequency: " std_fmt_size_m, params.sample_frequency );
-            std_log_info_m ( "\tbps: " std_fmt_size_m, params.bits_per_sample );
+            std_log_info_m ( "\tbpp: " std_fmt_size_m, params.bits_per_sample );
             std_log_info_m ( "\tchannels: " std_fmt_size_m, params.channel_count );
 
             int16_t* buffer = std_virtual_heap_alloc_array_m ( int16_t, mp3dec.samples );

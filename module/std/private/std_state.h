@@ -82,6 +82,14 @@ typedef struct {
     uint64_t tag_bin_map_payloads[std_tagged_allocator_max_bins_m * 2];
 } std_allocator_tagged_heap_t;
 
+#if std_allocator_track_allocations_m
+typedef struct {
+    std_alloc_scope_t scope;
+    void* user;
+} std_allocator_debug_record_t;
+#endif
+
+// see std_allocator.c for more info on the tlsf allocator
 #define std_allocator_tlsf_min_x_level_m 7      // min allocation size of 2^7 - header_size = 128 - 8 = 120 bytes
 #define std_allocator_tlsf_max_x_level_m 36     // max allocation size of 2^36 - 1 - header_size = ~68 GB
 #define std_allocator_tlsf_x_size_m (std_allocator_tlsf_max_x_level_m - std_allocator_tlsf_min_x_level_m)
@@ -92,17 +100,12 @@ typedef struct {
 #define std_allocator_tlsf_footer_size_m 8
 #define std_allocator_tlsf_min_segment_size_m ( 1 << std_allocator_tlsf_min_x_level_m )
 #define std_allocator_tlsf_max_segment_size_m ( ( 1ull << std_allocator_tlsf_max_x_level_m ) - 1 )
-#define std_allocator_tlsf_free_segment_bit_m (1 << 0)
-#define std_allocator_tlsf_free_prev_segment_bit_m (1 << 1)
-#define std_allocator_tlsf_alignment_bit_m (1 << 2)
+#define std_allocator_tlsf_free_segment_bit_m (1 << 0)      // set if this segment is free
+#define std_allocator_tlsf_free_prev_segment_bit_m (1 << 1) // set if the segment adjacent to the left of this one is free
+#define std_allocator_tlsf_alignment_bit_m (1 << 2)         // set if this is an alignment block and not the actual header
 #define std_allocator_tlsf_size_mask_m ( ( ~0ull ) << 3 )
 
-#if std_allocator_track_allocations_m
-typedef struct {
-    std_alloc_scope_t scope;
-    void* user;
-} std_allocator_debug_record_t;
-#endif
+#define sd_allocator_tlsf_grow_size_m ( 1024ull * 1024 * 32 )
 
 typedef struct {
     std_mutex_t mutex;

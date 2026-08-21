@@ -45,7 +45,6 @@ typedef struct {
 } xf_graph_subresource_dependencies_t;
 
 // Stores what kind of access the graph nodes do on a (sub) resource
-// Filled when adding nodes to a graph and never updated after
 typedef struct {
     xf_graph_subresource_dependencies_t* subresources;
     uint32_t subresource_count;

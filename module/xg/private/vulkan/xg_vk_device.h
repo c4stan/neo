@@ -24,11 +24,21 @@ typedef enum {
 } xg_vk_device_f;
 
 typedef struct {
+    bool found;
     uint32_t vk_heap_idx;
     uint32_t vk_memory_type_idx;
-    xg_memory_flag_bit_e memory_flags;
+    VkMemoryPropertyFlags vk_flags;
     size_t size;
-} xg_vk_device_memory_heap_t;
+} xg_vk_device_memory_type_t;
+
+#define xg_vk_device_memory_type_m(...) ( xg_vk_device_memory_type_t ) { \
+    .found = false, \
+    .vk_heap_idx = -1, \
+    .vk_memory_type_idx = -1, \
+    .vk_flags = 0, \
+    .size = 0, \
+    __VA_ARGS__ \
+}
 
 typedef struct {
     VkQueue vk_handle;
@@ -227,6 +237,7 @@ typedef struct {
     // Properties
     VkPhysicalDeviceProperties generic_properties; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceProperties.html
     VkPhysicalDeviceFeatures supported_features; // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPhysicalDeviceFeatures.html
+    VkPhysicalDeviceMaintenance3Properties maintenance3_properties; // https://registry.khronos.org/VulkanSC/specs/1.0-extensions/man/html/VkPhysicalDeviceMaintenance3Properties.html
     
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR raytrace_properties; //
     VkPhysicalDeviceAccelerationStructurePropertiesKHR acceleration_structure_properties;
@@ -243,7 +254,7 @@ typedef struct {
     VkDeviceQueueCreateInfo             queue_create_info[xg_cmd_queue_count_m]; // Determined when caching vulkan properties, used when creating the device (on activation)
     uint32_t                            queue_create_info_count;
     xg_vk_device_cmd_queue_t            queues[xg_cmd_queue_count_m];
-    xg_vk_device_memory_heap_t          memory_heaps[xg_memory_type_count_m];
+    xg_vk_device_memory_type_t          memory_types[xg_memory_type_count_m];
     xg_vk_device_ext_api_i              ext_api;
 
     bool supports_raytrace;

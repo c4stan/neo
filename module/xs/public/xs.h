@@ -186,19 +186,16 @@ typedef struct {
 typedef struct {
     uint32_t successful_shaders;
     uint32_t failed_shaders;
+    uint32_t unsupported_shaders;
     uint32_t skipped_shaders;
     uint32_t successful_pipeline_states;
     uint32_t failed_pipeline_states;
+    uint32_t unsupported_pipeline_states;
     uint32_t skipped_pipeline_states;
 } xs_database_build_result_t;
 
 #define xs_database_build_result_m( ... ) ( xs_database_build_result_t ) { \
-    .successful_shaders = 0, \
-    .failed_shaders = 0, \
-    .skipped_shaders = 0, \
-    .successful_pipeline_states = 0, \
-    .failed_pipeline_states = 0, \
-    .skipped_pipeline_states = 0, \
+    __VA_ARGS__ \
 }
 
 typedef struct {

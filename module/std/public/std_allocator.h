@@ -103,6 +103,8 @@ typedef struct {
 #define std_buffer_array_m( array, count ) std_buffer_m ( .base = array, .size = sizeof ( *array ) * count )
 #define std_static_buffer_m( array ) std_buffer_m ( .base = array, .size = sizeof ( array ) )
 
+#define std_buffer_virtual_heap_alloc_m( sz, align ) std_buffer_m ( .base = std_virtual_heap_alloc_m ( sz, align ), .size = sz )
+
 // Linear allocator based on virtual memory. The mapped segment will grow until the whole reserved range is full. It will not grow further.
 typedef struct {
     void* begin;

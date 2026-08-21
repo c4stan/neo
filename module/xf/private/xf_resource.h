@@ -281,6 +281,7 @@ void xf_resource_physical_texture_destroy ( xf_physical_texture_h texture );
 xf_physical_texture_t* xf_resource_physical_texture_get ( xf_physical_texture_h texture );
 void xf_resource_physical_texture_map_to_new ( xf_physical_texture_h texture, xg_texture_h xg_handle, const xg_texture_info_t* info );
 void xf_resource_physical_texture_state_barrier ( std_stack_t* stack, xf_physical_texture_h texture, xg_texture_view_t view, const xf_texture_execution_state_t* new_state );
+void xf_resource_physical_texture_discard_layout ( xf_physical_texture_h texture );
 
 xf_buffer_h xf_resource_buffer_create ( xf_graph_h graph_handle, const xf_buffer_params_t* params );
 xf_buffer_h xf_resource_buffer_create_from_external ( xf_graph_h graph_handle, xg_buffer_h buffer );

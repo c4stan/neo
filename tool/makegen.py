@@ -80,7 +80,8 @@ else:
 
 # -- Warnings
 CORE_WARNING_FLAGS = (
-    '-Wno-switch-enum'                          # Having a _COUNT enum not explicitly handled in a switch throws this
+    '-Wfatal-errors'                            # Stop after first error
+    ' -Wno-switch-enum'                         # Having a _COUNT enum not explicitly handled in a switch throws this
     ' -Wno-gnu-zero-variadic-macro-arguments'   # Allow 0 args variadic macros and ending ', __VA_ARGS__' trick (std_log uses this extensively)
     ' -Wno-reserved-id-macro'                   # Allow e.g. names starting with __. Although not using it is probably a good idea, the Win32 API does, so.
     #' -Wno-strict-prototypes'                   # Allow declaring foo() without having to explicit the (void).
@@ -97,7 +98,6 @@ CORE_WARNING_FLAGS = (
     ' -Wno-parentheses'
     ' -Wno-undef'                               # Allow treating undefined macros as 0 (C99 compliant)
     ' -Wno-float-equal'                         # Don't warn when comparing float values with ==
-    ' -Wfatal-errors'                           # Stop after first error
     ' -Wno-disabled-macro-expansion'
     ' -Wno-gnu-designator'                      # allow for int array[100] = { [0...99] = 1 };
     #' -Wno-void-pointer-to-enum-cast'           # allow casting void* to enum
@@ -249,7 +249,6 @@ def string_hash(string):
     h = 5381
     for c in string:
         h = h * 33 ^ ord(c)
-
     return h
 
 # Simple expression calculator
@@ -407,18 +406,6 @@ def resolve_bindings(makedef, bindings):
 
     return entries
 
-# Accumulates dependencies. modules is read-only and holds the modules to be recursively explored
-def gather_dependencies(sln, dependencies, modules):
-    for module in modules:
-        #module_path = normpath('../' + module)
-        #makedef_path = normpath(module_path + '/makedef')
-        #content = parse_makedef(makedef_path)
-        project = sln.get_project(module)
-        for dep in project.module_dependencies:
-            if dep not in dependencies:
-                dependencies.append(dep)
-                gather_dependencies(sln, dependencies, [dep])
-
 # makefile macro
 # TODO turn macro lists into python maps and remove this class entirely?
 class Macro:
@@ -479,7 +466,6 @@ class Project:
         self.inc = []
         self.src = []
         for absolute_path in self.project_paths + self.external_paths:
-            #absolute_path = normpath(self.path + '/' + relative_path)
             if os.path.isdir(absolute_path):
                 for filename in os.listdir(absolute_path):
                     skip = False
@@ -506,9 +492,17 @@ class Project:
         log.verbose("Gathering module dependencies...")
         log.push_verbose()
 
-        gather_dependencies(self.solution, self.module_dependencies, self.module_dependencies)
+        def gather_dependencies(sln, project):
+            deps = set()
+            for module_dependency in project.module_dependencies:
+                deps.add(module_dependency)
+                dependency_project = sln.get_project(module_dependency)
+                deps |= gather_dependencies(sln, dependency_project)
+            return deps
+        self.module_dependencies = gather_dependencies(self.solution, self)
 
         for module in self.module_dependencies:
+            #log.verbose(module)
             #module_path = normpath(self.path + '/../' + module)
             #makedef_path = normpath(module_path + '/makedef')
             #content = parse_makedef(makedef_path)
@@ -537,10 +531,6 @@ class Project:
                 for lib in project.external_libs:
                     #log.verbose("EXT LIB: " + lib)
                     self.external_libs.append(lib)
-
-            #for define in defs:
-            #    path = normpath(define)
-            #    self.defines.append(path)
 
             include_path = normpath(module_path + '/public')
             #log.verbose("EXT INC: " + include_path)
@@ -661,17 +651,8 @@ class Project:
 
         # Targets are generated for each config. Dependencies are the same but paths and compile flags differ.
         targets = []
-        config_flags = ''
-        # TODO FIX THIS, THIS DOESN'T WORK FOR RELEASE
-        # Process currently iterated config and prepare tokens to use later
-        config_path = config_str(self.config)
-        if self.config == CONFIG_DEBUG:
-            config_flags = '-O0'
-        elif self.config == CONFIG_RELEASE:
-            config_flags = '-O3'
-        else:
-            assert False
 
+        config_path = config_str(self.config)
         output_path = relpath(self.path + '/build/' + config_path + '/output', rootpath + '/' + build_path)
 
         # Group all objs that will be created by a compile step on source files (/src) into a macro.
@@ -741,7 +722,7 @@ class Project:
 
         global COMPILER
         if COMPILER == COMPILER_CLANG:
-            std = 'c99'
+            std = 'gnu99'
             comp = bindings.get("clang", "clang")
             ar = bindings.get("llvm-ar", "llvm-ar")
         elif COMPILER == COMPILER_GCC:
@@ -749,71 +730,74 @@ class Project:
             comp = bindings.get("gcc", "gcc")
             ar = bindings.get("ar", "ar")
         elif COMPILER == COMPILER_CLANG_ANDROID:
-            std = 'c99'
+            std = 'gnu99'
             comp = bindings.get("android_clang_path") + "clang.exe"
             ar = bindings.get("android_clang_path") + "llvm-ar.exe"
 
-        main_target.cmd = ''
-        if COMPILER == COMPILER_CLANG:
+        compile_flags = '-Wall'
+        compile_flags += ' -std=' + std
+        compile_flags += ' -funsigned-char' # default char to unsigned
+        if TARGET == TARGET_WIN32:
+            compile_flags += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION # TODO remove?
+        if self.config == CONFIG_DEBUG:
+            compile_flags += ' -O0 -g'
             if platform.system() == 'Windows':
-                if self.output == OUTPUT_LIB:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    main_target.cmd += '\t@' + ar + ' crus $@ ' + objs_dep
-                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
-                elif self.output == OUTPUT_EXE:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,/STACK:' + stack_size
-            elif platform.system() == 'Linux':
-                # -rdynamic preserves code symbols, allows to print callstack
-                if self.output == OUTPUT_LIB:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    # removed u flag from win32 version. https://bugzilla.redhat.com/show_bug.cgi?id=1155273
-                    main_target.cmd += '\t@' + ar + ' crs $@ ' + objs_dep
-                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + comp + ' -rdynamic -shared ' + config_flags + ' -o $@ ' + objs_dep
-                elif self.output == OUTPUT_EXE:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    # -lX11 -lvulkan -lpthread -lm -ldl
-                    main_target.cmd += '\t@' + comp + ' -rdynamic ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
-        elif COMPILER == COMPILER_GCC:
-            if platform.system() == 'Windows':
-                if self.output == OUTPUT_LIB:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    main_target.cmd += '\t@' + ar + ' crus $@ ' + objs_dep
-                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g -shared ' + config_flags + ' -o $@ ' + objs_dep
-                elif self.output == OUTPUT_EXE:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-stack,' + stack_size
-            elif platform.system() == 'Linux':
-                if self.output == OUTPUT_LIB:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    # removed u flag from win32 version. https://bugzilla.redhat.com/show_bug.cgi?id=1155273
-                    main_target.cmd += '\t@' + ar + ' crs $@ ' + objs_dep
-                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + comp + ' -shared ' + config_flags + ' -o $@ ' + objs_dep
-                elif self.output == OUTPUT_EXE:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@' + comp + ' ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
-        elif COMPILER == COMPILER_CLANG_ANDROID:
-            if platform.system() == 'Windows':
-                if self.output == OUTPUT_LIB:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.lib')
-                    main_target.cmd += '\t@' + ar + ' crus $@ ' + objs_dep
-                elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.dll')
-                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g --target=aarch64-linux-android31 -shared ' + config_flags + ' -o $@ ' + objs_dep
-                elif self.output == OUTPUT_EXE:
-                    main_target.name = normpath(output_path + '/' + self.name.lower() + '.exe')
-                    main_target.cmd += '\t@' + comp + ' -std=' + std + ' -g --target=aarch64-linux-android31 ' + config_flags + ' -o $@ ' + objs_dep + ' -Wl,-zstack-size=' + stack_size
-            elif platform.system() == 'Linux':
-                # TODO
-                pass                
+                compile_flags += ' -gcodeview'
+        elif self.config == CONFIG_RELEASE:
+            compile_flags += ' -O3'
+        #if self.output == OUTPUT_DLL:
+        #    if platform.system() == 'Linux':
+        #        compile_flags += ' -fPIC'
+
+        # Prepare obj compilation flags
+        compile_flags = concat([compile_flags, CORE_WARNING_FLAGS])
+        if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
+            compile_flags = concat([compile_flags, EXTENDED_WARNING_FLAGS])
+
+        compiler_flags_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/flags')
+        compiler_flags_file.write(compile_flags)
+
+        # main target name
+        main_target_ext = ''
+        if self.output == OUTPUT_LIB:
+            main_target_ext = 'lib'
+        elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
+            main_target_ext = 'dll'
+        elif self.output == OUTPUT_EXE:
+            main_target_ext = 'exe'
+        main_target.name = normpath(output_path + '/' + self.name.lower() + '.' + main_target_ext)
+
+        # main target cmd
+        if self.output == OUTPUT_LIB:
+            main_target.cmd = '\t@' + ar + ' crs $@ ' + objs_dep
+        elif self.output == OUTPUT_DLL or self.output == OUTPUT_APP or self.output == OUTPUT_EXE:
+            main_target.cmd = '\t@' + comp + ' -o $@ ' + objs_dep
+
+            if self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
+                main_target.cmd += ' -shared'
+
+            if platform.system() == 'Linux':
+                main_target.cmd += ' -rdynamic'
+
+            if self.output == OUTPUT_EXE:
+                if COMPILER == COMPILER_CLANG:
+                    if platform.system() == 'Windows':
+                        main_target.cmd += ' -Wl,/STACK:' + stack_size
+                    elif platform.system() == 'Linux':
+                        main_target.cmd += ' -Wl,-zstack-size=' + stack_size
+                elif COMPILER == COMPILER_GCC:
+                    if platform.system() == 'Windows':
+                        main_target.cmd += ' -Wl,-stack,' + stack_size
+                    elif platform.system() == 'Linux':
+                        main_target.cmd += ' -Wl,-zstack-size=' + stack_size
+                elif COMPILER == COMPILER_CLANG_ANDROID:
+                    if platform.system() == 'Windows':
+                        main_target.cmd += ' -Wl,-zstack-size=' + stack_size
+                    elif platform.system() == 'Linux':
+                        pass # TODO
+
+            main_target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
+            main_target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
 
         # When target is LIB, ignore the other .lib dependency. It will get linked in by the final target (DLL or EXE) that also includes this lib
         if self.output == OUTPUT_DLL or self.output == OUTPUT_EXE or self.output == OUTPUT_APP: # or self.output == OUTPUT_LIB:
@@ -841,6 +825,7 @@ class Project:
                     else:
                         main_target.cmd += ' ' + lib
 
+        # Nothing to do for main target in these cases (other than building its objs)
         if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP) or (BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM):
             main_target.cmd = ''
 
@@ -862,22 +847,6 @@ class Project:
             dlls_target.dependencies.append(dlls_dep)
             targets.append(dlls_target)
 
-        # Prepare obj compilation flags
-        platform_flags = ''
-        if TARGET == TARGET_WIN32:
-            #platform_flags = '/J' # default char to unsigned
-            platform_flags = '-funsigned-char' # default char to unsigned
-            platform_flags += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION # TODO remove?
-        elif TARGET == TARGET_LINUX:
-            platform_flags = '-funsigned-char' # default char to unsigned
-
-        compile_flags = concat(['-Wall', platform_flags, config_flags, CORE_WARNING_FLAGS])
-        if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-            compile_flags = concat([compile_flags, EXTENDED_WARNING_FLAGS])
-
-        compiler_flags_file = create_file(relpath(self.path + '/build/' + config_path, rootpath) + '/flags')
-        compiler_flags_file.write(compile_flags)
-
         # Generates one target for each obj, each depending on the corresponding source file and all header files.
         # output/<config>/<src>.o: src/<src>.c <headers>
         for src in self.src:
@@ -891,27 +860,19 @@ class Project:
 
             if COMPILER == COMPILER_CLANG:
                 if platform.system() == 'Windows':
-                    #target.cmd = '\t@clang-cl ' + config_flags + ' -Zi -Fa' + normpath(output_path + '/' + name + '.asm') + ' '
-                    target.cmd = '\t@' + comp + ' -std=' + std + ' -g -gcodeview --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@' + comp + ' --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
-                        #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                     for path in self.external_paths:
                         # TODO for each external path create a macro instead of referencing its path directly?
                         #      that way it would be easier to configure external references when sharing the generated makefile
-                        #target.cmd += ' -I' + relpath(self.path + '/' + path, rootpath)
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
-                    #target.cmd += ' -Wall /J ' + CORE_WARNING_FLAGS
-                    #if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                    #    target.cmd += ' ' + EXTENDED_WARNING_FLAGS
                     target.cmd += ' -o $@ -c ' + relpath(src, rootpath + '/' + build_path)
-                    #target.cmd += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION
                     target.cmd += ' ' + src_def_cmd
-                    #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
                 elif platform.system() == 'Linux':
-                    target.cmd = '\t@' + comp + ' ' + config_flags
+                    target.cmd = '\t@' + comp
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -S'
                         target.cmd += ' -mllvm --x86-asm-syntax=intel'
@@ -919,21 +880,19 @@ class Project:
                         target.cmd += ' -I' + path
                     for path in self.external_paths:
                         target.cmd += ' -I' + path
-                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNING_FLAGS
-                    if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                        target.cmd += ' ' + EXTENDED_WARNING_FLAGS
-                    target.cmd += ' -g -c ' + relpath(src, rootpath + '/' + build_path)
+                    target.cmd += ' -c ' + relpath(src, rootpath + '/' + build_path)
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -o ' + normpath(output_path + '/' + name + '.asm')
                     else:
                         target.cmd += ' -o $@'
-                    target.cmd += ' -fPIC' # needed when building a shared lib, static libs used by the shared lib must also have this...
+                    if self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
+                        target.cmd += ' -fPIC'
                     target.cmd += ' ' + src_def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
             elif COMPILER == COMPILER_GCC:
                 if platform.system() == 'Windows':
-                    target.cmd = '\t@' + comp + ' -std=' + std + ' -gcodeview'# --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
+                    target.cmd = '\t@' + comp # --target=x86_64-windows-msvc'# -Fa' + normpath(output_path + '/' + name + '.asm')
                     for path in self.project_paths:
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                     for path in self.external_paths:
@@ -946,7 +905,7 @@ class Project:
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
                 elif platform.system() == 'Linux':
-                    target.cmd = '\t@' + comp + ' -std=' + std + ' ' + config_flags
+                    target.cmd = '\t@' + comp
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -S'
                         target.cmd += ' -mllvm --x86-asm-syntax=intel'
@@ -954,22 +913,19 @@ class Project:
                         target.cmd += ' -I' + path
                     for path in self.external_paths:
                         target.cmd += ' -I' + path
-                    target.cmd += ' -Wall -funsigned-char ' + CORE_WARNING_FLAGS
-                    if not BUILD_FLAGS & BUILD_FLAG_PERMISSIVE_WARNINGS:
-                        target.cmd += ' ' + EXTENDED_WARNING_FLAGS
-                    target.cmd += ' -g -c ' + relpath(src, rootpath + '/' + build_path)
+                    target.cmd += ' -c ' + relpath(src, rootpath + '/' + build_path)
                     if BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM:
                         target.cmd += ' -o ' + normpath(output_path + '/' + name + '.asm')
                     else:
                         target.cmd += ' -o $@'
-                    target.cmd += ' -fPIC' # needed when building a shared lib, static libs used by the shared lib must also have this...
+                    if self.output == OUTPUT_DLL or self.output == OUTPUT_APP:
+                        target.cmd += ' -fPIC'
                     target.cmd += ' ' + src_def_cmd
-                    #target.cmd += ' ' + def_cmd
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/defines')
                     target.cmd += ' @' + normpath(relpath(self.path + '/build/' + config_path, rootpath + '/' + build_path) + '/flags')
             elif COMPILER == COMPILER_CLANG_ANDROID:
                 if platform.system() == 'Windows':
-                    target.cmd = '\t@' + comp + ' -std=' + std + ' -g --target=aarch64-linux-android31' # 64bit only
+                    target.cmd = '\t@' + comp + ' --target=aarch64-linux-android31' # 64bit only
                     for path in self.project_paths:
                         target.cmd += ' -I' + '"' + relpath(path, rootpath + '/' + build_path) + '"'
                     for path in self.external_paths:
@@ -986,9 +942,7 @@ class Project:
 
             #target.cmd += ' -march=native'
 
-            #TODO test this, is it working?
             if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP):
-                #if platform.system() == 'Linux':
                 if COMPILER == COMPILER_CLANG:
                     target.cmd = '\t@' + comp + ' -E ' + relpath(src, rootpath + '/' + build_path) + ' > ' + normpath(output_path + '/' + name + '.pp')
                 elif COMPILER == COMPILER_GCC:
@@ -1409,6 +1363,8 @@ class Generator:
         log.pop_verbose()
 
     def gather_dlls(self):
+        if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP) or (BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM):
+            return []
         log.info('Gathering dlls...')
         log.push_verbose()
         changelist = self.solution.gather_dlls()
@@ -1416,6 +1372,8 @@ class Generator:
         return changelist
 
     def gather_data(self):
+        if (BUILD_FLAGS & BUILD_FLAG_OUTPUT_PP) or (BUILD_FLAGS & BUILD_FLAG_OUTPUT_ASM):
+            return
         log.info('Gathering data...')
         log.push_verbose()
         self.solution.gather_data()

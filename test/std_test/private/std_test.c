@@ -524,25 +524,25 @@ static void test_queue ( void ) {
     {
         std_log_info_m ( "testing std_queue..." );
         size_t size = 16;
-        std_queue_local_t queue = std_queue_local_create ( size );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
+        std_queue_t queue = std_queue_create ( size );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == 0 );
         int i = 5;
 
-        std_queue_local_push ( &queue, &i, sizeof ( i ) );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == sizeof ( i ) );
+        std_queue_push ( &queue, &i, sizeof ( i ) );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == sizeof ( i ) );
 
         struct {
             int i;
             int j;
         } s;
         s.j = 3;
-        std_queue_local_pop_move ( &queue, &s.i, sizeof ( i ) );
+        std_queue_pop_move ( &queue, &s.i, sizeof ( i ) );
         std_assert_m ( s.i == i );
         std_assert_m ( s.j == 3 );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == 0 );
 
         struct {
             uint64_t u64;
@@ -551,30 +551,30 @@ static void test_queue ( void ) {
         t.u64 = 1;
         t.u32 = 2;
 
-        std_queue_local_push ( &queue, &t, 12 );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == 12 );
+        std_queue_push ( &queue, &t, 12 );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == 12 );
 
-        std_queue_local_pop_discard ( &queue, 12 );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
+        std_queue_pop_discard ( &queue, 12 );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == 0 );
 
         uint64_t j = 33;
-        std_queue_local_push ( &queue, &j, sizeof ( j ) );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == sizeof ( j ) );
+        std_queue_push ( &queue, &j, sizeof ( j ) );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == sizeof ( j ) );
 
         struct {
             uint64_t j;
             uint64_t k;
         } r;
         r.k = 9;
-        std_queue_local_pop_move ( &queue, &r.j, sizeof ( j ) );
+        std_queue_pop_move ( &queue, &r.j, sizeof ( j ) );
         std_assert_m ( r.j == j );
-        std_assert_m ( std_queue_local_size ( &queue ) >= size );
-        std_assert_m ( std_queue_local_used_size ( &queue ) == 0 );
+        std_assert_m ( std_queue_size ( &queue ) >= size );
+        std_assert_m ( std_queue_used_size ( &queue ) == 0 );
 
-        std_queue_local_destroy ( &queue );
+        std_queue_destroy ( &queue );
     }
 
     // Shared SPSC queue

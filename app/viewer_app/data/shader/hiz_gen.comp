@@ -10,7 +10,7 @@ layout ( binding = 0, set = xs_shader_binding_set_dispatch_m ) uniform draw_unif
 } draw_uniforms;
 
 layout ( binding = 1, set = xs_shader_binding_set_dispatch_m ) uniform texture2D tex_depth;
-layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, r32f ) uniform writeonly image2D img_color;
+layout ( binding = 2, set = xs_shader_binding_set_dispatch_m, r32f ) uniform writeonly image2D img_dest;
 layout ( binding = 3, set = xs_shader_binding_set_dispatch_m ) uniform sampler sampler_point;
 
 layout ( local_size_x = 8, local_size_y = 8, local_size_z = 1 ) in;
@@ -24,5 +24,5 @@ void main() {
 #else
     float depth = min ( min ( depths.x, depths.y ), min ( depths.z, depths.w ) );
 #endif
-    imageStore ( img_color, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( depth ) );
+    imageStore ( img_dest, ivec2 ( gl_GlobalInvocationID.xy ), vec4 ( depth ) );
 }

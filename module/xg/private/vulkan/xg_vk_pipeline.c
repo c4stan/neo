@@ -1751,12 +1751,15 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         info.pNext = NULL;
         info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         info.maxSets = 512;
-#if xg_enable_raytracing_m
-        info.poolSizeCount = xg_resource_binding_count_m;
-#else
         info.poolSizeCount = xg_resource_binding_count_m - 1;
+
+#if xg_enable_raytracing_m
+        if ( device->supports_raytrace ) {
+            info.poolSizeCount = xg_resource_binding_count_m;
+        }
 #endif
-        VkDescriptorPoolSize sizes[xg_resource_binding_count_m];
+
+        VkDescriptorPoolSize sizes[xg_resource_binding_count_m] = {};
         sizes[xg_resource_binding_sampler_m].type = VK_DESCRIPTOR_TYPE_SAMPLER;
         sizes[xg_resource_binding_sampler_m].descriptorCount = xg_vk_max_samplers_per_descriptor_pool_m;
         sizes[xg_resource_binding_texture_to_sample_m].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -1771,14 +1774,18 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         sizes[xg_resource_binding_buffer_texel_uniform_m].descriptorCount = xg_vk_max_uniform_texel_buffer_per_descriptor_pool_m;
         sizes[xg_resource_binding_buffer_texel_storage_m].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
         sizes[xg_resource_binding_buffer_texel_storage_m].descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
+
 #if xg_enable_raytracing_m
-#if xg_vk_enable_nv_raytracing_ext_m
-        sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
-#else
-        sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        if ( device->supports_raytrace ) {
+    #if xg_vk_enable_nv_raytracing_ext_m
+            sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+    #else
+            sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    #endif
+            sizes[xg_resource_binding_raytrace_world_m].descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m;
 #endif
-        sizes[xg_resource_binding_raytrace_world_m].descriptorCount = xg_vk_max_raytrace_world_per_descriptor_pool_m;
-#endif
+        }
+
         info.pPoolSizes = sizes;
         VkResult result = vkCreateDescriptorPool ( device->vk_handle, &info, xg_vk_cpu_allocator(), &context->vk_desc_pool );
         std_verify_m ( result == VK_SUCCESS );

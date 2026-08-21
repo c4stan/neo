@@ -11,11 +11,10 @@
 std_warnings_save_state_m()
 std_warnings_ignore_m ( "-Wsign-conversion" )
 std_warnings_ignore_m ( "-Wbad-function-cast" )
-//std_warnings_ignore_m ( "-Wcomma" )
 std_warnings_ignore_m ( "-Wunused-function" )
+std_warnings_ignore_m ( "-Wtypedef-redefinition" )
 #include "stb_rect_pack.h"
 #include "stb_truetype.h"
-
 std_warnings_restore_state_m()
 
 static xi_font_state_t* xi_font_state;

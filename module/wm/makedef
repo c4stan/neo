@@ -9,5 +9,5 @@ if win32
     libs = user32.lib
 endif
 if linux
-    libs = X11
+    libs = X11, Xrandr
 endif

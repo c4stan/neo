@@ -2,8 +2,6 @@
 
 #include <xg.h>
 
-#include "xg_vk_workload.h"
-
 #include "xg_vk.h"
 
 #include <std_mutex.h>

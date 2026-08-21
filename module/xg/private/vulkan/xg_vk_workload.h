@@ -7,9 +7,7 @@
 #include "xg_vk_device.h"
 #include "xg_cmd_buffer.h"
 #include "xg_vk_pipeline.h"
-
-typedef uint64_t xg_queue_event_h;
-typedef uint64_t xg_cpu_queue_event_h;
+#include "xg_vk_event.h"
 
 typedef struct {
     void* next; // used by the freelist

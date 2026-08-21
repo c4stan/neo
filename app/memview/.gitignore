@@ -8,11 +8,3 @@
 !public/**
 !data/
 !data/**
-*
-!.gitignore
-!makedef
-!*.def
-!private/
-!private/**
-!public/
-!public/**

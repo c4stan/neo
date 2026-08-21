@@ -10,9 +10,6 @@
 typedef struct {
     std_app_i api;
     bool boot;
-#if wm_enable_input_state_m
-    bool first_print;
-#endif
     wm_window_h window;
 } std_app_test_state_t;
 
@@ -60,11 +57,6 @@ static std_app_state_e std_app_test_tick ( void ) {
             return std_app_state_exit_m;
         }
 
-#if wm_enable_input_state_m
-        //wm->debug_print_window_input_state ( m_state->window, !m_state->first_print );
-        m_state->first_print = false;
-#endif
-
         wm_input_state_t input_state;
         wm->get_window_input_state ( m_state->window, &input_state );
 
@@ -74,7 +66,10 @@ static std_app_state_e std_app_test_tick ( void ) {
 
         if ( input_state.keyboard[wm_keyboard_state_f1_m] ) {
             return std_app_state_reload_m;
-            m_state->first_print = true;
+        }
+
+        if ( input_state.keyboard[wm_keyboard_state_f2_m] ) {
+            return std_app_state_reboot_m;
         }
 
         std_thread_this_sleep ( 1 );
@@ -96,7 +91,6 @@ void* std_app_test_load ( void* std_runtime ) {
 
     std_auto_m state = std_virtual_heap_alloc_struct_m ( std_app_test_state_t );
     state->boot = true;
-    state->first_print = true;
     state->window = wm_null_handle_m;
 
     m_state = state;

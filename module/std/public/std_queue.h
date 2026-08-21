@@ -47,32 +47,34 @@ uint64_t std_atomic_ring_push_align_wrap ( std_atomic_ring_t* ring, uint64_t cou
 void std_atomic_ring_clear ( std_atomic_ring_t* ring );
 #endif
 
+// Single/multi threaded access queues
+// All queues use aliased virtual memory to allow for contiguous access across queue boundaries
+
 // Single thread access queue
-// TODO rename to std_queue_t?
 typedef struct {
     void* base;
     void* alias;
     std_ring_t ring;
-} std_queue_local_t;
+} std_queue_t;
 
-std_queue_local_t   std_queue_local             ( void* base, size_t size );
-std_queue_local_t   std_queue_local_create      ( size_t size );
-void                std_queue_local_destroy     ( std_queue_local_t* queue );
-void                std_queue_local_clear       ( std_queue_local_t* queue );
-size_t              std_queue_local_size        ( const std_queue_local_t* queue );
-size_t              std_queue_local_used_size   ( const std_queue_local_t* queue );
+std_queue_t         std_queue               ( void* base, size_t size );
+std_queue_t         std_queue_create        ( size_t size );
+void                std_queue_destroy       ( std_queue_t* queue );
+void                std_queue_clear         ( std_queue_t* queue );
+size_t              std_queue_size          ( const std_queue_t* queue );
+size_t              std_queue_used_size     ( const std_queue_t* queue );
 
-void                std_queue_local_push        ( std_queue_local_t* queue, const void* item, size_t size );
-void                std_queue_local_pop_discard ( std_queue_local_t* queue, size_t size );
-void                std_queue_local_pop_move    ( std_queue_local_t* queue, void* dest, size_t size );
+void                std_queue_push          ( std_queue_t* queue, const void* item, size_t size );
+void                std_queue_pop_discard   ( std_queue_t* queue, size_t size );
+void                std_queue_pop_move      ( std_queue_t* queue, void* dest, size_t size );
 
-void*               std_queue_local_emplace     ( std_queue_local_t* queue, size_t size ); // TODO rename to reserve?
+void*               std_queue_emplace       ( std_queue_t* queue, size_t size );
 
-void                std_queue_local_align_push  ( std_queue_local_t* queue, size_t align );
-void                std_queue_local_align_pop   ( std_queue_local_t* queue, size_t align );
+void                std_queue_align_push    ( std_queue_t* queue, size_t align );
+void                std_queue_align_pop     ( std_queue_t* queue, size_t align );
 
-#define std_queue_local_emplace_array_m( queue, type, count ) ( type* ) std_queue_local_emplace( (queue), sizeof ( type ) * (count) )
-#define std_static_local_queue_m( array )           std_queue_local ( std_static_buffer_m ( array ) )
+#define std_queue_emplace_array_m( queue, type, count ) ( type* ) std_queue_emplace( (queue), sizeof ( type ) * (count) )
+#define std_static_queue_m( array )           std_queue ( std_static_buffer_m ( array ) )
 
 // Multi thread access queue
 // pad contents to avoid false sharing cache lines

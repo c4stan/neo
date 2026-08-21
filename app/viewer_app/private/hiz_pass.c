@@ -107,7 +107,7 @@ xf_node_h add_hiz_mip0_gen_pass ( xf_graph_h graph, xf_texture_h hiz, xf_texture
         .width = hiz_info.width,
         .height = hiz_info.height,
     };
-;
+
     xf_node_h hiz_mip0_gen_node = xf->create_node ( graph, &xf_node_params_m (
         .debug_name = "hiz_gen_mip_0",
         .type = xf_node_type_custom_pass_m,

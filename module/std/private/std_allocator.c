@@ -721,13 +721,13 @@ uint64_t std_stack_unused_size ( const std_stack_t* stack ) {
 
         2D table of bits of the same size as the freelist table, each bit indicating whether each corresponding freelist is empty or not
 
-        bitfield, each bit indicating whether at least one bit is set to 1 in the corresponding row in the 2D table of bits along the X dimension
+        1D bitfield, each bit indicating whether at least one bit is set to 1 in the corresponding row in the 2D table of bits along the X dimension
 
         The following uses an X range that goes from 7 to 32(supporting up to 64), and 16 buckets per level. It follows that the 2D table of bits is a u16 array and the bitfield is a u64. This guarantees 8 alignment on all blocks, support for possible higher segment size, and a decent spread along Y.
 
     Indexing:
         To find the freelist corresponding to a given size:
-        x = floor ( log2 ( size ) )                 = bit_scan_rev ( size )
+        x = floor ( log2 ( size ) )                 = 63 - bit_scan_rev ( size )
         y = floor ( size - 2^x ) / 2 ^ ( x - L )    = ( size >> ( x - L ) ) - 2^L
         where 2^L is the number of Y subdivision (e.g. L=4 for 16 subdivisions).
 
@@ -771,7 +771,7 @@ uint64_t std_stack_unused_size ( const std_stack_t* stack ) {
             the user data is offset the amount needed inside the block to achieve the requested alignment
             the alignment info is stored right before the user data, in 8 bytes. it contains the size in bytes between the end of the header and the start of the user data. this value is also guaranteed to be multiple of 8, and bit 2 is set to 1 to indicate that this is alignment info and not the actual header.
             the header has its regular info, and its bit 2 is set to 0. the memory in between header and alignment is unused.
-        if alignment is 8, no alignment info is stored and user data comes right after the header
+        if alignment is 8 or less, no alignment info is stored and user data comes right after the header
             the header has its regular info, and its bit 2 is set to 0
         min block size is 128 bytes. size of user data depends on requested size and alignment.
 
@@ -798,9 +798,12 @@ uint64_t std_stack_unused_size ( const std_stack_t* stack ) {
 
 // Indexes the tlsf freelist table
 typedef struct {
-    uint64_t x;
-    uint64_t y;
+    uint64_t x; // primary pow2 bucketing
+    uint64_t y; // secondary linear bucketing
 } std_allocator_tlsf_freelist_idx_t;
+
+#define std_allocator_tlsf_freelist_idx_null_m() ( std_allocator_tlsf_freelist_idx_t ) { -1, -1 }
+#define std_allocator_tlsf_freelist_idx_is_null_m( idx ) ( idx.x == -1 && idx.y == -1 )
 
 typedef struct std_allocator_tlsf_header_t {
     uint64_t size_flags;
@@ -812,16 +815,18 @@ typedef struct {
     uint64_t size;
 } std_allocator_tlsf_footer_t;
 
-std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx ( uint64_t size ) {
+// returns the ideal freelist bucket indices for the given size
+static std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx ( uint64_t size ) {
     std_allocator_tlsf_freelist_idx_t idx;
     idx.x = 63 - std_bit_scan_rev_64 ( size );
     idx.y = ( size >> ( idx.x - std_allocator_tlsf_log2_y_size_m ) ) - std_allocator_tlsf_y_size_m;
-    // offset the x level so that the min level indexes the tables at 0
+    // clamp and offset the x so that indexing starts with 0 at the chosen min x level
     idx.x = std_max_u64 ( idx.x, std_allocator_tlsf_min_x_level_m ) - std_allocator_tlsf_min_x_level_m;
     return idx;
 }
 
-uint64_t std_allocator_tlsf_heap_size_roundup ( uint64_t size ) {
+// grows the allocation size up by one bucket, so that all free segments in that bucket will be able to fit the requested size
+static uint64_t std_allocator_tlsf_heap_size_roundup ( uint64_t size ) {
     size += ( 1ull << ( 63 - std_bit_scan_rev_64 ( size ) - std_allocator_tlsf_log2_y_size_m ) ) - 1;
     return size;
 }
@@ -871,6 +876,7 @@ static void std_allocator_tlsf_print_state ( std_allocator_tlsf_heap_t* heap ) {
     }
 }
 
+// search the first available freelist bucket, starting from the given indices
 std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx_first_available ( std_allocator_tlsf_heap_t* heap, std_allocator_tlsf_freelist_idx_t base ) {
     std_allocator_tlsf_freelist_idx_t idx;
 
@@ -883,7 +889,10 @@ std_allocator_tlsf_freelist_idx_t std_allocator_tlsf_freelist_idx_first_availabl
     } else {
         uint32_t mask = ( 1 << std_allocator_tlsf_x_size_m ) - 1;
         t = heap->available_rows & ( mask << ( base.x + 1 ) );
-        std_assert_m ( t );
+        if ( t == 0 ) {
+            // OOM
+            return std_allocator_tlsf_freelist_idx_null_m();
+        }
         idx.x = std_bit_scan_32 ( t );
         std_assert_m ( heap->available_freelists[idx.x] );
         idx.y = std_bit_scan_32 ( heap->available_freelists[idx.x] );
@@ -915,6 +924,9 @@ void std_allocator_tlsf_remove_from_freelist ( std_allocator_tlsf_heap_t* heap, 
 char* std_allocator_tlsf_pop_from_freelist ( std_allocator_tlsf_heap_t* heap, uint64_t size ) {
     std_allocator_tlsf_freelist_idx_t start_idx = std_allocator_tlsf_freelist_idx ( size );
     std_allocator_tlsf_freelist_idx_t idx = std_allocator_tlsf_freelist_idx_first_available ( heap, start_idx );
+    if ( std_allocator_tlsf_freelist_idx_is_null_m ( idx ) ) {
+        return NULL;
+    }
     std_auto_m segment = std_dlist_pop ( &heap->freelists[idx.x][idx.y] ) - std_allocator_tlsf_header_size_m;
 
     if ( heap->freelists[idx.x][idx.y] == NULL ) {
@@ -935,14 +947,9 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
     void* top = heap->stack.top;
     bool empty = top == heap->stack.begin;
     void* new_segment = std_stack_alloc ( &heap->stack, size );
-    //uint64_t prev_top = heap->arena.used_size;
-    //bool empty = prev_top == 0;
-    //void* new_segment = std_arena_alloc ( &heap->arena, size );
 
     if ( !empty ) {
-        // not the first gro
-        //char* base = heap->arena.base;
-
+        // not the first grow
         char* top_segment_end = top;
         std_auto_m top_segment_footer = ( std_allocator_tlsf_footer_t* ) ( top_segment_end - std_allocator_tlsf_footer_size_m );
         uint64_t top_segment_size = top_segment_footer->size;
@@ -954,9 +961,11 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
 
         if ( top_size_flags & std_allocator_tlsf_free_segment_bit_m ) {
             std_assert_m ( ( top_size_flags & std_allocator_tlsf_free_prev_segment_bit_m ) == 0 );
-            //std_assert_m ( ( top_size_flags & std_allocator_tlsf_free_next_segment_bit_m ) == 0 );
-            top_segment_footer->size = top_segment_size + size;
             top_segment_header->size_flags = top_size_flags + size;
+            //top_segment_footer->size = top_segment_size + size;
+            uint64_t new_size = top_segment_size + size;
+            top_segment_footer = ( std_allocator_tlsf_footer_t* ) ( top_segment_start + new_size - std_allocator_tlsf_footer_size_m );
+            top_segment_footer->size = new_size;
 
             std_allocator_tlsf_remove_from_freelist ( heap, top_segment_header, top_segment_size );
             std_allocator_tlsf_add_to_freelist ( heap, top_segment_header, top_segment_size + size );
@@ -979,10 +988,6 @@ void std_allocator_tlsf_heap_grow ( std_allocator_tlsf_heap_t* heap, uint64_t si
         footer->size = size;
 
         std_allocator_tlsf_add_to_freelist ( heap, header, size );
-
-        //std_allocator_tlsf_print_state ( heap );
-
-        std_noop_m;
     }
 
     heap->total_size += size;
@@ -1021,12 +1026,11 @@ void std_allocator_tlsf_heap_init ( std_allocator_tlsf_heap_t* heap, uint64_t si
 #endif
 }
 
+void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align
 #if std_allocator_uses_alloc_scope_m
-void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align, std_alloc_scope_t scope )
-#else
-void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint64_t align )
+    , std_alloc_scope_t scope
 #endif
-{
+    ) {
 #if std_allocator_track_allocations_m
     size += 8;
 #endif
@@ -1044,8 +1048,13 @@ void* std_tlsf_heap_alloc ( std_allocator_tlsf_heap_t* heap, uint64_t size, uint
 
     std_mutex_lock ( &heap->mutex );
 
-    // grab from freelist
+    // grab from freelist. grow if needed.
     char* segment = std_allocator_tlsf_pop_from_freelist ( heap, size_roundup );
+
+    while ( segment == NULL ) {
+        std_allocator_tlsf_heap_grow ( heap, sd_allocator_tlsf_grow_size_m );
+        segment = std_allocator_tlsf_pop_from_freelist ( heap, size_roundup );
+    }
 
     // load segment
     std_auto_m segment_header = ( std_allocator_tlsf_header_t* ) segment;
@@ -1284,17 +1293,18 @@ void std_allocator_info ( std_allocator_info_t* info ) {
 
 //==============================================================================
 
+void* std_tlsf_alloc ( uint64_t size, uint64_t align
 #if std_allocator_uses_alloc_scope_m
-void* std_tlsf_alloc ( uint64_t size, uint64_t align, std_alloc_scope_t scope ) {
-    std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
-    return std_tlsf_heap_alloc ( heap, size, align, scope );
-}
-#else
-void* std_tlsf_alloc ( uint64_t size, uint64_t align ) {
-    std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
-    return std_tlsf_heap_alloc ( heap, size, align );
-}
+    , std_alloc_scope_t scope
 #endif
+    ) {
+    std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
+    return std_tlsf_heap_alloc ( heap, size, align
+#if std_allocator_uses_alloc_scope_m
+        , scope
+#endif
+    );
+}
 
 void std_tlsf_free ( void* address ) {
     std_allocator_tlsf_heap_t* heap = &std_allocator_state->tlsf_heap;
@@ -1303,15 +1313,17 @@ void std_tlsf_free ( void* address ) {
 
 //==============================================================================
 
+void* std_virtual_heap_alloc ( size_t size, size_t align
 #if std_allocator_uses_alloc_scope_m
-void* std_virtual_heap_alloc ( size_t size, size_t align, std_alloc_scope_t scope ) {
-    return std_tlsf_alloc ( size, align, scope );
-}
-#else
-void* std_virtual_heap_alloc ( size_t size, size_t align ) {
-    return std_tlsf_alloc ( size, align );
-}
+    , std_alloc_scope_t scope
 #endif
+    ) {
+    return std_tlsf_alloc ( size, align
+#if std_allocator_uses_alloc_scope_m
+        , scope
+#endif
+    );
+}
 
 bool std_virtual_heap_free ( void* address ) {
     std_tlsf_free ( address );
@@ -1390,7 +1402,7 @@ void std_allocator_init ( std_allocator_state_t* state ) {
 
     // TLSF heap
     {
-        uint64_t initial_size = 1024ull * 1024 * 1024 * 4;
+        uint64_t initial_size = 1024ull * 1024 * 128;
         std_allocator_tlsf_heap_init ( &state->tlsf_heap, initial_size );
     }
 }
