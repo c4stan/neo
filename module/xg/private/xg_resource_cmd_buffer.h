@@ -49,7 +49,11 @@ typedef struct {
     union {
         xg_color_clear_t clear;
         xg_depth_stencil_clear_t depth_stencil_clear;
-        xg_buffer_range_t staging;
+        struct {
+            uint32_t mip_count;
+            uint32_t array_count;
+            xg_buffer_range_t buffer;
+        } staging;
     };
     xg_texture_layout_e init_layout;
 } xg_resource_cmd_texture_create_t;

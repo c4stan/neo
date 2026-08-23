@@ -182,7 +182,7 @@ static void xg_vk_device_cache_properties ( xg_vk_device_t* device ) {
     std_virtual_heap_free ( queue_faimily_queries );
 
 #if xg_enable_raytracing_m
-    if ( device->supports_raytrace ) {
+    if ( device->flags & xg_vk_device_supports_raytrace_m ) {
         std_assert_m ( device->supported_features.shaderInt64 );
         //std_assert_m ( device->supported_raytrace_features.rayTracingPipeline );
         std_assert_m ( device->supported_device_address_features.bufferDeviceAddress );

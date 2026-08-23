@@ -256,8 +256,6 @@ typedef struct {
     xg_vk_device_cmd_queue_t            queues[xg_cmd_queue_count_m];
     xg_vk_device_memory_type_t          memory_types[xg_memory_type_count_m];
     xg_vk_device_ext_api_i              ext_api;
-
-    bool supports_raytrace;
 } xg_vk_device_t;
 
 typedef struct {

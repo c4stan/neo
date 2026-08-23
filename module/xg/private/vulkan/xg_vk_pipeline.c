@@ -1754,7 +1754,7 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         info.poolSizeCount = xg_resource_binding_count_m - 1;
 
 #if xg_enable_raytracing_m
-        if ( device->supports_raytrace ) {
+        if ( device->flags & xg_vk_device_supports_raytrace_m ) {
             info.poolSizeCount = xg_resource_binding_count_m;
         }
 #endif
@@ -1776,7 +1776,7 @@ void xg_vk_pipeline_activate_device ( xg_device_h device_handle ) {
         sizes[xg_resource_binding_buffer_texel_storage_m].descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m;
 
 #if xg_enable_raytracing_m
-        if ( device->supports_raytrace ) {
+        if ( device->flags & xg_vk_device_supports_raytrace_m ) {
     #if xg_vk_enable_nv_raytracing_ext_m
             sizes[xg_resource_binding_raytrace_world_m].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
     #else

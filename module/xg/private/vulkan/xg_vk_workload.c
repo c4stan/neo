@@ -32,8 +32,6 @@ static xg_vk_workload_state_t* xg_vk_workload_state;
 std_warnings_ignore_m ( "-Wint-to-pointer-cast" )
 #endif
 
-#define xg_vk_workload_max_uniform_buffers_m std_div_round_up_m ( xg_workload_max_uniform_size_m, xg_workload_uniform_buffer_size_m )
-#define xg_vk_workload_max_staging_buffers_m std_div_round_up_m ( xg_workload_max_staging_size_m, xg_workload_staging_buffer_size_m )
 
 void xg_vk_workload_load ( xg_vk_workload_state_t* state ) {
     xg_vk_workload_state = state;
@@ -66,14 +64,6 @@ static void xg_vk_workload_deactivate_device_context ( uint64_t device_idx ) {
     device_context->is_active = false;
     const xg_vk_device_t* device = xg_vk_device_get ( device_context->device_handle );
 
-    for ( uint32_t i = 0; i < xg_vk_workload_max_uniform_buffers_m; ++i ) {
-        xg_buffer_destroy ( device_context->uniform_buffers_array[i].handle );
-    }
-
-    for ( uint32_t i = 0; i < xg_vk_workload_max_staging_buffers_m; ++i ) {
-        xg_buffer_destroy ( device_context->staging_buffers_array[i].handle );
-    }
-
     for ( size_t i = 0; i <  xg_workload_max_queued_workloads_m; ++i ) {
         xg_vk_workload_context_t* workload_context = &device_context->workload_contexts_array[i];
 
@@ -94,9 +84,6 @@ static void xg_vk_workload_deactivate_device_context ( uint64_t device_idx ) {
 
     std_virtual_heap_free ( device_context->workload_contexts_array );
     std_virtual_heap_free ( device_context->desc_allocators_array );
-
-    std_virtual_heap_free ( device_context->uniform_buffers_array );
-    std_virtual_heap_free ( device_context->staging_buffers_array );
 }
 
 void xg_vk_workload_unload ( void ) {
@@ -172,7 +159,7 @@ static void xg_vk_desc_allocator_init ( xg_vk_desc_allocator_t* allocator, xg_de
         [xg_resource_binding_buffer_texel_storage_m] = { .type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, .descriptorCount = xg_vk_max_storage_texel_buffer_per_descriptor_pool_m },
     };
 #if xg_enable_raytracing_m
-    if ( device->supports_raytrace ) {
+    if ( device->flags & xg_vk_device_supports_raytrace_m ) {
     #if xg_vk_enable_nv_raytracing_ext_m
         sizes[xg_resource_binding_raytrace_world_m] = ( VkDescriptorPoolSize ) { .type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV,
     #else
@@ -183,7 +170,7 @@ static void xg_vk_desc_allocator_init ( xg_vk_desc_allocator_t* allocator, xg_de
 #endif
     uint32_t size_count = xg_resource_binding_count_m - 1;
 #if xg_enable_raytracing_m
-    if ( device->supports_raytrace ) {
+    if ( device->flags & xg_vk_device_supports_raytrace_m ) {
         size_count = xg_resource_binding_count_m;
     }
 #endif
@@ -287,53 +274,6 @@ void xg_vk_workload_activate_device ( xg_device_h device_handle ) {
     for ( uint32_t i = 0; i < xg_vk_workload_max_desc_allocators_m; ++i ) {
         xg_vk_desc_allocator_init ( &device_context->desc_allocators_array[i], device_handle );
     }
-
-    device_context->uniform_buffers_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_buffer_t, xg_vk_workload_max_uniform_buffers_m );
-    device_context->uniform_buffers_freelist = std_freelist_m ( device_context->uniform_buffers_array, xg_vk_workload_max_uniform_buffers_m );
-    device_context->staging_buffers_array = std_virtual_heap_alloc_array_m ( xg_vk_workload_buffer_t, xg_vk_workload_max_staging_buffers_m );
-    device_context->staging_buffers_freelist = std_freelist_m ( device_context->staging_buffers_array, xg_vk_workload_max_staging_buffers_m );
-
-    // TODO have all workload uniform buffers use a single permanently allocated buffer as backend,
-    //      and just offset into that, in order to support dynamic uniform buffers ( just need to 
-    //      rebind same descriptor with new offset instead of re-allocating a new descriptor 
-    //      and/or writing to it )
-    for ( uint32_t i = 0; i < xg_vk_workload_max_uniform_buffers_m; ++i ) {
-        xg_buffer_params_t params = xg_buffer_params_m (
-            .memory_type = xg_memory_type_gpu_mapped_m,
-            .device = device_handle,
-            .size = xg_workload_uniform_buffer_size_m,
-            .allowed_usage = xg_buffer_usage_bit_uniform_m,
-        );
-        std_string_t string = std_static_string_m ( params.debug_name );
-        std_string_append_format ( &string, "workload_uniform_buffer(" std_fmt_u32_m ")", i );
-        xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &params );
-        xg_buffer_info_t uniform_buffer_info;
-        xg_buffer_get_info ( &uniform_buffer_info, uniform_buffer_handle );
-        xg_vk_workload_buffer_t* buffer = &device_context->uniform_buffers_array[i];
-        buffer->handle = uniform_buffer_handle;
-        buffer->alloc = uniform_buffer_info.allocation;
-        buffer->used_size = 0;
-        buffer->total_size = xg_workload_uniform_buffer_size_m;
-    }
-
-    for ( uint32_t i = 0; i < xg_vk_workload_max_staging_buffers_m; ++i ) {
-        xg_buffer_params_t params = xg_buffer_params_m (
-            .memory_type = xg_memory_type_upload_m,
-            .device = device_handle,
-            .size = xg_workload_staging_buffer_size_m,
-            .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-        );
-        std_string_t string = std_static_string_m ( params.debug_name );
-        std_string_append_format ( &string, "workload_staging_buffer(" std_fmt_u32_m ")", i );
-        xg_buffer_h staging_buffer_handle = xg_buffer_create ( &params );
-        xg_buffer_info_t staging_buffer_info;
-        xg_buffer_get_info ( &staging_buffer_info, staging_buffer_handle );
-        xg_vk_workload_buffer_t* buffer = &device_context->staging_buffers_array[i];
-        buffer->handle = staging_buffer_handle;
-        buffer->alloc = staging_buffer_info.allocation;
-        buffer->used_size = 0;
-        buffer->total_size = xg_workload_staging_buffer_size_m;
-    }
 }
 
 void xg_vk_workload_deactivate_device ( xg_device_h device_handle ) {
@@ -361,25 +301,54 @@ static xg_vk_cmd_allocator_t* xg_vk_cmd_allocator_pop ( xg_device_h device_handl
 }
 #endif
 
-static xg_vk_workload_buffer_t* xg_vk_uniform_buffer_pop ( xg_device_h device_handle, xg_workload_h workload_handle ) {
-    xg_vk_workload_device_context_t* device_context = xg_vk_workload_device_context_get ( device_handle );
-    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
-    xg_vk_workload_buffer_t* buffer = std_list_pop_m ( &device_context->uniform_buffers_freelist );
-    std_assert_m ( buffer );
-    workload->uniform_buffer = buffer;
+static xg_vk_workload_buffer_t* xg_vk_uniform_buffer_alloc ( xg_vk_workload_t* workload ) {
     std_assert_m ( workload->uniform_buffers_count < xg_vk_workload_max_uniform_buffers_per_workload_m );
-    workload->uniform_buffers_array[workload->uniform_buffers_count++] = buffer;
+    uint32_t idx = workload->uniform_buffers_count++;
+    xg_vk_workload_buffer_t* buffer = &workload->uniform_buffers_array[idx];
+
+    xg_buffer_params_t params = xg_buffer_params_m (
+        .memory_type = xg_memory_type_gpu_mapped_m,
+        .device = workload->device,
+        .size = xg_workload_uniform_buffer_size_m,
+        .allowed_usage = xg_buffer_usage_bit_uniform_m,
+    );
+    std_string_t string = std_static_string_m ( params.debug_name );
+    std_string_append_format ( &string, "workload_uniform_buffer(" std_fmt_u32_m ")", idx );
+    xg_buffer_h uniform_buffer_handle = xg_buffer_create ( &params );
+    xg_buffer_info_t uniform_buffer_info;
+    xg_buffer_get_info ( &uniform_buffer_info, uniform_buffer_handle );
+
+    buffer->handle = uniform_buffer_handle;
+    buffer->alloc = uniform_buffer_info.allocation;
+    buffer->used_size = 0;
+    buffer->total_size = xg_workload_uniform_buffer_size_m;
+
     return buffer;
 }
 
-static xg_vk_workload_buffer_t* xg_vk_staging_buffer_pop ( xg_device_h device_handle, xg_workload_h workload_handle ) {
-    xg_vk_workload_device_context_t* device_context = xg_vk_workload_device_context_get ( device_handle );
-    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
-    xg_vk_workload_buffer_t* buffer = std_list_pop_m ( &device_context->staging_buffers_freelist );
-    std_assert_m ( buffer );
-    workload->staging_buffer = buffer;
+static xg_vk_workload_buffer_t* xg_vk_staging_buffer_alloc ( xg_vk_workload_t* workload, size_t required_size ) {
     std_assert_m ( workload->staging_buffers_count < xg_vk_workload_max_staging_buffers_per_workload_m );
-    workload->staging_buffers_array[workload->staging_buffers_count++] = buffer;
+    uint32_t idx = workload->staging_buffers_count++;
+    xg_vk_workload_buffer_t* buffer = &workload->staging_buffers_array[idx];
+
+    size_t size = std_max ( required_size, xg_workload_staging_buffer_size_m );
+    xg_buffer_params_t params = xg_buffer_params_m (
+        .memory_type = xg_memory_type_upload_m,
+        .device = workload->device,
+        .size = size,
+        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
+    );
+    std_string_t string = std_static_string_m ( params.debug_name );
+    std_string_append_format ( &string, "workload_staging_buffer(" std_fmt_u32_m ")", idx );
+    xg_buffer_h staging_buffer_handle = xg_buffer_create ( &params );
+    xg_buffer_info_t staging_buffer_info;
+    xg_buffer_get_info ( &staging_buffer_info, staging_buffer_handle );
+
+    buffer->handle = staging_buffer_handle;
+    buffer->alloc = staging_buffer_info.allocation;
+    buffer->used_size = 0;
+    buffer->total_size = size;
+
     return buffer;
 }
 
@@ -405,8 +374,6 @@ xg_workload_h xg_workload_create ( xg_device_h device_handle ) {
 
     // These need to happen outside of the init because they modify the workload state...
     workload->desc_allocator = xg_vk_desc_allocator_pop ( device_handle, workload_handle );
-    workload->uniform_buffer = xg_vk_uniform_buffer_pop ( device_handle, workload_handle );
-    workload->staging_buffer = xg_vk_staging_buffer_pop ( device_handle, workload_handle );
 
     return workload_handle;
 }
@@ -741,15 +708,11 @@ void xg_workload_destroy ( xg_workload_h workload_handle ) {
         std_list_push ( &context->desc_allocators_freelist, allocator );
     }
 
-    for ( uint32_t i = 0; i < workload->uniform_buffers_count; ++i  ) {
-        std_list_push ( &context->uniform_buffers_freelist, workload->uniform_buffers_array[i] );
+    for ( uint32_t i = 0; i < workload->uniform_buffers_count; ++i ) {
+        xg_buffer_destroy ( workload->uniform_buffers_array[i].handle );
     }
     for ( uint32_t i = 0; i < workload->staging_buffers_count; ++i ) {
-        std_list_push ( &context->staging_buffers_freelist, workload->staging_buffers_array[i] );
-    }
-
-    for ( uint32_t i = 0; i < workload->staging_allocs_count; ++i ) {
-        xg_buffer_destroy ( workload->staging_allocs_array[i] );
+        xg_buffer_destroy ( workload->staging_buffers_array[i].handle );
     }
 
 #if 0
@@ -1864,6 +1827,8 @@ xg_vk_workload_translate_cmd_chunks_result_t xg_vk_workload_translate_cmd_chunks
 #endif
 
                 vkCmdCopyBufferToImage ( vk_cmd_buffer, source->vk_handle, dest->vk_handle, dest_layout, copy_count, copy_array );
+
+                std_noop_m;
             }
             break;
             case xg_cmd_copy_texture_to_buffer_m: {
@@ -2496,7 +2461,6 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
 
                     xg_texture_h texture_handle = args->texture;
                     std_verify_m ( xg_texture_alloc ( texture_handle ) );
-                    const xg_vk_texture_t* texture = xg_vk_texture_get ( texture_handle );
                     if ( args->init ) {
                         switch ( args->init_mode ) {
                         case xg_texture_init_mode_clear_m:
@@ -2521,10 +2485,10 @@ static void xg_vk_workload_create_resources ( xg_workload_h workload_handle ) {
                             ) );
                             // TODO handle mip/array
                             xg_cmd_buffer_copy_buffer_to_texture ( cmd_buffer, 0, &xg_buffer_to_texture_copy_params_m (
-                                .source = args->staging.handle,
-                                .source_offset = args->staging.offset,
-                                .mip_count = texture->params.mip_levels,
-                                .array_count = texture->params.array_layers,
+                                .source = args->staging.buffer.handle,
+                                .source_offset = args->staging.buffer.offset,
+                                .mip_count = args->staging.mip_count,
+                                .array_count = args->staging.array_count,
                                 .destination = texture_handle,
                             ) );
                             break;
@@ -3014,13 +2978,16 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, std
     const xg_vk_device_t* device = xg_vk_device_get ( workload->device );
     uint64_t alignment = device->generic_properties.limits.minUniformBufferOffsetAlignment;
 
-    uint64_t offset = uniform_buffer->used_size;
-    offset = std_align_u64 ( offset, alignment );
-    if ( offset + buffer.size > uniform_buffer->total_size ) {
-        uniform_buffer = xg_vk_uniform_buffer_pop ( workload->device, workload_handle );
+    uint64_t offset = 0;
+    if ( uniform_buffer ) {
+        offset = std_align_u64 ( uniform_buffer->used_size, alignment );
+    }
+
+    if ( !uniform_buffer || offset + buffer.size > uniform_buffer->total_size ) {
+        uniform_buffer = xg_vk_uniform_buffer_alloc ( workload );
         workload->uniform_buffer = uniform_buffer;
         offset = 0;
-        std_assert_m ( uniform_buffer->total_size > buffer.size );
+        std_assert_m ( uniform_buffer->total_size >= buffer.size );
     }
 
     char* base = uniform_buffer->alloc.mapped_address;
@@ -3035,42 +3002,20 @@ xg_buffer_range_t xg_workload_write_uniform ( xg_workload_h workload_handle, std
     return range;
 }
 
-xg_buffer_range_t xg_workload_alloc_staging ( xg_workload_h workload_handle, std_buffer_t buffer ) {
-    xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
-    xg_buffer_params_t params = xg_buffer_params_m (
-        .memory_type = xg_memory_type_upload_m,
-        .device = workload->device,
-        .size = buffer.size,
-        .allowed_usage = xg_buffer_usage_bit_copy_source_m,
-    );
-    uint32_t idx = workload->staging_allocs_count++;
-    std_string_t string = std_static_string_m ( params.debug_name );
-    std_string_append_format ( &string, "workload_staging_alloc(" std_fmt_u32_m ")", idx );
-    xg_buffer_h xg_buffer = xg_buffer_create ( &params );
-    workload->staging_allocs_array[idx] = xg_buffer;
-
-    xg_buffer_info_t buffer_info;
-    xg_buffer_get_info ( &buffer_info, xg_buffer );
-    std_mem_copy ( buffer_info.allocation.mapped_address, buffer.base, buffer.size );
-
-    return xg_buffer_range_whole_buffer_m ( xg_buffer );
-}
-
 xg_buffer_range_t xg_workload_write_staging ( xg_workload_h workload_handle, std_buffer_t buffer, size_t alignment ) {
     xg_vk_workload_t* workload = xg_vk_workload_edit ( workload_handle );
     xg_vk_workload_buffer_t* staging_buffer = workload->staging_buffer;
 
-    if ( staging_buffer->total_size <= buffer.size ) {
-        return xg_workload_alloc_staging ( workload_handle, buffer );
+    uint64_t offset = 0;
+    if ( staging_buffer ) {
+        offset = std_align_u64 ( staging_buffer->used_size, alignment );
     }
 
-    uint64_t offset = staging_buffer->used_size;
-    offset = std_align_u64 ( offset, alignment );
-    if ( offset + buffer.size > staging_buffer->total_size ) {
-        staging_buffer = xg_vk_staging_buffer_pop ( workload->device, workload_handle );
+    if ( !staging_buffer || offset + buffer.size > staging_buffer->total_size ) {
+        staging_buffer = xg_vk_staging_buffer_alloc ( workload, buffer.size );
         workload->staging_buffer = staging_buffer;
         offset = 0;
-        std_assert_m ( staging_buffer->total_size > buffer.size );
+        std_assert_m ( staging_buffer->total_size >= buffer.size );
     }
 
     char* base = staging_buffer->alloc.mapped_address;

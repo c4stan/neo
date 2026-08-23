@@ -52,7 +52,7 @@ static xg_vk_alloc_t xg_vk_allocator_vk_alloc ( xg_device_h device_handle, size_
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
     };
 #if xg_enable_raytracing_m
-    if ( device->supports_raytrace ) {
+    if ( device->flags & xg_vk_device_supports_raytrace_m ) {
         flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
     }
 #endif
@@ -533,7 +533,7 @@ xg_alloc_t xg_vk_allocator_tlsf_pool_alloc ( xg_vk_allocator_tlsf_pool_t* pool, 
     // Create a new heap
     xg_vk_allocator_tlsf_heap_t* heap = std_list_pop_m ( &pool->heaps_freelist );
     std_assert_m ( heap );
-    xg_vk_allocator_tlsf_heap_init ( heap, pool->device, pool->memory_type, 1024ull * 1024ull * 256 ); // TODO
+    xg_vk_allocator_tlsf_heap_init ( heap, pool->device, pool->memory_type, pool->grow_size );
     std_bitset_set ( pool->heaps_bitset, heap - pool->heaps_array );
     alloc = xg_vk_tlsf_heap_alloc ( heap, size, align
 #if std_build_debug_m
@@ -879,7 +879,7 @@ void xg_vk_allocator_get_info ( xg_allocator_info_t* info, xg_device_h device_ha
     while ( std_bitset_scan ( &idx, global_allocator->tlsf_pool.heaps_bitset, idx, std_bitset_u64_count_m ( xg_vk_allocator_tlsf_pool_max_heaps_m ) ) ) {
         xg_vk_allocator_tlsf_heap_t* heap = &global_allocator->tlsf_pool.heaps_array[idx];
         reserved_size += heap->gpu_alloc.size;
-        allocated_size = heap->allocated_size;
+        allocated_size += heap->allocated_size;
         ++idx;
     }
 

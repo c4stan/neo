@@ -10,7 +10,6 @@
 #include "xg_vk_event.h"
 
 typedef struct {
-    void* next; // used by the freelist
     xg_buffer_h handle;
     xg_alloc_t alloc;
     uint64_t used_size;
@@ -67,15 +66,12 @@ typedef struct {
     bool stop_debug_capture_on_present;
 
     xg_vk_workload_buffer_t* uniform_buffer;
-    xg_vk_workload_buffer_t* uniform_buffers_array[xg_vk_workload_max_uniform_buffers_per_workload_m];
+    xg_vk_workload_buffer_t uniform_buffers_array[xg_vk_workload_max_uniform_buffers_per_workload_m];
     uint32_t uniform_buffers_count;
 
     xg_vk_workload_buffer_t* staging_buffer;
-    xg_vk_workload_buffer_t* staging_buffers_array[xg_vk_workload_max_staging_buffers_per_workload_m];
+    xg_vk_workload_buffer_t staging_buffers_array[xg_vk_workload_max_staging_buffers_per_workload_m];
     uint32_t staging_buffers_count;
-
-    xg_buffer_h staging_allocs_array[xg_vk_workload_max_staging_allocs_per_workload_m];
-    uint32_t staging_allocs_count;
 
     xg_vk_desc_allocator_t* desc_allocator;
     xg_vk_desc_allocator_t* desc_allocators_array[xg_vk_workload_max_desc_allocators_per_workload_m];
@@ -190,12 +186,6 @@ typedef struct {
     xg_device_h device_handle;
     xg_vk_workload_context_t* workload_contexts_array;
     std_ring_t workload_contexts_ring;
-
-    // TODO mutex guard (or atomic pop from an array of free indices?)
-    xg_vk_workload_buffer_t* staging_buffers_array;
-    xg_vk_workload_buffer_t* staging_buffers_freelist;
-    xg_vk_workload_buffer_t* uniform_buffers_array;
-    xg_vk_workload_buffer_t* uniform_buffers_freelist;
 
     xg_vk_desc_allocator_t* desc_allocators_array;
     xg_vk_desc_allocator_t* desc_allocators_freelist;

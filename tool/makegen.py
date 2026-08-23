@@ -741,8 +741,8 @@ class Project:
             compile_flags += ' -DWINVER=' + WINNT_VERSION + ' -D_WIN32_WINNT=' + WINNT_VERSION # TODO remove?
         if self.config == CONFIG_DEBUG:
             compile_flags += ' -O0 -g'
-            if platform.system() == 'Windows':
-                compile_flags += ' -gcodeview'
+            #if platform.system() == 'Windows':
+            #    compile_flags += ' -gcodeview'
         elif self.config == CONFIG_RELEASE:
             compile_flags += ' -O3'
         #if self.output == OUTPUT_DLL:
