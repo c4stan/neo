@@ -1,0 +1,9 @@
+compute_shader xf_export.comp
+
+begin bindings
+    buffer uniform
+    texture sampled
+    texture storage
+    sampler
+end
+
