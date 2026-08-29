@@ -1968,7 +1968,13 @@ static void viewapp_boot_raster_graph ( void ) {
         ),
         .passthrough = xf_node_passthrough_params_m (
             .enable = true,
-            .storage_texture_writes = { xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ) },
+            .storage_texture_writes = { 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ), 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ), 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ), 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ), 
+                xf_texture_passthrough_m ( .mode = xf_passthrough_mode_clear_m ), 
+            },
         ),
     ) );
 

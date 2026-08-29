@@ -59,6 +59,7 @@ xf_graph_h xf_graph_create ( const xf_graph_params_t* params ) {
     graph->heap.memory_handle = xg_null_memory_handle_m;
     graph->export_source_node = xf_null_handle_m;
     graph->export_node = xf_null_handle_m;
+    graph->last_execute_workload = xg_null_handle_m;
     graph->nodes_freelist = std_static_freelist_m ( graph->nodes_array );
     graph->query_contexts_ring = std_ring ( std_static_array_count_m ( graph->query_contexts_array ) );
     graph->resource_dependencies_allocator = std_stack_create ( sizeof ( xf_graph_subresource_dependencies_t ) * ( xf_graph_max_textures_m * xf_resource_max_mip_levels_m + xf_graph_max_buffers_m ) );
@@ -1946,6 +1947,7 @@ static void xf_graph_build_textures ( xf_graph_h graph_handle, xg_i* xg, xg_cmd_
 
     // Store the heap info into the graph for later release
     graph->heap.memory_handle = heap_alloc.handle;
+    graph->heap.textures_count = 0;
     for ( uint32_t i = 0; i < heap.textures_count; ++i ) {
         graph->heap.textures_array[graph->heap.textures_count++] = heap.textures_array[i].committed_texture->handle;
     }
@@ -2419,6 +2421,7 @@ void xf_graph_clear ( xf_graph_h graph_handle, xg_workload_h workload ) {
     if ( !xg_memory_handle_is_null_m ( graph->heap.memory_handle ) ) {
         xg->free_memory ( graph->heap.memory_handle );
         graph->heap.memory_handle = xg_null_memory_handle_m;
+        graph->heap.textures_count = 0;
     }
 
     graph->is_compiled = false;
@@ -2534,6 +2537,8 @@ static uint64_t xf_graph_prepare_for_execute ( xf_graph_h graph_handle, xg_i* xg
 
     // Clear if needed, then make sure the graph is compiled/built
     if ( graph->needs_clear ) {
+        // TODO queue up resource destruction for last_execute_workload at complete time and avoid stalling
+        xg->wait_for_workload ( graph->last_execute_workload );
         xf_graph_clear ( graph_handle, workload );
         graph->needs_clear = false;
         xf_graph_update_export_node ( graph_handle );
@@ -3021,6 +3026,8 @@ static xg_query_pool_h xf_graph_timestamp_query_pool_create ( xf_graph_h graph_h
 uint64_t xf_graph_execute ( xf_graph_h graph_handle, xg_workload_h xg_workload, uint64_t base_key ) {
     xf_graph_t* graph = &xf_graph_state->graphs_array[graph_handle];
     std_assert_m ( graph );
+
+    graph->last_execute_workload = xg_workload;
 
     xg_i* xg = std_module_get_m ( xg_module_name_m );
     xs_i* xs = std_module_get_m ( xs_module_name_m );

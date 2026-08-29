@@ -315,6 +315,8 @@ typedef struct {
     xf_texture_h export_dest;
     xf_node_h export_node;
     xf_export_channel_e export_channels[4];
+
+    xg_workload_h last_execute_workload;
 } xf_graph_t;
 
 typedef struct {
